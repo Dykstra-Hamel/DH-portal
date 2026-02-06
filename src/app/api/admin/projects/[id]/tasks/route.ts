@@ -130,6 +130,25 @@ export async function POST(
     // Parse request body
     const body = await request.json();
 
+    let displayOrder = body.display_order;
+
+    if (displayOrder === undefined || displayOrder === null) {
+      const { data: lastTask, error: lastTaskError } = await supabase
+        .from('project_tasks')
+        .select('display_order')
+        .eq('project_id', projectId)
+        .order('display_order', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (lastTaskError) {
+        console.error('Error fetching last task display_order:', lastTaskError);
+      }
+
+      const lastOrder = typeof lastTask?.display_order === 'number' ? lastTask.display_order : -1;
+      displayOrder = lastOrder + 1;
+    }
+
     // Prepare task data
     const taskData = {
       project_id: projectId,
@@ -143,10 +162,11 @@ export async function POST(
       created_by: user.id,
       due_date: body.due_date || null,
       start_date: body.start_date || null,
-      display_order: body.display_order || 0,
+      display_order: displayOrder ?? 0,
       blocks_task_id: body.blocks_task_id || null,
       blocked_by_task_id: body.blocked_by_task_id || null,
       blocker_reason: body.blocker_reason || null,
+      department_id: body.department_id || null,
       recurring_frequency: body.recurring_frequency || null,
       recurring_end_date: body.recurring_end_date || null,
       is_recurring_template: body.recurring_frequency && body.recurring_frequency !== 'none' ? true : false,

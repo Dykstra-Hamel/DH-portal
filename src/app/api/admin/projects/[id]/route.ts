@@ -167,10 +167,24 @@ export async function PUT(
       }
     }
 
+    // Map project_type to type_code for shortcode generation
+    const projectTypeToCode: Record<string, string | null> = {
+      'none': null,
+      'website': 'WEB',
+      'social': 'SOC',
+      'email': 'EML',
+      'print': 'PRT',
+      'vehicle': 'VEH',
+      'digital': 'DIG',
+      'ads': 'ADS',
+      'software': 'SFT',
+    };
+
     const updateData: Record<string, any> = {
       name,
       description,
       project_type,
+      type_code: projectTypeToCode[project_type] || null, // Update type_code to trigger shortcode regeneration
       project_subtype: project_subtype || null,
       assigned_to: assigned_to || null,
       status,

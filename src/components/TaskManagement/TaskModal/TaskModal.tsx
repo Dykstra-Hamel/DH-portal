@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import { Task, TaskPriority, DUMMY_USERS, DUMMY_CLIENTS, DUMMY_PROJECTS } from '@/types/taskManagement';
-import { ProjectTask, recurringFrequencyOptions } from '@/types/project';
+import { ProjectTask } from '@/types/project';
 import styles from './TaskModal.module.scss';
 
 // Task data format for the API (matches project_tasks table)
@@ -16,8 +16,6 @@ interface TaskFormData {
   assigned_to: string;
   due_date: string;
   start_date: string;
-  recurring_frequency: string;
-  recurring_end_date: string;
 }
 
 interface TaskModalProps {
@@ -28,9 +26,10 @@ interface TaskModalProps {
   task?: Task | ProjectTask;
   projects?: Array<{ id: string; name: string }>; // Optional projects list from API
   users?: Array<{ id: string; first_name?: string; last_name?: string; profiles?: { first_name: string; last_name: string } }>; // Optional users list from API
+  currentUserId?: string; // Current user's ID to default assignment
 }
 
-export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, users }: TaskModalProps) {
+export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, users, currentUserId }: TaskModalProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -38,11 +37,9 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
     is_completed: false,
     priority: 'medium' as TaskPriority,
     project_id: '',
-    assigned_to: '',
+    assigned_to: currentUserId || '',
     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     start_date: '',
-    recurring_frequency: 'none' as string,
-    recurring_end_date: '',
   });
 
   // Determine if task is a ProjectTask (has is_completed) or legacy Task (has status)
@@ -72,8 +69,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
         assigned_to: task.assigned_to || '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         start_date: isProjectTask(task) && task.start_date ? task.start_date.split('T')[0] : '',
-        recurring_frequency: task.recurring_frequency || 'none',
-        recurring_end_date: task.recurring_end_date ? task.recurring_end_date.split('T')[0] : '',
       });
     } else {
       setFormData({
@@ -83,14 +78,12 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
         is_completed: false,
         priority: 'medium',
         project_id: '',
-        assigned_to: '',
+        assigned_to: currentUserId || '',
         due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         start_date: '',
-        recurring_frequency: 'none',
-        recurring_end_date: '',
       });
     }
-  }, [task, isOpen]);
+  }, [task, isOpen, currentUserId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,8 +99,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
       assigned_to: formData.assigned_to || undefined,
       due_date: formData.due_date ? new Date(formData.due_date).toISOString() : undefined,
       start_date: formData.start_date ? new Date(formData.start_date).toISOString() : undefined,
-      recurring_frequency: formData.recurring_frequency === 'none' ? undefined : formData.recurring_frequency,
-      recurring_end_date: formData.recurring_end_date ? new Date(formData.recurring_end_date).toISOString() : undefined,
     };
 
     if (task) {
@@ -277,48 +268,6 @@ export function TaskModal({ isOpen, onClose, onSave, onDelete, task, projects, u
                 required
               />
             </div>
-          </div>
-
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label htmlFor="recurring_frequency" className={styles.label}>
-                Recurring Frequency
-              </label>
-              <select
-                id="recurring_frequency"
-                className={styles.select}
-                value={formData.recurring_frequency}
-                onChange={(e) => setFormData({ ...formData, recurring_frequency: e.target.value })}
-              >
-                {recurringFrequencyOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <small className={styles.helpText}>
-                Recurring tasks will automatically create new instances based on the schedule
-              </small>
-            </div>
-
-            {formData.recurring_frequency !== 'none' && (
-              <div className={styles.formGroup}>
-                <label htmlFor="recurring_end_date" className={styles.label}>
-                  Repeat Until (Optional)
-                </label>
-                <input
-                  type="date"
-                  id="recurring_end_date"
-                  className={styles.input}
-                  value={formData.recurring_end_date}
-                  onChange={(e) => setFormData({ ...formData, recurring_end_date: e.target.value })}
-                  min={formData.due_date}
-                />
-                <small className={styles.helpText}>
-                  Leave blank to repeat indefinitely
-                </small>
-              </div>
-            )}
           </div>
 
         </ModalMiddle>

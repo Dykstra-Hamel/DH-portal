@@ -211,6 +211,7 @@ export const projectTypeOptions = [
   { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
   { value: 'digital', label: 'Digital Designs', code: 'DIG' },
   { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
+  { value: 'software', label: 'Software', code: 'SFT' },
 ];
 
 export const printSubtypes = [
@@ -291,6 +292,11 @@ export interface ProjectTask {
   updated_at: string;
 
   // Relationships (populated by API)
+  project?: {
+    id: string;
+    name: string;
+    shortcode?: string | null;
+  } | null;
   assigned_to_profile?: {
     id: string;
     first_name: string;
@@ -507,6 +513,7 @@ export interface ProjectTemplateTask {
   default_assigned_to: string | null;
   blocks_task_id: string | null;
   blocked_by_task_id: string | null;
+  department_id: string | null;
   created_at: string;
   updated_at: string;
   categories?: Array<{
@@ -543,6 +550,7 @@ export interface ProjectTemplateFormData {
     default_assigned_to: string;
     blocks_task_id?: string | null;
     blocked_by_task_id?: string | null;
+    department_id?: string | null;
     category_ids?: string[];
   }>;
 }

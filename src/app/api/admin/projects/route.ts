@@ -62,11 +62,23 @@ export async function GET(request: NextRequest) {
     // Apply scope filter - scopeFilter takes precedence over scope param
     if (scopeFilter) {
       // New scopeFilter format: comma-separated values like 'internal,both' or 'external,both'
-      const scopes = scopeFilter.split(',').map(s => s.trim());
-      query = query.in('scope', scopes);
+      const allowedScopes = new Set(['internal', 'external', 'both']);
+      const scopes = scopeFilter
+        .split(',')
+        .map(s => s.trim())
+        .filter(scopeValue => allowedScopes.has(scopeValue));
+
+      if (scopes.length > 0) {
+        if (scopes.includes('internal')) {
+          // Treat NULL scope as internal for legacy records
+          query = query.or(`scope.in.(${scopes.join(',')}),scope.is.null`);
+        } else {
+          query = query.in('scope', scopes);
+        }
+      }
     } else if (scope === 'internal') {
-      // Legacy scope param support
-      query = query.in('scope', ['internal', 'both']);
+      // Legacy scope param support (include NULL as internal)
+      query = query.or('scope.in.(internal,both),scope.is.null');
     } else if (scope === 'client') {
       query = query.in('scope', ['external', 'both']);
     }

@@ -62,7 +62,7 @@ const MentionList = forwardRef<MentionListRef, MentionListProps>(function Mentio
         return true;
       }
 
-      if (event.key === 'Enter') {
+      if (event.key === 'Enter' || event.key === 'Tab') {
         enterHandler();
         return true;
       }

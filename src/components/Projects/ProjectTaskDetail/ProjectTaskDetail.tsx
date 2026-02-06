@@ -10,6 +10,7 @@ import {
   Check,
   CheckSquare,
   Plus,
+  ChevronDown,
   Activity as ActivityIcon,
   Flag,
   Pencil,
@@ -18,14 +19,16 @@ import {
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
-import { ProjectTask, taskPriorityOptions, ProjectCategory } from '@/types/project';
+import { ProjectTask, taskPriorityOptions, ProjectCategory, ProjectDepartment } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
 import styles from './ProjectTaskDetail.module.scss';
 
 interface ProjectTaskDetailProps {
   task: ProjectTask | null;
   onClose: () => void;
   onUpdate: (taskId: string, updates: Partial<ProjectTask>) => Promise<void>;
+  onUpdateRelatedTask?: (taskId: string, updates: Partial<ProjectTask>) => Promise<void>;
   onDelete: () => void;
   onAddComment: (comment: string) => Promise<void>;
   onCreateSubtask: () => void;
@@ -38,12 +41,14 @@ interface ProjectTaskDetailProps {
   projectMembers?: Array<{ user_id: string }>; // Project members
   projectAssignedTo?: string | null; // Project's assigned_to user
   availableTasks?: ProjectTask[]; // All tasks in project for dependency selection
+  departments?: ProjectDepartment[];
 }
 
 export default function ProjectTaskDetail({
   task,
   onClose,
   onUpdate,
+  onUpdateRelatedTask,
   onDelete,
   onAddComment,
   onCreateSubtask,
@@ -53,9 +58,8 @@ export default function ProjectTaskDetail({
   onToggleStar,
   isStarred,
   availableCategories = [],
-  projectMembers = [],
-  projectAssignedTo = null,
   availableTasks = [],
+  departments = [],
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -70,9 +74,14 @@ export default function ProjectTaskDetail({
   const [isSavingDescription, setIsSavingDescription] = useState(false);
   const [isSavingTitle, setIsSavingTitle] = useState(false);
   const [isUpdatingComplete, setIsUpdatingComplete] = useState(false);
+  const [isActivityCollapsed, setIsActivityCollapsed] = useState(true);
+  const [isPriorityOpen, setIsPriorityOpen] = useState(false);
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [blocksTaskId, setBlocksTaskId] = useState<string>('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
+  const [departmentDraft, setDepartmentDraft] = useState(task?.department_id || '');
+  const [blockedTaskDepartmentDraft, setBlockedTaskDepartmentDraft] = useState('');
+  const priorityRef = useRef<HTMLDivElement>(null);
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -96,19 +105,8 @@ export default function ProjectTaskDetail({
   };
 
   const assignableUsers = useMemo(() => {
-    // Get member IDs from project
-    const memberIds = new Set(projectMembers.map(m => m.user_id));
-
-    // Add project's assigned_to
-    if (projectAssignedTo) {
-      memberIds.add(projectAssignedTo);
-    }
-
-    // Filter users to members only
-    let filteredUsers = users.filter(u => {
-      const userId = u.profiles?.id || u.id;
-      return memberIds.has(userId);
-    });
+    // Allow assignment to any admin user
+    let filteredUsers = users.filter(user => isAdminRole(getUserRole(user)));
 
     // Always include current assignee even if not a member
     const currentAssignee = task?.assigned_to || assignedToDraft;
@@ -130,7 +128,7 @@ export default function ProjectTaskDetail({
     }
 
     return filteredUsers;
-  }, [task?.assigned_to, task?.assigned_to_profile, assignedToDraft, projectMembers, projectAssignedTo, users]);
+  }, [task?.assigned_to, task?.assigned_to_profile, assignedToDraft, users]);
 
   const formatDateInput = (dateString: string | null) => {
     if (!dateString) return '';
@@ -181,6 +179,26 @@ export default function ProjectTaskDetail({
     return formatDateTime(dateString);
   };
 
+  const formatDateWithTime = (dateString: string | null) => {
+    if (!dateString) {
+      return { datePart: 'Unknown', timePart: 'Unknown' };
+    }
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) {
+      return { datePart: 'Invalid Date', timePart: 'Invalid Date' };
+    }
+    const datePart = date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+    const timePart = date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+    return { datePart, timePart };
+  };
+
   useEffect(() => {
     if (!task) return;
     setTitleDraft(task.title || '');
@@ -189,6 +207,7 @@ export default function ProjectTaskDetail({
     setDueDateDraft(formatDateInput(task.due_date));
     setStartDateDraft(formatDateInput(task.start_date));
     setDescriptionDraft(task.description || '');
+    setDepartmentDraft(task.department_id || '');
     setIsEditingDescription(false);
     // Set selected categories from task
     const categoryIds = task.categories?.map(cat => cat.id) || [];
@@ -197,7 +216,18 @@ export default function ProjectTaskDetail({
     // Set dependency state
     setBlocksTaskId(task.blocks_task_id || '');
     setBlockedByTaskId(task.blocked_by_task_id || '');
+    setIsActivityCollapsed(true);
+    setIsPriorityOpen(false);
   }, [task]);
+
+  useEffect(() => {
+    if (!blocksTaskId) {
+      setBlockedTaskDepartmentDraft('');
+      return;
+    }
+    const blockedTask = availableTasks.find(t => t.id === blocksTaskId);
+    setBlockedTaskDepartmentDraft(blockedTask?.department_id || '');
+  }, [availableTasks, blocksTaskId]);
 
   useEffect(() => {
     const textarea = titleInputRef.current;
@@ -205,6 +235,18 @@ export default function ProjectTaskDetail({
     textarea.style.height = 'auto';
     textarea.style.height = `${textarea.scrollHeight}px`;
   }, [titleDraft]);
+
+  useEffect(() => {
+    if (!isPriorityOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (priorityRef.current && !priorityRef.current.contains(event.target as Node)) {
+        setIsPriorityOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isPriorityOpen]);
 
   useEffect(() => {
     if (!highlightedCommentId) return;
@@ -357,10 +399,38 @@ export default function ProjectTaskDetail({
   const handleBlockedByTaskChange = async (taskId: string) => {
     setBlockedByTaskId(taskId);
     try {
-      await onUpdate(task.id, { blocked_by_task_id: taskId || null });
+      const updates: Partial<ProjectTask> = { blocked_by_task_id: taskId || null };
+      if (!taskId) {
+        updates.department_id = null;
+        setDepartmentDraft('');
+      }
+      await onUpdate(task.id, updates);
     } catch (error) {
       console.error('Error updating blocked_by_task_id:', error);
       setBlockedByTaskId(task.blocked_by_task_id || '');
+    }
+  };
+
+  const handleDepartmentChange = async (departmentId: string) => {
+    setDepartmentDraft(departmentId);
+    try {
+      await onUpdate(task.id, { department_id: departmentId || null });
+    } catch (error) {
+      console.error('Error updating department:', error);
+      setDepartmentDraft(task.department_id || '');
+    }
+  };
+
+  const handleBlockedTaskDepartmentChange = async (departmentId: string) => {
+    setBlockedTaskDepartmentDraft(departmentId);
+    if (!blocksTaskId) return;
+    try {
+      const updateRelated = onUpdateRelatedTask || onUpdate;
+      await updateRelated(blocksTaskId, { department_id: departmentId || null });
+    } catch (error) {
+      console.error('Error updating blocked task department:', error);
+      const blockedTask = availableTasks.find(t => t.id === blocksTaskId);
+      setBlockedTaskDepartmentDraft(blockedTask?.department_id || '');
     }
   };
 
@@ -446,9 +516,55 @@ export default function ProjectTaskDetail({
                 <StarButton
                   isStarred={isStarred(task.id)}
                   onToggle={() => onToggleStar(task.id)}
-                  size="medium"
+                  size="xlarge"
                 />
               )}
+              <div ref={priorityRef} className={styles.priorityDropdown}>
+                <button
+                  type="button"
+                  className={styles.priorityButton}
+                  onClick={() => setIsPriorityOpen((prev) => !prev)}
+                  style={{
+                    borderColor: taskPriorityOptions.find(option => option.value === priorityDraft)?.color,
+                    color: taskPriorityOptions.find(option => option.value === priorityDraft)?.color,
+                  }}
+                  aria-label="Change priority"
+                >
+                  <Flag size={14} />
+                  <span className={styles.priorityButtonText}>
+                    {taskPriorityOptions.find(option => option.value === priorityDraft)?.label || 'Priority'}
+                  </span>
+                  <ChevronDown size={14} className={isPriorityOpen ? styles.priorityChevronOpen : ''} />
+                </button>
+                {isPriorityOpen && (
+                  <div className={styles.priorityMenu}>
+                    {taskPriorityOptions.map(option => (
+                      <button
+                        key={option.value}
+                        type="button"
+                        className={styles.priorityMenuItem}
+                        onClick={() => {
+                          handlePriorityChange(option.value);
+                          setIsPriorityOpen(false);
+                        }}
+                      >
+                        <span
+                          className={styles.priorityDot}
+                          style={{ backgroundColor: option.color }}
+                        />
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <span className={styles.projectPill}>
+                {task.project_id
+                  ? task.project?.shortcode
+                    ? formatProjectShortcode(task.project.shortcode)
+                    : task.project?.name || 'Personal Task'
+                  : 'Personal Task'}
+              </span>
               <button onClick={onClose} className={styles.closeButton}>
                 <X size={20} />
               </button>
@@ -583,33 +699,18 @@ export default function ProjectTaskDetail({
 
               <div className={styles.detailItem}>
                 <div className={styles.detailLabel}>
-                  <UserIcon size={14} />
-                  Created By
-                </div>
-                <div className={styles.detailValue}>
-                  {task.created_by_profile ? (
-                    <>
-                      {task.created_by_profile.first_name} {task.created_by_profile.last_name}
-                    </>
-                  ) : (
-                    <span className={styles.unassigned}>Unknown</span>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.detailItem}>
-                <div className={styles.detailLabel}>
-                  <Flag size={14} />
-                  Priority
+                  <Tag size={14} />
+                  Category
                 </div>
                 <select
                   className={styles.editSelect}
-                  value={priorityDraft}
-                  onChange={(e) => handlePriorityChange(e.target.value)}
+                  value={selectedCategoryIds[0] || ''}
+                  onChange={(e) => handleCategoryChange(e.target.value || null)}
                 >
-                  {taskPriorityOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <option value="">No Category</option>
+                  {availableCategories.map((category) => (
+                    <option key={category.id} value={category.id}>
+                      {category.name}
                     </option>
                   ))}
                 </select>
@@ -641,88 +742,112 @@ export default function ProjectTaskDetail({
                 />
               </div>
 
-              {/* Is Blocking Dropdown */}
-              <div className={styles.detailItem}>
-                <div className={styles.detailLabel}>
-                  <CheckSquare size={14} />
-                  Is Blocking
-                </div>
-                <select
-                  className={styles.editSelect}
-                  value={blocksTaskId}
-                  onChange={(e) => handleBlocksTaskChange(e.target.value)}
-                >
-                  <option value="">None</option>
-                  {availableTasks
-                    .filter(t => t.id !== task?.id && t.id !== blockedByTaskId)
-                    .map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.title}
-                      </option>
-                    ))}
-                </select>
-              </div>
+            </div>
+          </div>
 
-              {/* Is Blocked By Dropdown */}
-              <div className={styles.detailItem}>
-                <div className={styles.detailLabel}>
-                  <CheckSquare size={14} />
-                  Is Blocked By
-                </div>
-                <select
-                  className={styles.editSelect}
-                  value={blockedByTaskId}
-                  onChange={(e) => handleBlockedByTaskChange(e.target.value)}
-                >
-                  <option value="">None</option>
-                  {availableTasks
-                    .filter(t => t.id !== task?.id && t.id !== blocksTaskId)
-                    .map(t => (
-                      <option key={t.id} value={t.id}>
-                        {t.title} {!t.is_completed && '⏳'}
-                      </option>
-                    ))}
-                </select>
-              </div>
-
-
-              {availableCategories.length > 0 && (
-                <div className={`${styles.detailItem} ${styles.detailItemFullWidth}`}>
+          {/* Dependencies */}
+          {task.project_id && (
+            <div className={styles.section}>
+              <h3 className={styles.sectionTitle}>Task Dependencies</h3>
+              <div className={styles.detailsGrid}>
+                <div className={styles.detailItem}>
                   <div className={styles.detailLabel}>
-                    <Tag size={14} />
-                    Category
+                    <CheckSquare size={14} />
+                    Is Blocking
                   </div>
-                  <div className={styles.categorySelector}>
-                    <label className={styles.categoryCheckbox}>
-                      <input
-                        type="radio"
-                        name={`task-category-${task?.id ?? 'task'}`}
-                        checked={selectedCategoryIds.length === 0}
-                        onChange={() => handleCategoryChange(null)}
-                      />
-                      <span className={styles.categoryLabel}>No Category</span>
-                    </label>
-                    {availableCategories.map((category) => (
-                      <label key={category.id} className={styles.categoryCheckbox}>
-                        <input
-                          type="radio"
-                          name={`task-category-${task?.id ?? 'task'}`}
-                          checked={selectedCategoryIds.includes(category.id)}
-                          onChange={() => handleCategoryChange(category.id)}
-                        />
-                        <span className={styles.categoryLabel}>{category.name}</span>
-                      </label>
-                    ))}
-                    {availableCategories.length === 0 && (
-                      <span className={styles.noCategoriesText}>
-                        No categories available for this project
+                  <select
+                    className={styles.editSelect}
+                    value={blocksTaskId}
+                    onChange={(e) => handleBlocksTaskChange(e.target.value)}
+                  >
+                    <option value="">None</option>
+                    {availableTasks
+                      .filter(t => t.id !== task?.id && t.id !== blockedByTaskId)
+                      .map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.title}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {blocksTaskId && departments.length > 0 ? (
+                  <div className={styles.detailItem}>
+                    <div className={styles.detailLabel}>
+                      <Flag size={14} />
+                      Move Project When Complete
+                    </div>
+                    <select
+                      className={styles.editSelect}
+                      value={blockedTaskDepartmentDraft}
+                      onChange={(e) => handleBlockedTaskDepartmentChange(e.target.value)}
+                    >
+                      <option value="">Stay where it is</option>
+                      {departments.map(department => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
+                    {blockedTaskDepartmentDraft && (
+                      <span className={styles.detailHint}>
+                        Applies to the blocked task this one is holding up.
                       </span>
                     )}
                   </div>
+                ) : (
+                  <div className={styles.detailItemPlaceholder} />
+                )}
+
+                <div className={styles.detailItem}>
+                  <div className={styles.detailLabel}>
+                    <CheckSquare size={14} />
+                    Is Blocked By
+                  </div>
+                  <select
+                    className={styles.editSelect}
+                    value={blockedByTaskId}
+                    onChange={(e) => handleBlockedByTaskChange(e.target.value)}
+                  >
+                    <option value="">None</option>
+                    {availableTasks
+                      .filter(t => t.id !== task?.id && t.id !== blocksTaskId)
+                      .map(t => (
+                        <option key={t.id} value={t.id}>
+                          {t.title} {!t.is_completed && '⏳'}
+                        </option>
+                      ))}
+                  </select>
                 </div>
-              )}
+
+                {blockedByTaskId && departments.length > 0 ? (
+                  <div className={styles.detailItem}>
+                    <div className={styles.detailLabel}>
+                      <Flag size={14} />
+                      Move Project When Unblocked
+                    </div>
+                    <select
+                      className={styles.editSelect}
+                      value={departmentDraft}
+                      onChange={(e) => handleDepartmentChange(e.target.value)}
+                    >
+                      <option value="">Stay where it is</option>
+                      {departments.map(department => (
+                        <option key={department.id} value={department.id}>
+                          {department.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className={styles.detailHint}>
+                      If set, the project will move when the blocking task completes.
+                    </span>
+                  </div>
+                ) : (
+                  <div className={styles.detailItemPlaceholder} />
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Notes */}
           {task.notes && (
@@ -842,33 +967,45 @@ export default function ProjectTaskDetail({
           {/* Activity Log */}
           {task.activity && task.activity.length > 0 && (
             <div className={styles.section}>
-              <h3 className={styles.sectionTitle}>
-                <ActivityIcon size={16} />
-                Activity
-              </h3>
-              <div className={styles.activityFeed}>
-                {task.activity.map(activity => (
-                  <div key={activity.id} className={styles.activityItem}>
-                    <div className={styles.activityAvatar}>
-                      {activity.user_profile?.first_name?.[0]}
-                      {activity.user_profile?.last_name?.[0]}
-                    </div>
-                    <div className={styles.activityContent}>
-                      <div className={styles.activityText}>
-                        <span className={styles.activityUser}>
-                          {activity.user_profile?.first_name} {activity.user_profile?.last_name}
-                        </span>{' '}
-                        <span className={styles.activityAction}>
-                          {getActivityMessage(activity)}
-                        </span>
-                      </div>
-                      <div className={styles.activityTime}>
-                        {getRelativeTime(activity.created_at)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              <div className={styles.sectionHeader}>
+                <h3 className={styles.sectionTitle}>
+                  <ActivityIcon size={16} />
+                  Activity
+                  <button
+                    type="button"
+                    className={`${styles.sectionToggleIcon} ${isActivityCollapsed ? styles.sectionToggleIconCollapsed : ''}`}
+                    onClick={() => setIsActivityCollapsed(prev => !prev)}
+                    aria-label={isActivityCollapsed ? 'Expand activity log' : 'Collapse activity log'}
+                  >
+                    <ChevronDown size={16} />
+                  </button>
+                </h3>
               </div>
+              {!isActivityCollapsed && (
+                <div className={styles.activityFeed}>
+                  {task.activity.map(activity => (
+                    <div key={activity.id} className={styles.activityItem}>
+                      <div className={styles.activityAvatar}>
+                        {activity.user_profile?.first_name?.[0]}
+                        {activity.user_profile?.last_name?.[0]}
+                      </div>
+                      <div className={styles.activityContent}>
+                        <div className={styles.activityText}>
+                          <span className={styles.activityUser}>
+                            {activity.user_profile?.first_name} {activity.user_profile?.last_name}
+                          </span>{' '}
+                          <span className={styles.activityAction}>
+                            {getActivityMessage(activity)}
+                          </span>
+                        </div>
+                        <div className={styles.activityTime}>
+                          {getRelativeTime(activity.created_at)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -881,7 +1018,17 @@ export default function ProjectTaskDetail({
 
           {/* Metadata */}
           <div className={styles.metadata}>
-            <div>Created {formatDateTime(task.created_at)}</div>
+            <div>
+              {(() => {
+                const { datePart, timePart } = formatDateWithTime(task.created_at);
+                const createdBy = task.created_by_profile
+                  ? `${task.created_by_profile.first_name} ${task.created_by_profile.last_name}`
+                  : 'Unknown';
+                return (
+                  <>Created by {createdBy} on {datePart} at {timePart}</>
+                );
+              })()}
+            </div>
             <div>Last updated {formatDateTime(task.updated_at)}</div>
           </div>
         </div>

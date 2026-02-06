@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNotifications } from '@/hooks/useNotifications';
 import { Notification } from '@/types/notification';
 import { NotificationModal } from '../NotificationModal';
@@ -9,6 +9,11 @@ import styles from './NotificationIcon.module.scss';
 export function NotificationIcon() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [isRinging, setIsRinging] = useState(false);
+  const ringTimeoutRef = useRef<number | null>(null);
+  const previousUnreadCountRef = useRef<number | null>(null);
+  const initializedRef = useRef(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const {
     notifications,
@@ -21,6 +26,56 @@ export function NotificationIcon() {
     refreshNotifications,
     navigateToReference,
   } = useNotifications();
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const audio = new Audio('/sounds/notification.mp3');
+    audio.preload = 'auto';
+    audio.volume = 0.4;
+    audioRef.current = audio;
+
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (ringTimeoutRef.current) {
+        window.clearTimeout(ringTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (loading) return;
+
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      previousUnreadCountRef.current = unreadCount;
+      return;
+    }
+
+    const previousUnreadCount = previousUnreadCountRef.current ?? 0;
+    if (unreadCount > previousUnreadCount) {
+      setIsRinging(true);
+      if (ringTimeoutRef.current) {
+        window.clearTimeout(ringTimeoutRef.current);
+      }
+      ringTimeoutRef.current = window.setTimeout(() => {
+        setIsRinging(false);
+      }, 1200);
+
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+    }
+
+    previousUnreadCountRef.current = unreadCount;
+  }, [loading, unreadCount]);
 
   const toggleDropdown = () => {
     setShowDropdown(!showDropdown);
@@ -71,7 +126,7 @@ export function NotificationIcon() {
           height="25" 
           viewBox="0 0 22 25" 
           fill="none"
-          className={styles.bellIcon}
+          className={`${styles.bellIcon} ${isRinging ? styles.bellRinging : ''}`}
         >
           <path 
             d="M9.30838 22.5007C9.49863 22.8302 9.77226 23.1038 10.1018 23.2941C10.4313 23.4843 10.805 23.5844 11.1855 23.5844C11.566 23.5844 11.9398 23.4843 12.2693 23.2941C12.5988 23.1038 12.8724 22.8302 13.0627 22.5007" 

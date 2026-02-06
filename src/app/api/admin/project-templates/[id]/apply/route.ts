@@ -134,6 +134,7 @@ export async function POST(
       tags: body.tags || template.template_data?.tags || null,
       notes: body.notes || template.notes || null,
       scope: template.default_scope || 'internal',
+      current_department_id: template.initial_department_id || null,
     };
 
     // Create project
@@ -225,6 +226,7 @@ export async function POST(
             is_completed: false,
             progress_percentage: 0,
             parent_task_id: null,
+            department_id: templateTask.department_id || null,
           })
           .select('id')
           .single();
@@ -237,7 +239,7 @@ export async function POST(
       }
 
       if (childTemplateTasks.length > 0) {
-        const tasksToCreate = childTemplateTasks.map((templateTask: any) => {
+        for (const templateTask of childTemplateTasks) {
           let taskDueDate = null;
           if (templateTask.due_date_offset_days !== null) {
             const dueDate = new Date(projectStartDate);
@@ -245,32 +247,70 @@ export async function POST(
             taskDueDate = dueDate.toISOString().split('T')[0];
           }
 
-          return {
-            project_id: project.id,
-            title: templateTask.title,
-            description: templateTask.description,
-            priority: templateTask.priority,
-            due_date: taskDueDate,
-            start_date: body.start_date || null,
-            display_order: templateTask.display_order,
-            created_by: user.id,
-            assigned_to: templateTask.default_assigned_to || body.assigned_to || null,
-            is_completed: false,
-            progress_percentage: 0,
-            parent_task_id: templateTask.parent_task_id
-              ? taskIdMap.get(templateTask.parent_task_id) || null
-              : null,
-          };
-        });
+          const { data: createdTask, error: createError } = await supabase
+            .from('project_tasks')
+            .insert({
+              project_id: project.id,
+              title: templateTask.title,
+              description: templateTask.description,
+              priority: templateTask.priority,
+              due_date: taskDueDate,
+              start_date: body.start_date || null,
+              display_order: templateTask.display_order,
+              created_by: user.id,
+              assigned_to: templateTask.default_assigned_to || body.assigned_to || null,
+              is_completed: false,
+              progress_percentage: 0,
+              parent_task_id: templateTask.parent_task_id
+                ? taskIdMap.get(templateTask.parent_task_id) || null
+                : null,
+              department_id: templateTask.department_id || null,
+            })
+            .select('id')
+            .single();
 
-        const { error: tasksError } = await supabase
-          .from('project_tasks')
-          .insert(tasksToCreate);
+          if (createError || !createdTask) {
+            console.error('Error creating child task from template:', createError);
+          } else {
+            taskIdMap.set(templateTask.id, createdTask.id);
+          }
+        }
+      }
 
-        if (tasksError) {
-          console.error('Error creating child tasks from template:', tasksError);
-          // Project is created, but tasks failed - still return success
-          // Admin can manually add tasks if needed
+      // Third pass: Update task dependencies now that all tasks exist
+      for (const templateTask of template.tasks) {
+        const projectTaskId = taskIdMap.get(templateTask.id);
+        if (!projectTaskId) continue;
+
+        const dependencyUpdates: any = {};
+        let needsUpdate = false;
+
+        if (templateTask.blocks_task_id) {
+          const blocksProjectTaskId = taskIdMap.get(templateTask.blocks_task_id);
+          if (blocksProjectTaskId) {
+            dependencyUpdates.blocks_task_id = blocksProjectTaskId;
+            needsUpdate = true;
+          }
+        }
+
+        if (templateTask.blocked_by_task_id) {
+          const blockedByProjectTaskId = taskIdMap.get(templateTask.blocked_by_task_id);
+          if (blockedByProjectTaskId) {
+            dependencyUpdates.blocked_by_task_id = blockedByProjectTaskId;
+            needsUpdate = true;
+          }
+        }
+
+        if (needsUpdate) {
+          const { error: updateError } = await supabase
+            .from('project_tasks')
+            .update(dependencyUpdates)
+            .eq('id', projectTaskId);
+
+          if (updateError) {
+            console.error('Error updating task dependencies:', updateError);
+            // Don't fail the whole request, just log the error
+          }
         }
       }
     }
