@@ -310,6 +310,7 @@ export function ProjectKanbanView({
         <div className={`${styles.kanbanBoard} ${styles.departmentView}`}>
           {columns.map(column => {
             const columnProjects = getProjectsByDepartment(column.id);
+            const hasUnreadMentions = columnProjects.some(project => project.has_unread_mentions);
 
             return (
               <div
@@ -324,6 +325,9 @@ export function ProjectKanbanView({
                   <span className={styles.columnCount}>
                     ({columnProjects.length})
                   </span>
+                  {hasUnreadMentions && (
+                    <span className={styles.columnNewComments}>New Comments!</span>
+                  )}
                 </div>
 
                 <div

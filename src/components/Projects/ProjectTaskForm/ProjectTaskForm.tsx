@@ -6,9 +6,11 @@ import {
   ProjectTask,
   ProjectTaskFormData,
   ProjectCategory,
+  ProjectDepartment,
   User,
   taskPriorityOptions,
 } from '@/types/project';
+import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import styles from './ProjectTaskForm.module.scss';
 
 interface ProjectTaskFormProps {
@@ -22,6 +24,7 @@ interface ProjectTaskFormProps {
   projectMembers?: Array<{ user_id: string }>; // Project members
   projectAssignedTo?: string | null; // Project's assigned_to user
   availableCategories?: ProjectCategory[];
+  departments?: ProjectDepartment[];
 }
 
 export default function ProjectTaskForm({
@@ -30,11 +33,9 @@ export default function ProjectTaskForm({
   onSubmit,
   editingTask,
   users,
-  projectId,
   parentTasks = [],
-  projectMembers = [],
-  projectAssignedTo = null,
   availableCategories = [],
+  departments = [],
 }: ProjectTaskFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,10 +50,15 @@ export default function ProjectTaskForm({
     start_date: '',
     parent_task_id: '',
     category_ids: [],
+    department_id: '',
   });
 
   const [blocksTaskId, setBlocksTaskId] = useState<string>('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
+  const [blockedTaskDepartmentId, setBlockedTaskDepartmentId] = useState<string>('');
+  const [blockedTaskDepartmentDraft, setBlockedTaskDepartmentDraft] = useState<string>('');
+  const [isBlockedTaskDepartmentModalOpen, setIsBlockedTaskDepartmentModalOpen] = useState(false);
+  const [blockedTaskDepartmentTouched, setBlockedTaskDepartmentTouched] = useState(false);
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -76,19 +82,8 @@ export default function ProjectTaskForm({
   };
 
   const assignableUsers = useMemo(() => {
-    // Get member IDs from project
-    const memberIds = new Set(projectMembers.map(m => m.user_id));
-
-    // Add project's assigned_to
-    if (projectAssignedTo) {
-      memberIds.add(projectAssignedTo);
-    }
-
-    // Filter users to members only
-    let filteredUsers = users.filter(u => {
-      const userId = u.profiles?.id || u.id;
-      return memberIds.has(userId);
-    });
+    // Allow assignment to any admin user
+    let filteredUsers = users.filter(user => isAdminRole(getUserRole(user)));
 
     // Always include current assignee even if not a member
     const assignedId = formData.assigned_to || editingTask?.assigned_to || '';
@@ -110,7 +105,22 @@ export default function ProjectTaskForm({
     }
 
     return filteredUsers;
-  }, [formData.assigned_to, editingTask?.assigned_to, editingTask?.assigned_to_profile, projectMembers, projectAssignedTo, users]);
+  }, [formData.assigned_to, editingTask?.assigned_to, editingTask?.assigned_to_profile, users]);
+
+  const blockedTask = useMemo(
+    () => parentTasks.find(task => task.id === blocksTaskId),
+    [parentTasks, blocksTaskId]
+  );
+
+  const effectiveBlockedTaskDepartmentId = blockedTaskDepartmentTouched
+    ? blockedTaskDepartmentId
+    : (blockedTask?.department_id || blockedTaskDepartmentId);
+
+  const blockedTaskDepartmentLabel = useMemo(() => {
+    if (!effectiveBlockedTaskDepartmentId) return 'Stay where it is';
+    const department = departments.find(dep => dep.id === effectiveBlockedTaskDepartmentId);
+    return department?.name || 'Unknown Department';
+  }, [departments, effectiveBlockedTaskDepartmentId]);
 
   useEffect(() => {
     if (editingTask) {
@@ -124,11 +134,15 @@ export default function ProjectTaskForm({
         start_date: editingTask.start_date || '',
         parent_task_id: editingTask.parent_task_id || '',
         category_ids: editingTask.categories?.map(category => category.id).slice(0, 1) || [],
+        department_id: editingTask.department_id || '',
       });
 
       // Set dependency state
       setBlocksTaskId(editingTask.blocks_task_id || '');
       setBlockedByTaskId(editingTask.blocked_by_task_id || '');
+      const blockedTask = parentTasks.find(task => task.id === editingTask.blocks_task_id);
+      setBlockedTaskDepartmentId(blockedTask?.department_id || '');
+      setBlockedTaskDepartmentTouched(false);
     } else {
       // Reset form for new task
       setFormData({
@@ -141,9 +155,12 @@ export default function ProjectTaskForm({
         start_date: '',
         parent_task_id: '',
         category_ids: [],
+        department_id: '',
       });
       setBlocksTaskId('');
       setBlockedByTaskId('');
+      setBlockedTaskDepartmentId('');
+      setBlockedTaskDepartmentTouched(false);
     }
     setError(null);
   }, [editingTask, isOpen]);
@@ -155,6 +172,33 @@ export default function ProjectTaskForm({
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleBlocksTaskChange = (value: string) => {
+    setBlocksTaskId(value);
+    setBlockedTaskDepartmentTouched(false);
+
+    if (!value) {
+      setBlockedTaskDepartmentId('');
+      setIsBlockedTaskDepartmentModalOpen(false);
+      return;
+    }
+
+    const blockedTask = parentTasks.find(task => task.id === value);
+    const existingDepartmentId = blockedTask?.department_id || '';
+    setBlockedTaskDepartmentId(existingDepartmentId);
+    setBlockedTaskDepartmentDraft(existingDepartmentId);
+
+    if (departments.length > 0) {
+      setIsBlockedTaskDepartmentModalOpen(true);
+    }
+  };
+
+  const handleBlockedByTaskChange = (value: string) => {
+    setBlockedByTaskId(value);
+    if (!value) {
+      setFormData(prev => ({ ...prev, department_id: '' }));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -162,11 +206,17 @@ export default function ProjectTaskForm({
 
     try {
       // Add dependency fields to formData
-      const submitData = {
+      const submitData: any = {
         ...formData,
+        department_id: blockedByTaskId ? (formData.department_id || null) : null,
         blocks_task_id: blocksTaskId || null,
         blocked_by_task_id: blockedByTaskId || null,
       };
+
+      if (blockedTaskDepartmentTouched && blocksTaskId) {
+        submitData.blocked_task_id_for_department = blocksTaskId;
+        submitData.blocked_task_department_id = blockedTaskDepartmentId || null;
+      }
 
       await onSubmit(submitData);
       onClose();
@@ -213,7 +263,7 @@ export default function ProjectTaskForm({
         )}
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className={styles.form}>
+        <form onSubmit={handleSubmit} className={styles.form} style={{ width: '100%' }}>
           <div className={styles.formContent}>
             {/* Basic Information */}
             <section className={styles.section}>
@@ -392,7 +442,7 @@ export default function ProjectTaskForm({
                 <select
                   id="blocksTaskId"
                   value={blocksTaskId}
-                  onChange={(e) => setBlocksTaskId(e.target.value)}
+                  onChange={(e) => handleBlocksTaskChange(e.target.value)}
                   className={styles.select}
                 >
                   <option value="">None</option>
@@ -407,6 +457,28 @@ export default function ProjectTaskForm({
                 <span className={styles.helpText}>
                   Select a task that cannot start until this task is completed
                 </span>
+                {blocksTaskId && (
+                  <div className={styles.blockedTaskDepartmentSummary}>
+                    <span className={styles.blockedTaskDepartmentText}>
+                      Move project to when this task completes:{" "}
+                      <strong className={styles.blockedTaskDepartmentValue}>
+                        {blockedTaskDepartmentLabel}
+                      </strong>
+                    </span>
+                    {departments.length > 0 && (
+                      <button
+                        type="button"
+                        className={styles.blockedTaskDepartmentChange}
+                        onClick={() => {
+                          setBlockedTaskDepartmentDraft(effectiveBlockedTaskDepartmentId || '');
+                          setIsBlockedTaskDepartmentModalOpen(true);
+                        }}
+                      >
+                        Change
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Is Blocked By Dropdown */}
@@ -417,7 +489,7 @@ export default function ProjectTaskForm({
                 <select
                   id="blockedByTaskId"
                   value={blockedByTaskId}
-                  onChange={(e) => setBlockedByTaskId(e.target.value)}
+                  onChange={(e) => handleBlockedByTaskChange(e.target.value)}
                   className={styles.select}
                 >
                   <option value="">None</option>
@@ -433,6 +505,31 @@ export default function ProjectTaskForm({
                   Select a task that must be completed before this task can start
                 </span>
               </div>
+
+              {blockedByTaskId && departments.length > 0 && (
+                <div className={styles.formGroup}>
+                  <label htmlFor="department_id" className={styles.label}>
+                    Move Project To When Unblocked
+                  </label>
+                  <select
+                    id="department_id"
+                    name="department_id"
+                    value={formData.department_id || ''}
+                    onChange={handleChange}
+                    className={styles.select}
+                  >
+                    <option value="">Stay where it is</option>
+                    {departments.map(department => (
+                      <option key={department.id} value={department.id}>
+                        {department.name}
+                      </option>
+                    ))}
+                  </select>
+                  <p className={styles.fieldHelp}>
+                    If set, the project will move to this department when the blocking task is completed.
+                  </p>
+                </div>
+              )}
             </section>
 
             {/* Additional Notes */}
@@ -476,6 +573,61 @@ export default function ProjectTaskForm({
             </button>
           </div>
         </form>
+
+        <Modal
+          isOpen={isBlockedTaskDepartmentModalOpen}
+          onClose={() => setIsBlockedTaskDepartmentModalOpen(false)}
+          size="small"
+        >
+          <ModalTop
+            title="Move Project When Task Completes"
+            onClose={() => setIsBlockedTaskDepartmentModalOpen(false)}
+          />
+          <ModalMiddle>
+            <p className={styles.blockedTaskModalMessage}>
+              Select the department that the project should move to when this task is completed.
+              {blockedTask?.title ? ` This will unblock "${blockedTask.title}".` : ''}
+            </p>
+            <div className={styles.formGroup}>
+              <label htmlFor="blockedTaskDepartment" className={styles.label}>
+                Department
+              </label>
+              <select
+                id="blockedTaskDepartment"
+                value={blockedTaskDepartmentDraft}
+                onChange={(e) => setBlockedTaskDepartmentDraft(e.target.value)}
+                className={styles.select}
+              >
+                <option value="">Stay where it is</option>
+                {departments.map(department => (
+                  <option key={department.id} value={department.id}>
+                    {department.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </ModalMiddle>
+          <ModalBottom className={styles.blockedTaskModalActions}>
+            <button
+              type="button"
+              className={styles.cancelButton}
+              onClick={() => setIsBlockedTaskDepartmentModalOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={styles.saveButton}
+              onClick={() => {
+                setBlockedTaskDepartmentId(blockedTaskDepartmentDraft);
+                setBlockedTaskDepartmentTouched(true);
+                setIsBlockedTaskDepartmentModalOpen(false);
+              }}
+            >
+              Save
+            </button>
+          </ModalBottom>
+        </Modal>
       </div>
     </div>
   );

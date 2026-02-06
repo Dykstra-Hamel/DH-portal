@@ -163,10 +163,13 @@ export default function AdminTasksPage() {
   }, []);
 
   // Open task detail sidebar
-  const openTaskDetailById = useCallback(async (taskId: string, projectId: string) => {
+  const openTaskDetailById = useCallback(async (taskId: string, projectId?: string | null) => {
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/projects/${projectId}/tasks/${taskId}`, { headers });
+      const endpoint = projectId
+        ? `/api/admin/projects/${projectId}/tasks/${taskId}`
+        : `/api/admin/project-tasks/${taskId}`;
+      const response = await fetch(endpoint, { headers });
 
       if (response.ok) {
         const fullTask = await response.json();
@@ -261,9 +264,7 @@ export default function AdminTasksPage() {
   }, [fetchTasks]);
 
   const handleTaskClick = useCallback((task: Task) => {
-    if (task.project_id) {
-      openTaskDetailById(task.id, task.project_id);
-    }
+    openTaskDetailById(task.id, task.project_id ?? null);
   }, [openTaskDetailById]);
 
   const handleToggleStar = useCallback(async (taskId: string) => {
@@ -302,12 +303,16 @@ export default function AdminTasksPage() {
 
   // Task detail sidebar handlers
   const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
-    if (!selectedTaskDetail?.project_id) return;
+    if (!selectedTaskDetail) return;
 
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${taskId}`, {
-        method: 'PATCH',
+      const isProjectTask = !!selectedTaskDetail.project_id;
+      const endpoint = isProjectTask
+        ? `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${taskId}`
+        : `/api/admin/project-tasks/${taskId}`;
+      const response = await fetch(endpoint, {
+        method: isProjectTask ? 'PATCH' : 'PUT',
         headers,
         body: JSON.stringify(updates),
       });
@@ -319,6 +324,29 @@ export default function AdminTasksPage() {
       }
     } catch (error) {
       console.error('Error updating task:', error);
+    }
+  }, [selectedTaskDetail, fetchTasks]);
+
+  const handleUpdateRelatedTask = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
+    if (!selectedTaskDetail) return;
+
+    try {
+      const headers = await getAuthHeaders();
+      const isProjectTask = !!selectedTaskDetail.project_id;
+      const endpoint = isProjectTask
+        ? `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${taskId}`
+        : `/api/admin/project-tasks/${taskId}`;
+      const response = await fetch(endpoint, {
+        method: isProjectTask ? 'PATCH' : 'PUT',
+        headers,
+        body: JSON.stringify(updates),
+      });
+
+      if (response.ok) {
+        await fetchTasks();
+      }
+    } catch (error) {
+      console.error('Error updating related task:', error);
     }
   }, [selectedTaskDetail, fetchTasks]);
 
@@ -346,11 +374,14 @@ export default function AdminTasksPage() {
   }, [fetchTasks, selectedTaskDetail]);
 
   const handleDeleteTaskFromDetail = useCallback(async () => {
-    if (!selectedTaskDetail?.project_id || !selectedTaskDetail?.id) return;
+    if (!selectedTaskDetail?.id) return;
 
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`, {
+      const endpoint = selectedTaskDetail.project_id
+        ? `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`
+        : `/api/admin/project-tasks/${selectedTaskDetail.id}`;
+      const response = await fetch(endpoint, {
         method: 'DELETE',
         headers,
       });
@@ -366,7 +397,11 @@ export default function AdminTasksPage() {
   }, [selectedTaskDetail, fetchTasks]);
 
   const handleAddComment = useCallback(async (comment: string) => {
-    if (!selectedTaskDetail?.project_id || !selectedTaskDetail?.id) return;
+    if (!selectedTaskDetail?.id) return;
+    if (!selectedTaskDetail.project_id) {
+      console.warn('Comments are not available for personal tasks.');
+      return;
+    }
 
     try {
       const headers = await getAuthHeaders();
@@ -407,41 +442,44 @@ export default function AdminTasksPage() {
     });
   }, [selectedTaskDetail, handleUpdateTask]);
 
+  const viewTabs = (
+    <div className={styles.viewTabs}>
+      <button
+        className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
+        onClick={() => setCurrentView('list')}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
+          <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        List
+      </button>
+      <button
+        className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
+        onClick={() => setCurrentView('calendar')}
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
+          <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        Calendar
+      </button>
+      <button
+        className={`${styles.viewTab} ${currentView === 'archive' ? styles.active : ''}`}
+        onClick={() => setCurrentView('archive')}
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 5L8 2L14 5M2 5V12L8 15M2 5L8 8M14 5V12L8 15M14 5L8 8M8 8V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        Archive
+      </button>
+    </div>
+  );
+
+  // Separate personal tasks from project-based tasks
+  const personalTasks = filteredTasks.filter(task => !task.project_id);
+  const projectTasks = filteredTasks.filter(task => task.project_id);
+
   return (
     <div className={styles.pageContainer}>
-      {/* View Tabs and Toggle */}
-      <div className={styles.viewTabsContainer}>
-        <div className={styles.viewTabs}>
-          <button
-            className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
-            onClick={() => setCurrentView('list')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
-              <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            List
-          </button>
-          <button
-            className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
-            onClick={() => setCurrentView('calendar')}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
-              <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            Calendar
-          </button>
-          <button
-            className={`${styles.viewTab} ${currentView === 'archive' ? styles.active : ''}`}
-            onClick={() => setCurrentView('archive')}
-          >
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M2 5L8 2L14 5M2 5V12L8 15M2 5L8 8M14 5V12L8 15M14 5L8 8M8 8V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-            Archive
-          </button>
-        </div>
-      </div>
-
       {/* View Content */}
       <div className={styles.viewContent}>
         {isLoading ? (
@@ -450,36 +488,42 @@ export default function AdminTasksPage() {
             <p>Loading tasks...</p>
           </div>
         ) : (
-          <>
-            {currentView === 'list' && (
-              <TaskListView
-                tasks={filteredTasks}
-                projects={projectsWithStarred}
-                onTaskClick={handleTaskClick}
-                onDeleteTask={handleDeleteTask}
-                onToggleStar={handleToggleStar}
-                onProjectClick={handleProjectClick}
-                onToggleStarProject={handleToggleStarProject}
-                onToggleComplete={handleToggleTaskComplete}
-                onUpdateTask={handleInlineTaskUpdate}
-                currentUserId={user?.id}
-                groupTasksByProject
-              />
-            )}
-            {currentView === 'calendar' && (
-              <CalendarView
-                tasks={filteredTasks}
-                onTaskClick={handleTaskClick}
-              />
-            )}
-            {currentView === 'archive' && (
-              <ArchiveView
-                tasks={filteredTasks.filter(t => t.status === 'completed')}
-                projects={projectsWithStarred.filter(p => p.status === 'complete')}
-                onTaskClick={handleTaskClick}
-              />
-            )}
-          </>
+          <div className={styles.taskPageLayout}>
+            <div className={styles.taskMainContent}>
+              {currentView === 'list' && (
+                <TaskListView
+                  tasks={projectTasks}
+                  projects={projectsWithStarred}
+                  onTaskClick={handleTaskClick}
+                  onDeleteTask={handleDeleteTask}
+                  onToggleStar={handleToggleStar}
+                  onProjectClick={handleProjectClick}
+                  onToggleStarProject={handleToggleStarProject}
+                  onProjectUpdate={fetchProjects}
+                  onToggleComplete={handleToggleTaskComplete}
+                  onUpdateTask={handleInlineTaskUpdate}
+                  currentUserId={user?.id}
+                  groupTasksByProject
+                  viewTabsElement={viewTabs}
+                  personalTasks={personalTasks}
+                />
+              )}
+              {currentView === 'calendar' && (
+                <CalendarView
+                  tasks={filteredTasks}
+                  onTaskClick={handleTaskClick}
+                />
+              )}
+              {currentView === 'archive' && (
+                <ArchiveView
+                  tasks={filteredTasks.filter(t => t.status === 'completed')}
+                  projects={projectsWithStarred.filter(p => p.status === 'complete')}
+                  onTaskClick={handleTaskClick}
+                />
+              )}
+            </div>
+
+          </div>
         )}
       </div>
 
@@ -495,6 +539,7 @@ export default function AdminTasksPage() {
         task={selectedTask}
         projects={projects}
         users={users}
+        currentUserId={user?.id}
       />
 
       {/* Task Detail Sidebar */}
@@ -505,6 +550,7 @@ export default function AdminTasksPage() {
           setSelectedTaskDetail(null);
         }}
         onUpdate={handleUpdateTask}
+        onUpdateRelatedTask={handleUpdateRelatedTask}
         onDelete={handleDeleteTaskFromDetail}
         onAddComment={handleAddComment}
         onCreateSubtask={handleCreateSubtask}

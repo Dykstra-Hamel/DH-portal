@@ -25,24 +25,34 @@ export async function GET(
           id,
           first_name,
           last_name,
-          email
+          email,
+          avatar_url
         ),
         created_by_profile:profiles!project_tasks_created_by_fkey(
           id,
           first_name,
           last_name,
-          email
+          email,
+          avatar_url
         ),
         project:projects(
           id,
-          name
+          name,
+          shortcode
         ),
-        subtasks:project_tasks!project_tasks_parent_task_id_fkey(
-          id,
-          title,
-          is_completed,
-          priority,
-          due_date
+        blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
+        blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
+        comments:project_task_comments(
+          *,
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        activity:project_task_activity(
+          *,
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        project_task_category_assignments(
+          category_type,
+          category:project_categories(id, name)
         )
       `)
       .eq('id', id)
@@ -63,7 +73,55 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(task);
+    // Fetch subtasks separately to avoid schema cache FK issues
+    const { data: subtasks } = await supabase
+      .from('project_tasks')
+      .select(`
+        *,
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(
+          id,
+          first_name,
+          last_name,
+          email,
+          avatar_url
+        ),
+        created_by_profile:profiles!project_tasks_created_by_fkey(
+          id,
+          first_name,
+          last_name,
+          email,
+          avatar_url
+        )
+      `)
+      .eq('parent_task_id', id)
+      .order('display_order', { ascending: true });
+
+    // Sort activity by created_at descending (most recent first)
+    const sortedActivity = task.activity
+      ? task.activity.sort((a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+      : [];
+
+    // Flatten categories with category_type (internal only)
+    const categories = task.project_task_category_assignments
+      ?.filter((assignment: any) => assignment.category_type === 'internal')
+      .map((assignment: any) => ({
+        ...assignment.category,
+        category_type: assignment.category_type,
+      }))
+      .filter((category: any) => category !== null) || [];
+
+    const { project_task_category_assignments, ...taskWithoutAssignments } = task;
+
+    const taskWithSubtasks = {
+      ...taskWithoutAssignments,
+      categories,
+      subtasks: subtasks || [],
+      activity: sortedActivity,
+    };
+
+    return NextResponse.json(taskWithSubtasks);
   } catch (error) {
     console.error('Error in project-tasks GET:', error);
     return NextResponse.json(

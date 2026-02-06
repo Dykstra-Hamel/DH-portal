@@ -177,6 +177,7 @@ export async function POST(request: NextRequest) {
             tags: task.tags || null,
             default_assigned_to: task.default_assigned_to || null,
             parent_task_id: null,
+            department_id: task.department_id || null,
             // Don't set dependencies yet
           })
           .select('id')
@@ -230,6 +231,7 @@ export async function POST(request: NextRequest) {
               parent_task_id: task.parent_temp_id
                 ? taskIdMap.get(task.parent_temp_id) || null
                 : null,
+              department_id: task.department_id || null,
               // Don't set dependencies yet
             })
             .select('id')
@@ -289,6 +291,12 @@ export async function POST(request: NextRequest) {
             dependencyUpdates.blocked_by_task_id = blockedByUuid;
             needsUpdate = true;
           }
+        }
+
+        // Include department_id in update if present (for tasks that were created in earlier passes)
+        if (task.department_id !== undefined) {
+          dependencyUpdates.department_id = task.department_id || null;
+          needsUpdate = true;
         }
 
         if (needsUpdate) {

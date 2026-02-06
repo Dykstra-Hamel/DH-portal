@@ -117,6 +117,11 @@
   }
 }
 
+.formGroupPlaceholder {
+  // Empty placeholder to maintain grid layout when department selector is not shown
+  min-height: 1px;
+}
+
 .formRow {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

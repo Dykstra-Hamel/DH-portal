@@ -60,6 +60,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       default_assigned_to: task.default_assigned_to || '',
       blocks_task_id: task.blocks_task_id || null,
       blocked_by_task_id: task.blocked_by_task_id || null,
+      department_id: task.department_id || null,
       category_ids: task.categories?.map(c => c.category_id) || [],
     })) || [],
   });
@@ -81,12 +82,43 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [draggingTaskIndex, setDraggingTaskIndex] = useState<number | null>(null);
   const [dragOverTaskIndex, setDragOverTaskIndex] = useState<number | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
+  const [blockedTaskDepartments, setBlockedTaskDepartments] = useState<Record<string, string>>({});
+
+  // Helper to get effective department for a blocked task
+  const getBlockedTaskDepartmentId = (blocksTaskId: string | null) => {
+    if (!blocksTaskId) return '';
+
+    // Check if we have a manually set department
+    if (blockedTaskDepartments[blocksTaskId]) {
+      return blockedTaskDepartments[blocksTaskId];
+    }
+
+    // Otherwise, use the blocked task's current department (if exists)
+    const blockedTask = formData.tasks.find(t => t.temp_id === blocksTaskId);
+    return blockedTask?.department_id || '';
+  };
 
   useEffect(() => {
     setHasInitializedTaskCollapse(false);
     setCollapsedTaskCards({});
     setCollapsedSubtasks({});
     setCollapsedSubtaskCards({});
+
+    // Initialize blocked task departments when template loads
+    if (template?.tasks && Array.isArray(template.tasks)) {
+      const initialBlockedDepts: Record<string, string> = {};
+      template.tasks.forEach(task => {
+        // If this task blocks another task, and the blocked task has a department_id,
+        // pre-populate it in the state
+        if (task.blocks_task_id && template.tasks) {
+          const blockedTask = template.tasks.find(t => t.id === task.blocks_task_id);
+          if (blockedTask?.department_id) {
+            initialBlockedDepts[task.blocks_task_id] = blockedTask.department_id;
+          }
+        }
+      });
+      setBlockedTaskDepartments(initialBlockedDepts);
+    }
   }, [template?.id]);
 
   useEffect(() => {
@@ -480,6 +512,17 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         return;
       }
 
+      // Sync blocked task departments from state to formData
+      formData.tasks.forEach((task) => {
+        // If task blocks another, update the blocked task's department from our tracking state
+        if (task.blocks_task_id && blockedTaskDepartments[task.blocks_task_id]) {
+          const blockedTask = formData.tasks.find(t => t.temp_id === task.blocks_task_id);
+          if (blockedTask) {
+            blockedTask.department_id = blockedTaskDepartments[task.blocks_task_id] || null;
+          }
+        }
+      });
+
       // Prepare submission data
       const orderedTasks: ProjectTemplateFormData['tasks'] = [];
       const tasksByParent = new Map<string, ProjectTemplateFormData['tasks']>();
@@ -531,6 +574,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           default_assigned_to: task.default_assigned_to || null,
           blocks_task_id: task.blocks_task_id || null,
           blocked_by_task_id: task.blocked_by_task_id || null,
+          department_id: task.department_id || null,
           category_ids: task.category_ids || [],
         })),
       };
@@ -1195,19 +1239,46 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                               )}
                             </div>
 
+                            {/* Task Dependencies - Enhanced with Department Movement */}
                             <div className={styles.formRow}>
+                              {/* Column 1: This Task Blocks */}
                               <div className={styles.formGroup}>
                                 <label className={styles.label}>This Task Blocks</label>
                                 <select
                                   value={task.blocks_task_id || ''}
-                                  onChange={(e) =>
-                                    handleTaskChange(task.temp_id || '', 'blocks_task_id', e.target.value || null)
-                                  }
+                                  onChange={(e) => {
+                                    const blocksTaskId = e.target.value || null;
+                                    handleTaskChange(task.temp_id || '', 'blocks_task_id', blocksTaskId);
+
+                                    // Auto-populate blocked task's department when selecting
+                                    if (blocksTaskId) {
+                                      const blockedTask = formData.tasks.find(t => t.temp_id === blocksTaskId);
+                                      if (blockedTask?.department_id) {
+                                        setBlockedTaskDepartments(prev => ({
+                                          ...prev,
+                                          [blocksTaskId]: blockedTask.department_id || ''
+                                        }));
+                                      }
+                                    } else {
+                                      // Clear department when deselecting
+                                      if (task.blocks_task_id) {
+                                        setBlockedTaskDepartments(prev => {
+                                          const next = { ...prev };
+                                          delete next[task.blocks_task_id!];
+                                          return next;
+                                        });
+                                      }
+                                    }
+                                  }}
                                   className={styles.select}
                                 >
                                   <option value="">None</option>
                                   {formData.tasks
-                                    .filter((t) => t.temp_id !== task.temp_id && !t.parent_temp_id)
+                                    .filter((t) =>
+                                      t.temp_id !== task.temp_id &&
+                                      !t.parent_temp_id &&
+                                      t.temp_id !== task.blocked_by_task_id
+                                    )
                                     .map((t) => (
                                       <option key={t.temp_id} value={t.temp_id}>
                                         {t.title || 'Untitled Task'}
@@ -1219,18 +1290,65 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                                 </small>
                               </div>
 
+                              {/* Column 2: Move Project When Complete (Conditional) */}
+                              {task.blocks_task_id ? (
+                                <div className={styles.formGroup}>
+                                  <label className={styles.label}>Move Project To When Complete</label>
+                                  <select
+                                    value={getBlockedTaskDepartmentId(task.blocks_task_id)}
+                                    onChange={(e) => {
+                                      if (!task.blocks_task_id) return;
+                                      const deptId = e.target.value || '';
+                                      setBlockedTaskDepartments(prev => ({
+                                        ...prev,
+                                        [task.blocks_task_id!]: deptId
+                                      }));
+
+                                      // Also update the blocked task's department_id in formData
+                                      handleTaskChange(task.blocks_task_id, 'department_id', deptId || null);
+                                    }}
+                                    className={styles.select}
+                                  >
+                                    <option value="">Stay where it is</option>
+                                    {departments.map((dept) => (
+                                      <option key={dept.id} value={dept.id}>
+                                        {dept.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <small className={styles.hint}>
+                                    The blocked task&apos;s project will move here when this task completes
+                                  </small>
+                                </div>
+                              ) : (
+                                <div className={styles.formGroupPlaceholder} />
+                              )}
+                            </div>
+
+                            <div className={styles.formRow}>
+                              {/* Column 1: This Task Is Blocked By */}
                               <div className={styles.formGroup}>
                                 <label className={styles.label}>This Task Is Blocked By</label>
                                 <select
                                   value={task.blocked_by_task_id || ''}
-                                  onChange={(e) =>
-                                    handleTaskChange(task.temp_id || '', 'blocked_by_task_id', e.target.value || null)
-                                  }
+                                  onChange={(e) => {
+                                    const blockedByTaskId = e.target.value || null;
+                                    handleTaskChange(task.temp_id || '', 'blocked_by_task_id', blockedByTaskId);
+
+                                    // Clear department if deselecting blocked_by
+                                    if (!blockedByTaskId) {
+                                      handleTaskChange(task.temp_id || '', 'department_id', null);
+                                    }
+                                  }}
                                   className={styles.select}
                                 >
                                   <option value="">None</option>
                                   {formData.tasks
-                                    .filter((t) => t.temp_id !== task.temp_id && !t.parent_temp_id)
+                                    .filter((t) =>
+                                      t.temp_id !== task.temp_id &&
+                                      !t.parent_temp_id &&
+                                      t.temp_id !== task.blocks_task_id
+                                    )
                                     .map((t) => (
                                       <option key={t.temp_id} value={t.temp_id}>
                                         {t.title || 'Untitled Task'}
@@ -1241,6 +1359,32 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                                   Select a task that must be complete before this task can start
                                 </small>
                               </div>
+
+                              {/* Column 2: Move Project When Unblocked (Conditional) */}
+                              {task.blocked_by_task_id ? (
+                                <div className={styles.formGroup}>
+                                  <label className={styles.label}>Move Project To When Unblocked</label>
+                                  <select
+                                    value={task.department_id || ''}
+                                    onChange={(e) =>
+                                      handleTaskChange(task.temp_id || '', 'department_id', e.target.value || null)
+                                    }
+                                    className={styles.select}
+                                  >
+                                    <option value="">Stay where it is</option>
+                                    {departments.map((dept) => (
+                                      <option key={dept.id} value={dept.id}>
+                                        {dept.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <small className={styles.hint}>
+                                    This task&apos;s project will move here when the blocking task completes
+                                  </small>
+                                </div>
+                              ) : (
+                                <div className={styles.formGroupPlaceholder} />
+                              )}
                             </div>
 
                             <div className={styles.subtaskActions}>
