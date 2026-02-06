@@ -4,9 +4,9 @@ import { generateTasksForAllServices } from '@/lib/monthly-services/generate-tas
 
 /**
  * Cron job to generate tasks for all active monthly services
- * Runs on the 1st of each month at midnight
+ * Runs on the 24th of each month at midnight (approximately 1 week before the new month)
  *
- * Vercel Cron Schedule: "0 0 1 * *"
+ * Vercel Cron Schedule: "0 0 24 * *"
  */
 export async function GET(request: NextRequest) {
   try {
@@ -25,17 +25,20 @@ export async function GET(request: NextRequest) {
     // Create service role client for privileged access
     const supabase = await createClient();
 
-    // Generate tasks for current month
-    const currentMonth = new Date().toISOString().slice(0, 7);
+    // Calculate next month (to generate tasks ahead of time)
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const nextMonthStr = nextMonth.toISOString().slice(0, 7);
+
     const result = await generateTasksForAllServices(supabase, {
-      month: currentMonth,
+      month: nextMonthStr,
     });
 
     console.log('[Cron] Task generation completed:', result);
 
     return NextResponse.json({
       success: true,
-      month: currentMonth,
+      month: nextMonthStr,
       ...result,
     });
   } catch (error) {

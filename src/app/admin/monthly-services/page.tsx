@@ -55,10 +55,12 @@ export default function MonthlyServicesPage() {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
 
-  const [selectedMonthDayjs, setSelectedMonthDayjs] = useState<Dayjs | null>(() => {
-    // Default to current month
-    return dayjs();
-  });
+  const [selectedMonthDayjs, setSelectedMonthDayjs] = useState<Dayjs | null>(
+    () => {
+      // Default to current month
+      return dayjs();
+    }
+  );
 
   // Modal state
   const [showServiceModal, setShowServiceModal] = useState(false);
@@ -68,10 +70,14 @@ export default function MonthlyServicesPage() {
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
     const supabase = createClient();
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     return {
       'Content-Type': 'application/json',
-      ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+      ...(session?.access_token && {
+        Authorization: `Bearer ${session.access_token}`,
+      }),
     };
   };
 
@@ -111,6 +117,7 @@ export default function MonthlyServicesPage() {
               value={selectedMonthDayjs}
               onChange={handleMonthChange}
               views={['year', 'month']}
+              openTo="month"
               slotProps={{
                 textField: {
                   size: 'small',
@@ -149,7 +156,9 @@ export default function MonthlyServicesPage() {
     const fetchUsers = async () => {
       try {
         const headers = await getAuthHeaders();
-        const response = await fetch('/api/admin/users?include_system=true', { headers });
+        const response = await fetch('/api/admin/users?include_system=true', {
+          headers,
+        });
         if (response.ok) {
           const data = await response.json();
           setUsers(data);
@@ -169,7 +178,10 @@ export default function MonthlyServicesPage() {
       setServices([]); // Clear previous services while loading
       try {
         const headers = await getAuthHeaders();
-        const response = await fetch(`/api/admin/monthly-services?month=${selectedMonth}`, { headers });
+        const response = await fetch(
+          `/api/admin/monthly-services?month=${selectedMonth}`,
+          { headers }
+        );
         if (response.ok) {
           const data = await response.json();
           setServices(data.services || []);
@@ -206,7 +218,10 @@ export default function MonthlyServicesPage() {
     }
 
     // Refresh services list
-    const servicesResponse = await fetch(`/api/admin/monthly-services?month=${selectedMonth}`, { headers });
+    const servicesResponse = await fetch(
+      `/api/admin/monthly-services?month=${selectedMonth}`,
+      { headers }
+    );
     if (servicesResponse.ok) {
       const servicesData = await servicesResponse.json();
       setServices(servicesData.services || []);

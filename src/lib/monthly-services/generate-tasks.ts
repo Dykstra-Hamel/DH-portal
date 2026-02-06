@@ -7,7 +7,7 @@ interface TaskTemplate {
   week_of_month: number | null;
   due_day_of_week: number | null;
   default_assigned_to: string | null;
-  recurrence_frequency: string | null;
+  department_id: string | null;
   display_order: number;
 }
 
@@ -159,6 +159,33 @@ export async function generateTasksForMonth(
   if (insertError) {
     console.error(`[generateTasksForMonth] Error creating tasks:`, insertError);
     return [];
+  }
+
+  // Create department assignments for tasks that have a department
+  if (createdTasks && createdTasks.length > 0) {
+    const departmentAssignments = createdTasks
+      .map((task, index) => {
+        const template = templates[index];
+        if (template.department_id) {
+          return {
+            task_id: task.id,
+            department_id: template.department_id,
+          };
+        }
+        return null;
+      })
+      .filter((assignment): assignment is { task_id: string; department_id: string } => assignment !== null);
+
+    if (departmentAssignments.length > 0) {
+      const { error: deptError } = await supabase
+        .from('monthly_service_task_department_assignments')
+        .insert(departmentAssignments);
+
+      if (deptError) {
+        console.error(`[generateTasksForMonth] Error creating department assignments:`, deptError);
+        // Don't fail the whole operation, just log the error
+      }
+    }
   }
 
   console.log(

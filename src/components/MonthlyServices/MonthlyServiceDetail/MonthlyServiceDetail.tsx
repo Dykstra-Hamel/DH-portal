@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
@@ -12,6 +18,7 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import { Settings, ChevronDown, Check, Pencil, Trash2, X } from 'lucide-react';
 import { MonthlyServiceForm } from '@/components/MonthlyServices/MonthlyServiceForm/MonthlyServiceForm';
+import { BudgetCard } from '@/components/MonthlyServices/BudgetCard/BudgetCard';
 import ProjectTaskList from '@/components/Projects/ProjectTaskList/ProjectTaskList';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
@@ -21,6 +28,54 @@ import { ProjectTask } from '@/types/project';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { useUser } from '@/hooks/useUser';
 import styles from './MonthlyServiceDetail.module.scss';
+
+const DAYS_OF_WEEK = [
+  { value: 0, label: 'Sunday' },
+  { value: 1, label: 'Monday' },
+  { value: 2, label: 'Tuesday' },
+  { value: 3, label: 'Wednesday' },
+  { value: 4, label: 'Thursday' },
+  { value: 5, label: 'Friday' },
+  { value: 6, label: 'Saturday' },
+];
+
+/**
+ * Calculate the due date for a task based on week_of_month and due_day_of_week
+ * @param year - Year (YYYY)
+ * @param month - Month (1-12)
+ * @param weekOfMonth - Week of month (1-4)
+ * @param dayOfWeek - Day of week (0=Sunday, 6=Saturday)
+ * @returns ISO date string (YYYY-MM-DD)
+ */
+function calculateDueDate(
+  year: number,
+  month: number,
+  weekOfMonth: number,
+  dayOfWeek: number
+): string {
+  // Find the first occurrence of the target day of week in the month
+  const firstDayOfMonth = new Date(year, month - 1, 1);
+  const firstDayOfWeek = firstDayOfMonth.getDay();
+
+  // Calculate days to add to get to first occurrence of target day
+  let daysToAdd = dayOfWeek - firstDayOfWeek;
+  if (daysToAdd < 0) {
+    daysToAdd += 7;
+  }
+
+  // Add weeks to get to the target week
+  daysToAdd += (weekOfMonth - 1) * 7;
+
+  const dueDate = new Date(year, month - 1, 1 + daysToAdd);
+
+  // Ensure we didn't overflow into next month
+  if (dueDate.getMonth() !== month - 1) {
+    // If we overflowed, use the last occurrence of that day in the month
+    dueDate.setDate(dueDate.getDate() - 7);
+  }
+
+  return dueDate.toISOString().split('T')[0];
+}
 
 interface Company {
   id: string;
@@ -41,9 +96,9 @@ interface TaskTemplate {
   description: string | null;
   week_of_month: number | null;
   due_day_of_week: number | null;
-  recurrence_frequency: string | null;
   display_order: number;
   default_assigned_to: string | null;
+  department_id: string | null;
   profiles: Profile | null;
 }
 
@@ -56,6 +111,14 @@ interface MonthlyServiceTask {
   due_date: string;
   assigned_to: string | null;
   profiles: Profile | null;
+  monthly_service_task_department_assignments?: {
+    department_id: string;
+    monthly_services_departments: {
+      id: string;
+      name: string;
+      icon?: string;
+    };
+  }[];
 }
 
 interface CommentAttachment {
@@ -93,18 +156,34 @@ interface WeekProgress {
   tasks: MonthlyServiceTask[];
 }
 
+interface MonthlyServiceBudget {
+  id: string;
+  budget_type: 'google_ads' | 'social_media' | 'lsa';
+  year: number;
+  month: number;
+  budgeted_amount: number;
+  actual_spend: number | null;
+}
+
 interface Service {
   id: string;
   service_name: string;
   description: string | null;
   status: string;
   is_active: boolean;
+  track_google_ads_budget?: boolean;
+  default_google_ads_budget?: number;
+  track_social_media_budget?: boolean;
+  default_social_media_budget?: number;
+  track_lsa_budget?: boolean;
+  default_lsa_budget?: number;
   created_at: string;
   updated_at: string;
   company_id: string;
   companies: Company;
   templates: TaskTemplate[];
   weekProgress: WeekProgress[];
+  budgets?: MonthlyServiceBudget[];
 }
 
 interface MonthlyServiceDetailProps {
@@ -138,6 +217,7 @@ export function MonthlyServiceDetail({
   const [showEditModal, setShowEditModal] = useState(false);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [users, setUsers] = useState<Profile[]>([]);
+  const [departments, setDepartments] = useState<{id: string; name: string; icon?: string}[]>([]);
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
   const { isStarred, toggleStar } = useStarredItems();
@@ -148,7 +228,9 @@ export function MonthlyServiceDetail({
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
   const [isUpdatingComment, setIsUpdatingComment] = useState(false);
-  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
+    null
+  );
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -157,6 +239,18 @@ export function MonthlyServiceDetail({
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
+
+  // Add task state
+  const [showAddTaskDialog, setShowAddTaskDialog] = useState(false);
+  const [addTaskWeek, setAddTaskWeek] = useState<number | null>(null);
+  const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [newTaskDescription, setNewTaskDescription] = useState('');
+  const [newTaskAssignedTo, setNewTaskAssignedTo] = useState('');
+  const [newTaskPriority, setNewTaskPriority] = useState<'low' | 'medium' | 'high' | 'critical'>('medium');
+  const [newTaskDayOfWeek, setNewTaskDayOfWeek] = useState<number | null>(null);
+  const [newTaskDepartment, setNewTaskDepartment] = useState<string>('');
+  const [addToTemplate, setAddToTemplate] = useState(false);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const dragCounterRef = useRef(0);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
   const { getAvatarUrl, getDisplayName, getInitials } = useUser();
@@ -213,6 +307,23 @@ export function MonthlyServiceDetail({
     fetchUsers();
   }, []);
 
+  // Fetch departments
+  useEffect(() => {
+    const fetchDepartments = async () => {
+      try {
+        const response = await fetch('/api/admin/monthly-services/departments');
+        if (response.ok) {
+          const data = await response.json();
+          setDepartments(data.departments || []);
+        }
+      } catch (error) {
+        console.error('Error fetching departments:', error);
+      }
+    };
+
+    fetchDepartments();
+  }, []);
+
   // Fetch service data when month changes
   useEffect(() => {
     const fetchServiceData = async () => {
@@ -253,6 +364,7 @@ export function MonthlyServiceDetail({
                 value={selectedMonthDayjs}
                 onChange={handleMonthChange}
                 views={['year', 'month']}
+                openTo="month"
                 slotProps={{
                   textField: {
                     size: 'small',
@@ -349,7 +461,7 @@ export function MonthlyServiceDetail({
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         const mentionNodes = doc.querySelectorAll('span[data-type="mention"]');
-        mentionNodes.forEach((node) => {
+        mentionNodes.forEach(node => {
           const id = node.getAttribute('data-id');
           if (id && id === user.id) {
             node.setAttribute('data-mention-self', 'true');
@@ -375,16 +487,18 @@ export function MonthlyServiceDetail({
       notes: null,
       is_completed: task.is_completed,
       completed_at: task.is_completed ? new Date().toISOString() : null,
-      priority: (task.priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
+      priority:
+        (task.priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
       assigned_to: task.assigned_to,
       created_by: user.id,
       due_date: task.due_date,
       start_date: null,
       progress_percentage: task.is_completed ? 100 : 0,
       actual_hours: null,
-      blocked_by: null,
-      blocking: null,
+      blocks_task_id: null,
+      blocked_by_task_id: null,
       blocker_reason: null,
+      department_id: null,
       display_order: 0,
       recurring_frequency: null,
       recurring_end_date: null,
@@ -393,14 +507,18 @@ export function MonthlyServiceDetail({
       next_recurrence_date: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      assigned_to_profile: task.profiles ? {
-        id: task.profiles.id,
-        first_name: task.profiles.first_name || '',
-        last_name: task.profiles.last_name || '',
-        email: task.profiles.email,
-        avatar_url: undefined,
-      } : null,
-    };
+      assigned_to_profile: task.profiles
+        ? {
+            id: task.profiles.id,
+            first_name: task.profiles.first_name || '',
+            last_name: task.profiles.last_name || '',
+            email: task.profiles.email,
+            avatar_url: undefined,
+          }
+        : null,
+      // Add monthly_service_id so ProjectTaskDetail can detect this is a monthly service task
+      monthly_service_id: service.id,
+    } as any; // Use 'as any' since monthly_service_id is not in ProjectTask type
   };
 
   const handleTaskClick = (task: ProjectTask) => {
@@ -531,6 +649,135 @@ export function MonthlyServiceDetail({
     onServiceUpdate();
   };
 
+  const handleOpenAddTask = (week: number) => {
+    setAddTaskWeek(week);
+    setNewTaskTitle('');
+    setNewTaskDescription('');
+    setNewTaskAssignedTo('');
+    setNewTaskPriority('medium');
+    setNewTaskDayOfWeek(null);
+    setNewTaskDepartment('');
+    setAddToTemplate(false);
+    setShowAddTaskDialog(true);
+  };
+
+  const handleCloseAddTask = () => {
+    setShowAddTaskDialog(false);
+    setAddTaskWeek(null);
+    setNewTaskTitle('');
+    setNewTaskDescription('');
+    setNewTaskAssignedTo('');
+    setNewTaskPriority('medium');
+    setNewTaskDayOfWeek(null);
+    setNewTaskDepartment('');
+    setAddToTemplate(false);
+  };
+
+  const handleCreateTask = async () => {
+    if (!newTaskTitle.trim() || addTaskWeek === null) {
+      setToastMessage('Task title is required');
+      setToastType('error');
+      setShowToast(true);
+      return;
+    }
+
+    if (newTaskDayOfWeek === null) {
+      setToastMessage('Please select a day of the week');
+      setToastType('error');
+      setShowToast(true);
+      return;
+    }
+
+    if (!newTaskDepartment) {
+      setToastMessage('Please select a department');
+      setToastType('error');
+      setShowToast(true);
+      return;
+    }
+
+    setIsCreatingTask(true);
+
+    try {
+      const headers = await getAuthHeaders();
+
+      // Calculate due date based on week and day of week
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const dueDateStr = calculateDueDate(year, month, addTaskWeek, newTaskDayOfWeek);
+
+      console.log('[Add Task] Calculated due date:', {
+        selectedMonth,
+        addTaskWeek,
+        dayOfWeek: newTaskDayOfWeek,
+        dueDate: dueDateStr,
+        addToTemplate,
+      });
+
+      // Create task using the monthly service tasks endpoint
+      // This endpoint handles both template addition and task creation
+      const taskResponse = await fetch(`/api/admin/monthly-services/${service.id}/tasks`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          title: newTaskTitle.trim(),
+          description: newTaskDescription.trim() || null,
+          assigned_to: newTaskAssignedTo || null,
+          department_id: newTaskDepartment || null,
+          priority: newTaskPriority,
+          due_date: dueDateStr,
+          add_to_template: addToTemplate,
+          week_of_month: addTaskWeek,
+          due_day_of_week: newTaskDayOfWeek,
+        }),
+      });
+
+      if (!taskResponse.ok) {
+        const errorData = await taskResponse.json();
+        throw new Error(errorData.error || 'Failed to create task');
+      }
+
+      const taskData = await taskResponse.json();
+      console.log('[Add Task] Task created:', taskData);
+
+      // Refresh service data
+      console.log('[Add Task] Refreshing service data for month:', selectedMonth);
+      const refreshResponse = await fetch(
+        `/api/admin/monthly-services/${service.id}?month=${selectedMonth}`,
+        { headers }
+      );
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        console.log('[Add Task] Refreshed data:', {
+          taskCount: data.service?.weekProgress?.reduce((sum: number, w: any) => sum + w.tasks.length, 0),
+          weekProgress: data.service?.weekProgress?.map((w: any) => ({
+            week: w.week,
+            taskCount: w.tasks.length,
+          })),
+        });
+        setServiceData(data.service);
+      } else {
+        console.error('[Add Task] Failed to refresh service data:', refreshResponse.status);
+      }
+
+      // Show success message
+      if (addToTemplate) {
+        setToastMessage('Task created and added to template for future months');
+      } else {
+        setToastMessage('Task created for this month only');
+      }
+      setToastType('success');
+      setShowToast(true);
+
+      handleCloseAddTask();
+    } catch (error) {
+      console.error('Error creating task:', error);
+      setToastMessage(error instanceof Error ? error.message : 'Failed to create task');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsCreatingTask(false);
+    }
+  };
+
   // Comment handlers
   const handleSubmitComment = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -539,14 +786,17 @@ export function MonthlyServiceDetail({
     setIsSubmittingComment(true);
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/monthly-services/${service.id}/comments`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          comment: newComment,
-          month: selectedMonth,
-        }),
-      });
+      const response = await fetch(
+        `/api/admin/monthly-services/${service.id}/comments`,
+        {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            comment: newComment,
+            month: selectedMonth,
+          }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to post comment');
@@ -585,10 +835,13 @@ export function MonthlyServiceDetail({
     }
   };
 
-  const handleStartEditComment = useCallback((comment: MonthlyServiceComment) => {
-    setEditingCommentId(comment.id);
-    setEditingCommentText(comment.comment);
-  }, []);
+  const handleStartEditComment = useCallback(
+    (comment: MonthlyServiceComment) => {
+      setEditingCommentId(comment.id);
+      setEditingCommentText(comment.comment);
+    },
+    []
+  );
 
   const handleCancelEditComment = useCallback(() => {
     setEditingCommentId(null);
@@ -607,11 +860,14 @@ export function MonthlyServiceDetail({
     setIsUpdatingComment(true);
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/monthly-services/${service.id}/comments/${editingCommentId}`, {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify({ comment: editingCommentText }),
-      });
+      const response = await fetch(
+        `/api/admin/monthly-services/${service.id}/comments/${editingCommentId}`,
+        {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({ comment: editingCommentText }),
+        }
+      );
 
       if (!response.ok) {
         throw new Error('Failed to update comment');
@@ -638,42 +894,50 @@ export function MonthlyServiceDetail({
     }
   }, [editingCommentId, editingCommentText, service.id]);
 
-  const handleDeleteComment = useCallback(async (commentId: string) => {
-    if (!confirm('Delete this comment? This action cannot be undone.')) {
-      return;
-    }
-
-    setDeletingCommentId(commentId);
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/monthly-services/${service.id}/comments/${commentId}`, {
-        method: 'DELETE',
-        headers,
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to delete comment');
+  const handleDeleteComment = useCallback(
+    async (commentId: string) => {
+      if (!confirm('Delete this comment? This action cannot be undone.')) {
+        return;
       }
 
-      setComments(prev => prev.filter(comment => comment.id !== commentId));
-      if (editingCommentId === commentId) {
-        setEditingCommentId(null);
-        setEditingCommentText('');
-      }
-      setToastMessage('Comment deleted.');
-      setToastType('success');
-      setShowToast(true);
-    } catch (error) {
-      console.error('Error deleting comment:', error);
-      setToastMessage('Failed to delete comment.');
-      setToastType('error');
-      setShowToast(true);
-    } finally {
-      setDeletingCommentId(null);
-    }
-  }, [editingCommentId, service.id]);
+      setDeletingCommentId(commentId);
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(
+          `/api/admin/monthly-services/${service.id}/comments/${commentId}`,
+          {
+            method: 'DELETE',
+            headers,
+          }
+        );
 
-  const handleCommentFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        if (!response.ok) {
+          throw new Error('Failed to delete comment');
+        }
+
+        setComments(prev => prev.filter(comment => comment.id !== commentId));
+        if (editingCommentId === commentId) {
+          setEditingCommentId(null);
+          setEditingCommentText('');
+        }
+        setToastMessage('Comment deleted.');
+        setToastType('success');
+        setShowToast(true);
+      } catch (error) {
+        console.error('Error deleting comment:', error);
+        setToastMessage('Failed to delete comment.');
+        setToastType('error');
+        setShowToast(true);
+      } finally {
+        setDeletingCommentId(null);
+      }
+    },
+    [editingCommentId, service.id]
+  );
+
+  const handleCommentFileSelect = (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     if (event.target.files && event.target.files.length > 0) {
       const newFiles = Array.from(event.target.files);
       setPendingAttachments(prev => [...prev, ...newFiles]);
@@ -728,7 +992,9 @@ export function MonthlyServiceDetail({
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFiles = Array.from(e.dataTransfer.files);
-      const validFiles = droppedFiles.filter(file => allowedTypes.includes(file.type));
+      const validFiles = droppedFiles.filter(file =>
+        allowedTypes.includes(file.type)
+      );
 
       if (validFiles.length > 0) {
         setPendingAttachments(prev => [...prev, ...validFiles]);
@@ -744,9 +1010,147 @@ export function MonthlyServiceDetail({
 
   const rawAvatarUrl = getAvatarUrl();
   const commentAvatarUrl =
-    commentAvatarError || !rawAvatarUrl || rawAvatarUrl === 'null' || rawAvatarUrl === 'undefined'
+    commentAvatarError ||
+    !rawAvatarUrl ||
+    rawAvatarUrl === 'null' ||
+    rawAvatarUrl === 'undefined'
       ? null
       : rawAvatarUrl;
+
+  // Calculate total task completion for month navigation
+  const totalTasks = serviceData.weekProgress.reduce(
+    (sum, week) => sum + week.total,
+    0
+  );
+  const completedTasks = serviceData.weekProgress.reduce(
+    (sum, week) => sum + week.completed,
+    0
+  );
+
+  const handlePreviousMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const newDate = new Date(year, month - 2, 1); // month - 2 because month is 1-indexed
+    const newMonth = newDate.toISOString().slice(0, 7);
+    setSelectedMonth(newMonth);
+  };
+
+  const handleNextMonth = () => {
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const newDate = new Date(year, month, 1); // month is already correct for next month
+    const newMonth = newDate.toISOString().slice(0, 7);
+    setSelectedMonth(newMonth);
+  };
+
+  // Budget handlers
+  const handleBudgetChange = async (
+    budgetType: 'google_ads' | 'social_media' | 'lsa',
+    newAmount: number
+  ) => {
+    try {
+      const headers = await getAuthHeaders();
+      const [year, month] = selectedMonth.split('-').map(Number);
+
+      const response = await fetch(
+        `/api/admin/monthly-services/${service.id}/budgets`,
+        {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            budget_type: budgetType,
+            year,
+            month,
+            budgeted_amount: newAmount,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update budget');
+      }
+
+      // Refresh service data
+      const refreshResponse = await fetch(
+        `/api/admin/monthly-services/${service.id}?month=${selectedMonth}`,
+        { headers }
+      );
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        setServiceData(data.service);
+      }
+    } catch (error) {
+      console.error('Error updating budget:', error);
+      setToastMessage('Failed to update budget');
+      setToastType('error');
+      setShowToast(true);
+    }
+  };
+
+  const handleActualSpendChange = async (
+    budgetType: 'google_ads' | 'social_media' | 'lsa',
+    actualSpend: number
+  ) => {
+    try {
+      const headers = await getAuthHeaders();
+      const [year, month] = selectedMonth.split('-').map(Number);
+
+      // Get the current budget for this type (or default)
+      const existingBudget = serviceData.budgets?.find(
+        b => b.budget_type === budgetType
+      );
+
+      let budgetedAmount: number;
+      if (existingBudget) {
+        budgetedAmount = existingBudget.budgeted_amount;
+      } else {
+        // Use default amount if no budget record exists yet
+        if (budgetType === 'google_ads') {
+          budgetedAmount = serviceData.default_google_ads_budget || 5000;
+        } else if (budgetType === 'social_media') {
+          budgetedAmount = serviceData.default_social_media_budget || 2500;
+        } else {
+          budgetedAmount = serviceData.default_lsa_budget || 1500;
+        }
+      }
+
+      const response = await fetch(
+        `/api/admin/monthly-services/${service.id}/budgets`,
+        {
+          method: 'PATCH',
+          headers,
+          body: JSON.stringify({
+            budget_type: budgetType,
+            year,
+            month,
+            budgeted_amount: budgetedAmount,
+            actual_spend: actualSpend,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update actual spend');
+      }
+
+      // Refresh service data
+      const refreshResponse = await fetch(
+        `/api/admin/monthly-services/${service.id}?month=${selectedMonth}`,
+        { headers }
+      );
+      if (refreshResponse.ok) {
+        const data = await refreshResponse.json();
+        setServiceData(data.service);
+      }
+
+      setToastMessage('Actual spend updated');
+      setToastType('success');
+      setShowToast(true);
+    } catch (error) {
+      console.error('Error updating actual spend:', error);
+      setToastMessage('Failed to update actual spend');
+      setToastType('error');
+      setShowToast(true);
+    }
+  };
 
   return (
     <div
@@ -756,6 +1160,113 @@ export function MonthlyServiceDetail({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
     >
+      {/* Month Navigation */}
+      <div className={styles.monthNavigation}>
+        <button
+          onClick={handlePreviousMonth}
+          className={styles.monthNavButton}
+          type="button"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M10 12L6 8L10 4"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          Previous Month
+        </button>
+        <div className={styles.monthDisplay}>
+          <div className={styles.monthName}>{formatMonth(selectedMonth)}</div>
+          <div className={styles.monthStats}>
+            {completedTasks} of {totalTasks} tasks completed
+          </div>
+        </div>
+        <button
+          onClick={handleNextMonth}
+          className={styles.monthNavButton}
+          type="button"
+        >
+          Next Month
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M6 4L10 8L6 12"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {/* Budget Tracking Section */}
+      {(serviceData.track_google_ads_budget ||
+        serviceData.track_social_media_budget ||
+        serviceData.track_lsa_budget) && (
+        <div className={styles.section}>
+          <h2 className={styles.sectionTitle}>Budget Tracking</h2>
+          <div className={styles.budgetCardsContainer}>
+            {serviceData.track_google_ads_budget && (() => {
+              const budget = serviceData.budgets?.find(
+                b => b.budget_type === 'google_ads'
+              );
+              const defaultAmount = serviceData.default_google_ads_budget || 5000;
+              return (
+                <BudgetCard
+                  budgetType="google_ads"
+                  budgetAmount={budget?.budgeted_amount || defaultAmount}
+                  actualSpend={budget?.actual_spend || null}
+                  onBudgetChange={(amount) => handleBudgetChange('google_ads', amount)}
+                  onActualSpendChange={(spend) =>
+                    handleActualSpendChange('google_ads', spend)
+                  }
+                />
+              );
+            })()}
+
+            {serviceData.track_social_media_budget && (() => {
+              const budget = serviceData.budgets?.find(
+                b => b.budget_type === 'social_media'
+              );
+              const defaultAmount = serviceData.default_social_media_budget || 2500;
+              return (
+                <BudgetCard
+                  budgetType="social_media"
+                  budgetAmount={budget?.budgeted_amount || defaultAmount}
+                  actualSpend={budget?.actual_spend || null}
+                  onBudgetChange={(amount) =>
+                    handleBudgetChange('social_media', amount)
+                  }
+                  onActualSpendChange={(spend) =>
+                    handleActualSpendChange('social_media', spend)
+                  }
+                />
+              );
+            })()}
+
+            {serviceData.track_lsa_budget && (() => {
+              const budget = serviceData.budgets?.find(
+                b => b.budget_type === 'lsa'
+              );
+              const defaultAmount = serviceData.default_lsa_budget || 1500;
+              return (
+                <BudgetCard
+                  budgetType="lsa"
+                  budgetAmount={budget?.budgeted_amount || defaultAmount}
+                  actualSpend={budget?.actual_spend || null}
+                  onBudgetChange={(amount) => handleBudgetChange('lsa', amount)}
+                  onActualSpendChange={(spend) =>
+                    handleActualSpendChange('lsa', spend)
+                  }
+                />
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* Tasks by Week */}
       <div className={styles.section}>
@@ -765,41 +1276,118 @@ export function MonthlyServiceDetail({
         {loading ? (
           <div className={styles.loading}>Loading tasks...</div>
         ) : (
-          <div className={styles.weeksGrid}>
-            {serviceData.weekProgress.map(week => (
-              <div key={week.week} className={styles.weekCard}>
-                <div className={styles.weekHeader}>
-                  <h3 className={styles.weekTitle}>Week {week.week}</h3>
-                  <span className={styles.weekProgress}>
-                    {week.completed} / {week.total}
-                  </span>
+          <div className={styles.weeksContainer}>
+            {serviceData.weekProgress.map(week => {
+              // Group tasks by department within each week
+              const tasksByDepartment = new Map<string, MonthlyServiceTask[]>();
+              const noDepartmentTasks: MonthlyServiceTask[] = [];
+
+              week.tasks.forEach(task => {
+                const departmentAssignment = task.monthly_service_task_department_assignments?.[0];
+                if (!departmentAssignment) {
+                  noDepartmentTasks.push(task);
+                } else {
+                  const departmentName = departmentAssignment.monthly_services_departments?.name || 'Unknown';
+                  const existingTasks = tasksByDepartment.get(departmentName);
+                  if (existingTasks) {
+                    existingTasks.push(task);
+                  } else {
+                    tasksByDepartment.set(departmentName, [task]);
+                  }
+                }
+              });
+
+              const departmentGroups = Array.from(tasksByDepartment.entries()).sort(
+                ([nameA], [nameB]) => nameA.localeCompare(nameB)
+              );
+
+              return (
+                <div key={week.week} className={styles.weekSection}>
+                  <div className={styles.weekSectionHeader}>
+                    <h3 className={styles.weekSectionTitle}>
+                      Week {week.week}
+                    </h3>
+                    <div className={styles.progressBarContainer}>
+                      <div className={styles.progressBar}>
+                        <div
+                          className={styles.progressFill}
+                          style={{
+                            width: `${week.percentage}%`,
+                          }}
+                        >
+                          <span className={styles.progressPercentage}>
+                            {week.percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <span className={styles.totalTasksLabel}>
+                        Total Tasks:{' '}
+                        <strong>
+                          {week.completed} / {week.total}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {week.tasks.length === 0 ? (
+                    <div className={styles.noTasks}>No tasks for this week</div>
+                  ) : (
+                    <div className={styles.taskGroupsContainer}>
+                      {departmentGroups.map(([departmentName, tasks]) => (
+                        <div key={departmentName} className={styles.taskGroup}>
+                          <h4 className={styles.taskGroupTitle}>
+                            {departmentName}
+                          </h4>
+                          <ProjectTaskList
+                            tasks={tasks.map(convertToProjectTask)}
+                            onTaskClick={handleTaskClick}
+                            onToggleComplete={handleToggleComplete}
+                            onUpdateTask={handleUpdateTask}
+                            onDeleteTask={handleDeleteTask}
+                            onToggleStar={taskId => toggleStar('task', taskId)}
+                            isStarred={taskId => isStarred('task', taskId)}
+                            showHeader={false}
+                          />
+                        </div>
+                      ))}
+
+                      {noDepartmentTasks.length > 0 && (
+                        <div className={styles.taskGroup}>
+                          <h4 className={styles.taskGroupTitle}>No Department</h4>
+                          <ProjectTaskList
+                            tasks={noDepartmentTasks.map(convertToProjectTask)}
+                            onTaskClick={handleTaskClick}
+                            onToggleComplete={handleToggleComplete}
+                            onUpdateTask={handleUpdateTask}
+                            onDeleteTask={handleDeleteTask}
+                            onToggleStar={taskId => toggleStar('task', taskId)}
+                            isStarred={taskId => isStarred('task', taskId)}
+                            showHeader={false}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Add Task Button */}
+                  <button
+                    onClick={() => handleOpenAddTask(week.week)}
+                    className={styles.addTaskButton}
+                    type="button"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path
+                        d="M8 3V13M3 8H13"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    Add Task
+                  </button>
                 </div>
-                <div className={styles.progressBar}>
-                  <div
-                    className={styles.progressFill}
-                    style={{
-                      width: `${week.percentage}%`,
-                      backgroundColor:
-                        week.percentage === 100 ? '#10B981' : '#3B82F6',
-                    }}
-                  />
-                </div>
-                {week.tasks.length === 0 ? (
-                  <div className={styles.noTasks}>No tasks for this week</div>
-                ) : (
-                  <ProjectTaskList
-                    tasks={week.tasks.map(convertToProjectTask)}
-                    onTaskClick={handleTaskClick}
-                    onToggleComplete={handleToggleComplete}
-                    onUpdateTask={handleUpdateTask}
-                    onDeleteTask={handleDeleteTask}
-                    onToggleStar={(taskId) => toggleStar('task', taskId)}
-                    isStarred={(taskId) => isStarred('task', taskId)}
-                    showHeader={false}
-                  />
-                )}
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -811,7 +1399,24 @@ export function MonthlyServiceDetail({
         onSubmit={handleServiceSubmit}
         companies={companies}
         users={users}
-        service={serviceData}
+        service={{
+          id: serviceData.id,
+          company_id: serviceData.company_id,
+          service_name: serviceData.service_name,
+          description: serviceData.description,
+          status: serviceData.status,
+          is_active: serviceData.is_active,
+          templates: serviceData.templates.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            default_assigned_to: t.default_assigned_to,
+            department_id: t.department_id || null,
+            week_of_month: t.week_of_month,
+            due_day_of_week: t.due_day_of_week,
+            display_order: t.display_order,
+          })),
+        }}
       />
 
       {/* Comments Section */}
@@ -821,15 +1426,20 @@ export function MonthlyServiceDetail({
             type="button"
             className={styles.sectionToggle}
             onClick={() => setIsCommentsCollapsed(prev => !prev)}
-            aria-label={isCommentsCollapsed ? 'Expand comments' : 'Collapse comments'}
+            aria-label={
+              isCommentsCollapsed ? 'Expand comments' : 'Collapse comments'
+            }
           >
             <ChevronDown
               size={18}
-              className={isCommentsCollapsed ? styles.sectionChevronCollapsed : undefined}
+              className={
+                isCommentsCollapsed ? styles.sectionChevronCollapsed : undefined
+              }
             />
           </button>
           <h3 className={styles.sectionTitle}>
-            Comments <span className={styles.sectionCount}>({comments.length})</span>
+            Comments{' '}
+            <span className={styles.sectionCount}>({comments.length})</span>
           </h3>
         </div>
         {!isCommentsCollapsed && (
@@ -838,7 +1448,8 @@ export function MonthlyServiceDetail({
               <div className={styles.commentsList}>
                 {comments.map(comment => {
                   const authorName = comment.user_profile
-                    ? `${comment.user_profile.first_name || ''} ${comment.user_profile.last_name || ''}`.trim() || comment.user_profile.email
+                    ? `${comment.user_profile.first_name || ''} ${comment.user_profile.last_name || ''}`.trim() ||
+                      comment.user_profile.email
                     : 'Unknown';
                   const isCommentOwner = comment.user_id === user.id;
                   const isEditing = editingCommentId === comment.id;
@@ -855,8 +1466,12 @@ export function MonthlyServiceDetail({
                     >
                       <div className={styles.commentMeta}>
                         <MiniAvatar
-                          firstName={comment.user_profile?.first_name || undefined}
-                          lastName={comment.user_profile?.last_name || undefined}
+                          firstName={
+                            comment.user_profile?.first_name || undefined
+                          }
+                          lastName={
+                            comment.user_profile?.last_name || undefined
+                          }
                           email={comment.user_profile?.email || ''}
                           avatarUrl={comment.user_profile?.avatar_url || null}
                           size="small"
@@ -864,11 +1479,15 @@ export function MonthlyServiceDetail({
                           className={styles.commentAvatarMini}
                         />
                         <div className={styles.commentMetaDetails}>
-                          <span className={styles.commentAuthor}>{authorName}</span>
+                          <span className={styles.commentAuthor}>
+                            {authorName}
+                          </span>
                           <span className={styles.commentDate}>
                             {formatCommentDate(comment.created_at)}
                             {isEdited && (
-                              <span className={styles.commentEdited}>edited</span>
+                              <span className={styles.commentEdited}>
+                                edited
+                              </span>
                             )}
                           </span>
                         </div>
@@ -881,7 +1500,10 @@ export function MonthlyServiceDetail({
                                   className={styles.commentActionButton}
                                   onClick={handleUpdateComment}
                                   aria-label="Save comment"
-                                  disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
+                                  disabled={
+                                    isUpdatingComment ||
+                                    isRichTextEmpty(editingCommentText)
+                                  }
                                 >
                                   <Check size={14} />
                                 </button>
@@ -900,7 +1522,9 @@ export function MonthlyServiceDetail({
                                 <button
                                   type="button"
                                   className={styles.commentActionButton}
-                                  onClick={() => handleStartEditComment(comment)}
+                                  onClick={() =>
+                                    handleStartEditComment(comment)
+                                  }
                                   aria-label="Edit comment"
                                 >
                                   <Pencil size={14} />
@@ -908,7 +1532,9 @@ export function MonthlyServiceDetail({
                                 <button
                                   type="button"
                                   className={`${styles.commentActionButton} ${styles.commentActionDanger}`}
-                                  onClick={() => handleDeleteComment(comment.id)}
+                                  onClick={() =>
+                                    handleDeleteComment(comment.id)
+                                  }
                                   aria-label="Delete comment"
                                   disabled={deletingCommentId === comment.id}
                                 >
@@ -932,74 +1558,107 @@ export function MonthlyServiceDetail({
                         <>
                           <div
                             className={styles.commentText}
-                            dangerouslySetInnerHTML={{ __html: getCommentHtml(comment.comment) }}
+                            dangerouslySetInnerHTML={{
+                              __html: getCommentHtml(comment.comment),
+                            }}
                           />
-                          {comment.attachments && comment.attachments.length > 0 && (() => {
-                            const imageAttachments = comment.attachments.filter(
-                              (attachment) =>
-                                attachment.mime_type?.startsWith('image/')
-                            );
-                            const fileAttachments = comment.attachments.filter(
-                              (attachment) =>
-                                !attachment.mime_type?.startsWith('image/')
-                            );
+                          {comment.attachments &&
+                            comment.attachments.length > 0 &&
+                            (() => {
+                              const imageAttachments =
+                                comment.attachments.filter(attachment =>
+                                  attachment.mime_type?.startsWith('image/')
+                                );
+                              const fileAttachments =
+                                comment.attachments.filter(
+                                  attachment =>
+                                    !attachment.mime_type?.startsWith('image/')
+                                );
 
-                            return (
-                              <>
-                                {imageAttachments.length > 0 && (
-                                  <div className={styles.commentImageAttachments}>
-                                    {imageAttachments.map((attachment) => (
-                                      <a
-                                        key={attachment.id}
-                                        href={attachment.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={styles.commentImageLink}
-                                      >
-                                        <img
-                                          src={attachment.url}
-                                          alt={attachment.file_name}
-                                          className={styles.commentImage}
-                                        />
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                                {fileAttachments.length > 0 && (
-                                  <div className={styles.commentAttachments}>
-                                    {fileAttachments.map((attachment) => (
-                                      <a
-                                        key={attachment.id}
-                                        href={attachment.url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className={styles.attachmentCard}
-                                      >
-                                        <div className={styles.attachmentIcon}>
-                                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                            <path
-                                              d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-                                              stroke="currentColor"
-                                              strokeWidth="2"
-                                              strokeLinecap="round"
-                                              strokeLinejoin="round"
-                                            />
-                                            <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                          </svg>
-                                        </div>
-                                        <div className={styles.attachmentInfo}>
-                                          <span className={styles.attachmentName}>{attachment.file_name}</span>
-                                          {attachment.mime_type === 'application/pdf' && (
-                                            <span className={styles.attachmentBadge}>PDF</span>
-                                          )}
-                                        </div>
-                                      </a>
-                                    ))}
-                                  </div>
-                                )}
-                              </>
-                            );
-                          })()}
+                              return (
+                                <>
+                                  {imageAttachments.length > 0 && (
+                                    <div
+                                      className={styles.commentImageAttachments}
+                                    >
+                                      {imageAttachments.map(attachment => (
+                                        <a
+                                          key={attachment.id}
+                                          href={attachment.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className={styles.commentImageLink}
+                                        >
+                                          <img
+                                            src={attachment.url}
+                                            alt={attachment.file_name}
+                                            className={styles.commentImage}
+                                          />
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+                                  {fileAttachments.length > 0 && (
+                                    <div className={styles.commentAttachments}>
+                                      {fileAttachments.map(attachment => (
+                                        <a
+                                          key={attachment.id}
+                                          href={attachment.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          className={styles.attachmentCard}
+                                        >
+                                          <div
+                                            className={styles.attachmentIcon}
+                                          >
+                                            <svg
+                                              width="16"
+                                              height="16"
+                                              viewBox="0 0 24 24"
+                                              fill="none"
+                                            >
+                                              <path
+                                                d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                              />
+                                              <path
+                                                d="M14 2V8H20"
+                                                stroke="currentColor"
+                                                strokeWidth="2"
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                              />
+                                            </svg>
+                                          </div>
+                                          <div
+                                            className={styles.attachmentInfo}
+                                          >
+                                            <span
+                                              className={styles.attachmentName}
+                                            >
+                                              {attachment.file_name}
+                                            </span>
+                                            {attachment.mime_type ===
+                                              'application/pdf' && (
+                                              <span
+                                                className={
+                                                  styles.attachmentBadge
+                                                }
+                                              >
+                                                PDF
+                                              </span>
+                                            )}
+                                          </div>
+                                        </a>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              );
+                            })()}
                         </>
                       )}
                     </div>
@@ -1010,7 +1669,10 @@ export function MonthlyServiceDetail({
               <div className={styles.commentsEmpty}>No comments yet.</div>
             )}
 
-            <form onSubmit={handleSubmitComment} className={styles.commentComposer}>
+            <form
+              onSubmit={handleSubmitComment}
+              className={styles.commentComposer}
+            >
               {commentAvatarUrl ? (
                 <Image
                   src={commentAvatarUrl}
@@ -1035,8 +1697,13 @@ export function MonthlyServiceDetail({
                 {pendingAttachments.length > 0 && (
                   <div className={styles.pendingAttachments}>
                     {pendingAttachments.map((file, index) => (
-                      <div key={`${file.name}-${index}`} className={styles.pendingAttachment}>
-                        <span className={styles.pendingAttachmentName}>{file.name}</span>
+                      <div
+                        key={`${file.name}-${index}`}
+                        className={styles.pendingAttachment}
+                      >
+                        <span className={styles.pendingAttachmentName}>
+                          {file.name}
+                        </span>
                         <button
                           type="button"
                           onClick={() => removeCommentAttachment(index)}
@@ -1076,7 +1743,11 @@ export function MonthlyServiceDetail({
               <button
                 type="submit"
                 className={styles.commentSubmit}
-                disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
+                disabled={
+                  isSubmittingComment ||
+                  (isRichTextEmpty(newComment) &&
+                    pendingAttachments.length === 0)
+                }
               >
                 Post
               </button>
@@ -1092,8 +1763,185 @@ export function MonthlyServiceDetail({
         onSubmit={handleServiceSubmit}
         companies={companies}
         users={users}
-        service={serviceData}
+        service={{
+          id: serviceData.id,
+          company_id: serviceData.company_id,
+          service_name: serviceData.service_name,
+          description: serviceData.description,
+          status: serviceData.status,
+          is_active: serviceData.is_active,
+          templates: serviceData.templates.map(t => ({
+            id: t.id,
+            title: t.title,
+            description: t.description,
+            default_assigned_to: t.default_assigned_to,
+            department_id: t.department_id || null,
+            week_of_month: t.week_of_month,
+            due_day_of_week: t.due_day_of_week,
+            display_order: t.display_order,
+          })),
+        }}
       />
+
+      {/* Add Task Dialog */}
+      {showAddTaskDialog && addTaskWeek !== null && (
+        <div className={styles.modalOverlay} onClick={handleCloseAddTask}>
+          <div className={styles.addTaskDialog} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.dialogHeader}>
+              <h3>Add Task to Week {addTaskWeek}</h3>
+              <button onClick={handleCloseAddTask} className={styles.closeButton}>
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                  <path
+                    d="M15 5L5 15M5 5L15 15"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className={styles.dialogBody}>
+              <div className={styles.formGroup}>
+                <label htmlFor="taskTitle">
+                  Task Title <span className={styles.required}>*</span>
+                </label>
+                <input
+                  id="taskTitle"
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="Enter task title"
+                  className={styles.input}
+                />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label htmlFor="taskDescription">Description</label>
+                <textarea
+                  id="taskDescription"
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
+                  placeholder="Optional description"
+                  className={styles.textarea}
+                  rows={3}
+                />
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="taskAssignee">Assigned To</label>
+                  <select
+                    id="taskAssignee"
+                    value={newTaskAssignedTo}
+                    onChange={(e) => setNewTaskAssignedTo(e.target.value)}
+                    className={styles.select}
+                  >
+                    <option value="">Unassigned</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.first_name || user.last_name
+                          ? `${user.first_name || ''} ${user.last_name || ''}`.trim()
+                          : user.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="taskPriority">Priority</label>
+                  <select
+                    id="taskPriority"
+                    value={newTaskPriority}
+                    onChange={(e) => setNewTaskPriority(e.target.value as any)}
+                    className={styles.select}
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="taskDayOfWeek">
+                    Day of Week <span className={styles.required}>*</span>
+                  </label>
+                  <select
+                    id="taskDayOfWeek"
+                    value={newTaskDayOfWeek ?? ''}
+                    onChange={(e) => setNewTaskDayOfWeek(e.target.value !== '' ? parseInt(e.target.value) : null)}
+                    className={styles.select}
+                  >
+                    <option value="">Select day...</option>
+                    {DAYS_OF_WEEK.map((day) => (
+                      <option key={day.value} value={day.value}>
+                        {day.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label htmlFor="taskDepartment">
+                    Department <span className={styles.required}>*</span>
+                  </label>
+                  <select
+                    id="taskDepartment"
+                    value={newTaskDepartment}
+                    onChange={(e) => setNewTaskDepartment(e.target.value)}
+                    className={styles.select}
+                  >
+                    <option value="">Select department...</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={addToTemplate}
+                    onChange={(e) => setAddToTemplate(e.target.checked)}
+                    className={styles.checkbox}
+                  />
+                  <span>Add to template (include in all future months)</span>
+                </label>
+                <p className={styles.helpText}>
+                  {addToTemplate
+                    ? `This task will be added to the service template and automatically created for all future months.`
+                    : `This task will only be created for ${formatMonth(selectedMonth)}.`}
+                </p>
+              </div>
+            </div>
+
+            <div className={styles.dialogFooter}>
+              <button
+                onClick={handleCloseAddTask}
+                className={styles.cancelButton}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateTask}
+                className={styles.createButton}
+                type="button"
+                disabled={isCreatingTask || !newTaskTitle.trim()}
+              >
+                {isCreatingTask ? 'Creating...' : 'Create Task'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Task Detail Panel */}
       {isTaskDetailOpen && selectedTask && (
@@ -1119,8 +1967,9 @@ export function MonthlyServiceDetail({
             });
           }}
           users={users}
-          onToggleStar={(taskId) => toggleStar('task', taskId)}
-          isStarred={(taskId) => isStarred('task', taskId)}
+          onToggleStar={taskId => toggleStar('task', taskId)}
+          isStarred={taskId => isStarred('task', taskId)}
+          monthlyServiceDepartments={departments}
         />
       )}
 
@@ -1144,8 +1993,12 @@ export function MonthlyServiceDetail({
                 strokeLinejoin="round"
               />
             </svg>
-            <span className={styles.dropZoneText}>Drop files to attach to comment</span>
-            <span className={styles.dropZoneSubtext}>Images (JPEG, PNG, WebP) and documents (PDF, Word, Excel)</span>
+            <span className={styles.dropZoneText}>
+              Drop files to attach to comment
+            </span>
+            <span className={styles.dropZoneSubtext}>
+              Images (JPEG, PNG, WebP) and documents (PDF, Word, Excel)
+            </span>
           </div>
         </div>
       )}

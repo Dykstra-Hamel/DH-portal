@@ -38,6 +38,7 @@ interface ProjectTaskDetailProps {
   projectMembers?: Array<{ user_id: string }>; // Project members
   projectAssignedTo?: string | null; // Project's assigned_to user
   availableTasks?: ProjectTask[]; // All tasks in project for dependency selection
+  monthlyServiceDepartments?: Array<{ id: string; name: string; icon?: string }>; // For monthly service tasks
 }
 
 export default function ProjectTaskDetail({
@@ -56,6 +57,7 @@ export default function ProjectTaskDetail({
   projectMembers = [],
   projectAssignedTo = null,
   availableTasks = [],
+  monthlyServiceDepartments = [],
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -73,6 +75,8 @@ export default function ProjectTaskDetail({
   const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
   const [blocksTaskId, setBlocksTaskId] = useState<string>('');
   const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
+  const [monthlyServiceDepartmentId, setMonthlyServiceDepartmentId] = useState<string>('');
+  const [isUpdatingDepartment, setIsUpdatingDepartment] = useState(false);
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -197,7 +201,28 @@ export default function ProjectTaskDetail({
     // Set dependency state
     setBlocksTaskId(task.blocks_task_id || '');
     setBlockedByTaskId(task.blocked_by_task_id || '');
+
+    // Fetch monthly service department assignment if this is a monthly service task
+    if ((task as any).monthly_service_id) {
+      fetchMonthlyServiceDepartment(task.id);
+    } else {
+      setMonthlyServiceDepartmentId('');
+    }
   }, [task]);
+
+  const fetchMonthlyServiceDepartment = async (taskId: string) => {
+    try {
+      const response = await fetch(`/api/admin/tasks/${taskId}`);
+      if (response.ok) {
+        const data = await response.json();
+        // Extract department from join table
+        const departmentAssignment = data.monthly_service_task_department_assignments?.[0];
+        setMonthlyServiceDepartmentId(departmentAssignment?.department_id || '');
+      }
+    } catch (error) {
+      console.error('Error fetching monthly service department:', error);
+    }
+  };
 
   useEffect(() => {
     const textarea = titleInputRef.current;
@@ -341,6 +366,32 @@ export default function ProjectTaskDetail({
       alert('Failed to update date. Please try again.');
       setDueDateDraft(formatDateInput(task.due_date));
       setStartDateDraft(formatDateInput(task.start_date));
+    }
+  };
+
+  const handleMonthlyServiceDepartmentChange = async (departmentId: string) => {
+    const previousValue = monthlyServiceDepartmentId;
+    setMonthlyServiceDepartmentId(departmentId);
+    setIsUpdatingDepartment(true);
+    try {
+      const response = await fetch(`/api/admin/tasks/${task.id}/monthly-service-department`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ department_id: departmentId || null }),
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update department');
+      }
+
+      // Trigger parent refresh by calling onUpdate with empty updates
+      // This will cause MonthlyServiceDetail to refetch the service data and update department groupings
+      await onUpdate(task.id, {});
+    } catch (error) {
+      console.error('Error updating monthly service department:', error);
+      alert('Failed to update department. Please try again.');
+      setMonthlyServiceDepartmentId(previousValue);
+    } finally {
+      setIsUpdatingDepartment(false);
     }
   };
 
@@ -614,6 +665,29 @@ export default function ProjectTaskDetail({
                   ))}
                 </select>
               </div>
+
+              {/* Monthly Service Department - only show for monthly service tasks */}
+              {(task as any)?.monthly_service_id && monthlyServiceDepartments.length > 0 && (
+                <div className={styles.detailItem}>
+                  <div className={styles.detailLabel}>
+                    <Tag size={14} />
+                    MS Department
+                  </div>
+                  <select
+                    className={styles.editSelect}
+                    value={monthlyServiceDepartmentId}
+                    onChange={(e) => handleMonthlyServiceDepartmentChange(e.target.value)}
+                    disabled={isUpdatingDepartment}
+                  >
+                    <option value="">No Department</option>
+                    {monthlyServiceDepartments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className={styles.detailItem}>
                 <div className={styles.detailLabel}>

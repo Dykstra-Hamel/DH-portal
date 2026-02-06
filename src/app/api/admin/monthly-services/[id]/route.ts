@@ -34,7 +34,7 @@ export async function GET(
     const searchParams = request.nextUrl.searchParams;
     const month = searchParams.get('month') || new Date().toISOString().slice(0, 7); // YYYY-MM format
 
-    // Fetch the monthly service with company info
+    // Fetch the monthly service with company info and budget tracking settings
     const { data: service, error: serviceError } = await supabase
       .from('monthly_services')
       .select(
@@ -44,6 +44,12 @@ export async function GET(
         description,
         status,
         is_active,
+        track_google_ads_budget,
+        default_google_ads_budget,
+        track_social_media_budget,
+        default_social_media_budget,
+        track_lsa_budget,
+        default_lsa_budget,
         created_at,
         updated_at,
         company_id,
@@ -75,11 +81,17 @@ export async function GET(
         recurrence_frequency,
         display_order,
         default_assigned_to,
+        department_id,
         profiles:default_assigned_to (
           id,
           first_name,
           last_name,
           email
+        ),
+        monthly_services_departments:department_id (
+          id,
+          name,
+          icon
         )
       `
       )
@@ -116,6 +128,14 @@ export async function GET(
           first_name,
           last_name,
           email
+        ),
+        monthly_service_task_department_assignments (
+          department_id,
+          monthly_services_departments (
+            id,
+            name,
+            icon
+          )
         )
       `
       )
@@ -144,13 +164,29 @@ export async function GET(
       console.log(`[Monthly Service ${id}] Task due dates:`, tasks.map(t => ({ title: t.title, due_date: t.due_date })));
     }
 
+    // Fetch budgets for the selected month
+    const [budgetYear, budgetMonth] = month.split('-').map(Number);
+    const { data: budgets, error: budgetsError } = await supabase
+      .from('monthly_service_budgets')
+      .select('*')
+      .eq('monthly_service_id', id)
+      .eq('year', budgetYear)
+      .eq('month', budgetMonth);
+
+    if (budgetsError) {
+      console.error(`[Monthly Service ${id}] Error fetching budgets:`, budgetsError);
+      // Don't fail the request if budgets fail to load
+    }
+
+    console.log(`[Monthly Service ${id}] Budgets fetched: ${budgets?.length || 0}`);
+
     // Calculate progress by week
     const weekProgress = [1, 2, 3, 4].map(week => {
       const weekTemplates = (templates || []).filter(t => t.week_of_month === week);
       const weekTasks = (tasks || []).filter(t => {
         // Calculate week from due_date
-        const taskDate = new Date(t.due_date);
-        const dayOfMonth = taskDate.getDate();
+        // Parse day directly from ISO date string to avoid timezone issues
+        const dayOfMonth = parseInt(t.due_date.split('-')[2], 10);
         const calculatedWeek = Math.ceil(dayOfMonth / 7);
         return calculatedWeek === week;
       });
@@ -173,11 +209,171 @@ export async function GET(
         ...service,
         templates: templates || [],
         weekProgress,
+        budgets: budgets || [],
       },
       month,
     });
   } catch (error) {
     console.error('Error in GET /api/admin/monthly-services/[id]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// PUT /api/admin/monthly-services/[id] - Update monthly service with task templates
+export async function PUT(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient();
+    const { id } = await params;
+
+    // Check if user is admin
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const body = await request.json();
+    const {
+      company_id,
+      service_name,
+      description,
+      status,
+      is_active,
+      track_google_ads_budget,
+      default_google_ads_budget,
+      track_social_media_budget,
+      default_social_media_budget,
+      track_lsa_budget,
+      default_lsa_budget,
+      task_templates
+    } = body;
+
+    if (!service_name) {
+      return NextResponse.json(
+        { error: 'service_name is required' },
+        { status: 400 }
+      );
+    }
+
+    // Update service
+    const { data: service, error: updateError } = await supabase
+      .from('monthly_services')
+      .update({
+        service_name,
+        description,
+        status: status || 'active',
+        is_active: is_active !== undefined ? is_active : true,
+        track_google_ads_budget: track_google_ads_budget || false,
+        default_google_ads_budget: default_google_ads_budget || null,
+        track_social_media_budget: track_social_media_budget || false,
+        default_social_media_budget: default_social_media_budget || null,
+        track_lsa_budget: track_lsa_budget || false,
+        default_lsa_budget: default_lsa_budget || null,
+      })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      console.error('Error updating service:', updateError);
+      return NextResponse.json({ error: 'Failed to update service' }, { status: 500 });
+    }
+
+    // Handle task templates
+    if (task_templates && Array.isArray(task_templates)) {
+      // Validate task templates
+      for (const template of task_templates) {
+        if (!template.title || !template.title.trim()) {
+          return NextResponse.json(
+            { error: 'All task templates must have a title' },
+            { status: 400 }
+          );
+        }
+        if (template.week_of_month === null || template.week_of_month === undefined) {
+          return NextResponse.json(
+            { error: 'All task templates must have a week of month' },
+            { status: 400 }
+          );
+        }
+        if (template.due_day_of_week === null || template.due_day_of_week === undefined) {
+          return NextResponse.json(
+            { error: 'All task templates must have a day of week' },
+            { status: 400 }
+          );
+        }
+        if (!template.department_id) {
+          return NextResponse.json(
+            { error: 'All task templates must have a department' },
+            { status: 400 }
+          );
+        }
+      }
+
+      // Get existing template IDs
+      const { data: existingTemplates } = await supabase
+        .from('monthly_service_task_templates')
+        .select('id')
+        .eq('monthly_service_id', id);
+
+      const existingIds = new Set(existingTemplates?.map(t => t.id) || []);
+      const submittedIds = new Set(task_templates.filter(t => t.id && !t.id.startsWith('temp-')).map(t => t.id));
+
+      // Delete templates that were removed
+      const idsToDelete = Array.from(existingIds).filter(id => !submittedIds.has(id));
+      if (idsToDelete.length > 0) {
+        await supabase
+          .from('monthly_service_task_templates')
+          .delete()
+          .in('id', idsToDelete);
+      }
+
+      // Update or insert templates
+      for (const template of task_templates) {
+        const templateData = {
+          monthly_service_id: id,
+          title: template.title,
+          description: template.description || null,
+          default_assigned_to: template.default_assigned_to || null,
+          department_id: template.department_id,
+          week_of_month: template.week_of_month,
+          due_day_of_week: template.due_day_of_week,
+          display_order: template.display_order !== undefined ? template.display_order : 0,
+        };
+
+        if (template.id && !template.id.startsWith('temp-')) {
+          // Update existing template
+          await supabase
+            .from('monthly_service_task_templates')
+            .update(templateData)
+            .eq('id', template.id);
+        } else {
+          // Insert new template
+          await supabase
+            .from('monthly_service_task_templates')
+            .insert(templateData);
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true, service });
+  } catch (error) {
+    console.error('Error in PUT /api/admin/monthly-services/[id]:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
