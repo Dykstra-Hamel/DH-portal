@@ -61,6 +61,8 @@ const buildTaskFromModal = (taskData: TaskModalSaveData, fallback?: Task): Task 
   const tags = (taskData as { tags?: string[] }).tags;
   const estimatedHours = (taskData as { estimated_hours?: number }).estimated_hours;
   const clientId = (taskData as { client_id?: string }).client_id;
+  const recurringFrequency = (taskData as { recurring_frequency?: RecurringFrequency | string | null }).recurring_frequency;
+  const recurringEndDate = (taskData as { recurring_end_date?: string | null }).recurring_end_date;
   const fallbackTask = fallback;
   const fallbackStatus = fallbackTask?.status ?? 'todo';
 
@@ -81,10 +83,10 @@ const buildTaskFromModal = (taskData: TaskModalSaveData, fallback?: Task): Task 
     completed_date: fallbackTask?.completed_date,
     tags: Array.isArray(tags) ? tags : fallbackTask?.tags ?? [],
     recurring_frequency: normalizeRecurringFrequency(
-      taskData.recurring_frequency,
+      recurringFrequency,
       fallbackTask?.recurring_frequency
     ),
-    recurring_end_date: taskData.recurring_end_date ?? fallbackTask?.recurring_end_date,
+    recurring_end_date: recurringEndDate ?? fallbackTask?.recurring_end_date,
     created_at: fallbackTask?.created_at ?? new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -112,6 +114,11 @@ export default function TasksPage() {
     }
     return tasks;
   }, [tasks, showMyTasksOnly, user?.id]);
+
+  const personalTasks = useMemo(() => {
+    if (!user?.id) return [];
+    return tasks.filter(task => task.assigned_to === user.id && !task.project_id);
+  }, [tasks, user?.id]);
 
   // Register page actions (Add buttons in header)
   useEffect(() => {
@@ -274,6 +281,7 @@ export default function TasksPage() {
                 projects={projects}
                 onTaskClick={handleTaskClick}
                 onDeleteTask={handleDeleteTask}
+                personalTasks={personalTasks}
               />
             )}
             {currentView === 'calendar' && (
@@ -303,6 +311,7 @@ export default function TasksPage() {
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
         task={selectedTask}
+        currentUserId={user?.id}
       />
     </div>
   );

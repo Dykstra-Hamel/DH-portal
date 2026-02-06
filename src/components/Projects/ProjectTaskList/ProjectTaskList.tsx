@@ -574,9 +574,21 @@ export default function ProjectTaskList({
       )}
 
       {topLevelTasks.length === 0 ? (
-        <div className={styles.emptyState}>
+        <div
+          className={styles.emptyState}
+          onClick={onAddTask}
+          style={{ cursor: onAddTask ? 'pointer' : 'default' }}
+          role={onAddTask ? 'button' : undefined}
+          tabIndex={onAddTask ? 0 : undefined}
+          onKeyDown={onAddTask ? (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              onAddTask();
+            }
+          } : undefined}
+        >
           <h3>No tasks yet</h3>
-          <p>Use Create Task in the header to start tracking work on this project.</p>
+          <p>Click here or use &quot;+ Add Task&quot; below to start tracking work on this project.</p>
         </div>
       ) : (
         <div className={styles.taskItems}>

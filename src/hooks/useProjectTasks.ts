@@ -6,6 +6,45 @@ import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
+const getTaskReference = (task: ProjectTask) => ({
+  id: task.id,
+  title: task.title,
+  is_completed: task.is_completed,
+  assigned_to: task.assigned_to,
+  due_date: task.due_date,
+});
+
+const applyTaskUpdate = (tasks: ProjectTask[], updatedTask: ProjectTask) => {
+  const updatedRef = getTaskReference(updatedTask);
+
+  return tasks.map((task) => {
+    if (task.id === updatedTask.id) {
+      return updatedTask;
+    }
+
+    let changed = false;
+    let nextTask = task;
+
+    if (task.blocked_by_task?.id === updatedTask.id) {
+      changed = true;
+      nextTask = {
+        ...nextTask,
+        blocked_by_task: updatedRef,
+      };
+    }
+
+    if (task.blocking_task?.id === updatedTask.id) {
+      changed = true;
+      nextTask = {
+        ...nextTask,
+        blocking_task: updatedRef,
+      };
+    }
+
+    return changed ? nextTask : task;
+  });
+};
+
 interface UseProjectTasksResult {
   tasks: ProjectTask[];
   isLoading: boolean;
@@ -110,9 +149,7 @@ export function useProjectTasks(projectId?: string): UseProjectTasksResult {
         }
 
         const updatedTask = await response.json();
-        setTasks((prev) =>
-          prev.map((task) => (task.id === taskId ? updatedTask : task))
-        );
+        setTasks((prev) => applyTaskUpdate(prev, updatedTask));
         return updatedTask;
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Failed to update task';
@@ -199,11 +236,7 @@ export function useProjectTasks(projectId?: string): UseProjectTasksResult {
               fetch(`/api/admin/projects/${projectId}/tasks/${payload.new.id}`)
                 .then((res) => res.json())
                 .then((updatedTask) => {
-                  setTasks((prev) =>
-                    prev.map((task) =>
-                      task.id === updatedTask.id ? updatedTask : task
-                    )
-                  );
+                  setTasks((prev) => applyTaskUpdate(prev, updatedTask));
                 })
                 .catch((err) => console.error('Error fetching updated task:', err));
             } else if (payload.eventType === 'DELETE') {

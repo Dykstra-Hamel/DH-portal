@@ -45,6 +45,11 @@ export async function GET(
           *,
           user_profile:profiles(id, first_name, last_name, email, avatar_url)
         ),
+        project:projects(
+          id,
+          name,
+          shortcode
+        ),
         project_task_category_assignments(
           category_type,
           category:project_categories(id, name)
@@ -204,6 +209,7 @@ export async function PUT(
     if (body.blocks_task_id !== undefined) updateData.blocks_task_id = body.blocks_task_id || null;
     if (body.blocked_by_task_id !== undefined) updateData.blocked_by_task_id = body.blocked_by_task_id || null;
     if (body.blocker_reason !== undefined) updateData.blocker_reason = body.blocker_reason || null;
+    if (body.department_id !== undefined) updateData.department_id = body.department_id || null;
     if (body.display_order !== undefined) updateData.display_order = body.display_order;
     if (body.parent_task_id !== undefined) updateData.parent_task_id = body.parent_task_id || null;
 

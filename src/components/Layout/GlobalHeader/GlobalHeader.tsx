@@ -24,6 +24,9 @@ export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) 
     pathname.startsWith('/admin/project-management/') ||
     pathname.startsWith('/admin/project-management/tasks') ||
     pathname.startsWith('/admin/project-management/templates');
+  const hideBreadcrumbs =
+    pathname === '/admin/project-management' ||
+    pathname.startsWith('/admin/project-management/');
 
   return (
     <header className={styles.globalHeader}>
@@ -38,7 +41,7 @@ export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) 
               <Menu size={24} />
             </button>
           )}
-          <Breadcrumbs />
+          {!hideBreadcrumbs && <Breadcrumbs />}
         </div>
         <div className={styles.centerSection}>
         </div>

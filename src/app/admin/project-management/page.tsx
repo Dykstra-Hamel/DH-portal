@@ -238,6 +238,22 @@ export default function AdminProjectManagementDashboard() {
     fetchAllProjectsForCounts();
   }, [filterCompanyId, filterAssignedTo, fetchAllProjectsForCounts]);
 
+  // Refetch projects when page becomes visible (e.g., navigating back from detail page)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProjects();
+        fetchAllProjectsForCounts();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [fetchProjects, fetchAllProjectsForCounts]);
+
   // Fetch tasks on mount
   useEffect(() => {
     if (isAdmin) {
@@ -915,6 +931,7 @@ export default function AdminProjectManagementDashboard() {
           task={selectedTask}
           projects={projects.map(p => ({ id: p.id, name: p.name }))}
           users={users}
+          currentUserId={user?.id}
         />
       )}
 
