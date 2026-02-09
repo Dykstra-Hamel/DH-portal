@@ -191,7 +191,7 @@ export async function GET(
         return calculatedWeek === week;
       });
 
-      const total = weekTemplates.length;
+      const total = weekTasks.length;
       const completed = weekTasks.filter(t => t.is_completed === true).length;
       const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 

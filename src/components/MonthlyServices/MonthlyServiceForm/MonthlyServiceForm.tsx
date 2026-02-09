@@ -710,7 +710,7 @@ export function MonthlyServiceForm({
                                   updateTaskTemplate(
                                     template.id,
                                     'department_id',
-                                    e.target.value || null
+                                    e.target.value === '' ? null : e.target.value
                                   )
                                 }
                                 className={styles.select}

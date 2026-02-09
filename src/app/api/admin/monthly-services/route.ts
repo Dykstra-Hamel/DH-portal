@@ -91,13 +91,13 @@ export async function GET(request: NextRequest) {
           const weekTemplates = (templates || []).filter(t => t.week_of_month === week);
           const weekTasks = (tasks || []).filter(t => {
             // Calculate week from due_date
-            const taskDate = new Date(t.due_date);
-            const dayOfMonth = taskDate.getDate();
+            // Parse day directly from ISO date string to avoid timezone issues
+            const dayOfMonth = parseInt(t.due_date.split('-')[2], 10);
             const calculatedWeek = Math.ceil(dayOfMonth / 7);
             return calculatedWeek === week;
           });
 
-          const total = weekTemplates.length;
+          const total = weekTasks.length;
           const completed = weekTasks.filter(t => t.is_completed === true).length;
           const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -153,7 +153,20 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { company_id, service_name, description, status, is_active, task_templates } = body;
+    const {
+      company_id,
+      service_name,
+      description,
+      status,
+      is_active,
+      track_google_ads_budget,
+      default_google_ads_budget,
+      track_social_media_budget,
+      default_social_media_budget,
+      track_lsa_budget,
+      default_lsa_budget,
+      task_templates
+    } = body;
 
     if (!company_id || !service_name) {
       return NextResponse.json(
@@ -171,6 +184,12 @@ export async function POST(request: NextRequest) {
         description,
         status: status || 'active',
         is_active: is_active !== undefined ? is_active : true,
+        track_google_ads_budget: track_google_ads_budget || false,
+        default_google_ads_budget: default_google_ads_budget || null,
+        track_social_media_budget: track_social_media_budget || false,
+        default_social_media_budget: default_social_media_budget || null,
+        track_lsa_budget: track_lsa_budget || false,
+        default_lsa_budget: default_lsa_budget || null,
         created_by: user.id,
       })
       .select()
@@ -188,6 +207,7 @@ export async function POST(request: NextRequest) {
         title: template.title,
         description: template.description || null,
         default_assigned_to: template.default_assigned_to || null,
+        department_id: template.department_id || null,
         week_of_month: template.week_of_month || null,
         due_day_of_week: template.due_day_of_week !== undefined ? template.due_day_of_week : null,
         recurrence_frequency: template.recurrence_frequency || null,
