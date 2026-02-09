@@ -35,7 +35,7 @@ export function BudgetCard({
   const [actualInput, setActualInput] = useState(actualSpend?.toString() || '');
   const budgetInputRef = useRef<HTMLInputElement>(null);
   const actualInputRef = useRef<HTMLInputElement>(null);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout>();
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
 
   // Sync local budget with prop changes
   useEffect(() => {
