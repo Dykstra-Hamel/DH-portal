@@ -478,6 +478,30 @@ export function MonthlyServiceDetail({
   );
 
   const convertToProjectTask = (task: MonthlyServiceTask): ProjectTask => {
+    // Try to get profile data - first from task.profiles, then from users array
+    let assignedToProfile = null;
+    if (task.profiles) {
+      assignedToProfile = {
+        id: task.profiles.id,
+        first_name: task.profiles.first_name || '',
+        last_name: task.profiles.last_name || '',
+        email: task.profiles.email,
+        avatar_url: undefined,
+      };
+    } else if (task.assigned_to) {
+      // Look up user in users array
+      const matchingUser = users.find(u => u.id === task.assigned_to);
+      if (matchingUser) {
+        assignedToProfile = {
+          id: matchingUser.id,
+          first_name: matchingUser.first_name || '',
+          last_name: matchingUser.last_name || '',
+          email: matchingUser.email,
+          avatar_url: undefined,
+        };
+      }
+    }
+
     return {
       id: task.id,
       project_id: null,
@@ -507,15 +531,7 @@ export function MonthlyServiceDetail({
       next_recurrence_date: null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
-      assigned_to_profile: task.profiles
-        ? {
-            id: task.profiles.id,
-            first_name: task.profiles.first_name || '',
-            last_name: task.profiles.last_name || '',
-            email: task.profiles.email,
-            avatar_url: undefined,
-          }
-        : null,
+      assigned_to_profile: assignedToProfile,
       // Add monthly_service_id so ProjectTaskDetail can detect this is a monthly service task
       monthly_service_id: service.id,
     } as any; // Use 'as any' since monthly_service_id is not in ProjectTask type
