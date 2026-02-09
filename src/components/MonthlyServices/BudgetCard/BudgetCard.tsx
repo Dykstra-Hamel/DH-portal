@@ -202,7 +202,7 @@ export function BudgetCard({
           className={styles.slider}
           disabled={isUpdating}
           style={{
-            // @ts-ignore - CSS custom property
+            // @ts-expect-error - CSS custom property
             '--value-percent': `${(localBudget / maxBudget) * 100}%`
           }}
         />
