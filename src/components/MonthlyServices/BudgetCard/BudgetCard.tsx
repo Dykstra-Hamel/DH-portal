@@ -155,7 +155,7 @@ export function BudgetCard({
   };
 
   const spendPercentage = actualSpend !== null && localBudget > 0
-    ? Math.min((actualSpend / localBudget) * 100, 100)
+    ? (actualSpend / localBudget) * 100
     : 0;
 
   const isOverBudget = actualSpend !== null && actualSpend > localBudget;
@@ -201,6 +201,10 @@ export function BudgetCard({
           onChange={handleSliderChange}
           className={styles.slider}
           disabled={isUpdating}
+          style={{
+            // @ts-ignore - CSS custom property
+            '--value-percent': `${(localBudget / maxBudget) * 100}%`
+          }}
         />
         <div className={styles.sliderLabels}>
           <span>$0</span>

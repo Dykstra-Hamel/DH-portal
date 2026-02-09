@@ -82,18 +82,26 @@
   width: 100%;
   height: 8px;
   border-radius: 4px;
-  background: linear-gradient(
-    to right,
-    #dbeafe 0%,
-    #3b82f6 50%,
-    #1d4ed8 100%
-  );
+  background: linear-gradient(to right, #3b82f6 var(--value-percent, 50%), #e5e7eb var(--value-percent, 50%));
   outline: none;
   cursor: pointer;
 
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  // Firefox - filled track
+  &::-moz-range-track {
+    height: 8px;
+    border-radius: 4px;
+    background: #e5e7eb;
+  }
+
+  &::-moz-range-progress {
+    height: 8px;
+    border-radius: 4px;
+    background: #3b82f6;
   }
 
   // Webkit/Chrome/Safari

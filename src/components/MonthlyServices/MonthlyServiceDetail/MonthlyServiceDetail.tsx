@@ -1589,11 +1589,15 @@ export function MonthlyServiceDetail({
                                           rel="noopener noreferrer"
                                           className={styles.commentImageLink}
                                         >
-                                          <img
-                                            src={attachment.url}
-                                            alt={attachment.file_name}
-                                            className={styles.commentImage}
-                                          />
+                                          <div className={styles.commentImage}>
+                                            <Image
+                                              src={attachment.url}
+                                              alt={attachment.file_name}
+                                              fill={true}
+                                              unoptimized={true}
+                                              style={{ objectFit: 'contain' }}
+                                            />
+                                          </div>
                                         </a>
                                       ))}
                                     </div>
