@@ -37,7 +37,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isQuotePage = pathname.match(/^\/[^\/]+\/quote\/[^\/]+$/);
   const isCampaignLandingPage = pathname.match(/^\/campaign\/[^\/]+\/[^\/]+$/);
   const isProjectManagementPage =
-    pathname === '/project-management' || pathname === '/admin/project-management';
+    pathname === '/project-management' ||
+    pathname === '/admin/project-management';
 
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
@@ -182,7 +183,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       case '/admin/project-management':
         return {
           title: pageHeader?.title || 'Admin Project Dashboard',
-          description: pageHeader?.description || 'Internal Project and Task Management',
+          description:
+            pageHeader?.description || 'Internal Project and Task Management',
           showAddButton: false,
           projectFilterControls: pageHeader?.projectFilterControls,
           customActions: (
@@ -203,10 +205,23 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       case '/admin/project-management/templates':
         return {
           title: pageHeader?.title || 'Project Templates',
-          description: pageHeader?.description || 'Manage project templates with pre-configured tasks',
+          description:
+            pageHeader?.description ||
+            'Manage project templates with pre-configured tasks',
           showAddButton: true,
           addButtonText: 'New Template',
           onAddClick: getPageAction('add-template') || (() => {}),
+        };
+      case '/admin/monthly-services':
+        return {
+          title: pageHeader?.title || 'Monthly Services',
+          description:
+            pageHeader?.description ||
+            'Track recurring marketing tasks for client companies',
+          showAddButton: true,
+          addButtonText: 'New Monthly Service',
+          onAddClick: getPageAction('add-monthly-service') || (() => {}),
+          customActions: pageHeader?.customActions,
         };
       case '/tickets/leads':
         return {
@@ -362,6 +377,33 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return null;
         }
 
+        // Show lower header for monthly service detail pages
+        if (pathname.match(/^\/admin\/monthly-services\/[^\/]+$/)) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
+        // Show lower header for monthly service detail pages
+        if (pathname.match(/^\/admin\/monthly-services\/[^\/]+$/)) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
         // Show lower header for task detail pages
         if (pathname.match(/^\/tickets\/tasks\/[^\/]+$/)) {
           // Use dynamic page header if set, otherwise hide header
@@ -456,7 +498,11 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           {pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
-              titleLeading={'titleLeading' in pageConfig ? pageConfig.titleLeading : undefined}
+              titleLeading={
+                'titleLeading' in pageConfig
+                  ? pageConfig.titleLeading
+                  : undefined
+              }
               description={pageConfig.description}
               showAddButton={pageConfig.showAddButton}
               addButtonText={pageConfig.addButtonText}
@@ -483,7 +529,9 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           >
             <section
               className={`pageWrapper ${
-                isProjectManagementPage ? styles.projectManagementPageWrapper : ''
+                isProjectManagementPage
+                  ? styles.projectManagementPageWrapper
+                  : ''
               }`}
             >
               {children}
