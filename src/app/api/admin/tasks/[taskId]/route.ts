@@ -2,6 +2,68 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 
+// GET /api/admin/tasks/[taskId] - Get task details
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ taskId: string }> }
+) {
+  try {
+    const { taskId } = await params;
+    const supabase = await createClient();
+
+    // Check authentication
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Check admin authorization
+    const adminAuthorized = await isAuthorizedAdmin(user);
+    if (!adminAuthorized) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Fetch task with monthly service department assignments
+    const { data: task, error } = await supabase
+      .from('project_tasks')
+      .select(
+        `
+        *,
+        monthly_service_task_department_assignments (
+          department_id,
+          monthly_services_departments (
+            id,
+            name,
+            icon
+          )
+        )
+      `
+      )
+      .eq('id', taskId)
+      .single();
+
+    if (error) {
+      console.error(`[GET /api/admin/tasks/${taskId}] Error:`, error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (!task) {
+      return NextResponse.json({ error: 'Task not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(task);
+  } catch (error) {
+    console.error('Error in GET /api/admin/tasks/[taskId]:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
+
 // PATCH /api/admin/tasks/[taskId] - Update a task (works for both project and monthly service tasks)
 export async function PATCH(
   request: NextRequest,
