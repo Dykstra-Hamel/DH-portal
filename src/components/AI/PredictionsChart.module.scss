@@ -326,7 +326,7 @@
 
 .pressureValue {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 600;
   text-align: center;

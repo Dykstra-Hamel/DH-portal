@@ -252,7 +252,7 @@
 .cancelButton {
   background: transparent;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 500;
@@ -274,7 +274,7 @@
 .assignButton {
   background: var(--action-500);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 10px 16px;
   font-size: 14px;
   font-weight: 600;

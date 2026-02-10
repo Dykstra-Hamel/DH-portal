@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     // Validate type_code if provided
     if (type_code) {
-      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'SFT'];
       if (!validTypeCodes.includes(type_code)) {
         return NextResponse.json(
           { error: `Invalid type_code. Must be one of: ${validTypeCodes.join(', ')}` },

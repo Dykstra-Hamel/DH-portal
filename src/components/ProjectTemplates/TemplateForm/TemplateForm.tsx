@@ -83,6 +83,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   const [dragOverTaskIndex, setDragOverTaskIndex] = useState<number | null>(null);
   const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
   const [blockedTaskDepartments, setBlockedTaskDepartments] = useState<Record<string, string>>({});
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
 
   // Helper to get effective department for a blocked task
   const getBlockedTaskDepartmentId = (blocksTaskId: string | null) => {
@@ -99,6 +100,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   };
 
   useEffect(() => {
+    setCurrentStep(1);
     setHasInitializedTaskCollapse(false);
     setCollapsedTaskCards({});
     setCollapsedSubtasks({});
@@ -119,7 +121,16 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       });
       setBlockedTaskDepartments(initialBlockedDepts);
     }
-  }, [template?.id]);
+  }, [template]);
+
+  const handleGoToTasksStep = () => {
+    if (!formData.name || !formData.project_type || !formData.initial_department_id) {
+      setError('Please complete all required fields before continuing.');
+      return;
+    }
+    setError('');
+    setCurrentStep(2);
+  };
 
   useEffect(() => {
     if (hasInitializedTaskCollapse) return;
@@ -501,6 +512,12 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (currentStep === 1) {
+      handleGoToTasksStep();
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
 
@@ -606,7 +623,12 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     <div className={styles.overlay}>
       <div className={styles.modal}>
         <div className={styles.header}>
-          <h2>{isEditing ? 'Edit Template' : 'Create New Template'}</h2>
+          <div className={styles.headerTitle}>
+            <h2>{isEditing ? 'Edit Template' : 'Create New Template'}</h2>
+            <p className={styles.stepText}>
+              Step {currentStep} of 2: {currentStep === 1 ? 'Template Details' : 'Template Tasks'}
+            </p>
+          </div>
           <button
             type="button"
             onClick={onClose}
@@ -620,8 +642,8 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         <form onSubmit={handleSubmit} className={styles.form}>
           {error && <div className={styles.error}>{error}</div>}
 
-          {/* Basic Info */}
-          <div className={styles.section}>
+          {currentStep === 1 && (
+            <div className={styles.section}>
             <h3 className={styles.sectionTitle}>Basic Information</h3>
 
             <div className={styles.formGroup}>
@@ -983,10 +1005,11 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                 </span>
               </div>
             </div>
-          </div>
+            </div>
+          )}
 
-          {/* Template Tasks */}
-          <div className={styles.section}>
+          {currentStep === 2 && (
+            <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <h3 className={styles.sectionTitle}>Template Tasks</h3>
               <div className={styles.sectionActions}>
@@ -1624,29 +1647,53 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                 </button>
               </div>
             )}
-          </div>
+            </div>
+          )}
 
           {/* Actions */}
-          <div className={styles.actions}>
-            <button
-              type="button"
-              onClick={onClose}
-              className={styles.cancelButton}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={styles.submitButton}
-              disabled={isSubmitting}
-            >
-              {isSubmitting
-                ? 'Saving...'
-                : isEditing
-                  ? 'Update Template'
-                  : 'Create Template'}
-            </button>
+          <div className={styles.actions} key={`template-form-actions-step-${currentStep}`}>
+            {currentStep === 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className={styles.cancelButton}
+                  disabled={isSubmitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.submitButton}
+                  disabled={isSubmitting}
+                  onClick={handleGoToTasksStep}
+                >
+                  Next
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className={styles.cancelButton}
+                  disabled={isSubmitting}
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  className={styles.submitButton}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? 'Saving...'
+                    : isEditing
+                      ? 'Update Template'
+                      : 'Create Template'}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>

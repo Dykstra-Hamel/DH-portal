@@ -47,7 +47,7 @@
   border: none;
   color: #ffffff;
   padding: 8px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   display: flex;
   align-items: center;

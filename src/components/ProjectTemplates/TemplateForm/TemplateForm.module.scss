@@ -38,6 +38,19 @@
   }
 }
 
+.headerTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.stepText {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+}
+
 .closeButton {
   background: none;
   border: none;
@@ -495,7 +508,7 @@
   padding: 12px;
   background: var(--gray-50);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   min-height: 60px;
 }
 
@@ -503,7 +516,7 @@
   padding: 0;
   background: white;
   border: 2px solid transparent;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
   display: inline-flex;
@@ -534,7 +547,7 @@
   padding: 0.75rem;
   background: var(--gray-50);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .memberItem {
@@ -543,7 +556,7 @@
   justify-content: space-between;
   padding: 0.5rem 0.75rem;
   background: white;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--border-color-light, #e5e7eb);
 }
 
@@ -602,7 +615,7 @@
   background: var(--primary-color, #3b82f6);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -619,7 +632,7 @@
   background: transparent;
   color: var(--text-secondary, #6b7280);
   border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;

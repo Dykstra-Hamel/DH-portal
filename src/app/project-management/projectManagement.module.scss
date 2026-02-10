@@ -39,7 +39,7 @@
   color: white;
   padding: 10px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 650;
   font-family: var(--font-satoshi);
@@ -82,7 +82,7 @@
   padding: 8px 16px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 550;
   font-family: var(--font-satoshi);
@@ -141,6 +141,8 @@
 .tabsRight {
   display: flex;
   align-items: center;
+  height: 40px;
+  align-items: stretch;
   gap: 12px;
 }
 
@@ -152,7 +154,7 @@
 .tabsSection {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 32px;
   border-bottom: 1px solid var(--gray-300, #d1d5db);
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -252,7 +254,7 @@
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 10px 14px;
+  padding: 10px 0;
   gap: 8px;
   white-space: nowrap;
 
@@ -283,8 +285,7 @@
   &::after {
     content: '';
     position: absolute;
-    left: 12px;
-    right: 12px;
+    right: 0px;
     bottom: -1px;
     height: 3px;
     background: transparent;
@@ -360,7 +361,7 @@
   padding: 8px 16px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 600;
   color: #6b7280;
@@ -388,7 +389,7 @@
   background: transparent;
   cursor: pointer;
   transition: all 0.2s ease;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 
   // Inactive state
   color: var(--UI-Gray-400, #99a1af);
@@ -415,7 +416,8 @@
 .statusFilter {
   padding: 8px 12px;
   border: 1px solid var(--UI-Gray-300, #d1d5db);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
+  height: 40px;
   background: var(--white, #ffffff);
   color: var(--UI-Gray-950, #0c0e12);
   font-family: 'Satoshi Variable', var(--font-satoshi);
@@ -473,7 +475,7 @@
   max-width: 300px;
   padding: 8px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   color: var(--gray-800);
   font-size: 14px;
@@ -546,6 +548,12 @@
   min-width: 0;
 }
 
+.taskViewTabsRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
 .taskSidebar {
   width: 320px;
   flex-shrink: 0;
@@ -568,7 +576,7 @@
   gap: 12px;
   padding: 10px;
   background: var(--gray-50, #f9fafb);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: background 0.15s ease;
 

@@ -16,12 +16,15 @@ import {
   Pencil,
   Tag,
   Lock,
+  AlertCircle,
+  Layers,
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ProjectTask, taskPriorityOptions, ProjectCategory, ProjectDepartment } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
+import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import styles from './ProjectTaskDetail.module.scss';
 
 interface ProjectTaskDetailProps {
@@ -81,7 +84,13 @@ export default function ProjectTaskDetail({
   const [blockedByTaskId, setBlockedByTaskId] = useState<string>('');
   const [departmentDraft, setDepartmentDraft] = useState(task?.department_id || '');
   const [blockedTaskDepartmentDraft, setBlockedTaskDepartmentDraft] = useState('');
+  const [parentTaskDraft, setParentTaskDraft] = useState<string>(task?.parent_task_id || '');
   const priorityRef = useRef<HTMLDivElement>(null);
+
+  // Error modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorTitle, setErrorTitle] = useState('');
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -216,6 +225,7 @@ export default function ProjectTaskDetail({
     // Set dependency state
     setBlocksTaskId(task.blocks_task_id || '');
     setBlockedByTaskId(task.blocked_by_task_id || '');
+    setParentTaskDraft(task.parent_task_id || '');
     setIsActivityCollapsed(true);
     setIsPriorityOpen(false);
   }, [task]);
@@ -434,6 +444,16 @@ export default function ProjectTaskDetail({
     }
   };
 
+  const handleParentTaskChange = async (taskId: string) => {
+    setParentTaskDraft(taskId);
+    try {
+      await onUpdate(task.id, { parent_task_id: taskId || null });
+    } catch (error) {
+      console.error('Error updating parent_task_id:', error);
+      setParentTaskDraft(task.parent_task_id || '');
+    }
+  };
+
   const handleDescriptionSave = async () => {
     const nextDescription = descriptionDraft.trim();
     setIsSavingDescription(true);
@@ -458,8 +478,22 @@ export default function ProjectTaskDetail({
 
     // Check if task is blocked
     if (!task.is_completed && task.blocked_by_task && !task.blocked_by_task.is_completed) {
-      alert(`Cannot complete task: blocked by "${task.blocked_by_task.title}"`);
+      setErrorTitle('Cannot Complete Task');
+      setErrorMessage(`This task is blocked by "${task.blocked_by_task.title}". Please complete the blocking task first.`);
+      setShowErrorModal(true);
       return;
+    }
+
+    // Check if task has incomplete subtasks
+    if (!task.is_completed && task.subtasks && task.subtasks.length > 0) {
+      const incompleteSubtasks = task.subtasks.filter(subtask => !subtask.is_completed);
+      if (incompleteSubtasks.length > 0) {
+        const subtaskList = incompleteSubtasks.map(st => `• ${st.title}`).join('\n');
+        setErrorTitle('Cannot Complete Task');
+        setErrorMessage(`This task has ${incompleteSubtasks.length} incomplete subtask${incompleteSubtasks.length > 1 ? 's' : ''}:\n\n${subtaskList}\n\nPlease complete all subtasks first.`);
+        setShowErrorModal(true);
+        return;
+      }
     }
 
     setIsUpdatingComplete(true);
@@ -468,7 +502,9 @@ export default function ProjectTaskDetail({
     } catch (error) {
       console.error('Error updating completion:', error);
       const errorMsg = error instanceof Error ? error.message : 'Failed to update task';
-      alert(errorMsg);
+      setErrorTitle('Error');
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
     } finally {
       setIsUpdatingComplete(false);
     }
@@ -845,6 +881,45 @@ export default function ProjectTaskDetail({
                 ) : (
                   <div className={styles.detailItemPlaceholder} />
                 )}
+
+                {(!task.subtasks || task.subtasks.length === 0) && (
+                  <div className={styles.detailItem}>
+                    <div className={styles.detailLabel}>
+                      <Layers size={14} />
+                      Parent Task
+                    </div>
+                    <select
+                      className={styles.editSelect}
+                      value={parentTaskDraft}
+                      onChange={(e) => handleParentTaskChange(e.target.value)}
+                    >
+                      <option value="">None</option>
+                      {availableTasks
+                        .filter(t => {
+                          // Exclude current task
+                          if (t.id === task?.id) return false;
+                          // Only allow top-level tasks (not subtasks themselves)
+                          if (t.parent_task_id) return false;
+                          // Always include the current parent task if one exists
+                          if (t.id === task?.parent_task_id) return true;
+                          // Exclude tasks that already have subtasks (other than potentially this task)
+                          const hasOtherSubtasks = availableTasks.some(st =>
+                            st.parent_task_id === t.id && st.id !== task?.id
+                          );
+                          if (hasOtherSubtasks) return false;
+                          return true;
+                        })
+                        .map(t => (
+                          <option key={t.id} value={t.id}>
+                            {t.title}
+                          </option>
+                        ))}
+                    </select>
+                    <span className={styles.detailHint}>
+                      Makes this task a subtask of the selected parent task.
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -1033,6 +1108,19 @@ export default function ProjectTaskDetail({
           </div>
         </div>
       </div>
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <ConfirmationModal
+          isOpen={showErrorModal}
+          title={errorTitle}
+          message={errorMessage}
+          confirmText="OK"
+          cancelText=""
+          onConfirm={() => setShowErrorModal(false)}
+          onCancel={() => setShowErrorModal(false)}
+        />
+      )}
     </div>
   );
 }

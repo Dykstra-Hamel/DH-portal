@@ -66,13 +66,13 @@ export const getCustomerColumns = (showCompanyColumn: boolean = false): ColumnDe
             {customer.email && (
               <div className={styles.contactRow}>
                 <Mail size={12} />
-                {customer.email}
+                <span>{customer.email}</span>
               </div>
             )}
             {customer.phone && (
               <div className={styles.contactRow}>
                 <Phone size={12} />
-                {customer.phone}
+                <span>{customer.phone}</span>
               </div>
             )}
           </div>

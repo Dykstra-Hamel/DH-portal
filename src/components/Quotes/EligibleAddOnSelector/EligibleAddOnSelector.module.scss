@@ -192,7 +192,7 @@
   background: var(--action-500);
   color: #ffffff;
   border: 1px solid var(--action-500);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
   cursor: pointer;
@@ -212,7 +212,7 @@
   background: var(--error-500);
   color: #ffffff;
   border: 1px solid var(--error-600);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
   cursor: pointer;

@@ -103,19 +103,19 @@ function generateEmailHtml(domain: string, records: DnsRecord[]): string {
 
       <h2 style="margin: 30px 0 20px 0; color: #1f2937; font-size: 20px;">What These Records Do</h2>
 
-      <div style="background-color: #f9fafb; padding: 20px; border-radius: 6px; margin-bottom: 20px;">
+      <div style="background-color: #f9fafb; padding: 20px; border-radius: var(--border-radius); margin-bottom: 20px;">
         <h3 style="margin: 0 0 10px 0; color: #1f2937; font-size: 16px;">CNAME Records (DKIM)</h3>
         <p style="margin: 0; color: #6b7280; line-height: 1.6;">These records enable DomainKeys Identified Mail (DKIM) authentication, which helps prevent email spoofing and improves deliverability. You should see 3 CNAME records with &quot;_domainkey&quot; in the hostname.</p>
       </div>
 
-      <div style="background-color: #fef3c7; padding: 20px; border-radius: 6px; border-left: 4px solid #f59e0b; margin-bottom: 20px;">
+      <div style="background-color: #fef3c7; padding: 20px; border-radius: var(--border-radius); border-left: 4px solid #f59e0b; margin-bottom: 20px;">
         <h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 16px;">⚠️ TXT Record (SPF) - IMPORTANT</h3>
         <p style="margin: 0 0 10px 0; color: #78350f; line-height: 1.6; font-weight: 600;">You can only have ONE SPF record per domain.</p>
         <p style="margin: 0; color: #78350f; line-height: 1.6;"><strong>If you already have an SPF record:</strong> Do NOT create a new one. Instead, add <code style="background-color: #ffffff; padding: 2px 6px; border-radius: 3px;">include:amazonses.com</code> to your existing SPF record, before the final mechanism (usually <code style="background-color: #ffffff; padding: 2px 6px; border-radius: 3px;">~all</code> or <code style="background-color: #ffffff; padding: 2px 6px; border-radius: 3px;">-all</code>).</p>
         <p style="margin: 10px 0 0 0; color: #78350f; line-height: 1.6;"><strong>If you don&apos;t have an SPF record yet:</strong> Create a new TXT record with the value shown in the table above.</p>
       </div>
 
-      <div style="background-color: #fef3c7; padding: 20px; border-radius: 6px; border-left: 4px solid #f59e0b;">
+      <div style="background-color: #fef3c7; padding: 20px; border-radius: var(--border-radius); border-left: 4px solid #f59e0b;">
         <h3 style="margin: 0 0 10px 0; color: #92400e; font-size: 16px;">⚠️ TXT Record (DMARC) - IMPORTANT</h3>
         <p style="margin: 0 0 10px 0; color: #78350f; line-height: 1.6; font-weight: 600;">You can only have ONE DMARC record per domain.</p>
         <p style="margin: 0; color: #78350f; line-height: 1.6;"><strong>If you already have a DMARC record:</strong> Do NOT create a new one. Your existing DMARC record should work fine with AWS SES. No changes needed unless you want to adjust your DMARC policy.</p>

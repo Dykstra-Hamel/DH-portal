@@ -785,8 +785,7 @@ export default function AdminProjectManagementDashboard() {
               className={`${styles.categoryTab} ${projectStatusTab === 'completed' ? styles.active : ''}`}
               onClick={() => setProjectStatusTab('completed')}
             >
-              Completed Projects
-              <span className={styles.tabCount}>{statusTabCounts.completed}</span>
+              Completed
             </button>
           </div>
           <div className={styles.searchSection}>
@@ -887,6 +886,7 @@ export default function AdminProjectManagementDashboard() {
                 onEditProject={handleEditProject}
                 onDeleteProject={handleDeleteProject}
                 onToggleStar={handleToggleStar}
+                onProjectClick={handleProjectClick}
               />
             )}
             {currentView === 'calendar' && (

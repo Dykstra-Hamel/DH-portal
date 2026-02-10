@@ -50,6 +50,9 @@ export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'A
 // Project scope types
 export type ProjectScope = 'internal' | 'external' | 'both';
 
+// Project status types
+export type ProjectStatus = 'new' | 'in_progress' | 'on_hold' | 'internal_review' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
+
 export const PROJECT_TYPE_CODES: Record<ProjectTypeCode, { label: string; description: string }> = {
   WEB: { label: 'Website', description: 'Landing Pages, Full Websites' },
   SOC: { label: 'Social Media', description: 'Social media content and campaigns' },
@@ -164,6 +167,7 @@ export interface ProjectFormData {
   scope?: ProjectScope; // internal, external, or both
   category_ids: string[]; // Array of category IDs for many-to-many relationship
   current_department_id?: string; // Optional department ID
+  tasks?: ProjectTaskDraft[]; // Optional tasks to create with the project
 }
 
 export interface User {
@@ -523,6 +527,22 @@ export interface ProjectTemplateTask {
   }>;
 }
 
+export interface ProjectTaskDraft {
+  temp_id?: string;
+  parent_temp_id?: string | null;
+  title: string;
+  description: string;
+  priority: string;
+  due_date_offset_days: string;
+  display_order: string;
+  tags: string;
+  default_assigned_to: string;
+  blocks_task_id?: string | null;
+  blocked_by_task_id?: string | null;
+  department_id?: string | null;
+  category_ids?: string[];
+}
+
 export interface ProjectTemplateFormData {
   name: string;
   description: string;
@@ -538,21 +558,7 @@ export interface ProjectTemplateFormData {
   initial_department_id?: string;
   category_ids?: string[];
   default_member_ids?: string[];
-  tasks: Array<{
-    temp_id?: string;
-    parent_temp_id?: string | null;
-    title: string;
-    description: string;
-    priority: string;
-    due_date_offset_days: string;
-    display_order: string;
-    tags: string;
-    default_assigned_to: string;
-    blocks_task_id?: string | null;
-    blocked_by_task_id?: string | null;
-    department_id?: string | null;
-    category_ids?: string[];
-  }>;
+  tasks: ProjectTaskDraft[];
 }
 
 // Apply Template Options

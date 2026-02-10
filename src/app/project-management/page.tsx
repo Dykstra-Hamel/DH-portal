@@ -731,6 +731,7 @@ export default function ProjectManagementDashboard() {
                 tasks={tasks}
                 onEditProject={handleEditProject}
                 onDeleteProject={handleDeleteProject}
+                onProjectClick={handleProjectClick}
               />
             )}
             {currentView === 'calendar' && (

@@ -259,7 +259,7 @@
 
 // Expand/Collapse Button
 .expandCollapseButton {
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid #fff;
   display: flex;
   padding: 6px 8px 6px 16px;

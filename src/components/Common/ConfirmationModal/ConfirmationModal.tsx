@@ -39,9 +39,11 @@ export default function ConfirmationModal({
         </div>
 
         <div className={styles.modalFooter}>
-          <button onClick={onCancel} className={styles.cancelButton}>
-            {cancelText}
-          </button>
+          {cancelText && (
+            <button onClick={onCancel} className={styles.cancelButton}>
+              {cancelText}
+            </button>
+          )}
           <button
             onClick={onConfirm}
             className={`${styles.confirmButton} ${

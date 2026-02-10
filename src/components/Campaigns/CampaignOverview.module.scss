@@ -111,7 +111,7 @@
 .progressBar {
   height: 12px;
   background: var(--gray-100);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   overflow: hidden;
   margin-bottom: 0.5rem;
 }

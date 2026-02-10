@@ -1,12 +1,10 @@
 import React, { useState, useMemo } from 'react';
-import { Project, statusOptions } from '@/types/project';
+import { Project, ProjectStatus, statusOptions } from '@/types/project';
 import { Task } from '@/types/taskManagement';
 import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectsView.module.scss';
-
-type ProjectStatus = Project['status'];
 
 interface ProjectsViewProps {
   projects: Project[];
@@ -14,11 +12,17 @@ interface ProjectsViewProps {
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
   onToggleStar?: (projectId: string) => void;
+  onProjectClick?: (project: Project) => void | Promise<void>;
 }
 
-export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, onToggleStar }: ProjectsViewProps) {
-  const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
-  const [typeFilter, setTypeFilter] = useState<string | 'all'>('all');
+export function ProjectsView({
+  projects,
+  tasks,
+  onEditProject,
+  onDeleteProject,
+  onToggleStar,
+  onProjectClick,
+}: ProjectsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Calculate project task counts
@@ -32,16 +36,6 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
   const filteredProjects = useMemo(() => {
     return projects
       .filter(project => {
-        // Status filter
-        if (statusFilter !== 'all' && project.status !== statusFilter) {
-          return false;
-        }
-
-        // Type filter
-        if (typeFilter !== 'all' && project.project_type !== typeFilter) {
-          return false;
-        }
-
         // Search filter
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase();
@@ -58,7 +52,7 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
           (parseDateString(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY) -
           (parseDateString(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY)
       );
-  }, [projects, statusFilter, typeFilter, searchQuery]);
+  }, [projects, searchQuery]);
 
   const formatDate = (dateString: string): string => {
     const date = parseDateString(dateString);
@@ -133,28 +127,6 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
           />
         </div>
 
-        <select
-          className={styles.filterSelect}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | 'all')}
-        >
-          <option value="all">All Status</option>
-          {statusOptions.map(option => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
-
-        <select
-          className={styles.filterSelect}
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
-          <option value="all">All Types</option>
-          <option value="print">Print</option>
-          <option value="digital">Digital</option>
-        </select>
       </div>
 
       {/* Projects Table */}
@@ -192,7 +164,20 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
               const progress = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0;
 
               return (
-                <div key={project.id} className={styles.tableRow}>
+                <div
+                  key={project.id}
+                  className={`${styles.tableRow} ${onProjectClick ? styles.clickableRow : ''}`}
+                  onClick={() => onProjectClick?.(project)}
+                  role={onProjectClick ? 'button' : undefined}
+                  tabIndex={onProjectClick ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (!onProjectClick) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onProjectClick(project);
+                    }
+                  }}
+                >
                   <div className={styles.cell}>
                     <div className={styles.projectName}>{project.name}</div>
                   </div>
@@ -233,7 +218,11 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject, 
                     </div>
                   </div>
                   <div className={styles.cell}>
-                    <div className={styles.actions}>
+                    <div
+                      className={styles.actions}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
                       {onToggleStar && (
                         <StarButton
                           isStarred={project.is_starred || false}

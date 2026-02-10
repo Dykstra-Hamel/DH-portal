@@ -1109,7 +1109,7 @@
   width: 100%;
   text-align: left;
   padding: 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--gray-300);
 }
 
@@ -1268,7 +1268,7 @@
     max-width: 300px;
     padding: 12px 16px;
     border: 1px solid var(--gray-300);
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 16px;
     background: #fff;
     color: var(--color-text-gray);
@@ -1737,7 +1737,7 @@
   padding: 12px 20px;
   background: #fff4ad;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   width: fit-content;
 
   @media (max-width: 768px) {

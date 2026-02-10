@@ -31,7 +31,7 @@
 
 .alert {
   padding: 12px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   margin-bottom: 16px;
   font-size: 0.875rem;
 
@@ -121,7 +121,7 @@
 
 .btnProvision {
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
@@ -147,7 +147,7 @@
 
 .btnDeleteTenant {
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
@@ -175,7 +175,7 @@
 .form {
   background: #f9fafb;
   padding: 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid #e5e7eb;
 }
 
@@ -202,7 +202,7 @@
   width: 100%;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   transition: border-color 0.2s;
 
@@ -229,7 +229,7 @@
 .btnDanger,
 .btnCopy {
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -351,7 +351,7 @@
   margin-top: 20px;
   background: #f9fafb;
   padding: 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid #e5e7eb;
 
   h5 {
@@ -377,7 +377,7 @@
 .recordCard {
   background: #fff;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 16px;
 }
 
@@ -449,7 +449,7 @@
 .verifiedInfo {
   background-color: #d1fae5;
   border: 1px solid #10b981;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 12px 16px;
   margin-top: 16px;
 
@@ -472,7 +472,7 @@
 .fallbackInfo {
   background-color: #fef3c7;
   border: 1px solid #fbbf24;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 16px;
   margin-top: 16px;
 
@@ -591,7 +591,7 @@
 .domainCard {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 16px;
 
   h5 {

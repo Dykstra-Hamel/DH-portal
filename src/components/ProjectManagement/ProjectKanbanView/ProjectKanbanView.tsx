@@ -38,10 +38,6 @@ export function ProjectKanbanView({
 }: ProjectKanbanViewProps) {
   // Simple drag state
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
-  const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(
-    null
-  );
   const [draggedFromColumn, setDraggedFromColumn] = useState<string | null>(
     null
   );
@@ -253,33 +249,9 @@ export function ProjectKanbanView({
 
     // Reset all drag state
     setDraggedId(null);
-    setDropTargetId(null);
-    setDropPosition(null);
     setDraggedFromColumn(null);
     setDropToColumn(null);
     setIsDragging(false);
-  };
-
-  const handleDragOver = (e: DragEvent<HTMLDivElement>, projectId: string) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    if (!draggedId || draggedId === projectId) {
-      setDropTargetId(null);
-      setDropPosition(null);
-      return;
-    }
-
-    const rect = e.currentTarget.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const position = e.clientY < midY ? 'before' : 'after';
-
-    setDropTargetId(projectId);
-    setDropPosition(position);
-  };
-
-  const handleDragLeave = () => {
-    // Don't clear immediately - let dragOver on another card set new target
   };
 
   const handleColumnDragOver = (
@@ -287,6 +259,7 @@ export function ProjectKanbanView({
     columnId: string
   ) => {
     e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
     setDropToColumn(columnId);
   };
 
@@ -311,6 +284,10 @@ export function ProjectKanbanView({
           {columns.map(column => {
             const columnProjects = getProjectsByDepartment(column.id);
             const hasUnreadMentions = columnProjects.some(project => project.has_unread_mentions);
+            const isColumnDropTarget =
+              isDragging &&
+              dropToColumn === column.id &&
+              draggedFromColumn !== column.id;
 
             return (
               <div
@@ -318,20 +295,25 @@ export function ProjectKanbanView({
                 className={`${styles.kanbanColumnWrapper} ${styles.departmentView}`}
               >
                 <div className={styles.columnHeader}>
-                  <span className={styles.columnTitle}>
-                    {column.icon && <span className={styles.columnIcon}>{column.icon}</span>}
-                    {column.title}
+                  <div className={styles.columnHeaderRow}>
+                    <span className={styles.columnTitle}>
+                      {column.icon && <span className={styles.columnIcon}>{column.icon}</span>}
+                      {column.title}
+                    </span>
+                    <span className={styles.columnCount}>
+                      ({columnProjects.length})
+                    </span>
+                  </div>
+                  <span
+                    className={`${styles.columnNewComments} ${!hasUnreadMentions ? styles.columnNewCommentsPlaceholder : ''}`}
+                    aria-hidden={!hasUnreadMentions}
+                  >
+                    Unread Comments
                   </span>
-                  <span className={styles.columnCount}>
-                    ({columnProjects.length})
-                  </span>
-                  {hasUnreadMentions && (
-                    <span className={styles.columnNewComments}>New Comments!</span>
-                  )}
                 </div>
 
                 <div
-                  className={`${styles.kanbanColumn} ${styles.departmentColumn}`}
+                  className={`${styles.kanbanColumn} ${styles.departmentColumn} ${isColumnDropTarget ? styles.columnDropTarget : ''}`}
                   onDragOver={e => handleColumnDragOver(e, column.id)}
                   onDrop={e => handleColumnDrop(e, column.id)}
                 >
@@ -342,18 +324,8 @@ export function ProjectKanbanView({
                     className={styles.columnContent}
                     onScroll={() => checkColumnScroll(column.id)}
                   >
-                    {columnProjects.length === 0 &&
-                      isDragging &&
-                      dropToColumn === column.id && (
-                        <div className={styles.emptyDropIndicator} />
-                      )}
                     {columnProjects.map(project => {
-                      const isDragging = draggedId === project.id;
-                      const isDropTarget = dropTargetId === project.id;
-                      const showDropBefore =
-                        isDropTarget && dropPosition === 'before';
-                      const showDropAfter =
-                        isDropTarget && dropPosition === 'after';
+                      const isDraggedProject = draggedId === project.id;
 
                       return (
                         <div
@@ -361,15 +333,11 @@ export function ProjectKanbanView({
                           className={`
                           ${styles.draggableProject}
                           ${styles.draggable}
-                          ${isDragging ? styles.dragging : ''}
-                          ${showDropBefore ? styles.dropBefore : ''}
-                          ${showDropAfter ? styles.dropAfter : ''}
+                          ${isDraggedProject ? styles.dragging : ''}
                         `}
                           draggable={true}
                           onDragStart={e => handleDragStart(e, project.id, column.id)}
                           onDragEnd={handleDragEnd}
-                          onDragOver={e => handleDragOver(e, project.id)}
-                          onDragLeave={handleDragLeave}
                         >
                           <ProjectCard
                             project={project}

@@ -522,7 +522,7 @@ export default function CallSettingsManager() {
                   style={{
                     backgroundColor: '#f0f9ff',
                     border: '1px solid #0ea5e9',
-                    borderRadius: '6px',
+                    borderRadius: 'var(--border-radius)',
                     padding: '16px',
                     marginTop: '16px',
                   }}

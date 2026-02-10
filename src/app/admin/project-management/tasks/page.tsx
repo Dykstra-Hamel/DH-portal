@@ -45,7 +45,7 @@ export default function AdminTasksPage() {
   };
 
   // Convert ProjectTask to Task format for components
-  const convertToTask = (projectTask: ProjectTask): Task => ({
+  const convertToTask = useCallback((projectTask: ProjectTask): Task => ({
     id: projectTask.id,
     title: projectTask.title,
     description: projectTask.description || '',
@@ -54,13 +54,15 @@ export default function AdminTasksPage() {
     project_id: projectTask.project_id || undefined,
     assigned_to: projectTask.assigned_to || undefined,
     due_date: projectTask.due_date || '',
+    recurring_frequency: (projectTask.recurring_frequency as Task['recurring_frequency']) || undefined,
+    recurring_end_date: projectTask.recurring_end_date || undefined,
     estimated_hours: 0,
     tags: [],
     created_at: projectTask.created_at || new Date().toISOString(),
     updated_at: projectTask.updated_at || new Date().toISOString(),
     is_starred: isStarred('task', projectTask.id),
     blocked_by_task: projectTask.blocked_by_task || null,
-  });
+  }), [isStarred]);
 
   // Filter tasks - always show only tasks assigned to current user
   const filteredTasks = useMemo(() => {
@@ -70,8 +72,7 @@ export default function AdminTasksPage() {
       return convertedTasks.filter(task => task.assigned_to === user.id);
     }
     return convertedTasks;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, user?.id, isStarred]);
+  }, [tasks, user?.id, convertToTask]);
 
   // Calculate task stats by project for progress bars
   const taskStatsByProject = useMemo(() => {
@@ -192,7 +193,6 @@ export default function AdminTasksPage() {
     fetchData();
   }, [fetchTasks, fetchProjects, fetchUsers]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveTask = useCallback(async (taskData: any) => {
     try {
       const headers = await getAuthHeaders();
@@ -490,6 +490,11 @@ export default function AdminTasksPage() {
         ) : (
           <div className={styles.taskPageLayout}>
             <div className={styles.taskMainContent}>
+              {currentView !== 'list' && (
+                <div className={styles.taskViewTabsRow}>
+                  {viewTabs}
+                </div>
+              )}
               {currentView === 'list' && (
                 <TaskListView
                   tasks={projectTasks}

@@ -20,7 +20,7 @@
   padding: 0.5rem 1rem;
   background: white;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--brand-black);
@@ -161,7 +161,7 @@
   padding: 0.5rem 1rem;
   background: var(--action-600);
   color: white;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
@@ -197,7 +197,7 @@
   margin-bottom: 1rem;
   padding: 1rem;
   background: var(--gray-50);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 
   p {
     margin: 0;
@@ -231,7 +231,7 @@
   padding: 0.25rem 0.75rem;
   background: var(--indigo-50);
   color: var(--indigo-600);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.8125rem;
   font-weight: 500;
 }

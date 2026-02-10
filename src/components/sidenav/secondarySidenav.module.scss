@@ -243,7 +243,7 @@
   min-width: 13px;
   height: 23px;
   width: 23px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 12px;
   font-weight: 600;
   display: flex;

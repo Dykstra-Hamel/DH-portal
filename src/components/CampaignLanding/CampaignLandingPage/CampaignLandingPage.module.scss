@@ -127,7 +127,7 @@
   position: relative;
   isolation: isolate;
   padding: 14px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 700;
   font-size: 16px;
   cursor: pointer;
@@ -357,7 +357,7 @@
   color: var(--color-white);
   border: none;
   padding: 14px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -701,7 +701,7 @@
   color: var(--color-white);
   border: none;
   padding: 14px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -838,7 +838,7 @@
   color: var(--color-white);
   border: none;
   padding: 14px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
@@ -1014,7 +1014,7 @@
   color: var(--color-white);
   border: none;
   padding: 14px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;

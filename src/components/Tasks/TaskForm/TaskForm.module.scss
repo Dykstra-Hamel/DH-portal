@@ -8,7 +8,7 @@
 .section {
   background: #fff;
   border: 1px solid #dedede;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: border-color 0.2s ease;
 }
 
@@ -47,7 +47,7 @@
 .textarea {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   background: #fff;
   transition: border-color 0.2s ease;
@@ -100,7 +100,7 @@
   padding: 8px 12px;
   background-color: #f8fafc;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: #6b7280;
 }

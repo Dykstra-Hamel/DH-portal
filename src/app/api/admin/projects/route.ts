@@ -293,7 +293,9 @@ export async function POST(request: NextRequest) {
       primary_file_path,
       scope = 'internal', // Project scope: internal, external, or both
       category_ids = [],
+      current_department_id,
       type_code, // Project type code for shortcode generation
+      tasks = [],
     } = body;
 
     // Validate required fields
@@ -322,7 +324,7 @@ export async function POST(request: NextRequest) {
     // Validate type_code and company short_code
     if (type_code) {
       // Validate type_code format
-      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'SFT'];
       if (!validTypeCodes.includes(type_code)) {
         return NextResponse.json(
           { error: `Invalid type_code. Must be one of: ${validTypeCodes.join(', ')}` },
@@ -380,6 +382,7 @@ export async function POST(request: NextRequest) {
         notes,
         primary_file_path: primary_file_path || null,
         scope, // Project scope: internal, external, or both
+        current_department_id: current_department_id || null,
       })
       .select(
         `
@@ -430,6 +433,131 @@ export async function POST(request: NextRequest) {
       if (categoryError) {
         console.error('Error assigning categories to project:', categoryError);
         // Don't fail the whole request, just log the error
+      }
+    }
+
+    // Create tasks from request payload, if provided
+    if (Array.isArray(tasks) && tasks.length > 0) {
+      const projectStartDate = start_date ? new Date(start_date) : new Date();
+      const taskIdMap = new Map<string, string>();
+      const parentTasks = tasks.filter((task: any) => !task.parent_temp_id);
+      const childTasks = tasks.filter((task: any) => !!task.parent_temp_id);
+
+      const parseIntOrDefault = (value: unknown, defaultValue: number) => {
+        const parsed = Number.parseInt(String(value ?? ''), 10);
+        return Number.isFinite(parsed) ? parsed : defaultValue;
+      };
+
+      const buildTaskDueDate = (offsetDays: unknown) => {
+        const dueDate = new Date(projectStartDate);
+        dueDate.setDate(dueDate.getDate() + parseIntOrDefault(offsetDays, 0));
+        return dueDate.toISOString().split('T')[0];
+      };
+
+      const insertTaskWithCategories = async (
+        task: any,
+        parentTaskId: string | null,
+        fallbackOrder: number
+      ) => {
+        const { data: createdTask, error: createTaskError } = await supabase
+          .from('project_tasks')
+          .insert({
+            project_id: project.id,
+            parent_task_id: parentTaskId,
+            title: task.title || 'Untitled Task',
+            description: task.description || null,
+            priority: task.priority || 'medium',
+            due_date: buildTaskDueDate(task.due_date_offset_days),
+            start_date: start_date || null,
+            display_order: parseIntOrDefault(task.display_order, fallbackOrder),
+            created_by: user.id,
+            assigned_to: task.default_assigned_to || assigned_to || null,
+            is_completed: false,
+            progress_percentage: 0,
+            department_id: task.department_id || null,
+            blocks_task_id: null,
+            blocked_by_task_id: null,
+          })
+          .select('id')
+          .single();
+
+        if (createTaskError || !createdTask) {
+          console.error('Error creating project task from project form:', createTaskError);
+          return;
+        }
+
+        if (task.temp_id) {
+          taskIdMap.set(task.temp_id, createdTask.id);
+        }
+
+        if (Array.isArray(task.category_ids) && task.category_ids.length > 0) {
+          const categoryAssignments = task.category_ids.map((categoryId: string) => ({
+            task_id: createdTask.id,
+            category_id: categoryId,
+            category_type: 'internal',
+          }));
+
+          const { error: categoryError } = await supabase
+            .from('project_task_category_assignments')
+            .insert(categoryAssignments);
+
+          if (categoryError) {
+            console.error('Error assigning categories to project task:', categoryError);
+          }
+        }
+      };
+
+      for (const [index, task] of parentTasks.entries()) {
+        await insertTaskWithCategories(task, null, index);
+      }
+
+      for (const [index, task] of childTasks.entries()) {
+        const mappedParentId = task.parent_temp_id
+          ? taskIdMap.get(task.parent_temp_id) || null
+          : null;
+        await insertTaskWithCategories(task, mappedParentId, index);
+      }
+
+      // Update dependency fields after every task exists
+      for (const task of tasks) {
+        if (!task.temp_id) continue;
+        const taskId = taskIdMap.get(task.temp_id);
+        if (!taskId) continue;
+
+        const dependencyUpdates: Record<string, string | null> = {};
+        let needsUpdate = false;
+
+        if (task.blocks_task_id) {
+          const mappedBlocksTaskId = taskIdMap.get(task.blocks_task_id);
+          if (mappedBlocksTaskId) {
+            dependencyUpdates.blocks_task_id = mappedBlocksTaskId;
+            needsUpdate = true;
+          }
+        }
+
+        if (task.blocked_by_task_id) {
+          const mappedBlockedByTaskId = taskIdMap.get(task.blocked_by_task_id);
+          if (mappedBlockedByTaskId) {
+            dependencyUpdates.blocked_by_task_id = mappedBlockedByTaskId;
+            needsUpdate = true;
+          }
+        }
+
+        if (task.department_id !== undefined) {
+          dependencyUpdates.department_id = task.department_id || null;
+          needsUpdate = true;
+        }
+
+        if (!needsUpdate) continue;
+
+        const { error: dependencyError } = await supabase
+          .from('project_tasks')
+          .update(dependencyUpdates)
+          .eq('id', taskId);
+
+        if (dependencyError) {
+          console.error('Error updating project task dependencies:', dependencyError);
+        }
       }
     }
 

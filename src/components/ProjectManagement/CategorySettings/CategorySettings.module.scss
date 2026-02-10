@@ -35,7 +35,7 @@
   background: var(--action-500);
   color: var(--white);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-family: var(--font-satoshi);
   font-size: 14px;
   font-weight: 600;
@@ -66,7 +66,7 @@
   padding: 16px;
   background: var(--gray-50);
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s ease;
   cursor: grab;
 
@@ -309,7 +309,7 @@
   background: transparent;
   color: var(--gray-500);
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s ease;
 
   &:hover {
@@ -387,7 +387,7 @@
   width: 60px;
   height: 40px;
   border: 1px solid var(--border-color);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   padding: 0;
   overflow: hidden;
@@ -398,7 +398,7 @@
 
   &::-webkit-color-swatch {
     border: none;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
   }
 }
 
@@ -466,7 +466,7 @@
   padding: 16px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   margin-bottom: 20px;
 }
 
@@ -509,7 +509,7 @@
   padding: 12px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: #991b1b;
   font-family: var(--font-satoshi);
   font-size: 13px;
@@ -589,7 +589,7 @@
   padding: 10px 12px;
   background: var(--white);
   border: 1px solid var(--border-color-light, #e5e7eb);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s ease;
 
   &:hover {
@@ -669,7 +669,7 @@
   padding: 6px 10px;
   background: var(--action-500);
   color: var(--white);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-family: var(--font-satoshi);
   font-size: 13px;
   font-weight: 700;

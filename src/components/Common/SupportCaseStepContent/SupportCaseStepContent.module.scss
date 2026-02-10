@@ -312,7 +312,7 @@
 
 .button {
   padding: 10px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;

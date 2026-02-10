@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import {
   Project,
   ProjectFormData,
+  ProjectTaskDraft,
   User,
   Company,
   ProjectCategory,
@@ -17,6 +18,7 @@ import {
 } from '@/types/project';
 import CategoryBadge from '@/components/ProjectManagement/CategorySettings/CategoryBadge';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import { ProjectTaskBuilder } from './ProjectTaskBuilder';
 import styles from './ProjectForm.module.scss';
 
 interface ProjectFormProps {
@@ -32,6 +34,42 @@ interface ProjectFormProps {
   mode?: 'full' | 'request'; // 'full' for admin, 'request' for non-admin simplified form
   userActiveCompany?: Company | null; // Auto-selected company for non-admin users
 }
+
+const normalizeTaskOrder = (tasks: ProjectTaskDraft[]): ProjectTaskDraft[] => {
+  const topLevelTasks = tasks
+    .filter((task) => !task.parent_temp_id)
+    .sort((a, b) => Number(a.display_order || 0) - Number(b.display_order || 0));
+
+  const childrenByParent = new Map<string, ProjectTaskDraft[]>();
+  tasks
+    .filter((task) => !!task.parent_temp_id)
+    .forEach((task) => {
+      const parentId = task.parent_temp_id || '';
+      const list = childrenByParent.get(parentId) || [];
+      list.push(task);
+      childrenByParent.set(parentId, list);
+    });
+
+  const orderedTasks: ProjectTaskDraft[] = [];
+  topLevelTasks.forEach((task, index) => {
+    orderedTasks.push({
+      ...task,
+      display_order: index.toString(),
+    });
+
+    const children = (childrenByParent.get(task.temp_id || '') || []).sort(
+      (a, b) => Number(a.display_order || 0) - Number(b.display_order || 0)
+    );
+    children.forEach((child, childIndex) => {
+      orderedTasks.push({
+        ...child,
+        display_order: childIndex.toString(),
+      });
+    });
+  });
+
+  return orderedTasks;
+};
 
 const ProjectForm: React.FC<ProjectFormProps> = ({
   isOpen,
@@ -81,6 +119,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [showRequestedBySelect, setShowRequestedBySelect] = useState(false);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentStep, setCurrentStep] = useState<1 | 2>(1);
+  const [projectTasks, setProjectTasks] = useState<ProjectTaskDraft[]>([]);
+
+  const shouldUseTwoStep = mode === 'full' && !editingProject;
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -246,6 +288,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   // Update form data when editingProject changes
   useEffect(() => {
     if (editingProject) {
+      setCurrentStep(1);
+      setProjectTasks([]);
       setFormData({
         name: editingProject.name || '',
         description: editingProject.description || '',
@@ -269,6 +313,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         current_department_id: editingProject.current_department_id || '',
       });
     } else {
+      setCurrentStep(1);
+      setProjectTasks([]);
       // Reset form for new project
       setFormData({
         name: '',
@@ -353,8 +399,27 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     }
   }, [formData.type_code, formData.name, formData.company_id, companyShortCodes]);
 
+  const handleGoToTasksStep = () => {
+    if (!formData.name || !formData.project_type || !formData.company_id || !formData.due_date) {
+      alert('Please complete all required fields before continuing.');
+      return;
+    }
+
+    if (mode === 'full' && !formData.current_department_id) {
+      alert('Please select an initial department for this project.');
+      return;
+    }
+
+    setCurrentStep(2);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (shouldUseTwoStep && currentStep === 1) {
+      handleGoToTasksStep();
+      return;
+    }
 
     // Validate department is selected for full mode
     if (mode === 'full' && !formData.current_department_id) {
@@ -367,9 +432,11 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
     try {
       setIsSubmitting(true);
+      const orderedTasks = normalizeTaskOrder(projectTasks);
       const submitData = {
         ...formData,
         type_code: formData.type_code || undefined, // Include type_code if set
+        tasks: shouldUseTwoStep ? orderedTasks : undefined,
       };
       await onSubmit(submitData);
       onClose();
@@ -395,6 +462,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   };
 
   const handleClose = () => {
+    setCurrentStep(1);
+    setProjectTasks([]);
     setFormData({
       name: '',
       description: '',
@@ -415,6 +484,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       notes: '',
       scope: 'internal',
       category_ids: [],
+      current_department_id: '',
     });
     setShowRequestedBySelect(false);
     setShortcodePreview('');
@@ -427,20 +497,29 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     <div className={styles.modal}>
       <div className={styles.modalContent}>
         <div className={styles.modalHeader}>
-          <h3>
-            {mode === 'request'
-              ? 'Request New Project'
-              : editingProject
-                ? 'Edit Project'
-                : 'Create New Project'}
-          </h3>
+          <div className={styles.headerTitle}>
+            <h3>
+              {mode === 'request'
+                ? 'Request New Project'
+                : editingProject
+                  ? 'Edit Project'
+                  : 'Create New Project'}
+            </h3>
+            {shouldUseTwoStep && (
+              <p className={styles.stepText}>
+                Step {currentStep} of 2: {currentStep === 1 ? 'Project Details' : 'Project Tasks'}
+              </p>
+            )}
+          </div>
           <button onClick={handleClose} className={styles.closeButton}>
             <X size={24} />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className={styles.form}>
-          <div className={styles.formGrid}>
+          {(!shouldUseTwoStep || currentStep === 1) && (
+            <>
+              <div className={styles.formGrid}>
             <div className={styles.formGroup}>
               <label>Project Name *</label>
               <input
@@ -804,54 +883,108 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 )}
               </>
             )}
-          </div>
+              </div>
 
-          <div className={styles.formGroup}>
-            <label>Description</label>
-            <RichTextEditor
-              value={formData.description}
-              onChange={(value) =>
-                setFormData({ ...formData, description: value })
-              }
-              placeholder="Add a project description..."
-              className={styles.richTextField}
-            />
-          </div>
+              <div className={styles.formGroup}>
+                <label>Description</label>
+                <RichTextEditor
+                  value={formData.description}
+                  onChange={(value) =>
+                    setFormData({ ...formData, description: value })
+                  }
+                  placeholder="Add a project description..."
+                  className={styles.richTextField}
+                />
+              </div>
 
-          {mode === 'full' && (
-            <div className={styles.formGroup}>
-              <label>Notes</label>
-              <textarea
-                value={formData.notes}
-                onChange={e =>
-                  setFormData({ ...formData, notes: e.target.value })
-                }
-                rows={2}
-              />
-            </div>
+              {mode === 'full' && (
+                <div className={styles.formGroup}>
+                  <label>Notes</label>
+                  <textarea
+                    value={formData.notes}
+                    onChange={e =>
+                      setFormData({ ...formData, notes: e.target.value })
+                    }
+                    rows={2}
+                  />
+                </div>
+              )}
+            </>
           )}
 
-          <div className={styles.modalActions}>
-            <button
-              type="button"
-              onClick={handleClose}
-              className={styles.cancelButton}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className={styles.saveButton}
-              disabled={isSubmitting}
-            >
-              {isSubmitting
-                ? 'Submitting...'
-                : mode === 'request'
-                  ? 'Submit Request'
-                  : editingProject
-                    ? 'Update Project'
-                    : 'Create Project'}
-            </button>
+          {shouldUseTwoStep && currentStep === 2 && (
+            <ProjectTaskBuilder
+              tasks={projectTasks}
+              onChange={setProjectTasks}
+              users={assignableUsers}
+              availableCategories={availableCategories}
+              projectCategoryIds={formData.category_ids}
+              isFetchingCategories={isFetchingCategories}
+              departments={availableDepartments}
+              title="Project Tasks"
+            />
+          )}
+
+          <div className={styles.modalActions} key={`project-form-actions-step-${currentStep}`}>
+            {shouldUseTwoStep && currentStep === 1 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className={styles.cancelButton}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.saveButton}
+                  onClick={handleGoToTasksStep}
+                >
+                  Next
+                </button>
+              </>
+            ) : shouldUseTwoStep && currentStep === 2 ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep(1)}
+                  className={styles.cancelButton}
+                  disabled={isSubmitting}
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  className={styles.saveButton}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Submitting...' : 'Create Project'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className={styles.cancelButton}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={styles.saveButton}
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting
+                    ? 'Submitting...'
+                    : mode === 'request'
+                      ? 'Submit Request'
+                      : editingProject
+                        ? 'Update Project'
+                        : 'Create Project'}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>

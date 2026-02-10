@@ -153,7 +153,7 @@
     .warningMessage {
       margin-top: 12px;
       padding: 10px 12px;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       font-size: 13px;
       display: flex;
       align-items: center;

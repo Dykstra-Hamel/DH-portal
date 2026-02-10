@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, ReactNode } from 'react';
 import Image from 'next/image';
-import { ChevronDown, Users } from 'lucide-react';
+import { Building2, ChevronDown, Tag, UserRound, Users } from 'lucide-react';
 import { statusOptions as projectStatusOptions } from '@/types/project';
 import styles from './GlobalLowerHeader.module.scss';
 
@@ -961,7 +961,13 @@ export function GlobalLowerHeader({
           <div className={styles.controlsSection}>
             {/* Company Filter Dropdown */}
             <div className={styles.controlGroup} ref={projectCompanyRef}>
-              <label className={styles.controlLabel}>What Company:</label>
+              <label
+                className={`${styles.controlLabel} ${styles.iconOnlyLabel}`}
+                aria-label="What Company"
+                title="What Company"
+              >
+                <Building2 size={18} aria-hidden="true" />
+              </label>
               <button
                 className={styles.controlDropdown}
                 onClick={() => setIsProjectCompanyOpen(!isProjectCompanyOpen)}
@@ -1021,7 +1027,13 @@ export function GlobalLowerHeader({
             {/* Category Filter Dropdown */}
             {projectFilterControls.onCategoryChange && projectFilterControls.categories && projectFilterControls.categories.length > 0 && (
               <div className={styles.controlGroup} ref={projectCategoryRef}>
-                <label className={styles.controlLabel}>Category:</label>
+                <label
+                  className={`${styles.controlLabel} ${styles.iconOnlyLabel}`}
+                  aria-label="Category"
+                  title="Category"
+                >
+                  <Tag size={18} aria-hidden="true" />
+                </label>
                 <button
                   className={styles.controlDropdown}
                   onClick={() => setIsProjectCategoryOpen(!isProjectCategoryOpen)}
@@ -1065,7 +1077,13 @@ export function GlobalLowerHeader({
 
             {/* Assigned To Filter Dropdown */}
             <div className={styles.controlGroup} ref={projectAssignedToRef}>
-              <label className={styles.controlLabel}>Assigned To:</label>
+              <label
+                className={`${styles.controlLabel} ${styles.iconOnlyLabel}`}
+                aria-label="Assigned To"
+                title="Assigned To"
+              >
+                <UserRound size={18} aria-hidden="true" />
+              </label>
               <button
                 className={styles.controlDropdown}
                 onClick={() => setIsProjectAssignedToOpen(!isProjectAssignedToOpen)}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Calendar, Check, ChevronLeft, ChevronRight, Lock, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/taskManagement';
 import { Project, statusOptions as projectStatusOptions } from '@/types/project';
@@ -14,7 +14,7 @@ import styles from './TaskListView.module.scss';
 
 type SortField = 'title' | 'project' | 'client' | 'status' | 'priority' | 'due_date';
 type SortDirection = 'asc' | 'desc';
-type DueDateFilter = 'all' | 'today' | 'this_week' | 'next_30_days';
+type DueDateFilter = 'all' | 'today' | 'this_week' | 'this_month' | 'next_30_days';
 type ProjectStatus = Project['status'];
 type StatusFilter = 'all' | ProjectStatus;
 
@@ -33,6 +33,7 @@ interface TaskListViewProps {
   currentUserId?: string;
   viewTabsElement?: React.ReactNode;
   personalTasks?: Task[];
+  monthlyServices?: Task[];
 }
 
 export function TaskListView({
@@ -50,6 +51,7 @@ export function TaskListView({
   currentUserId,
   viewTabsElement,
   personalTasks,
+  monthlyServices,
 }: TaskListViewProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [companyFilter, setCompanyFilter] = useState('all');
@@ -63,6 +65,7 @@ export function TaskListView({
   const [datePickerProjectId, setDatePickerProjectId] = useState<string | null>(null);
   const [calendarMonthByTask, setCalendarMonthByTask] = useState<Record<string, Date>>({});
   const [calendarMonthByProject, setCalendarMonthByProject] = useState<Record<string, Date>>({});
+  const [expandedWorkingOnProjects, setExpandedWorkingOnProjects] = useState<Record<string, boolean>>({});
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -128,10 +131,92 @@ export function TaskListView({
   }, [datePickerProjectId]);
 
   // Get project for a task
-  const getProjectForTask = (taskProjectId?: string) => {
+  const getProjectForTask = useCallback((taskProjectId?: string): Project | null => {
     if (!taskProjectId) return null;
-    return projects.find(p => p.id === taskProjectId);
-  };
+    return projects.find(p => p.id === taskProjectId) ?? null;
+  }, [projects]);
+
+  const getTaskDueDateSortValue = useCallback((task: Task) => {
+    if (!task.due_date) return Number.POSITIVE_INFINITY;
+    const parsed = parseDateString(task.due_date);
+    return parsed ? parsed.getTime() : Number.POSITIVE_INFINITY;
+  }, []);
+
+  const isInDueDateFilter = useCallback((dueDate?: string | null) => {
+    if (dueDateFilter === 'all') return true;
+    if (!dueDate) return false;
+
+    const parsed = parseDateString(dueDate);
+    if (!parsed) return false;
+
+    const targetDate = new Date(parsed);
+    targetDate.setHours(0, 0, 0, 0);
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (dueDateFilter === 'today') {
+      return targetDate.getTime() <= today.getTime();
+    }
+
+    if (dueDateFilter === 'this_week') {
+      const dayOfWeek = today.getDay();
+      const saturday = new Date(today);
+      saturday.setDate(today.getDate() + (6 - dayOfWeek));
+      saturday.setHours(23, 59, 59, 999);
+      return targetDate.getTime() <= saturday.getTime();
+    }
+
+    if (dueDateFilter === 'this_month') {
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+      return targetDate.getTime() <= endOfMonth.getTime();
+    }
+
+    if (dueDateFilter === 'next_30_days') {
+      const end = new Date(today);
+      end.setDate(today.getDate() + 30);
+      end.setHours(23, 59, 59, 999);
+      return targetDate.getTime() >= today.getTime() && targetDate.getTime() <= end.getTime();
+    }
+
+    return true;
+  }, [dueDateFilter]);
+
+  const matchesTaskFilters = useCallback((
+    task: Task,
+    project: Project | null,
+    dueDateValue?: string | null
+  ) => {
+    if (statusFilter !== 'all') {
+      if (!project?.status || project.status !== statusFilter) {
+        return false;
+      }
+    }
+
+    if (!isInDueDateFilter(dueDateValue)) {
+      return false;
+    }
+
+    if (companyFilter !== 'all') {
+      if (!project?.company?.id || project.company.id !== companyFilter) {
+        return false;
+      }
+    }
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const clientName = project?.company?.name || '';
+      const projectName = project?.name || '';
+      return (
+        task.title.toLowerCase().includes(query) ||
+        projectName.toLowerCase().includes(query) ||
+        clientName.toLowerCase().includes(query)
+      );
+    }
+
+    return true;
+  }, [statusFilter, companyFilter, searchQuery, isInDueDateFilter]);
 
   // Handle column sort
   const handleSort = (field: SortField) => {
@@ -176,83 +261,12 @@ export function TaskListView({
     const getProjectStatusForTask = (task: Task) =>
       getProjectForTask(task.project_id)?.status;
 
-    const isInDueDateFilter = (dueDate?: string | null) => {
-      if (dueDateFilter === 'all') return true;
-      if (!dueDate) return false;
-      const parsed = parseDateString(dueDate);
-      if (!parsed) return false;
-
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      parsed.setHours(0, 0, 0, 0);
-
-      if (dueDateFilter === 'today') {
-        return parsed.getTime() <= today.getTime();
-      }
-
-      if (dueDateFilter === 'this_week') {
-        const dayOfWeek = today.getDay();
-        const saturday = new Date(today);
-        saturday.setDate(today.getDate() + (6 - dayOfWeek));
-        saturday.setHours(23, 59, 59, 999);
-        return parsed >= today && parsed <= saturday;
-      }
-
-      if (dueDateFilter === 'next_30_days') {
-        const end = new Date(today);
-        end.setDate(today.getDate() + 30);
-        end.setHours(23, 59, 59, 999);
-        return parsed >= today && parsed <= end;
-      }
-
-      return true;
-    };
-
     const filterAndSort = (taskList: Task[]) => {
       return taskList
         .filter(task => {
           const project = getProjectForTask(task.project_id);
-
-          // Status filter
-          if (statusFilter !== 'all') {
-            const projectStatus = getProjectStatusForTask(task);
-            if (!projectStatus || projectStatus !== statusFilter) {
-              return false;
-            }
-          }
-
-          // Due date filter - filter by PROJECT due date in grouped view, task due date in table view
-          if (groupTasksByProject) {
-            // In grouped view, filter by project due date
-            if (!isInDueDateFilter(project?.due_date)) {
-              return false;
-            }
-          } else {
-            // In table view, filter by task due date
-            if (!isInDueDateFilter(task.due_date)) {
-              return false;
-            }
-          }
-
-          // Company filter
-          if (companyFilter !== 'all') {
-            if (!project?.company?.id || project.company.id !== companyFilter) {
-              return false;
-            }
-          }
-
-          // Search filter - FIXED: Use real company data from project
-          if (searchQuery.trim()) {
-            const query = searchQuery.toLowerCase();
-            const clientName = project?.company?.name || '';
-            return (
-              task.title.toLowerCase().includes(query) ||
-              project?.name.toLowerCase().includes(query) ||
-              clientName.toLowerCase().includes(query)
-            );
-          }
-
-          return true;
+          const dueDateToFilter = groupTasksByProject ? project?.due_date : task.due_date;
+          return matchesTaskFilters(task, project, dueDateToFilter);
         })
         .sort((a, b) => {
           let comparison = 0;
@@ -310,7 +324,7 @@ export function TaskListView({
       starred: filterAndSort(starredTasks),
       regular: filterAndSort(regularTasks),
     };
-  }, [starredTasks, regularTasks, statusFilter, dueDateFilter, companyFilter, searchQuery, projects, sortField, sortDirection]);
+  }, [starredTasks, regularTasks, sortField, sortDirection, groupTasksByProject, getProjectForTask, matchesTaskFilters]);
 
   const companyOptions = useMemo(() => {
     const map = new Map<string, string>();
@@ -323,6 +337,35 @@ export function TaskListView({
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [projects]);
+
+  const sidebarPersonalTasks = useMemo(() => {
+    if (!personalTasks) return [];
+    return personalTasks.filter((task) => task.recurring_frequency !== 'monthly');
+  }, [personalTasks]);
+
+  const sidebarMonthlyServices = useMemo(() => {
+    if (monthlyServices) return monthlyServices;
+    if (!personalTasks) return [];
+    return personalTasks.filter((task) => task.recurring_frequency === 'monthly');
+  }, [monthlyServices, personalTasks]);
+
+  const personalTasksList = useMemo(() => {
+    return sidebarPersonalTasks
+      .filter((task) => {
+        const project = getProjectForTask(task.project_id);
+        return matchesTaskFilters(task, project, task.due_date);
+      })
+      .sort((a, b) => getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b));
+  }, [sidebarPersonalTasks, getProjectForTask, matchesTaskFilters, getTaskDueDateSortValue]);
+
+  const monthlyServicesList = useMemo(() => {
+    return sidebarMonthlyServices
+      .filter((task) => {
+        const project = getProjectForTask(task.project_id);
+        return matchesTaskFilters(task, project, task.due_date);
+      })
+      .sort((a, b) => getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b));
+  }, [sidebarMonthlyServices, getProjectForTask, matchesTaskFilters, getTaskDueDateSortValue]);
 
   const groupedTasks = useMemo(() => {
     if (!groupTasksByProject) {
@@ -411,7 +454,7 @@ export function TaskListView({
       projectGroups: sortedProjectGroups,
       personalTasks: sortedPersonalTasks,
     };
-  }, [groupTasksByProject, processedTasks.regular, projects, currentUserId, statusFilter, dueDateFilter, companyFilter, searchQuery]);
+  }, [groupTasksByProject, processedTasks.regular, projects, currentUserId, statusFilter, dueDateFilter, companyFilter, searchQuery, getProjectForTask]);
 
   const getInitialCalendarMonth = (task?: Task) => {
     if (task?.due_date) {
@@ -571,6 +614,13 @@ export function TaskListView({
       onDeleteTask(taskId);
     }
   };
+
+  const toggleWorkingOnProject = useCallback((projectId: string) => {
+    setExpandedWorkingOnProjects((prev) => ({
+      ...prev,
+      [projectId]: !prev[projectId],
+    }));
+  }, []);
 
   // Project-level handlers
   const handleProjectCalendarClick = (event: React.MouseEvent, project: Project) => {
@@ -767,18 +817,18 @@ export function TaskListView({
               <ClockIcon />
               <span>{formatDate(task.due_date)}</span>
             </span>
+            {onToggleStar && (
+              <div className={styles.taskStarAction}>
+                <StarButton
+                  isStarred={task.is_starred || false}
+                  onToggle={() => onToggleStar(task.id)}
+                  size="small"
+                />
+              </div>
+            )}
 
             {!isEditing && (
               <div className={styles.hoverActions}>
-                {onToggleStar && (
-                  <div className={styles.starWrapper}>
-                    <StarButton
-                      isStarred={task.is_starred || false}
-                      onToggle={() => onToggleStar(task.id)}
-                      size="small"
-                    />
-                  </div>
-                )}
                 <button
                   type="button"
                   className={styles.actionIcon}
@@ -1082,6 +1132,9 @@ export function TaskListView({
 
         <div className={styles.starredProjectsList}>
           {starredProjectGroups.map((projectGroup) => {
+            const projectId = projectGroup.project?.id;
+            const hasTasks = projectGroup.tasks.length > 0;
+            const isExpanded = projectId ? !!expandedWorkingOnProjects[projectId] : false;
             const projectName = projectGroup.project?.name || 'No Project';
             const projectCode = projectGroup.project?.shortcode
               ? formatProjectShortcode(projectGroup.project.shortcode)
@@ -1121,54 +1174,73 @@ export function TaskListView({
                       />
                     </div>
                   )}
+                  {projectId && hasTasks && (
+                    <button
+                      type="button"
+                      className={styles.cwoExpandToggle}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleWorkingOnProject(projectId);
+                      }}
+                      aria-expanded={isExpanded}
+                      aria-label={isExpanded ? `Collapse tasks for ${projectName}` : `Expand tasks for ${projectName}`}
+                    >
+                      <ChevronRight
+                        size={14}
+                        className={`${styles.cwoExpandIcon} ${isExpanded ? styles.cwoExpandIconExpanded : ''}`}
+                      />
+                    </button>
+                  )}
 
                   <span className={styles.projectGroupTitle}>{projectName}</span>
                   {projectCode && (
                     <span className={styles.projectGroupCode}>{projectCode}</span>
                   )}
-                  {projectDueDate && (
-                    <span className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}>
-                      <ClockIcon />
-                      <span>{formatDate(projectDueDate)}</span>
-                    </span>
-                  )}
+                  <div className={styles.projectMetaActions}>
+                    {projectDueDate && (
+                      <span className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}>
+                        <ClockIcon />
+                        <span>{formatDate(projectDueDate)}</span>
+                      </span>
+                    )}
+                    {projectGroup.project && onToggleStarProject && (
+                      <div className={styles.projectStarAction}>
+                        <StarButton
+                          isStarred={projectGroup.project.is_starred || false}
+                          onToggle={() => onToggleStarProject(projectGroup.project!.id)}
+                          size="small"
+                        />
+                      </div>
+                    )}
 
-                  {projectGroup.project && (
-                    <div className={styles.projectHoverActions} onClick={(e) => e.stopPropagation()}>
-                      {onToggleStarProject && (
-                        <div className={styles.starWrapper}>
-                          <StarButton
-                            isStarred={projectGroup.project.is_starred || false}
-                            onToggle={() => onToggleStarProject(projectGroup.project!.id)}
-                            size="small"
-                          />
-                        </div>
-                      )}
-                      <button
-                        type="button"
-                        className={styles.actionIcon}
-                        onClick={(event) => handleProjectCalendarClick(event, projectGroup.project!)}
-                        title={
-                          projectGroup.project.due_date
-                            ? `Due on ${formatDate(projectGroup.project.due_date)}`
-                            : 'No due date set.'
-                        }
-                      >
-                        <Calendar size={14} />
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.actionIcon}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          if (onProjectClick) onProjectClick(projectGroup.project!);
-                        }}
-                        title="Go to project"
-                      >
-                        <Pencil size={14} />
-                      </button>
-                    </div>
-                  )}
+                    {projectGroup.project && (
+                      <div className={styles.projectHoverActions} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className={styles.actionIcon}
+                          onClick={(event) => handleProjectCalendarClick(event, projectGroup.project!)}
+                          title={
+                            projectGroup.project.due_date
+                              ? `Due on ${formatDate(projectGroup.project.due_date)}`
+                              : 'No due date set.'
+                          }
+                        >
+                          <Calendar size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.actionIcon}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            if (onProjectClick) onProjectClick(projectGroup.project!);
+                          }}
+                          title="Go to project"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {showProjectDatePicker && projectGroup.project && (
                     <div
@@ -1239,9 +1311,11 @@ export function TaskListView({
                     </div>
                   )}
                 </div>
-                <ul className={styles.projectTaskList}>
-                  {projectGroup.tasks.sort((a, b) => sortDueDate(a) - sortDueDate(b)).map((task) => renderGroupedTaskRow(task))}
-                </ul>
+                {hasTasks && isExpanded && (
+                  <ul className={styles.projectTaskList}>
+                    {projectGroup.tasks.sort((a, b) => sortDueDate(a) - sortDueDate(b)).map((task) => renderGroupedTaskRow(task))}
+                  </ul>
+                )}
               </div>
             );
           })}
@@ -1259,8 +1333,7 @@ export function TaskListView({
     );
   };
 
-  const showPersonalTasksCard = personalTasks !== undefined;
-  const personalTasksList = personalTasks || [];
+  const showPersonalTasksCard = personalTasks !== undefined || monthlyServices !== undefined;
 
   const renderPersonalTaskRow = (task: Task) => {
     const overdue = isOverdue(task.due_date, task.status);
@@ -1306,18 +1379,18 @@ export function TaskListView({
               <ClockIcon />
               <span>{formatDate(task.due_date)}</span>
             </span>
+            {onToggleStar && (
+              <div className={styles.taskStarAction}>
+                <StarButton
+                  isStarred={task.is_starred || false}
+                  onToggle={() => onToggleStar(task.id)}
+                  size="small"
+                />
+              </div>
+            )}
 
             {!isEditing && (
               <div className={styles.hoverActions}>
-                {onToggleStar && (
-                  <div className={styles.starWrapper}>
-                    <StarButton
-                      isStarred={task.is_starred || false}
-                      onToggle={() => onToggleStar(task.id)}
-                      size="small"
-                    />
-                  </div>
-                )}
                 <button
                   type="button"
                   className={styles.actionIcon}
@@ -1446,7 +1519,13 @@ export function TaskListView({
           )}
         </InfoCard>
         <InfoCard title="Monthly Services" isCollapsible={true} startExpanded={true}>
-          <p className={styles.emptyPersonalTasks}>No monthly services</p>
+          {monthlyServicesList.length === 0 ? (
+            <p className={styles.emptyPersonalTasks}>No monthly services</p>
+          ) : (
+            <ul className={styles.personalTasksList}>
+              {monthlyServicesList.map(renderPersonalTaskRow)}
+            </ul>
+          )}
         </InfoCard>
       </>
     );
@@ -1504,6 +1583,7 @@ export function TaskListView({
           <option value="all">All Due Dates</option>
           <option value="today">Today</option>
           <option value="this_week">This Week</option>
+          <option value="this_month">This Month</option>
           <option value="next_30_days">Next 30 Days</option>
         </select>
 
@@ -1609,49 +1689,51 @@ export function TaskListView({
                       {projectCode && (
                         <span className={styles.projectGroupCode}>{projectCode}</span>
                       )}
-                      {projectDueDate && (
-                        <span className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}>
-                          <ClockIcon />
-                          <span>{formatDate(projectDueDate)}</span>
-                        </span>
-                      )}
+                      <div className={styles.projectMetaActions}>
+                        {projectDueDate && (
+                          <span className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}>
+                            <ClockIcon />
+                            <span>{formatDate(projectDueDate)}</span>
+                          </span>
+                        )}
+                        {projectGroup.project && onToggleStarProject && (
+                          <div className={styles.projectStarAction}>
+                            <StarButton
+                              isStarred={projectGroup.project.is_starred || false}
+                              onToggle={() => onToggleStarProject(projectGroup.project!.id)}
+                              size="small"
+                            />
+                          </div>
+                        )}
 
-                      {projectGroup.project && (
-                        <div className={styles.projectHoverActions} onClick={(e) => e.stopPropagation()}>
-                          {onToggleStarProject && (
-                            <div className={styles.starWrapper}>
-                              <StarButton
-                                isStarred={projectGroup.project.is_starred || false}
-                                onToggle={() => onToggleStarProject(projectGroup.project!.id)}
-                                size="small"
-                              />
-                            </div>
-                          )}
-                          <button
-                            type="button"
-                            className={styles.actionIcon}
-                            onClick={(event) => handleProjectCalendarClick(event, projectGroup.project!)}
-                            title={
-                              projectGroup.project.due_date
-                                ? `Due on ${formatDate(projectGroup.project.due_date)}`
-                                : 'No due date set.'
-                            }
-                          >
-                            <Calendar size={14} />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.actionIcon}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              if (onProjectClick) onProjectClick(projectGroup.project!);
-                            }}
-                            title="Go to project"
-                          >
-                            <Pencil size={14} />
-                          </button>
-                        </div>
-                      )}
+                        {projectGroup.project && (
+                          <div className={styles.projectHoverActions} onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className={styles.actionIcon}
+                              onClick={(event) => handleProjectCalendarClick(event, projectGroup.project!)}
+                              title={
+                                projectGroup.project.due_date
+                                  ? `Due on ${formatDate(projectGroup.project.due_date)}`
+                                  : 'No due date set.'
+                              }
+                            >
+                              <Calendar size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.actionIcon}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (onProjectClick) onProjectClick(projectGroup.project!);
+                              }}
+                              title="Go to project"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
 
                       {showProjectDatePicker && projectGroup.project && (
                         <div

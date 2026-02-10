@@ -107,7 +107,7 @@ export default function DataTable<T>({
   }, [filteredData, searchQuery, searchEnabled]);
 
   // Handle sorting
-  const handleSort = (key: string) => {
+  const handleSort = useCallback((key: string) => {
     setSortConfig(prevSort => {
       let newSort: SortConfig | null;
       if (!prevSort || prevSort.key !== key) {
@@ -118,14 +118,29 @@ export default function DataTable<T>({
         newSort = null; // Clear sort
       }
 
-      // Notify parent of sort change
-      if (newSort) {
-        onSortChange?.(newSort.key, newSort.direction);
-      }
-
       return newSort;
     });
-  };
+
+    // Calculate the new sort outside of setState for immediate callback
+    const prevSort = sortConfig;
+    let newSort: SortConfig | null;
+    if (!prevSort || prevSort.key !== key) {
+      newSort = { key, direction: 'asc' };
+    } else if (prevSort.direction === 'asc') {
+      newSort = { key, direction: 'desc' };
+    } else {
+      newSort = null; // Clear sort
+    }
+
+    // Always notify parent of sort change (including when clearing)
+    if (newSort) {
+      onSortChange?.(newSort.key, newSort.direction);
+    } else if (onSortChange) {
+      // When clearing sort, notify parent with default sort or no sort
+      // For now, we'll just call with the original key and 'asc' to reset
+      onSortChange(key, 'asc');
+    }
+  }, [sortConfig, onSortChange]);
 
   // Sort data based on current sort configuration
   const sortedData = useMemo(() => {

@@ -113,7 +113,7 @@
 .cancelButton,
 .saveButton {
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -147,7 +147,7 @@
 
 .previewButton {
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

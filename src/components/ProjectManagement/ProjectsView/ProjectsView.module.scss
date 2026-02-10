@@ -1,7 +1,8 @@
 .projectsContainer {
+  width: 100%;
   padding: 24px;
-  max-width: 1400px;
-  margin: 0 auto;
+  max-width: none;
+  margin: 0;
 }
 
 .pageHeader {
@@ -31,7 +32,7 @@
   padding: 10px 14px;
   background: white;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s ease;
 
   &:focus-within {
@@ -62,7 +63,7 @@
 .filterSelect {
   padding: 10px 14px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-family: var(--font-satoshi);
   color: #252c37;
@@ -78,6 +79,7 @@
 }
 
 .projectsTable {
+  width: 100%;
   background: white;
   border-radius: 8px;
   box-shadow: 0 0 11px 0 #e8e8ea;
@@ -123,6 +125,10 @@
   }
 }
 
+.clickableRow {
+  cursor: pointer;
+}
+
 .cell {
   display: flex;
   align-items: center;
@@ -144,7 +150,7 @@
   align-items: center;
   justify-content: center;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 12px;
   font-weight: 550;
   white-space: nowrap;
@@ -206,7 +212,7 @@
   height: 32px;
   background: white;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
   color: #6b7280;

@@ -9,7 +9,7 @@
   font-weight: 600;
   color: white;
   background-color: transparent;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--gray-700, #99a1af);
   transition: all 0.2s ease;
   transform: scale(1);

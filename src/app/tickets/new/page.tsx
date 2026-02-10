@@ -975,6 +975,8 @@ function TicketsPageContent() {
             loadingMore={loadingMore}
             // Tab counts
             tabCounts={tabCounts}
+            // Default sort (matches initial ref values)
+            defaultSort={{ key: 'created_at', direction: 'asc' }}
             // Callbacks for data fetching
             onTabChange={handleTabChange}
             onSortChange={handleSortChange}

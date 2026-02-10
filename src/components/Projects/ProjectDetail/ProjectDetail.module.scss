@@ -541,7 +541,7 @@
   color: var(--text-primary, #111827);
   margin: 0 0 1rem 0;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px 12px;
   width: 100%;
   max-width: 600px;
@@ -620,7 +620,7 @@
   width: 100%;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-family: inherit;
   font-size: 14px;
   resize: vertical;
@@ -644,7 +644,7 @@
   width: 100%;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-family: inherit;
   font-size: 14px;
   color: #374151;
@@ -662,7 +662,7 @@
   width: 100%;
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-family: inherit;
   font-size: 14px;
   color: #374151;
@@ -902,7 +902,7 @@
   background: var(--primary-color, #3b82f6);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
@@ -931,7 +931,7 @@
   background: transparent;
   color: var(--text-secondary, #6b7280);
   border: 1px solid var(--border-color, #d1d5db);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
