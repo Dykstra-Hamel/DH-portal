@@ -7,7 +7,7 @@ import {
   ModalMiddle,
   ModalBottom,
 } from '@/components/Common/Modal/Modal';
-import { Plus, Trash2, GripVertical } from 'lucide-react';
+import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import styles from './MonthlyServiceForm.module.scss';
 
 interface Company {
@@ -118,6 +118,7 @@ export function MonthlyServiceForm({
   // Task templates
   const [taskTemplates, setTaskTemplates] = useState<TaskTemplate[]>([]);
   const [nextTempId, setNextTempId] = useState(1);
+  const [collapsedTasks, setCollapsedTasks] = useState<Set<string>>(new Set());
 
   // Departments
   const [departments, setDepartments] = useState<{id: string; name: string; icon?: string}[]>([]);
@@ -256,6 +257,18 @@ export function MonthlyServiceForm({
     // Update display_order
     const reindexed = newTemplates.map((t, i) => ({ ...t, display_order: i }));
     setTaskTemplates(reindexed);
+  };
+
+  const toggleTaskCollapse = (id: string) => {
+    setCollapsedTasks(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -533,7 +546,18 @@ export function MonthlyServiceForm({
               </div>
 
               {taskTemplates.length === 0 ? (
-                <div className={styles.emptyState}>
+                <div
+                  className={styles.emptyState}
+                  onClick={addTaskTemplate}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      addTaskTemplate();
+                    }
+                  }}
+                >
                   <p>
                     No tasks added yet. Click &quot;Add Task&quot; to create
                     task templates.
@@ -542,46 +566,66 @@ export function MonthlyServiceForm({
               ) : (
                 <>
                   <div className={styles.taskList}>
-                    {taskTemplates.map((template, index) => (
-                      <div key={template.id} className={styles.taskCard}>
-                        <div className={styles.taskCardHeader}>
-                          <div className={styles.taskCardTitle}>
-                            <GripVertical size={18} className={styles.gripIcon} />
-                            <span>Task {index + 1}</span>
+                    {taskTemplates.map((template, index) => {
+                      const isCollapsed = collapsedTasks.has(template.id);
+                      return (
+                        <div key={template.id} className={styles.taskCard}>
+                          <div className={styles.taskCardHeader}>
+                            <button
+                              type="button"
+                              onClick={() => toggleTaskCollapse(template.id)}
+                              className={styles.collapseButton}
+                              title={isCollapsed ? 'Expand' : 'Collapse'}
+                            >
+                              {isCollapsed ? (
+                                <ChevronDown size={18} />
+                              ) : (
+                                <ChevronUp size={18} />
+                              )}
+                            </button>
+                            <div className={styles.taskCardTitle}>
+                              <GripVertical size={18} className={styles.gripIcon} />
+                              <span>Task {index + 1}</span>
+                              {template.title && (
+                                <span className={styles.taskCardTitlePreview}>
+                                  - {template.title}
+                                </span>
+                              )}
+                            </div>
+                            <div className={styles.taskCardActions}>
+                              <button
+                                type="button"
+                                onClick={() => moveTaskTemplate(template.id, 'up')}
+                                disabled={index === 0}
+                                className={styles.iconButton}
+                                title="Move up"
+                              >
+                                ↑
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  moveTaskTemplate(template.id, 'down')
+                                }
+                                disabled={index === taskTemplates.length - 1}
+                                className={styles.iconButton}
+                                title="Move down"
+                              >
+                                ↓
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => removeTaskTemplate(template.id)}
+                                className={styles.deleteButton}
+                                title="Remove task"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
                           </div>
-                          <div className={styles.taskCardActions}>
-                            <button
-                              type="button"
-                              onClick={() => moveTaskTemplate(template.id, 'up')}
-                              disabled={index === 0}
-                              className={styles.iconButton}
-                              title="Move up"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                moveTaskTemplate(template.id, 'down')
-                              }
-                              disabled={index === taskTemplates.length - 1}
-                              className={styles.iconButton}
-                              title="Move down"
-                            >
-                              ↓
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => removeTaskTemplate(template.id)}
-                              className={styles.deleteButton}
-                              title="Remove task"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </div>
 
-                        <div className={styles.taskCardBody}>
+                          {!isCollapsed && (
+                            <div className={styles.taskCardBody}>
                           <div className={styles.formGroup}>
                             <label className={styles.label}>
                               Title <span className={styles.required}>*</span>
@@ -726,8 +770,10 @@ export function MonthlyServiceForm({
                             </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <button

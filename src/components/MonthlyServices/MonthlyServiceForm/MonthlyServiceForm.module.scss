@@ -219,6 +219,21 @@
   background-color: #f9fafb;
   border: 1px dashed #d1d5db;
   border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background-color: #f3f4f6;
+    border-color: #9ca3af;
+    border-style: solid;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #3b82f6;
+    border-style: solid;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
 
   p {
     margin: 0;
@@ -247,6 +262,29 @@
   padding: 12px 16px;
   background-color: #f3f4f6;
   border-bottom: 1px solid #e5e7eb;
+  gap: 12px;
+}
+
+.collapseButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background-color: white;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+    color: #374151;
+  }
 }
 
 .taskCardTitle {
@@ -256,6 +294,16 @@
   font-size: 14px;
   font-weight: 600;
   color: #374151;
+  flex: 1;
+  min-width: 0;
+}
+
+.taskCardTitlePreview {
+  font-weight: 400;
+  color: #6b7280;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .gripIcon {
