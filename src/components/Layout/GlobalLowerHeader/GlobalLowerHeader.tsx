@@ -1248,9 +1248,8 @@ export function GlobalLowerHeader({
           showAddButton ||
           customActions) && (
           <div className={styles.rightSection}>
-            {customActions ? (
-              customActions
-            ) : actionButtons && actionButtons.length > 0 ? (
+            {customActions && customActions}
+            {actionButtons && actionButtons.length > 0 && (
               actionButtons.map((button, index) => (
                 <button
                   key={index}
@@ -1262,7 +1261,8 @@ export function GlobalLowerHeader({
                   <span>{button.text}</span>
                 </button>
               ))
-            ) : showAddButton ? (
+            )}
+            {showAddButton && (
               <button
                 className={styles.addLeadButton}
                 onClick={onAddClick}
@@ -1271,7 +1271,7 @@ export function GlobalLowerHeader({
                 {addButtonIcon || <PlusIcon />}
                 <span>{addButtonText}</span>
               </button>
-            ) : null}
+            )}
           </div>
         )}
       </div>

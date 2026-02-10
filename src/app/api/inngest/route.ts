@@ -30,6 +30,9 @@ import { detectPestAnomalies } from '@/lib/inngest/functions/detect-pest-anomali
 // Google Places Review Sync
 import { syncGoogleReviews } from '@/lib/inngest/functions/sync-google-reviews';
 
+// Monthly Services Task Generation
+import { generateMonthlyServiceTasks } from '@/lib/inngest/functions/generate-monthly-service-tasks';
+
 // Create the handler
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -64,6 +67,8 @@ export const { GET, POST, PUT } = serve({
     detectPestAnomalies,
     // Google Places Review Sync
     syncGoogleReviews,
+    // Monthly Services Task Generation
+    generateMonthlyServiceTasks,
   ],
   streaming: false, // Disable streaming for compatibility
 });

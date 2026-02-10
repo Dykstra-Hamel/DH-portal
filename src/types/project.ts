@@ -301,6 +301,20 @@ export interface ProjectTask {
     name: string;
     shortcode?: string | null;
   } | null;
+  monthly_service_id?: string | null;
+  monthly_service?: {
+    id: string;
+    service_name: string;
+    company?: {
+      id: string;
+      name: string;
+      branding?: {
+        icon_logo_url?: string;
+      } | {
+        icon_logo_url?: string;
+      }[] | null;
+    } | null;
+  } | null;
   assigned_to_profile?: {
     id: string;
     first_name: string;

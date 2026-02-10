@@ -34,6 +34,15 @@ interface TaskListViewProps {
   viewTabsElement?: React.ReactNode;
   personalTasks?: Task[];
   monthlyServices?: Task[];
+  monthlyServiceMetaByTaskId?: Record<
+    string,
+    {
+      companyId: string | null;
+      companyName: string;
+      iconUrl: string | null;
+      serviceName: string;
+    }
+  >;
 }
 
 export function TaskListView({
@@ -52,6 +61,7 @@ export function TaskListView({
   viewTabsElement,
   personalTasks,
   monthlyServices,
+  monthlyServiceMetaByTaskId,
 }: TaskListViewProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [companyFilter, setCompanyFilter] = useState('all');
@@ -333,10 +343,15 @@ export function TaskListView({
         map.set(project.company.id, project.company.name);
       }
     });
+    Object.values(monthlyServiceMetaByTaskId || {}).forEach((meta) => {
+      if (meta.companyId && meta.companyName) {
+        map.set(meta.companyId, meta.companyName);
+      }
+    });
     return Array.from(map.entries())
       .map(([id, name]) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [projects]);
+  }, [projects, monthlyServiceMetaByTaskId]);
 
   const sidebarPersonalTasks = useMemo(() => {
     if (!personalTasks) return [];
@@ -361,11 +376,43 @@ export function TaskListView({
   const monthlyServicesList = useMemo(() => {
     return sidebarMonthlyServices
       .filter((task) => {
-        const project = getProjectForTask(task.project_id);
-        return matchesTaskFilters(task, project, task.due_date);
+        if (statusFilter !== 'all') {
+          return false;
+        }
+
+        if (!isInDueDateFilter(task.due_date)) {
+          return false;
+        }
+
+        const serviceMeta = monthlyServiceMetaByTaskId?.[task.id];
+
+        if (companyFilter !== 'all') {
+          if (!serviceMeta?.companyId || serviceMeta.companyId !== companyFilter) {
+            return false;
+          }
+        }
+
+        if (searchQuery.trim()) {
+          const query = searchQuery.toLowerCase();
+          return (
+            task.title.toLowerCase().includes(query) ||
+            (serviceMeta?.serviceName || '').toLowerCase().includes(query) ||
+            (serviceMeta?.companyName || '').toLowerCase().includes(query)
+          );
+        }
+
+        return true;
       })
       .sort((a, b) => getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b));
-  }, [sidebarMonthlyServices, getProjectForTask, matchesTaskFilters, getTaskDueDateSortValue]);
+  }, [
+    sidebarMonthlyServices,
+    statusFilter,
+    companyFilter,
+    searchQuery,
+    isInDueDateFilter,
+    getTaskDueDateSortValue,
+    monthlyServiceMetaByTaskId,
+  ]);
 
   const groupedTasks = useMemo(() => {
     if (!groupTasksByProject) {
@@ -1507,6 +1554,59 @@ export function TaskListView({
   const renderPersonalTasksCard = () => {
     if (!showPersonalTasksCard) return null;
 
+    const renderMonthlyServiceRow = (task: Task) => {
+      const overdue = isOverdue(task.due_date, task.status);
+      const serviceMeta = monthlyServiceMetaByTaskId?.[task.id];
+
+      return (
+        <li
+          key={task.id}
+          className={`${styles.personalTaskRow} ${styles.projectTaskItem} ${task.status === 'completed' ? styles.taskCompleted : ''}`}
+          onClick={() => onTaskClick(task)}
+        >
+          <button
+            type="button"
+            className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
+            onClick={(event) => handleToggleComplete(event, task)}
+            aria-label={task.status === 'completed' ? 'Mark task incomplete' : 'Mark task complete'}
+            disabled={!onToggleComplete || !!(task.blocked_by_task && !task.blocked_by_task.is_completed)}
+          >
+            {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+              <Lock size={12} />
+            ) : task.status === 'completed' ? (
+              <Check size={12} />
+            ) : null}
+          </button>
+          <div className={styles.companyLogoWrapper}>
+            <CompanyIcon
+              companyName={serviceMeta?.companyName || 'Company'}
+              iconUrl={serviceMeta?.iconUrl || null}
+              size="small"
+              showTooltip={true}
+            />
+          </div>
+          <div className={`${styles.taskTitleRow} ${styles.personalTaskTitleRow}`}>
+            <span className={styles.taskTitleText}>{task.title}</span>
+            <div className={styles.taskMetaActions}>
+              <span className={`${styles.taskDueDate} ${overdue ? styles.taskDueDateOverdue : ''}`}>
+                <ClockIcon />
+                <span>{formatDate(task.due_date)}</span>
+              </span>
+              {onToggleStar && (
+                <div className={styles.taskStarAction}>
+                  <StarButton
+                    isStarred={task.is_starred || false}
+                    onToggle={() => onToggleStar(task.id)}
+                    size="small"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </li>
+      );
+    };
+
     return (
       <>
         <InfoCard title="Personal Tasks" isCollapsible={true} startExpanded={true}>
@@ -1523,7 +1623,7 @@ export function TaskListView({
             <p className={styles.emptyPersonalTasks}>No monthly services</p>
           ) : (
             <ul className={styles.personalTasksList}>
-              {monthlyServicesList.map(renderPersonalTaskRow)}
+              {monthlyServicesList.map(renderMonthlyServiceRow)}
             </ul>
           )}
         </InfoCard>

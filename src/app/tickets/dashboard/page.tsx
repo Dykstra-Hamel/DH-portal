@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef, Suspense, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import {
   Ticket,
   TicketFormData,
@@ -1614,10 +1615,12 @@ function TicketsDashboardContent() {
                   + Expand To See More ({announcements.length - 1})
                 </span>
               )}
-              <img
+              <Image
                 src="/images/announcements-agent.png"
                 alt=""
                 aria-hidden="true"
+                width={128}
+                height={161}
                 className={styles.announcementImage}
               />
             </button>

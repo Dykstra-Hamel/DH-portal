@@ -365,6 +365,30 @@ export function Breadcrumbs() {
             break;
           }
 
+          if (pathSegments[1] === 'monthly-services') {
+            crumbs.push({ label: 'Monthly Services', href: '/admin/monthly-services' });
+
+            if (pathSegments[2] && params?.id) {
+              try {
+                setLoading(true);
+                const response = await fetch(`/api/admin/monthly-services/${params.id}`);
+                if (response.ok) {
+                  const data = await response.json();
+                  const serviceName = data.service?.service_name || 'Service';
+                  crumbs.push({ label: serviceName });
+                } else {
+                  crumbs.push({ label: 'Service' });
+                }
+              } catch (error) {
+                console.error('Error fetching monthly service for breadcrumb:', error);
+                crumbs.push({ label: 'Service' });
+              } finally {
+                setLoading(false);
+              }
+            }
+            break;
+          }
+
           crumbs.push({ label: 'Admin Dashboard' });
           break;
 
