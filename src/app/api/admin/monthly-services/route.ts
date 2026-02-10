@@ -46,7 +46,11 @@ export async function GET(request: NextRequest) {
         companies (
           id,
           name,
-          logo_url
+          logo_url,
+          branding:brands!company_id(
+            logo_url,
+            icon_logo_url
+          )
         )
       `
       )
@@ -109,8 +113,15 @@ export async function GET(request: NextRequest) {
           };
         });
 
+        const companies = service.companies as any;
         return {
           ...service,
+          companies: {
+            ...companies,
+            branding: Array.isArray(companies.branding)
+              ? companies.branding[0] || null
+              : companies.branding,
+          },
           templates: templates || [],
           weekProgress,
         };

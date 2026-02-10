@@ -33,6 +33,22 @@ interface TaskTemplate {
   display_order: number;
 }
 
+interface DefaultTemplate {
+  id: string;
+  name: string;
+  description: string | null;
+  tasks: {
+    id: string;
+    title: string;
+    description: string | null;
+    default_assigned_to: string | null;
+    department_id: string | null;
+    week_of_month: number | null;
+    due_day_of_week: number | null;
+    display_order: number;
+  }[];
+}
+
 interface Service {
   id: string;
   company_id: string;
@@ -123,26 +139,40 @@ export function MonthlyServiceForm({
   // Departments
   const [departments, setDepartments] = useState<{id: string; name: string; icon?: string}[]>([]);
 
+  // Default templates
+  const [defaultTemplates, setDefaultTemplates] = useState<DefaultTemplate[]>([]);
+  const [showTemplateDropdown, setShowTemplateDropdown] = useState(false);
+
   const isEditMode = !!service;
 
-  // Fetch departments on mount
+  // Fetch departments and default templates on mount
   useEffect(() => {
-    const fetchDepartments = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/admin/monthly-services/departments');
-        if (response.ok) {
-          const data = await response.json();
-          setDepartments(data.departments || []);
+        // Fetch departments
+        const deptResponse = await fetch('/api/admin/monthly-services/departments');
+        if (deptResponse.ok) {
+          const deptData = await deptResponse.json();
+          setDepartments(deptData.departments || []);
+        }
+
+        // Fetch default templates (only on create, not edit)
+        if (!isEditMode) {
+          const templatesResponse = await fetch('/api/admin/monthly-services/default-templates');
+          if (templatesResponse.ok) {
+            const templatesData = await templatesResponse.json();
+            setDefaultTemplates(templatesData || []);
+          }
         }
       } catch (error) {
-        console.error('Error fetching departments:', error);
+        console.error('Error fetching data:', error);
       }
     };
 
     if (isOpen) {
-      fetchDepartments();
+      fetchData();
     }
-  }, [isOpen]);
+  }, [isOpen, isEditMode]);
 
   // Auto-generate service name from company selection
   useEffect(() => {
@@ -270,6 +300,42 @@ export function MonthlyServiceForm({
       return newSet;
     });
   };
+
+  const loadFromTemplate = (templateId: string) => {
+    const template = defaultTemplates.find(t => t.id === templateId);
+    if (!template) return;
+
+    // Convert template tasks to TaskTemplate format
+    const newTasks: TaskTemplate[] = template.tasks.map((task, index) => ({
+      id: `temp-${nextTempId + index}`,
+      title: task.title,
+      description: task.description || '',
+      default_assigned_to: task.default_assigned_to || '',
+      department_id: task.department_id,
+      week_of_month: task.week_of_month,
+      due_day_of_week: task.due_day_of_week,
+      display_order: index,
+    }));
+
+    setTaskTemplates(newTasks);
+    setNextTempId(nextTempId + newTasks.length);
+    setShowTemplateDropdown(false);
+  };
+
+  // Close template dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest(`.${styles.templateDropdownContainer}`)) {
+        setShowTemplateDropdown(false);
+      }
+    };
+
+    if (showTemplateDropdown) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [showTemplateDropdown]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -535,14 +601,52 @@ export function MonthlyServiceForm({
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <h3 className={styles.sectionTitle}>Task Templates</h3>
-                <button
-                  type="button"
-                  onClick={addTaskTemplate}
-                  className={styles.addButton}
-                >
-                  <Plus size={16} />
-                  Add Task
-                </button>
+                <div className={styles.headerActions}>
+                  {!isEditMode && defaultTemplates.length > 0 && (
+                    <div className={styles.templateDropdownContainer}>
+                      <button
+                        type="button"
+                        onClick={() => setShowTemplateDropdown(!showTemplateDropdown)}
+                        className={styles.templateButton}
+                      >
+                        Load from Template
+                        <ChevronDown size={16} />
+                      </button>
+                      {showTemplateDropdown && (
+                        <div className={styles.templateDropdown}>
+                          {defaultTemplates.map(template => (
+                            <button
+                              key={template.id}
+                              type="button"
+                              onClick={() => loadFromTemplate(template.id)}
+                              className={styles.templateOption}
+                            >
+                              <div className={styles.templateOptionContent}>
+                                <span className={styles.templateName}>{template.name}</span>
+                                {template.description && (
+                                  <span className={styles.templateDescription}>
+                                    {template.description}
+                                  </span>
+                                )}
+                                <span className={styles.templateTaskCount}>
+                                  {template.tasks.length} task{template.tasks.length !== 1 ? 's' : ''}
+                                </span>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={addTaskTemplate}
+                    className={styles.addButton}
+                  >
+                    <Plus size={16} />
+                    Add Task
+                  </button>
+                </div>
               </div>
 
               {taskTemplates.length === 0 ? (

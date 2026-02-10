@@ -16,6 +16,10 @@ interface Company {
   id: string;
   name: string;
   logo_url: string | null;
+  branding: {
+    logo_url: string | null;
+    icon_logo_url: string | null;
+  } | null;
 }
 
 interface User {
