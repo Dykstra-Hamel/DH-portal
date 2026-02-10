@@ -46,7 +46,11 @@ export async function GET(request: NextRequest) {
         companies (
           id,
           name,
-          logo_url
+          logo_url,
+          branding:brands!company_id(
+            logo_url,
+            icon_logo_url
+          )
         )
       `
       )
@@ -111,6 +115,10 @@ export async function GET(request: NextRequest) {
 
         return {
           ...service,
+          companies: {
+            ...service.companies,
+            branding: service.companies.branding?.[0] || null,
+          },
           templates: templates || [],
           weekProgress,
         };

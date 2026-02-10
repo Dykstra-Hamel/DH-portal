@@ -8,6 +8,10 @@ interface Company {
   id: string;
   name: string;
   logo_url: string | null;
+  branding: {
+    logo_url: string | null;
+    icon_logo_url: string | null;
+  } | null;
 }
 
 interface WeekProgress {
@@ -112,19 +116,26 @@ export function MonthlyServicesTable({
               {/* Company */}
               <td className={styles.companyCell}>
                 <div className={styles.companyInfo}>
-                  {service.companies.logo_url ? (
-                    <Image
-                      src={service.companies.logo_url}
-                      alt={service.companies.name}
-                      width={32}
-                      height={32}
-                      className={styles.logo}
-                    />
-                  ) : (
-                    <div className={styles.logoPlaceholder}>
-                      {service.companies.name.charAt(0)}
-                    </div>
-                  )}
+                  {(() => {
+                    const iconLogoUrl = service.companies.branding?.icon_logo_url;
+                    const brandingLogoUrl = service.companies.branding?.logo_url;
+                    const companyLogoUrl = service.companies.logo_url;
+                    const logoUrl = iconLogoUrl || brandingLogoUrl || companyLogoUrl;
+
+                    return logoUrl ? (
+                      <Image
+                        src={logoUrl}
+                        alt={service.companies.name}
+                        width={32}
+                        height={32}
+                        className={styles.logo}
+                      />
+                    ) : (
+                      <div className={styles.logoPlaceholder}>
+                        {service.companies.name.charAt(0)}
+                      </div>
+                    );
+                  })()}
                   <span className={styles.companyName}>
                     {service.companies.name}
                   </span>
