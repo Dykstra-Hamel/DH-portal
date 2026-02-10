@@ -877,24 +877,27 @@ export default function ProjectTaskDetail({
                 </select>
               </div>
 
-              <div className={styles.detailItem}>
-                <div className={styles.detailLabel}>
-                  <Tag size={14} />
-                  Category
+              {/* Category - only show for project tasks, not monthly service tasks */}
+              {!(task as any)?.monthly_service_id && (
+                <div className={styles.detailItem}>
+                  <div className={styles.detailLabel}>
+                    <Tag size={14} />
+                    Category
+                  </div>
+                  <select
+                    className={styles.editSelect}
+                    value={selectedCategoryIds[0] || ''}
+                    onChange={e => handleCategoryChange(e.target.value || null)}
+                  >
+                    <option value="">No Category</option>
+                    {availableCategories.map(category => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <select
-                  className={styles.editSelect}
-                  value={selectedCategoryIds[0] || ''}
-                  onChange={e => handleCategoryChange(e.target.value || null)}
-                >
-                  <option value="">No Category</option>
-                  {availableCategories.map(category => (
-                    <option key={category.id} value={category.id}>
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              )}
 
               {/* Monthly Service Department - only show for monthly service tasks */}
               {(task as any)?.monthly_service_id &&

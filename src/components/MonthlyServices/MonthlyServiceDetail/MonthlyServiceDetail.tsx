@@ -119,6 +119,8 @@ interface MonthlyServiceTask {
       icon?: string;
     };
   }[];
+  comments?: any[];
+  activity?: any[];
 }
 
 interface CommentAttachment {
@@ -532,6 +534,9 @@ export function MonthlyServiceDetail({
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       assigned_to_profile: assignedToProfile,
+      // Include comments and activity from the task
+      comments: task.comments || [],
+      activity: task.activity || [],
       // Add monthly_service_id so ProjectTaskDetail can detect this is a monthly service task
       monthly_service_id: service.id,
     } as any; // Use 'as any' since monthly_service_id is not in ProjectTask type
@@ -1974,8 +1979,22 @@ export function MonthlyServiceDetail({
           onUpdate={handleUpdateTask}
           onDelete={() => selectedTask && handleDeleteTask(selectedTask.id)}
           onAddComment={async (comment: string) => {
-            // TODO: Implement comment functionality
-            console.log('Add comment:', comment);
+            if (!selectedTask) return;
+            try {
+              const headers = await getAuthHeaders();
+              const response = await fetch(`/api/admin/tasks/${selectedTask.id}/comments`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ comment }),
+              });
+              if (!response.ok) {
+                throw new Error('Failed to add comment');
+              }
+              // Refresh service data to show new comment
+              onServiceUpdate();
+            } catch (error) {
+              console.error('Error adding comment:', error);
+            }
           }}
           onCreateSubtask={() => {
             // TODO: Implement subtask functionality

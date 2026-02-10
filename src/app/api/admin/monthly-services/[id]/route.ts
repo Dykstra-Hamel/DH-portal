@@ -136,6 +136,23 @@ export async function GET(
             name,
             icon
           )
+        ),
+        comments:project_task_comments (
+          id,
+          comment,
+          created_at,
+          updated_at,
+          user_id,
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        activity:project_task_activity (
+          id,
+          action_type,
+          old_value,
+          new_value,
+          created_at,
+          user_id,
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
         )
       `
       )
@@ -208,6 +225,7 @@ export async function GET(
       service: {
         ...service,
         templates: templates || [],
+        tasks: tasks || [],
         weekProgress,
         budgets: budgets || [],
       },
