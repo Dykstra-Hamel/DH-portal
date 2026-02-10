@@ -447,7 +447,7 @@ export function SecondarySideNav({
           {
             items: [
               {
-                text: 'Dashboard',
+                text: 'Projects',
                 href: '/admin/project-management',
                 icon: (
                   <svg
@@ -545,7 +545,7 @@ export function SecondarySideNav({
                 ),
               },
               {
-                text: 'Templates',
+                text: 'Project Templates',
                 href: '/admin/project-management/templates',
                 icon: (
                   <svg

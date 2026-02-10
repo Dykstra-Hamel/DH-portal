@@ -28,7 +28,7 @@
   align-items: center;
   justify-content: center;
   z-index: 10;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .loadingText {
@@ -189,7 +189,7 @@
   background-color: var(--gray-100);
   border: 1px solid var(--gray-300);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .tabButton {
@@ -217,11 +217,11 @@
   }
 
   &.firstTab {
-    border-radius: 6px 0 0 6px;
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
   }
 
   &.lastTab {
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
     border-right: 1px solid var(--gray-300);
   }
 }
@@ -241,7 +241,7 @@
 
 // Pest Badges
 .pestBadge {
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--success-500);
   background: var(--success-100);
   display: flex;
@@ -283,7 +283,7 @@
   width: 131px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 7px 12px;
   display: flex;
   justify-content: center;
@@ -403,7 +403,7 @@
 .pestCoverageItem {
   padding: 8px 12px;
   background: var(--gray-50);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-700);
   border: 1px solid var(--gray-200);
@@ -442,7 +442,7 @@
   padding: 4px 8px;
   background: var(--gray-50);
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-700);
@@ -487,7 +487,7 @@
   padding: 9px 12px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-700);
@@ -524,7 +524,7 @@
   right: 0;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -654,7 +654,7 @@
     align-items: center;
     padding: 10px 12px;
     background: var(--gray-50);
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     margin-bottom: 8px;
 
     &:last-child {
@@ -888,7 +888,7 @@
   padding: 10px 20px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-900);
@@ -996,7 +996,7 @@
 .multiplePlansIndicator {
   background-color: var(--action-50);
   border: 1px solid var(--action-200);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px 12px;
   margin-bottom: 16px;
   font-size: 13px;
@@ -1046,7 +1046,7 @@
   background: var(--action-500);
   color: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -1212,7 +1212,7 @@
 .pestCoverageItem {
   padding: 8px 12px;
   background-color: var(--gray-50);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-700);
   border: 1px solid var(--gray-200);
@@ -1238,7 +1238,7 @@
   margin-top: 16px;
   padding: 12px;
   background-color: var(--action-50);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--action-200);
 }
 
@@ -1256,7 +1256,7 @@
 .faqItem {
   padding: 16px;
   background-color: var(--gray-50);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .faqQuestion {
@@ -1314,7 +1314,7 @@
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s ease;
   white-space: nowrap;
 
@@ -1336,7 +1336,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;

@@ -15,6 +15,14 @@ import { createClient } from '@/lib/supabase/client';
 import styles from '@/app/project-management/projectManagement.module.scss';
 
 type ViewType = 'list' | 'calendar' | 'archive';
+type TaskWithMonthlyServiceMeta = Task & { monthly_service_id?: string | null };
+
+interface MonthlyServiceTaskMeta {
+  companyId: string | null;
+  companyName: string;
+  iconUrl: string | null;
+  serviceName: string;
+}
 
 export default function AdminTasksPage() {
   const { registerPageAction } = usePageActions();
@@ -45,7 +53,7 @@ export default function AdminTasksPage() {
   };
 
   // Convert ProjectTask to Task format for components
-  const convertToTask = (projectTask: ProjectTask): Task => ({
+  const convertToTask = useCallback((projectTask: ProjectTask): TaskWithMonthlyServiceMeta => ({
     id: projectTask.id,
     title: projectTask.title,
     description: projectTask.description || '',
@@ -54,13 +62,16 @@ export default function AdminTasksPage() {
     project_id: projectTask.project_id || undefined,
     assigned_to: projectTask.assigned_to || undefined,
     due_date: projectTask.due_date || '',
+    recurring_frequency: (projectTask.recurring_frequency as Task['recurring_frequency']) || undefined,
+    recurring_end_date: projectTask.recurring_end_date || undefined,
     estimated_hours: 0,
     tags: [],
     created_at: projectTask.created_at || new Date().toISOString(),
     updated_at: projectTask.updated_at || new Date().toISOString(),
     is_starred: isStarred('task', projectTask.id),
     blocked_by_task: projectTask.blocked_by_task || null,
-  });
+    monthly_service_id: projectTask.monthly_service_id || null,
+  }), [isStarred]);
 
   // Filter tasks - always show only tasks assigned to current user
   const filteredTasks = useMemo(() => {
@@ -70,8 +81,29 @@ export default function AdminTasksPage() {
       return convertedTasks.filter(task => task.assigned_to === user.id);
     }
     return convertedTasks;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, user?.id, isStarred]);
+  }, [tasks, user?.id, convertToTask]);
+
+  const monthlyServiceMetaByTaskId = useMemo<Record<string, MonthlyServiceTaskMeta>>(() => {
+    const meta: Record<string, MonthlyServiceTaskMeta> = {};
+
+    tasks.forEach((task) => {
+      if (!task.monthly_service_id || !task.monthly_service) return;
+
+      const company = task.monthly_service.company;
+      const iconUrl = Array.isArray(company?.branding)
+        ? company?.branding?.[0]?.icon_logo_url || null
+        : company?.branding?.icon_logo_url || null;
+
+      meta[task.id] = {
+        companyId: company?.id || null,
+        companyName: company?.name || 'Company',
+        iconUrl,
+        serviceName: task.monthly_service.service_name || 'Monthly Service',
+      };
+    });
+
+    return meta;
+  }, [tasks]);
 
   // Calculate task stats by project for progress bars
   const taskStatsByProject = useMemo(() => {
@@ -192,7 +224,6 @@ export default function AdminTasksPage() {
     fetchData();
   }, [fetchTasks, fetchProjects, fetchUsers]);
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleSaveTask = useCallback(async (taskData: any) => {
     try {
       const headers = await getAuthHeaders();
@@ -475,7 +506,12 @@ export default function AdminTasksPage() {
   );
 
   // Separate personal tasks from project-based tasks
-  const personalTasks = filteredTasks.filter(task => !task.project_id);
+  const personalTasks = filteredTasks.filter(
+    (task) => !task.project_id && !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
+  const monthlyServices = filteredTasks.filter(
+    (task) => !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
   const projectTasks = filteredTasks.filter(task => task.project_id);
 
   return (
@@ -490,6 +526,11 @@ export default function AdminTasksPage() {
         ) : (
           <div className={styles.taskPageLayout}>
             <div className={styles.taskMainContent}>
+              {currentView !== 'list' && (
+                <div className={styles.taskViewTabsRow}>
+                  {viewTabs}
+                </div>
+              )}
               {currentView === 'list' && (
                 <TaskListView
                   tasks={projectTasks}
@@ -506,6 +547,8 @@ export default function AdminTasksPage() {
                   groupTasksByProject
                   viewTabsElement={viewTabs}
                   personalTasks={personalTasks}
+                  monthlyServices={monthlyServices}
+                  monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
                 />
               )}
               {currentView === 'calendar' && (

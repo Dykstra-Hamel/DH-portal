@@ -76,7 +76,7 @@
     width: 100%;
     padding: 0.625rem 0.75rem;
     border: 1px solid #e0e0e0;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 0.9375rem;
     font-family: inherit;
 
@@ -134,7 +134,7 @@
   padding: 0.5rem 1rem;
   background: white;
   border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   cursor: pointer;
   transition: all 0.2s;
@@ -159,7 +159,7 @@
 
 .membersTable {
   border: 1px solid #e0e0e0;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   overflow: hidden;
 
   table {
@@ -225,7 +225,7 @@
 .campaignItem {
   padding: 0.75rem 1rem;
   background: #f8f9fa;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -256,7 +256,7 @@
 .cancelButton,
 .saveButton {
   padding: 0.625rem 1.25rem;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;
@@ -383,7 +383,7 @@
   padding: 0.625rem 0.875rem;
   background: #fee;
   border: 1px solid #fcc;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: #c00;
   font-size: 0.8125rem;
 }

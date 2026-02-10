@@ -90,7 +90,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-900);
   background: white;
@@ -113,7 +113,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-900);
   background: white;
@@ -147,7 +147,7 @@
 .cancelButton {
   padding: 10px 20px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   color: var(--gray-700);
   font-size: 14px;
@@ -173,7 +173,7 @@
 .confirmButton {
   padding: 10px 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: var(--action-500);
   color: white;
   font-size: 14px;

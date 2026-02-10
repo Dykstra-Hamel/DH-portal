@@ -65,7 +65,7 @@ export function generateQuoteSignedEmailTemplate(
           </div>
 
           <!-- Quote Information -->
-          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
             <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
               📋 Quote Details
             </h3>
@@ -95,7 +95,7 @@ export function generateQuoteSignedEmailTemplate(
           </div>
 
           <!-- Customer Information -->
-          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
             <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
               👤 Customer Information
             </h3>
@@ -125,7 +125,7 @@ export function generateQuoteSignedEmailTemplate(
           </div>
 
           <!-- Action Required Section -->
-          <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 24px;">
+          <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: var(--border-radius); padding: 16px; text-align: center; margin-bottom: 24px;">
             <p style="margin: 0; font-size: 14px; color: #92400e;">
               📞 <strong>Next Steps:</strong> Please contact ${customerName} to schedule the service and confirm the appointment details.
             </p>
@@ -133,7 +133,7 @@ export function generateQuoteSignedEmailTemplate(
 
           <!-- View Lead Button -->
           <div style="text-align: center; margin-bottom: 16px;">
-            <a href="${leadUrl}" style="display: inline-block; background-color: #007bff; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: 6px; font-weight: 500; font-size: 16px;">
+            <a href="${leadUrl}" style="display: inline-block; background-color: #007bff; color: #ffffff; padding: 12px 32px; text-decoration: none; border-radius: var(--border-radius); font-weight: 500; font-size: 16px;">
               View Lead Details
             </a>
           </div>

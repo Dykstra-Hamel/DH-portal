@@ -296,7 +296,7 @@
   padding: 0 6px;
   background: var(--UX-Colors-White, #fff);
   border: 1px solid var(--gray-200, #e5e7eb);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: var(--gray-500, #6b7280);
   font-size: 13px;
   font-weight: 600;

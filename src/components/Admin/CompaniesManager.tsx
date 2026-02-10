@@ -501,7 +501,7 @@ export default function CompaniesManager() {
             padding: '10px 14px',
             fontSize: '14px',
             border: '1px solid #d1d5db',
-            borderRadius: '6px',
+            borderRadius: 'var(--border-radius)',
             outline: 'none',
           }}
         />

@@ -189,7 +189,7 @@
   width: 32px;
   height: 32px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   color: #6b7280;
   cursor: pointer;

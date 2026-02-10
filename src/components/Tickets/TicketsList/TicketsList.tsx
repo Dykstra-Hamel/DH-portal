@@ -39,6 +39,8 @@ interface TicketsListProps {
   onTabChange?: (tab: string) => void;
   onSortChange?: (field: string, order: 'asc' | 'desc') => void;
   onSearchChange?: (query: string) => void;
+  // Default sort configuration
+  defaultSort?: { key: string; direction: 'asc' | 'desc' };
 }
 
 function TicketsList({
@@ -55,6 +57,7 @@ function TicketsList({
   onTabChange,
   onSortChange,
   onSearchChange,
+  defaultSort,
 }: TicketsListProps) {
   // Tab and search state (managed internally, callbacks notify parent)
   const [activeTab, setActiveTab] = useState('all');
@@ -450,6 +453,7 @@ function TicketsList({
         emptyStateMessage="No tickets found for this category."
         onShowToast={handleShowToast}
         searchEnabled={false}
+        defaultSort={defaultSort}
         // Infinite scroll props
         infiniteScrollEnabled={infiniteScrollEnabled}
         hasMore={hasMore}

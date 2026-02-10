@@ -113,7 +113,7 @@
   padding: 8px 12px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: #dc2626;
   font-size: 14px;
 }
@@ -132,7 +132,7 @@
 .summary {
   padding: 8px 12px;
   background: #f8fafc;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 12px;
   text-align: center;
 }

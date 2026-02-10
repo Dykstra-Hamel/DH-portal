@@ -24,6 +24,7 @@ import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
 import ProjectTaskDetail from '../ProjectTaskDetail/ProjectTaskDetail';
 import ApplyTemplateModal from '../ApplyTemplateModal/ApplyTemplateModal';
+import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ProjectDetailWithTasks.module.scss';
 
@@ -125,6 +126,13 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [isTasksCollapsed, setIsTasksCollapsed] = useState(false);
   const [isCommentsCollapsed, setIsCommentsCollapsed] = useState(false);
   const [isEditingProjectDescription, setIsEditingProjectDescription] = useState(false);
+
+  // Error modal state
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorTitle, setErrorTitle] = useState('');
+  const [showDeleteAttachmentModal, setShowDeleteAttachmentModal] = useState(false);
+  const [attachmentToDelete, setAttachmentToDelete] = useState<string | null>(null);
   const [projectDescriptionDraft, setProjectDescriptionDraft] = useState(
     project?.description || ''
   );
@@ -330,8 +338,21 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     const taskById = new Map<string, ProjectTask>();
     tasksWithAssigneeProfiles.forEach(task => taskById.set(task.id, task));
 
+    // Find the root parent task for category resolution
+    const findRootParent = (task: ProjectTask): ProjectTask => {
+      let current = task;
+      while (current.parent_task_id) {
+        const parent = taskById.get(current.parent_task_id);
+        if (!parent) break;
+        current = parent;
+      }
+      return current;
+    };
+
     const resolveCategory = (task: ProjectTask) => {
-      let current: ProjectTask | undefined = task;
+      // For subtasks, always use the root parent's category
+      const rootTask = findRootParent(task);
+      let current: ProjectTask | undefined = rootTask;
       while (current) {
         const category = current.categories?.[0];
         if (category) return category;
@@ -343,28 +364,57 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
     const groupsMap = new Map<
       string,
-      { title: string; tasks: ProjectTask[] }
+      { title: string; tasks: ProjectTask[]; taskIds: Set<string> }
     >();
-    const otherTasks: ProjectTask[] = [];
+    const otherTaskIds = new Set<string>();
 
-    tasksWithAssigneeProfiles.forEach(task => {
+    // First, group top-level tasks by category
+    const topLevelTasks = tasksWithAssigneeProfiles.filter(task => !task.parent_task_id);
+
+    topLevelTasks.forEach(task => {
       const category = resolveCategory(task);
       if (!category) {
-        otherTasks.push(task);
+        otherTaskIds.add(task.id);
         return;
       }
       const key = category.id || category.name;
       const existing = groupsMap.get(key);
       if (existing) {
-        existing.tasks.push(task);
+        existing.taskIds.add(task.id);
       } else {
-        groupsMap.set(key, { title: category.name, tasks: [task] });
+        groupsMap.set(key, { title: category.name, tasks: [], taskIds: new Set([task.id]) });
       }
     });
 
-    const groups = Array.from(groupsMap.values()).sort((a, b) =>
-      a.title.localeCompare(b.title)
-    );
+    // Now add all tasks (including subtasks) to their respective groups
+    tasksWithAssigneeProfiles.forEach(task => {
+      const rootParent = findRootParent(task);
+      const category = resolveCategory(rootParent);
+
+      if (!category) {
+        // Task belongs to "Other Tasks" - add all tasks in this family
+        if (otherTaskIds.has(rootParent.id)) {
+          // This task is part of an "Other Tasks" family - we'll add it when building otherTasks array
+        }
+        return;
+      }
+
+      const key = category.id || category.name;
+      const group = groupsMap.get(key);
+      if (group && group.taskIds.has(rootParent.id)) {
+        group.tasks.push(task);
+      }
+    });
+
+    // Build otherTasks array (all tasks whose root parent is in otherTaskIds)
+    const otherTasks: ProjectTask[] = tasksWithAssigneeProfiles.filter(task => {
+      const rootParent = findRootParent(task);
+      return otherTaskIds.has(rootParent.id);
+    });
+
+    const groups = Array.from(groupsMap.values())
+      .map(({ title, tasks }) => ({ title, tasks }))
+      .sort((a, b) => a.title.localeCompare(b.title));
 
     return { groups, otherTasks };
   }, [tasksWithAssigneeProfiles]);
@@ -739,21 +789,21 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
               height: '36px',
               width: '160px',
               background: 'var(--gray-200, #e5e7eb)',
-              borderRadius: '6px',
+              borderRadius: 'var(--border-radius)',
               animation: 'pulse 1.5s ease-in-out infinite'
             }} />
             <div style={{
               height: '36px',
               width: '180px',
               background: 'var(--gray-200, #e5e7eb)',
-              borderRadius: '6px',
+              borderRadius: 'var(--border-radius)',
               animation: 'pulse 1.5s ease-in-out infinite'
             }} />
             <div style={{
               height: '36px',
               width: '36px',
               background: 'var(--gray-200, #e5e7eb)',
-              borderRadius: '6px',
+              borderRadius: 'var(--border-radius)',
               animation: 'pulse 1.5s ease-in-out infinite'
             }} />
           </div>
@@ -1007,11 +1057,20 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
   const handleToggleComplete = async (taskId: string, isCompleted: boolean) => {
     if (!project?.id) return;
-    const updatedTask = await updateTask(project.id, taskId, { is_completed: isCompleted });
-    if (selectedTask?.id === updatedTask.id) {
-      setSelectedTask((prev) => (prev ? { ...prev, ...updatedTask } : updatedTask));
+    try {
+      const updatedTask = await updateTask(project.id, taskId, { is_completed: isCompleted });
+      if (selectedTask?.id === updatedTask.id) {
+        setSelectedTask((prev) => (prev ? { ...prev, ...updatedTask } : updatedTask));
+      }
+      onProjectUpdate?.();
+    } catch (error) {
+      console.error('Error toggling task completion:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to update task';
+      setErrorTitle('Cannot Complete Task');
+      setErrorMessage(errorMsg);
+      setShowErrorModal(true);
+      clearError(); // Clear the hook's error state to prevent banner from showing
     }
-    onProjectUpdate?.();
   };
 
   // Handler for inline task updates (title, due_date, etc.)
@@ -1608,12 +1667,19 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
   }, [project?.id, onProjectUpdate, project]);
 
-  const handleDeleteProjectAttachment = useCallback(async (attachmentId: string) => {
-    if (!project?.id || !confirm('Are you sure you want to delete this attachment?')) return;
+  const handleDeleteProjectAttachment = useCallback((attachmentId: string) => {
+    setAttachmentToDelete(attachmentId);
+    setShowDeleteAttachmentModal(true);
+  }, []);
+
+  const confirmDeleteAttachment = useCallback(async () => {
+    if (!project?.id || !attachmentToDelete) return;
+
+    setShowDeleteAttachmentModal(false);
 
     try {
       const response = await fetch(
-        `/api/admin/projects/${project.id}/attachments?id=${attachmentId}`,
+        `/api/admin/projects/${project.id}/attachments?id=${attachmentToDelete}`,
         { method: 'DELETE' }
       );
 
@@ -1621,7 +1687,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         throw new Error('Failed to delete attachment');
       }
 
-      setProjectAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      setProjectAttachments(prev => prev.filter(a => a.id !== attachmentToDelete));
       setToastMessage('Attachment deleted.');
       setToastType('success');
       setShowToast(true);
@@ -1631,8 +1697,10 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setToastMessage('Failed to delete attachment.');
       setToastType('error');
       setShowToast(true);
+    } finally {
+      setAttachmentToDelete(null);
     }
-  }, [project?.id, onProjectUpdate, project]);
+  }, [project?.id, attachmentToDelete, onProjectUpdate, project]);
 
   const handleProjectDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -2372,16 +2440,20 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                               className={styles.attachmentCard}
                                             >
                                               <div className={styles.attachmentIcon}>
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                  <path
-                                                    d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-                                                    stroke="currentColor"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                  />
-                                                  <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
+                                                {attachment.mime_type === 'application/pdf' ? (
+                                                  <FileText size={16} />
+                                                ) : (
+                                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                    <path
+                                                      d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                                      stroke="currentColor"
+                                                      strokeWidth="2"
+                                                      strokeLinecap="round"
+                                                      strokeLinejoin="round"
+                                                    />
+                                                    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                  </svg>
+                                                )}
                                               </div>
                                               <div className={styles.attachmentInfo}>
                                                 <span className={styles.attachmentName}>{attachment.file_name}</span>
@@ -2574,6 +2646,34 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
           }}
         />
       )}
+
+      {/* Error Modal */}
+      {showErrorModal && (
+        <ConfirmationModal
+          isOpen={showErrorModal}
+          title={errorTitle}
+          message={errorMessage}
+          confirmText="OK"
+          cancelText=""
+          onConfirm={() => setShowErrorModal(false)}
+          onCancel={() => setShowErrorModal(false)}
+        />
+      )}
+
+      {/* Delete Attachment Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={showDeleteAttachmentModal}
+        title="Delete Attachment"
+        message="Are you sure you want to delete this attachment? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={confirmDeleteAttachment}
+        onCancel={() => {
+          setShowDeleteAttachmentModal(false);
+          setAttachmentToDelete(null);
+        }}
+      />
     </div>
   );
 }

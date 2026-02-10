@@ -191,7 +191,7 @@ export async function POST(
             ? ` - ${item.service_frequency.charAt(0).toUpperCase()}${item.service_frequency.slice(1)}`
             : '';
 
-          return `<li style="margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: 6px;">
+          return `<li style="margin-bottom: 12px; padding: 12px; background: #f9fafb; border-radius: var(--border-radius);">
             <strong>${item.plan_name}</strong>${frequency}<br>
             <span style="color: #6b7280; font-size: 14px;">
               ${formatCurrency(item.final_initial_price || item.initial_price || 0)} initial,

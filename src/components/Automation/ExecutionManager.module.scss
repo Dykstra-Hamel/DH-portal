@@ -30,7 +30,7 @@
 .statusFilter {
   padding: 0.5rem 0.75rem;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   font-size: 0.875rem;
   color: #374151;
@@ -52,7 +52,7 @@
   padding: 1rem;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: #dc2626;
   margin-bottom: 1rem;
 }
@@ -199,7 +199,7 @@
   padding: 0.75rem;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   color: #dc2626;
   margin-bottom: 1rem;
@@ -219,7 +219,7 @@
 
   details {
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     overflow: hidden;
 
     summary {
@@ -303,7 +303,7 @@
   background: #3b82f6;
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.875rem;
   cursor: pointer;
   transition: background-color 0.2s ease;

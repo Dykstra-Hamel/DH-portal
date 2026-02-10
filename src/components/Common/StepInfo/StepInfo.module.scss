@@ -45,7 +45,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -67,7 +67,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 14px;
   cursor: pointer;
@@ -135,7 +135,7 @@
 .middleButton {
   padding: 9px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   color: var(--gray-900);
   font-size: 14px;
@@ -178,7 +178,7 @@
   color: white;
   font-size: 12px;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   white-space: nowrap;
   z-index: 1000;
   pointer-events: none;
@@ -207,7 +207,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   cursor: pointer;
   transition: background-color 0.2s;
@@ -239,7 +239,7 @@
   right: 0;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);

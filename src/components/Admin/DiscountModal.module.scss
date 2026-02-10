@@ -48,7 +48,7 @@
   padding: 4px;
   cursor: pointer;
   color: #6b7280;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s;
 
   &:hover {
@@ -109,7 +109,7 @@
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     color: #1e293b;
     transition: all 0.2s;
@@ -150,7 +150,7 @@
   gap: 10px;
   cursor: pointer;
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: background 0.2s;
   margin-bottom: 8px;
 
@@ -184,7 +184,7 @@
   gap: 10px;
   cursor: pointer;
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: background 0.2s;
 
   &:hover {
@@ -240,7 +240,7 @@
   max-height: 240px;
   overflow-y: auto;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px;
   background: #f9fafb;
 }
@@ -364,7 +364,7 @@
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     color: #1e293b;
     background: white;

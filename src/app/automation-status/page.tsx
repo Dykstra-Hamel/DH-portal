@@ -174,7 +174,7 @@ export default function AutomationStatus() {
             background: testing ? '#94a3b8' : '#3b82f6',
             color: 'white',
             border: 'none',
-            borderRadius: '6px',
+            borderRadius: 'var(--border-radius)',
             padding: '10px 16px',
             fontSize: '14px',
             cursor: testing ? 'not-allowed' : 'pointer',
@@ -189,7 +189,7 @@ export default function AutomationStatus() {
             padding: '12px',
             background: testResult.startsWith('✅') ? '#f0f9f3' : '#fed7d7',
             border: '1px solid ' + (testResult.startsWith('✅') ? '#c6f6d5' : '#feb2b2'),
-            borderRadius: '6px',
+            borderRadius: 'var(--border-radius)',
             fontSize: '14px',
           }}>
             {testResult}

@@ -127,7 +127,7 @@
   padding: 8px 12px;
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   text-decoration: none;
   color: inherit;
   transition: all 0.2s ease;

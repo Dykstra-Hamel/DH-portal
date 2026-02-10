@@ -279,7 +279,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 9px 12px;
   font-size: 14px;
   font-weight: 600;
@@ -303,7 +303,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 9px 12px;
   font-size: 14px;
   font-weight: 600;
@@ -382,7 +382,7 @@
 .transcriptContent {
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 16px;
   max-height: 200px;
   overflow-y: auto;
@@ -616,7 +616,7 @@
   padding: 8px 16px;
   font-size: 14px;
   font-weight: 600;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
@@ -657,7 +657,7 @@
 .actionButton {
   padding: 8px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   color: var(--gray-700);
   font-size: 12px;
@@ -706,7 +706,7 @@
   background-color: var(--gray-100);
   border: 1px solid var(--gray-300);
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .tabButton {
@@ -734,11 +734,11 @@
   }
 
   &.firstTab {
-    border-radius: 6px 0 0 6px;
+    border-radius: var(--border-radius) 0 0 var(--border-radius);
   }
 
   &.lastTab {
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 var(--border-radius) var(--border-radius) 0;
     border-right: 1px solid var(--gray-300);
   }
 }
@@ -758,7 +758,7 @@
 
 // Pest Badges
 .pestBadge {
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--UI-Green-500, #00c951);
   background: var(--UI-Green-100, #dcfce7);
   display: flex;
@@ -799,7 +799,7 @@
   width: 131px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 9px 12px;
   display: flex;
   justify-content: center;
@@ -941,7 +941,7 @@
 .pestCoverageItem {
   padding: 8px 12px;
   background: var(--gray-50);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-700);
   border: 1px solid var(--gray-200);
@@ -980,7 +980,7 @@
   padding: 4px 8px;
   background: var(--gray-50);
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-700);
@@ -1025,7 +1025,7 @@
   padding: 9px 12px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-700);
@@ -1062,7 +1062,7 @@
   right: 0;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow:
     0 4px 6px -1px rgba(0, 0, 0, 0.1),
     0 2px 4px -1px rgba(0, 0, 0, 0.06);
@@ -1190,7 +1190,7 @@
     align-items: center;
     padding: 10px 12px;
     background: var(--gray-50);
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     margin-bottom: 8px;
 
     &:last-child {
@@ -1412,7 +1412,7 @@
 .multiplePlansIndicator {
   background-color: var(--blue-50);
   border: 1px solid var(--blue-200);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px 12px;
   margin-bottom: 16px;
   font-size: 13px;
@@ -1496,7 +1496,7 @@
 .formInput {
   padding: 10px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-900);
   background-color: white;
@@ -1515,7 +1515,7 @@
 .formTextarea {
   padding: 10px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: var(--gray-900);
   background-color: white;
@@ -1546,7 +1546,7 @@
   color: white;
   border: none;
   padding: 12px 24px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -1572,7 +1572,7 @@
   padding: 10px 12px;
   background-color: #f8f9fa;
   border: 1px solid #dee2e6;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: #495057;

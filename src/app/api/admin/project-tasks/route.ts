@@ -40,6 +40,17 @@ export async function GET(request: NextRequest) {
         project:projects(
           id,
           name
+        ),
+        monthly_service:monthly_services(
+          id,
+          service_name,
+          company:companies(
+            id,
+            name,
+            branding:brands!company_id(
+              icon_logo_url
+            )
+          )
         )
       `)
       .order('created_at', { ascending: false });

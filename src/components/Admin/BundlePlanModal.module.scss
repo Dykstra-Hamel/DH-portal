@@ -53,7 +53,7 @@
   height: 32px;
   cursor: pointer;
   color: #6b7280;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s;
   display: flex;
   align-items: center;
@@ -79,7 +79,7 @@
   border: none;
   background: transparent;
   color: #6b7280;
-  border-radius: 6px 6px 0 0;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -163,7 +163,7 @@
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     color: #1e293b;
     transition: all 0.2s;
@@ -209,7 +209,7 @@
   gap: 10px;
   cursor: pointer;
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: background 0.2s;
   margin-bottom: 0;
   font-weight: 400;
@@ -265,7 +265,7 @@
   max-height: 300px;
   overflow-y: auto;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 8px;
   background: #f9fafb;
 }
@@ -286,7 +286,7 @@
   background: white;
   color: #ef4444;
   border: 1px solid #ef4444;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;
@@ -304,7 +304,7 @@
   background: white;
   color: #2563eb;
   border: 1px solid #2563eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
@@ -392,7 +392,7 @@
     width: 100%;
     padding: 10px 12px;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     color: #1e293b;
     background: white;

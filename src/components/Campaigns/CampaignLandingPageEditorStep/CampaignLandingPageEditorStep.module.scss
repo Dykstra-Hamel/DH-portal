@@ -127,7 +127,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: #2b2b2b;
   background: #ffffff;
@@ -181,7 +181,7 @@
   height: 48px;
   padding: 4px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   background: #ffffff;
 
@@ -202,7 +202,7 @@
   padding: 8px 14px;
   background: #f3f4f6;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: #2b2b2b;
@@ -222,7 +222,7 @@
   padding: 16px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .previewHeader {
@@ -291,7 +291,7 @@
   padding: 12px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   margin-bottom: 16px;
 
   p {
@@ -360,7 +360,7 @@
   font-family: 'Courier New', monospace;
   background: white;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s;
   color: #374151;
@@ -388,7 +388,7 @@
   padding: 10px 12px;
   background: #f0f9ff;
   border: 1px solid #bfdbfe;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 
   p {
     margin: 0;

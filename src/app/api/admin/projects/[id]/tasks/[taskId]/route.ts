@@ -177,6 +177,28 @@ export async function PUT(
           { status: 400 }
         );
       }
+
+      // Check if task has incomplete subtasks
+      const { data: incompleteSubtasks, error: subtasksError } = await supabase
+        .from('project_tasks')
+        .select('id, title')
+        .eq('parent_task_id', taskId)
+        .eq('is_completed', false);
+
+      if (subtasksError) {
+        console.error('Error checking subtasks:', subtasksError);
+      }
+
+      if (incompleteSubtasks && incompleteSubtasks.length > 0) {
+        const subtaskTitles = incompleteSubtasks.map(st => st.title).join(', ');
+        return NextResponse.json(
+          {
+            error: `Cannot complete task: ${incompleteSubtasks.length} incomplete subtask${incompleteSubtasks.length > 1 ? 's' : ''} (${subtaskTitles})`,
+            incompleteSubtasks
+          },
+          { status: 400 }
+        );
+      }
     }
 
     // Prepare update data

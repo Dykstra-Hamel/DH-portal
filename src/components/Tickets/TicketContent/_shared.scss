@@ -11,7 +11,7 @@
   align-items: center;
   padding: 8px 16px;
   background: #f2f2f7;
-  border-radius: 6px 6px 0 0;
+  border-radius: var(--border-radius) var(--border-radius) 0 0;
   transition: background-color 0.2s ease;
 
   &.editing {
@@ -55,7 +55,7 @@
   border: none;
   font-size: 14px;
   font-weight: 700;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -156,7 +156,7 @@
 .input {
   padding: 8px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   background: #fff;
   transition: border-color 0.2s ease;
@@ -186,7 +186,7 @@
   color: #374151;
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -203,7 +203,7 @@
   color: white;
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

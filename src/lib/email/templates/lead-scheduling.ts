@@ -48,7 +48,7 @@ export function generateLeadSchedulingEmailTemplate(
 
                 <!-- Header -->
                 <tr>
-                  <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center; border-radius: 6px;">
+                  <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center; border-radius: var(--border-radius);">
                     <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">Lead Ready to Schedule</h1>
                     <img src="${baseUrl}/images/email/header-logo.png" alt="PMP CENTRAL" style="width: 110px; height: auto; opacity: 0.56;" />
                   </td>
@@ -73,7 +73,7 @@ export function generateLeadSchedulingEmailTemplate(
                 <!-- Scheduling Section -->
                 <tr>
                   <td class="section-outer" style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 6px;">
+                    <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: var(--border-radius);">
                       <tr>
                         <td class="section-inner" style="text-align: center; padding: 20px;">
                           <img src="${baseUrl}/images/email/phone-icon.png" alt="Phone" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
@@ -99,7 +99,7 @@ export function generateLeadSchedulingEmailTemplate(
                 <!-- Customer Information Section -->
                 <tr>
                   <td class="section-outer" style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: var(--border-radius);">
                       <tr>
                         <td class="section-inner" style="padding: 20px;">
                           <!-- Section Header with Icon (table-based for compatibility) -->
@@ -145,7 +145,7 @@ export function generateLeadSchedulingEmailTemplate(
                 <!-- Service Request Section (conditional) -->
                 <tr>
                   <td class="section-outer" style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: var(--border-radius);">
                       <tr>
                         <td class="section-inner" style="padding: 20px;">
                           <!-- Section Header with Icon (table-based for compatibility) -->

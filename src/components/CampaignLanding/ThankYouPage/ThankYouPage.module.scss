@@ -305,7 +305,7 @@
   color: var(--color-white);
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 14px 20px;
   cursor: pointer;
   transition:

@@ -111,7 +111,7 @@
 .cancelButton,
 .saveButton {
   padding: 10px 24px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

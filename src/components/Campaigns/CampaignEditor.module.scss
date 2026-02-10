@@ -43,7 +43,7 @@
   border: none;
   cursor: pointer;
   color: var(--gray-600);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s;
 
   &:hover {
@@ -327,7 +327,7 @@
   padding: 0.625rem 1rem;
   background: white;
   border: 1px dashed var(--action-600);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: var(--action-600);
   font-weight: 600;
   font-size: 0.875rem;
