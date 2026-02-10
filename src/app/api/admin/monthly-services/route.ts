@@ -113,11 +113,14 @@ export async function GET(request: NextRequest) {
           };
         });
 
+        const companies = service.companies as any;
         return {
           ...service,
           companies: {
-            ...service.companies,
-            branding: service.companies.branding?.[0] || null,
+            ...companies,
+            branding: Array.isArray(companies.branding)
+              ? companies.branding[0] || null
+              : companies.branding,
           },
           templates: templates || [],
           weekProgress,
