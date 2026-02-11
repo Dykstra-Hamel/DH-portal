@@ -102,10 +102,10 @@ export async function GET(
       );
     }
 
-    // Fetch customer with service address (or use mock data for preview mode)
+    // Fetch customer with service address (or use mock data for preview/admin mode)
     let customer;
-    if (isPreviewMode) {
-      // For preview mode, provide mock customer data regardless of authentication
+    if (isPreviewMode || (isAdminRequest && !customerId)) {
+      // For preview or admin requests without a customer, provide mock customer data
       customer = {
         id: 'preview',
         first_name: 'John',
@@ -279,22 +279,34 @@ export async function GET(
       ? campaign.company_discounts[0]
       : campaign.company_discounts;
 
-    // For admin requests, skip customer authorization and provide mock redemption data
+    // For admin or preview requests, skip customer authorization and provide mock redemption data
     let redemption;
-    if (isAdminRequest) {
+    if (isAdminRequest || isPreviewMode) {
       // For authenticated admin users, verify they have access to this campaign's company
-      const { data: userCompany } = await authSupabase
-        .from('user_companies')
-        .select('id')
-        .eq('user_id', user!.id)
-        .eq('company_id', campaign.company_id)
-        .maybeSingle();
+      if (isAdminRequest && user) {
+        const { data: getProfile } = await authSupabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        const isGetGlobalAdmin = getProfile?.role === 'admin';
 
-      if (!userCompany) {
-        return NextResponse.json(
-          { success: false, error: 'You do not have access to this campaign' },
-          { status: 403 }
-        );
+        // Skip company check for global admins
+        if (!isGetGlobalAdmin) {
+          const { data: userCompany } = await authSupabase
+            .from('user_companies')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('company_id', campaign.company_id)
+            .maybeSingle();
+
+          if (!userCompany) {
+            return NextResponse.json(
+              { success: false, error: 'You do not have access to this campaign' },
+              { status: 403 }
+            );
+          }
+        }
       }
 
       // Mock redemption data for preview
@@ -507,7 +519,7 @@ export async function GET(
         greeting: landingPageData?.thankyou_greeting || 'Thanks {first_name}!',
         content: landingPageData?.thankyou_content || null,
         showExpect: landingPageData?.thankyou_show_expect ?? true,
-        expectHeading: landingPageData?.thankyou_expect_heading || 'What To Expect',
+        expectHeading: landingPageData?.thankyou_expect_heading ?? 'What To Expect',
         expectColumns: [
           {
             imageUrl: landingPageData?.thankyou_expect_col1_image || null,
@@ -639,19 +651,29 @@ export async function POST(
       );
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', campaign.company_id)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: postProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isPostGlobalAdmin = postProfile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have access to this campaign' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (skip for global admins)
+    if (!isPostGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', campaign.company_id)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this campaign' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse request body
@@ -777,7 +799,7 @@ export async function POST(
     if (body.service_plan_id !== undefined) {
       const { error: campaignUpdateError } = await supabase
         .from('campaigns')
-        .update({ service_plan_id: body.service_plan_id })
+        .update({ service_plan_id: body.service_plan_id || null })
         .eq('campaign_id', campaignId);
 
       if (campaignUpdateError) {
@@ -856,19 +878,29 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', campaign.company_id)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isGlobalAdmin = profile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have access to this campaign' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (skip for global admins)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', campaign.company_id)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this campaign' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse request body
@@ -981,7 +1013,7 @@ export async function PUT(
     if (body.service_plan_id !== undefined) {
       const { error: campaignUpdateError } = await supabase
         .from('campaigns')
-        .update({ service_plan_id: body.service_plan_id })
+        .update({ service_plan_id: body.service_plan_id || null })
         .eq('campaign_id', campaignId);
 
       if (campaignUpdateError) {

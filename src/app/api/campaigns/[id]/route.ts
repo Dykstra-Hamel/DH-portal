@@ -153,12 +153,12 @@ export async function PUT(
       .update({
         name,
         description,
-        discount_id: discount_id !== undefined ? discount_id : null,
-        service_plan_id: service_plan_id !== undefined ? service_plan_id : null,
-        target_pest_id: target_pest_id !== undefined ? target_pest_id : null,
+        discount_id: discount_id ? discount_id : null,
+        service_plan_id: service_plan_id ? service_plan_id : null,
+        target_pest_id: target_pest_id ? target_pest_id : null,
         start_datetime,
         end_datetime,
-        workflow_id,
+        workflow_id: workflow_id ? workflow_id : null,
         target_audience_type,
         audience_filter_criteria,
       })
