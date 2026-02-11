@@ -343,6 +343,7 @@ export default function CampaignLandingPageEditorStep({
 
   const toggleAddonSelection = (addonId: string) => {
     const current = data.selected_addon_ids || [];
+    const customCount = data.additional_services?.length || 0;
 
     // If deselecting, always allow
     if (current.includes(addonId)) {
@@ -351,8 +352,8 @@ export default function CampaignLandingPageEditorStep({
       return;
     }
 
-    // If selecting, check limit
-    if (current.length >= MAX_ADDONS) {
+    // If selecting, check combined limit (addons + custom items)
+    if (current.length + customCount >= MAX_ADDONS) {
       return; // Do nothing - checkbox will be disabled
     }
 
@@ -1263,8 +1264,8 @@ export default function CampaignLandingPageEditorStep({
                     <>
                       <div className={styles.addonLimitInfo}>
                         <p className={styles.helpText}>
-                          {data.selected_addon_ids?.length || 0} of {MAX_ADDONS} add-ons selected
-                          {data.selected_addon_ids?.length >= MAX_ADDONS &&
+                          {(data.selected_addon_ids?.length || 0) + (data.additional_services?.length || 0)} of {MAX_ADDONS} display items used
+                          {(data.selected_addon_ids?.length || 0) + (data.additional_services?.length || 0) >= MAX_ADDONS &&
                             ` (maximum reached)`
                           }
                         </p>
@@ -1272,7 +1273,7 @@ export default function CampaignLandingPageEditorStep({
                       <div className={styles.checkboxGrid}>
                         {availableAddons.map((addon) => {
                           const isSelected = data.selected_addon_ids?.includes(addon.id);
-                          const isAtLimit = (data.selected_addon_ids?.length || 0) >= MAX_ADDONS;
+                          const isAtLimit = (data.selected_addon_ids?.length || 0) + (data.additional_services?.length || 0) >= MAX_ADDONS;
                           const isDisabled = !isSelected && isAtLimit;
 
                           return (
@@ -1301,6 +1302,85 @@ export default function CampaignLandingPageEditorStep({
                       </div>
                     </>
                   )}
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>Custom Display Items</label>
+                  <p className={styles.helpText}>
+                    Add custom items (e.g., &quot;&amp; So Much More!&quot;) to display alongside add-ons. Combined total limited to {MAX_ADDONS}.
+                  </p>
+                  {(() => {
+                    const selectedCount = data.selected_addon_ids?.length || 0;
+                    const customCount = data.additional_services?.length || 0;
+                    const totalCount = selectedCount + customCount;
+                    const isAtLimit = totalCount >= MAX_ADDONS;
+
+                    return (
+                      <>
+                        <div className={styles.customItemInputRow}>
+                          <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="e.g., & So Much More!"
+                            id="custom-item-input"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                const value = input.value.trim();
+                                if (!value || isAtLimit) return;
+                                const current = data.additional_services || [];
+                                updateField('additional_services', [...current, { name: value }]);
+                                input.value = '';
+                              }
+                            }}
+                            disabled={isAtLimit}
+                          />
+                          <button
+                            type="button"
+                            className={styles.addButton}
+                            disabled={isAtLimit}
+                            onClick={() => {
+                              const input = document.getElementById('custom-item-input') as HTMLInputElement;
+                              const value = input?.value.trim();
+                              if (!value || isAtLimit) return;
+                              const current = data.additional_services || [];
+                              updateField('additional_services', [...current, { name: value }]);
+                              input.value = '';
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {isAtLimit && (
+                          <p className={styles.helpText}>
+                            Maximum of {MAX_ADDONS} combined items reached ({selectedCount} add-ons + {customCount} custom).
+                          </p>
+                        )}
+                        {data.additional_services && data.additional_services.length > 0 && (
+                          <div className={styles.customItemsList}>
+                            {data.additional_services.map((item, index) => (
+                              <div key={index} className={styles.customItemRow}>
+                                <span>{item.name}</span>
+                                <button
+                                  type="button"
+                                  className={styles.customItemDelete}
+                                  onClick={() => {
+                                    const current = [...(data.additional_services || [])];
+                                    current.splice(index, 1);
+                                    updateField('additional_services', current);
+                                  }}
+                                  aria-label={`Remove ${item.name}`}
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <ImagePicker

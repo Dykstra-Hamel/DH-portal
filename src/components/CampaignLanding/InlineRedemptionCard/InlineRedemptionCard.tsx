@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import styles from './InlineRedemptionCard.module.scss';
 import { processTextWithVariables, processRedemptionHeading, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -51,6 +51,7 @@ interface InlineRedemptionCardProps {
   company?: VariableContext['company'];
   branding?: VariableContext['branding'];
   serviceName?: string;
+  initialAddonId?: string;
   onRedeem: (data: {
     startDate: Date | null;
     serviceTime: string;
@@ -68,12 +69,18 @@ export default function InlineRedemptionCard({
   company,
   branding,
   serviceName,
+  initialAddonId,
   onRedeem,
 }: InlineRedemptionCardProps) {
   const [startDate, setStartDate] = useState<string>('');
   const [serviceTime, setServiceTime] = useState<string>('');
   const [phoneNumber, setPhoneNumber] = useState<string>(customer.phone_number || '');
-  const [selectedAddonId, setSelectedAddonId] = useState<string>('');
+  const [selectedAddonId, setSelectedAddonId] = useState<string>(initialAddonId || '');
+
+  // Sync selectedAddonId when initialAddonId changes (e.g., modal reopened with different addon)
+  useEffect(() => {
+    setSelectedAddonId(initialAddonId || '');
+  }, [initialAddonId]);
   const [isRedeeming, setIsRedeeming] = useState(false);
 
   // Create variable context for text processing
