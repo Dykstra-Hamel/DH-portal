@@ -50,7 +50,13 @@ export async function POST(
       .select(
         `
         *,
-        tasks:project_template_tasks(*),
+        tasks:project_template_tasks(
+          *,
+          categories:project_template_task_category_assignments(
+            id,
+            category_id
+          )
+        ),
         categories:project_template_category_assignments(
           id,
           category_id
@@ -309,6 +315,33 @@ export async function POST(
 
           if (updateError) {
             console.error('Error updating task dependencies:', updateError);
+            // Don't fail the whole request, just log the error
+          }
+        }
+      }
+
+      // Fourth pass: Copy task category assignments
+      for (const templateTask of template.tasks) {
+        const projectTaskId = taskIdMap.get(templateTask.id);
+        if (!projectTaskId) continue;
+
+        if (
+          templateTask.categories &&
+          Array.isArray(templateTask.categories) &&
+          templateTask.categories.length > 0
+        ) {
+          const firstCategoryId = templateTask.categories[0]?.category_id;
+          if (!firstCategoryId) continue;
+
+          const { error: categoryError } = await supabase
+            .from('project_task_category_assignments')
+            .insert({
+              task_id: projectTaskId,
+              category_id: firstCategoryId,
+            });
+
+          if (categoryError) {
+            console.error('Error assigning categories to project task:', categoryError);
             // Don't fail the whole request, just log the error
           }
         }

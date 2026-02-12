@@ -7,6 +7,7 @@ import { Edit, Trash2, Copy, CheckCircle, XCircle } from 'lucide-react';
 
 interface TemplateListProps {
   onEdit: (template: ProjectTemplate) => void;
+  onDuplicate?: (template: ProjectTemplate) => void;
   onRefresh: number;
   searchQuery?: string;
   filterProjectType?: string;
@@ -15,6 +16,7 @@ interface TemplateListProps {
 
 const TemplateList: React.FC<TemplateListProps> = ({
   onEdit,
+  onDuplicate,
   onRefresh,
   searchQuery = '',
   filterProjectType = 'all',
@@ -224,6 +226,17 @@ const TemplateList: React.FC<TemplateListProps> = ({
                   title="Edit"
                 >
                   <Edit size={16} />
+                </button>
+                <button
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onDuplicate?.(template);
+                  }}
+                  className={styles.actionButton}
+                  title="Duplicate"
+                  disabled={!onDuplicate}
+                >
+                  <Copy size={16} />
                 </button>
                 <button
                   onClick={(event) => {

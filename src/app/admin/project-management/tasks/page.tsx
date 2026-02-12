@@ -6,7 +6,6 @@ import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
-import { ArchiveView } from '@/components/TaskManagement/ArchiveView/ArchiveView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
 import { Task } from '@/types/taskManagement';
@@ -505,14 +504,54 @@ export default function AdminTasksPage() {
     </div>
   );
 
+  const isProjectCompletedStatus = (status?: string | null) =>
+    status === 'complete' || status === 'completed';
+
+  const activeProjects = projectsWithStarred.filter(
+    (project) => !isProjectCompletedStatus(project.status)
+  );
+  const completedProjects = projectsWithStarred.filter((project) =>
+    isProjectCompletedStatus(project.status)
+  );
+
+  const activeProjectIds = new Set(activeProjects.map((project) => project.id));
+  const completedProjectIds = new Set(completedProjects.map((project) => project.id));
+
   // Separate personal tasks from project-based tasks
   const personalTasks = filteredTasks.filter(
-    (task) => !task.project_id && !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+    (task) =>
+      task.status !== 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
   );
   const monthlyServices = filteredTasks.filter(
-    (task) => !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
+    (task) =>
+      task.status !== 'completed' &&
+      !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
   );
-  const projectTasks = filteredTasks.filter(task => task.project_id);
+  const projectTasks = filteredTasks.filter(
+    (task) =>
+      task.status !== 'completed' &&
+      !!task.project_id &&
+      activeProjectIds.has(task.project_id)
+  );
+  const completedProjectTasks = filteredTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !!task.project_id &&
+      completedProjectIds.has(task.project_id)
+  );
+  const completedPersonalTasks = filteredTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
+  const completedMonthlyServices = filteredTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
 
   return (
     <div className={styles.pageContainer}>
@@ -526,7 +565,7 @@ export default function AdminTasksPage() {
         ) : (
           <div className={styles.taskPageLayout}>
             <div className={styles.taskMainContent}>
-              {currentView !== 'list' && (
+              {currentView === 'calendar' && (
                 <div className={styles.taskViewTabsRow}>
                   {viewTabs}
                 </div>
@@ -534,7 +573,7 @@ export default function AdminTasksPage() {
               {currentView === 'list' && (
                 <TaskListView
                   tasks={projectTasks}
-                  projects={projectsWithStarred}
+                  projects={activeProjects}
                   onTaskClick={handleTaskClick}
                   onDeleteTask={handleDeleteTask}
                   onToggleStar={handleToggleStar}
@@ -558,10 +597,24 @@ export default function AdminTasksPage() {
                 />
               )}
               {currentView === 'archive' && (
-                <ArchiveView
-                  tasks={filteredTasks.filter(t => t.status === 'completed')}
-                  projects={projectsWithStarred.filter(p => p.status === 'complete')}
+                <TaskListView
+                  tasks={completedProjectTasks}
+                  projects={completedProjects}
                   onTaskClick={handleTaskClick}
+                  onDeleteTask={handleDeleteTask}
+                  onToggleStar={handleToggleStar}
+                  onProjectClick={handleProjectClick}
+                  onToggleStarProject={handleToggleStarProject}
+                  onProjectUpdate={fetchProjects}
+                  onToggleComplete={handleToggleTaskComplete}
+                  onUpdateTask={handleInlineTaskUpdate}
+                  currentUserId={user?.id}
+                  groupTasksByProject
+                  viewTabsElement={viewTabs}
+                  personalTasks={completedPersonalTasks}
+                  monthlyServices={completedMonthlyServices}
+                  monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
+                  archiveMode
                 />
               )}
             </div>

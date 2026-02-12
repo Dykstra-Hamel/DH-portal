@@ -52,6 +52,7 @@ interface InlineRedemptionCardProps {
   branding?: VariableContext['branding'];
   serviceName?: string;
   initialAddonId?: string;
+  isModal?: boolean;
   onRedeem: (data: {
     startDate: Date | null;
     serviceTime: string;
@@ -70,6 +71,7 @@ export default function InlineRedemptionCard({
   branding,
   serviceName,
   initialAddonId,
+  isModal = false,
   onRedeem,
 }: InlineRedemptionCardProps) {
   const [startDate, setStartDate] = useState<string>('');
@@ -123,6 +125,8 @@ export default function InlineRedemptionCard({
     () => processTextWithVariables(disclaimerText, variableContext),
     [disclaimerText, variableContext]
   );
+
+  const callNumber = branding?.phoneNumber?.trim() || '';
 
   const handleRedeemClick = async () => {
     setIsRedeeming(true);
@@ -323,6 +327,13 @@ export default function InlineRedemptionCard({
         className={styles.disclaimer}
         dangerouslySetInnerHTML={{ __html: processedDisclaimer }}
       />
+
+      {isModal && callNumber && (
+        <p className={styles.modalCallPrompt}>
+          Or Give Us A Call At{' '}
+          <a href={`tel:${callNumber}`}>{callNumber}</a>.
+        </p>
+      )}
     </div>
   );
 }

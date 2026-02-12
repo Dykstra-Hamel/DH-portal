@@ -796,6 +796,15 @@
   @media (max-width: 768px) {
     font-size: 28px;
   }
+
+  p {
+    margin: 0;
+  }
+
+  strong,
+  b {
+    color: var(--accent-color);
+  }
 }
 
 .featuresList {
@@ -945,6 +954,15 @@
 
   @media (max-width: 768px) {
     font-size: 28px;
+  }
+
+  p {
+    margin: 0;
+  }
+
+  strong,
+  b {
+    color: var(--accent-color);
   }
 }
 

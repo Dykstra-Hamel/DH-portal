@@ -474,6 +474,7 @@ export default function CampaignLandingPage({
               branding={landingPage.branding}
               serviceName={landingPage.faq.serviceName}
               initialAddonId={preSelectedAddonId}
+              isModal={true}
               onRedeem={handleImmediateRedeem}
             />
           </div>

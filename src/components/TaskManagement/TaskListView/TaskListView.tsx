@@ -43,6 +43,7 @@ interface TaskListViewProps {
       serviceName: string;
     }
   >;
+  archiveMode?: boolean;
 }
 
 export function TaskListView({
@@ -62,6 +63,7 @@ export function TaskListView({
   personalTasks,
   monthlyServices,
   monthlyServiceMetaByTaskId,
+  archiveMode = false,
 }: TaskListViewProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [companyFilter, setCompanyFilter] = useState('all');
@@ -152,6 +154,22 @@ export function TaskListView({
     return parsed ? parsed.getTime() : Number.POSITIVE_INFINITY;
   }, []);
 
+  const getTaskCompletionSortValue = useCallback((task: Task) => {
+    const completedAt = task.updated_at ? new Date(task.updated_at).getTime() : Number.NaN;
+    if (!Number.isNaN(completedAt)) return completedAt;
+    return getTaskDueDateSortValue(task);
+  }, [getTaskDueDateSortValue]);
+
+  const getProjectCompletionSortValue = useCallback((project: Project) => {
+    if (project.completion_date) {
+      const parsed = parseDateString(project.completion_date);
+      if (parsed) return parsed.getTime();
+    }
+    const updatedAt = project.updated_at ? new Date(project.updated_at).getTime() : Number.NaN;
+    if (!Number.isNaN(updatedAt)) return updatedAt;
+    return 0;
+  }, []);
+
   const isInDueDateFilter = useCallback((dueDate?: string | null) => {
     if (dueDateFilter === 'all') return true;
     if (!dueDate) return false;
@@ -240,18 +258,21 @@ export function TaskListView({
     }
   };
 
-  // Get starred projects (exclude completed)
+  // Get starred projects (exclude completed in active mode)
   const starredProjects = useMemo(() => {
+    if (archiveMode) {
+      return projects.filter((p) => p.is_starred);
+    }
     return projects.filter(p => p.is_starred && p.status !== 'complete');
-  }, [projects]);
+  }, [projects, archiveMode]);
 
   // Separate starred and non-starred tasks
   const { starredTasks, regularTasks } = useMemo(() => {
-    const hideCompletedTasks = statusFilter !== 'complete';
+    const hideCompletedTasks = !archiveMode && statusFilter !== 'complete';
 
-    // Only include directly starred tasks (exclude completed from starred section)
+    // Only include directly starred tasks (exclude completed from starred section in active mode)
     const starred = tasks.filter(t => {
-      return t.is_starred && t.status !== 'completed';
+      return t.is_starred && (archiveMode || t.status !== 'completed');
     });
 
     // Regular tasks: show ALL tasks (including starred), exclude completed unless filtering by completed
@@ -264,7 +285,7 @@ export function TaskListView({
     });
 
     return { starredTasks: starred, regularTasks: regular };
-  }, [tasks, statusFilter]);
+  }, [tasks, statusFilter, archiveMode]);
 
   // Filter and sort tasks
   const processedTasks = useMemo(() => {
@@ -370,8 +391,19 @@ export function TaskListView({
         const project = getProjectForTask(task.project_id);
         return matchesTaskFilters(task, project, task.due_date);
       })
-      .sort((a, b) => getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b));
-  }, [sidebarPersonalTasks, getProjectForTask, matchesTaskFilters, getTaskDueDateSortValue]);
+      .sort((a, b) =>
+        archiveMode
+          ? getTaskCompletionSortValue(b) - getTaskCompletionSortValue(a)
+          : getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b)
+      );
+  }, [
+    sidebarPersonalTasks,
+    getProjectForTask,
+    matchesTaskFilters,
+    getTaskDueDateSortValue,
+    getTaskCompletionSortValue,
+    archiveMode,
+  ]);
 
   const monthlyServicesList = useMemo(() => {
     return sidebarMonthlyServices
@@ -403,7 +435,11 @@ export function TaskListView({
 
         return true;
       })
-      .sort((a, b) => getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b));
+      .sort((a, b) =>
+        archiveMode
+          ? getTaskCompletionSortValue(b) - getTaskCompletionSortValue(a)
+          : getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b)
+      );
   }, [
     sidebarMonthlyServices,
     statusFilter,
@@ -411,7 +447,9 @@ export function TaskListView({
     searchQuery,
     isInDueDateFilter,
     getTaskDueDateSortValue,
+    getTaskCompletionSortValue,
     monthlyServiceMetaByTaskId,
+    archiveMode,
   ]);
 
   const groupedTasks = useMemo(() => {
@@ -440,6 +478,7 @@ export function TaskListView({
 
     // Include empty projects assigned to current user
     const includeEmptyAssignedProjects =
+      !archiveMode &&
       !!currentUserId &&
       statusFilter === 'all' &&
       dueDateFilter === 'all' &&
@@ -478,13 +517,23 @@ export function TaskListView({
       return taskDue;
     };
 
-    // Convert to array and sort by project due date
+    // Convert to array and sort by project due date (active mode) or completion date (archive)
     const sortedProjectGroups = Array.from(projectTaskMap.values())
       .map((projectGroup) => ({
         ...projectGroup,
-        tasks: [...projectGroup.tasks].sort((a, b) => sortDueDate(a) - sortDueDate(b)),
+        tasks: [...projectGroup.tasks].sort((a, b) =>
+          archiveMode
+            ? getTaskCompletionSortValue(b) - getTaskCompletionSortValue(a)
+            : sortDueDate(a) - sortDueDate(b)
+        ),
       }))
       .sort((a, b) => {
+        if (archiveMode) {
+          const completedA = getProjectCompletionSortValue(a.project);
+          const completedB = getProjectCompletionSortValue(b.project);
+          if (completedA !== completedB) return completedB - completedA;
+        }
+
         const dueA = getProjectDueDate(a);
         const dueB = getProjectDueDate(b);
         if (dueA !== dueB) return dueA - dueB;
@@ -495,13 +544,30 @@ export function TaskListView({
         return nameA.localeCompare(nameB);
       });
 
-    const sortedPersonalTasks = [...personalTasks].sort((a, b) => sortDueDate(a) - sortDueDate(b));
+    const sortedPersonalTasks = [...personalTasks].sort((a, b) =>
+      archiveMode
+        ? getTaskCompletionSortValue(b) - getTaskCompletionSortValue(a)
+        : sortDueDate(a) - sortDueDate(b)
+    );
 
     return {
       projectGroups: sortedProjectGroups,
       personalTasks: sortedPersonalTasks,
     };
-  }, [groupTasksByProject, processedTasks.regular, projects, currentUserId, statusFilter, dueDateFilter, companyFilter, searchQuery, getProjectForTask]);
+  }, [
+    groupTasksByProject,
+    processedTasks.regular,
+    projects,
+    currentUserId,
+    statusFilter,
+    dueDateFilter,
+    companyFilter,
+    searchQuery,
+    getProjectForTask,
+    archiveMode,
+    getProjectCompletionSortValue,
+    getTaskCompletionSortValue,
+  ]);
 
   const getInitialCalendarMonth = (task?: Task) => {
     if (task?.due_date) {
@@ -1132,6 +1198,10 @@ export function TaskListView({
 
 
   const renderCurrentlyWorkingOn = () => {
+    if (archiveMode) {
+      return null;
+    }
+
     // Build starred items structure similar to main list
     const starredProjectMap = new Map<string, { project: Project; tasks: Task[] }>();
     const starredStandaloneTasks: Task[] = [];
@@ -1687,18 +1757,20 @@ export function TaskListView({
           <option value="next_30_days">Next 30 Days</option>
         </select>
 
-        <select
-          className={styles.filterSelect}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-        >
-          <option value="all">All Status</option>
-          {projectStatusOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
-            </option>
-          ))}
-        </select>
+        {!archiveMode && (
+          <select
+            className={styles.filterSelect}
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          >
+            <option value="all">All Status</option>
+            {projectStatusOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        )}
         </div>
 
         {/* View Tabs */}

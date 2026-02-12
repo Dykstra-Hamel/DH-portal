@@ -12,7 +12,7 @@ import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
-import { Project, ProjectAttachment, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
@@ -103,6 +103,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const headerDepartmentRef = useRef<HTMLDivElement>(null);
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [departments, setDepartments] = useState<ProjectDepartment[]>([]);
+  const [allInternalCategories, setAllInternalCategories] = useState<ProjectCategory[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [comments, setComments] = useState<ProjectComment[]>([]);
   const [newComment, setNewComment] = useState('');
@@ -269,6 +270,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       .then(res => res.json())
       .then(data => setDepartments(data || []))
       .catch(() => {});
+    // Fetch all internal categories for task dropdowns
+    fetch('/api/admin/project-categories')
+      .then(res => res.json())
+      .then(data => setAllInternalCategories(data || []))
+      .catch(() => {});
   }, [project?.id, fetchTasks]);
 
   React.useEffect(() => {
@@ -323,12 +329,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   }, [project?.current_department_id, departments, project]);
 
   const availableTaskCategories = useMemo(() => {
-    return (
-      project?.categories
-        ?.map(assignment => assignment.category)
-        .filter((cat): cat is NonNullable<typeof cat> => cat !== null && cat !== undefined) || []
-    );
-  }, [project?.categories, project]);
+    return allInternalCategories;
+  }, [allInternalCategories]);
 
   const taskGroups = useMemo(() => {
     if (!tasksWithAssigneeProfiles || tasksWithAssigneeProfiles.length === 0) {

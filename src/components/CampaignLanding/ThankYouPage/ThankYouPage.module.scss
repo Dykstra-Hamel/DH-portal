@@ -65,7 +65,9 @@
   font-weight: 700;
   color: var(--Gray-Text, #4e4e4e);
   text-align: center;
-  margin: 0 0 24px 0;
+  margin: 0 auto 24px;
+  max-width: 800px;
+  width: 100%;
   line-height: 50px;
 
   @media (max-width: 768px) {
@@ -106,7 +108,8 @@
   justify-content: center;
   gap: 109px;
   margin: 0 auto;
-  width: 1076px;
+  max-width: 1076px;
+  width: 100%;
   border-radius: 8px;
   border: 1px solid var(--UI-Gray-300, #d1d5db);
   padding: 23px 40px;
@@ -245,12 +248,15 @@
 }
 
 .expectImage {
+  position: relative;
   width: 100%;
+  aspect-ratio: 4 / 3;
   border-radius: 16px;
   overflow: hidden;
   background: #f9fafb;
 
   img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
