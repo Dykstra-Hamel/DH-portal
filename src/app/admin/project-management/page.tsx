@@ -480,7 +480,7 @@ export default function AdminProjectManagementDashboard() {
           selectedCategoryId,
           companies: companies,
           categories: [
-            ...availableCategories.map(category => ({
+            ...availableCategories.filter(c => !c.is_hidden).map(category => ({
               id: category.id,
               name: category.name,
               count: categoryCounts[category.id] || 0,

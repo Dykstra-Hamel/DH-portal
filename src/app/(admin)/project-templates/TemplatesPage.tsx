@@ -15,26 +15,37 @@ interface TemplatesPageProps {
 const TemplatesPage: React.FC<TemplatesPageProps> = ({ user }) => {
   const [showForm, setShowForm] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<ProjectTemplate | undefined>(undefined);
+  const [duplicateTemplate, setDuplicateTemplate] = useState<ProjectTemplate | undefined>(undefined);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCreate = () => {
     setEditingTemplate(undefined);
+    setDuplicateTemplate(undefined);
     setShowForm(true);
   };
 
   const handleEdit = (template: ProjectTemplate) => {
+    setDuplicateTemplate(undefined);
     setEditingTemplate(template);
+    setShowForm(true);
+  };
+
+  const handleDuplicate = (template: ProjectTemplate) => {
+    setEditingTemplate(undefined);
+    setDuplicateTemplate(template);
     setShowForm(true);
   };
 
   const handleCloseForm = () => {
     setShowForm(false);
     setEditingTemplate(undefined);
+    setDuplicateTemplate(undefined);
   };
 
   const handleSuccess = () => {
     setShowForm(false);
     setEditingTemplate(undefined);
+    setDuplicateTemplate(undefined);
     setRefreshKey((prev) => prev + 1);
   };
 
@@ -54,12 +65,13 @@ const TemplatesPage: React.FC<TemplatesPageProps> = ({ user }) => {
       </div>
 
       <div className={styles.content}>
-        <TemplateList onEdit={handleEdit} onRefresh={refreshKey} />
+        <TemplateList onEdit={handleEdit} onDuplicate={handleDuplicate} onRefresh={refreshKey} />
       </div>
 
       {showForm && (
         <TemplateForm
           template={editingTemplate}
+          initialTemplate={duplicateTemplate}
           onClose={handleCloseForm}
           onSuccess={handleSuccess}
         />

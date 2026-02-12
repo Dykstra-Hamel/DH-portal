@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { name, description, color, icon, is_system_default } = body;
+    const { name, description, is_system_default, is_hidden } = body;
 
     // Validate required fields
     if (!name) {
@@ -128,9 +128,8 @@ export async function POST(request: NextRequest) {
       .insert({
         name,
         description: description || null,
-        color: color || null,
-        icon: icon || null,
         is_system_default: is_system_default || false,
+        is_hidden: is_hidden || false,
         company_id: null, // Internal category
         sort_order: nextSortOrder,
       })

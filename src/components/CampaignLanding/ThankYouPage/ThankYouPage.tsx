@@ -307,9 +307,10 @@ export default function ThankYouPage({
                       <Image
                         src={column.imageUrl}
                         alt={column.heading || ''}
-                        width={200}
-                        height={200}
-                        style={{ objectFit: 'contain' }}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        quality={95}
+                        style={{ objectFit: 'cover' }}
                       />
                     </div>
                   )}

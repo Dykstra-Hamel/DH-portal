@@ -73,7 +73,7 @@ export default function AdditionalServicesSection({
       <div className={styles.additionalServicesContainer}>
         {/* Left column - Content */}
         <div className={styles.additionalServicesContent}>
-          <h2
+          <div
             className={styles.additionalServicesHeading}
             dangerouslySetInnerHTML={{ __html: processedHeading }}
           />

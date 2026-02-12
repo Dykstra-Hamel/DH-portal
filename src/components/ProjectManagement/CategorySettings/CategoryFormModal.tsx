@@ -20,6 +20,7 @@ export default function CategoryFormModal({
 }: CategoryFormModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [isHidden, setIsHidden] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -27,10 +28,12 @@ export default function CategoryFormModal({
     if (category) {
       setName(category.name || '');
       setDescription(category.description || '');
+      setIsHidden(category.is_hidden || false);
     } else {
       // Reset form when creating new
       setName('');
       setDescription('');
+      setIsHidden(false);
     }
     setError('');
   }, [category, isOpen]);
@@ -51,6 +54,7 @@ export default function CategoryFormModal({
         ...(category?.id ? { id: category.id } : {}),
         name: name.trim(),
         description: description.trim() || null,
+        is_hidden: isHidden,
       });
 
       // Close modal on success
@@ -77,6 +81,7 @@ export default function CategoryFormModal({
     description,
     sort_order: 0,
     is_system_default: false,
+    is_hidden: isHidden,
     company_id: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
@@ -121,6 +126,21 @@ export default function CategoryFormModal({
                 placeholder="Optional description for this category"
                 disabled={isSubmitting}
               />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={isHidden}
+                  onChange={(e) => setIsHidden(e.target.checked)}
+                  disabled={isSubmitting}
+                />
+                <span>Hidden Category</span>
+              </label>
+              <p className={styles.helpText}>
+                Hidden categories are available for task assignment but won&apos;t appear in project overview or filter dropdowns.
+              </p>
             </div>
 
             <div className={styles.formGroup}>

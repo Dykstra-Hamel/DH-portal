@@ -190,15 +190,14 @@ export async function PUT(
           }
 
           // Handle task category assignments
-          if (task.category_ids && Array.isArray(task.category_ids) && task.category_ids.length > 0) {
-            const categoryAssignments = task.category_ids.map((categoryId: string) => ({
-              template_task_id: createdTask.id,
-              category_id: categoryId,
-            }));
-
+          if (Array.isArray(task.category_ids) && task.category_ids.length > 0) {
+            const firstCategoryId = task.category_ids[0];
             const { error: categoryError } = await supabase
               .from('project_template_task_category_assignments')
-              .insert(categoryAssignments);
+              .insert({
+                template_task_id: createdTask.id,
+                category_id: firstCategoryId,
+              });
 
             if (categoryError) {
               console.error('Error assigning categories to template task:', categoryError);
@@ -243,15 +242,14 @@ export async function PUT(
             }
 
             // Handle task category assignments
-            if (task.category_ids && Array.isArray(task.category_ids) && task.category_ids.length > 0) {
-              const categoryAssignments = task.category_ids.map((categoryId: string) => ({
-                template_task_id: createdTask.id,
-                category_id: categoryId,
-              }));
-
+            if (Array.isArray(task.category_ids) && task.category_ids.length > 0) {
+              const firstCategoryId = task.category_ids[0];
               const { error: categoryError } = await supabase
                 .from('project_template_task_category_assignments')
-                .insert(categoryAssignments);
+                .insert({
+                  template_task_id: createdTask.id,
+                  category_id: firstCategoryId,
+                });
 
               if (categoryError) {
                 console.error('Error assigning categories to child template task:', categoryError);

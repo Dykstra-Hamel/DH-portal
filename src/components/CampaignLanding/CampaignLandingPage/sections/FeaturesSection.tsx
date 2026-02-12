@@ -46,24 +46,15 @@ export default function FeaturesSection({
     [customer, pricing, company, branding, serviceName]
   );
 
-  // Decode HTML entities for rendering as JSX
-  const decodeHtmlEntities = (text: string): string => {
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
-
   // Process heading with variables
   const processedHeading = useMemo(
-    () => decodeHtmlEntities(processTextWithVariables(features.heading, variableContext)),
+    () => processTextWithVariables(features.heading, variableContext),
     [features.heading, variableContext]
   );
 
   // Process each bullet with variables
   const processedBullets = useMemo(
-    () => features.bullets.map((bullet) =>
-      decodeHtmlEntities(processTextWithVariables(bullet, variableContext))
-    ),
+    () => features.bullets.map((bullet) => processTextWithVariables(bullet, variableContext)),
     [features.bullets, variableContext]
   );
 
@@ -72,64 +63,6 @@ export default function FeaturesSection({
     if (faqSection) {
       faqSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  };
-
-  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-  // Render price parts with accent color styling
-  const renderPriceParts = (text: string, keyPrefix: string | number) => {
-    // Split by <br> tags first to handle line breaks
-    const lines = text.split('<br>');
-
-    return lines.flatMap((line, lineIndex) => {
-      const parts = line.split('$').map((part, index) => {
-        if (index === 0) return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>{part}</span>;
-
-        // Extract price pattern like "44/mo"
-        const pricePattern = part.match(/^(\d+)(\/mo)/);
-        if (pricePattern) {
-          return (
-            <span key={`${keyPrefix}-line${lineIndex}-${index}`}>
-              <span className={styles.priceHighlight}>
-                <sup>$</sup>
-                {pricePattern[1]}
-                <span className={styles.priceUnit}>{pricePattern[2]}</span>
-              </span>
-              {part.slice(pricePattern[0].length)}
-            </span>
-          );
-        }
-
-        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>${part}</span>;
-      });
-
-      // Add line break between lines (but not after the last line)
-      if (lineIndex < lines.length - 1) {
-        return [...parts, <br key={`${keyPrefix}-br${lineIndex}`} />];
-      }
-      return parts;
-    });
-  };
-
-  // Render heading with styled prices and original price strikethrough
-  const renderHeadingWithStyles = () => {
-    const originalPrice = pricing.originalPrice?.trim();
-    const headingSegments =
-      originalPrice && processedHeading
-        ? processedHeading.split(new RegExp(`(${escapeRegExp(originalPrice)})`, 'g')).filter(Boolean)
-        : [processedHeading];
-
-    return headingSegments.map((segment, idx) => {
-      if (originalPrice && segment === originalPrice) {
-        return (
-          <span key={`orig-${idx}`} className={styles.strikethrough}>
-            {segment}
-          </span>
-        );
-      }
-
-      return renderPriceParts(segment, `seg-${idx}`);
-    });
   };
 
   return (
@@ -152,7 +85,10 @@ export default function FeaturesSection({
 
         {/* Right column - Content */}
         <div className={styles.featuresContent}>
-          <h2 className={styles.featuresHeading}>{renderHeadingWithStyles()}</h2>
+          <div
+            className={styles.featuresHeading}
+            dangerouslySetInnerHTML={{ __html: processedHeading }}
+          />
 
           <ul className={styles.featuresList}>
             {processedBullets.map((bullet, index) => (
@@ -186,7 +122,7 @@ export default function FeaturesSection({
                     </clipPath>
                   </defs>
                 </svg>
-                <span>{bullet}</span>
+                <span dangerouslySetInnerHTML={{ __html: bullet }} />
               </li>
             ))}
           </ul>

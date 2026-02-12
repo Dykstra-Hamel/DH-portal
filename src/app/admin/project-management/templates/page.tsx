@@ -18,6 +18,7 @@ export default function ProjectTemplatesPage() {
 
   const [showTemplateForm, setShowTemplateForm] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate | undefined>();
+  const [duplicateTemplate, setDuplicateTemplate] = useState<ProjectTemplate | undefined>();
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterProjectType, setFilterProjectType] = useState<string>('all');
@@ -65,6 +66,7 @@ export default function ProjectTemplatesPage() {
   useEffect(() => {
     registerPageAction('add-template', () => {
       setSelectedTemplate(undefined);
+      setDuplicateTemplate(undefined);
       setShowTemplateForm(true);
     });
 
@@ -74,19 +76,28 @@ export default function ProjectTemplatesPage() {
   }, [registerPageAction]);
 
   const handleEditTemplate = (template: ProjectTemplate) => {
+    setDuplicateTemplate(undefined);
     setSelectedTemplate(template);
+    setShowTemplateForm(true);
+  };
+
+  const handleDuplicateTemplate = (template: ProjectTemplate) => {
+    setSelectedTemplate(undefined);
+    setDuplicateTemplate(template);
     setShowTemplateForm(true);
   };
 
   const handleFormSuccess = () => {
     setShowTemplateForm(false);
     setSelectedTemplate(undefined);
+    setDuplicateTemplate(undefined);
     setRefreshTrigger(prev => prev + 1);
   };
 
   const handleFormClose = () => {
     setShowTemplateForm(false);
     setSelectedTemplate(undefined);
+    setDuplicateTemplate(undefined);
   };
 
   // Don't render for non-admins
@@ -144,6 +155,7 @@ export default function ProjectTemplatesPage() {
       <div className={styles.templateListContainer}>
         <TemplateList
           onEdit={handleEditTemplate}
+          onDuplicate={handleDuplicateTemplate}
           onRefresh={refreshTrigger}
           searchQuery={searchQuery}
           filterProjectType={filterProjectType}
@@ -155,6 +167,7 @@ export default function ProjectTemplatesPage() {
       {showTemplateForm && (
         <TemplateForm
           template={selectedTemplate}
+          initialTemplate={duplicateTemplate}
           onClose={handleFormClose}
           onSuccess={handleFormSuccess}
           users={users}

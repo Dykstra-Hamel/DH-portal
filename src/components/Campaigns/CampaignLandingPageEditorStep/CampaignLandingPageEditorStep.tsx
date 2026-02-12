@@ -156,6 +156,8 @@ export default function CampaignLandingPageEditorStep({
   const thankyouCol1EditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol2EditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol3EditorRef = useRef<RichTextEditorHandle | null>(null);
+  const featureHeadingEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const additionalServicesHeadingEditorRef = useRef<RichTextEditorHandle | null>(null);
   const [availableAddons, setAvailableAddons] = useState<AddOn[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
   const selectionInitializedRef = useRef(false);
@@ -413,6 +415,30 @@ export default function CampaignLandingPageEditorStep({
     if (fieldName === 'thankyou_expect_col3_content') {
       if (thankyouCol3EditorRef.current?.insertText) {
         thankyouCol3EditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Features heading RichTextEditor
+    if (fieldName === 'feature_heading') {
+      if (featureHeadingEditorRef.current?.insertText) {
+        featureHeadingEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Additional Services heading RichTextEditor
+    if (fieldName === 'additional_services_heading') {
+      if (additionalServicesHeadingEditorRef.current?.insertText) {
+        additionalServicesHeadingEditorRef.current.insertText(variable);
       } else {
         const currentValue = data[fieldName] as string;
         const newValue = currentValue ? `${currentValue} ${variable}` : variable;
@@ -1048,13 +1074,11 @@ export default function CampaignLandingPageEditorStep({
           <>
             <div className={styles.field}>
               <label className={styles.label}>Features Heading</label>
-              <input
-                type="text"
+              <RichTextEditor
+                ref={featureHeadingEditorRef}
                 value={data.feature_heading}
-                onChange={(e) => updateField('feature_heading', e.target.value)}
+                onChange={(value) => updateField('feature_heading', value)}
                 placeholder="e.g., No initial cost to get started"
-                className={styles.input}
-                id="feature-heading-input"
               />
             </div>
 
@@ -1181,13 +1205,11 @@ export default function CampaignLandingPageEditorStep({
               <>
                 <div className={styles.field}>
                   <label className={styles.label}>Services Heading</label>
-                  <input
-                    type="text"
+                  <RichTextEditor
+                    ref={additionalServicesHeadingEditorRef}
                     value={data.additional_services_heading}
-                    onChange={(e) => updateField('additional_services_heading', e.target.value)}
+                    onChange={(value) => updateField('additional_services_heading', value)}
                     placeholder="e.g., And that's not all, we offer additional add-on programs as well including:"
-                    className={styles.input}
-                    id="services-heading-input"
                   />
                 </div>
 
