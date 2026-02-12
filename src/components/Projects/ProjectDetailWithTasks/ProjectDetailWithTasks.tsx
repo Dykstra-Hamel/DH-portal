@@ -2075,21 +2075,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                   </div>
                 </div>
               ) : (
-                <div
-                  className={styles.projectDescriptionDisplay}
-                  onClick={() => setIsEditingProjectDescription(true)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      setIsEditingProjectDescription(true);
-                    }
-                  }}
-                  role="button"
-                  tabIndex={0}
-                >
-                  <span className={styles.projectDescriptionEditIcon} aria-hidden="true">
+                <div className={styles.projectDescriptionDisplay}>
+                  <button
+                    type="button"
+                    className={styles.projectDescriptionEditIcon}
+                    onClick={() => setIsEditingProjectDescription(true)}
+                    aria-label="Edit project description"
+                  >
                     <Pencil size={14} />
-                  </span>
+                  </button>
                   {projectDescriptionDraft ? (
                     <div
                       className={`${styles.projectDescription} ${styles.projectDescriptionContent}`}

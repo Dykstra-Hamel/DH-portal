@@ -90,6 +90,38 @@
   }
 }
 
+.dateRangeFilter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterDateInput {
+  padding: 10px 14px;
+  border: 1px solid #d1d5db;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: #252c37;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:focus {
+    outline: none;
+    border-color: #0080f0;
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
+  }
+}
+
+.dateRangeSeparator {
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: #6b7280;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
 .tasksTable {
   background: white;
   border-radius: 8px;
@@ -177,6 +209,8 @@
   align-items: center;
   font-size: 14px;
   color: #252c37;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .taskTitle {
@@ -285,13 +319,16 @@
 }
 
 .taskGridMain {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
   min-width: 0;
 }
 
 .taskGridSidebar {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 24px;
   min-width: 0;
 }
 
@@ -332,12 +369,19 @@
   font-size: 16px;
   font-weight: 700;
   color: #252c37;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .projectGroupCode {
   font-size: 12px;
   font-weight: 600;
   color: #6b7280;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .projectDueDate {
@@ -379,6 +423,8 @@
   display: inline-flex;
   align-items: center;
   gap: 12px;
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .projectStarAction {
@@ -444,6 +490,10 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+.projectTaskListCompact {
+  padding-left: 8px;
 }
 
 .projectTaskItem {
@@ -827,14 +877,146 @@
   margin: 0;
 }
 
-// Currently Working On Section
-.currentlyWorkingOnSection {
-  background: #f9fafb;
-  border-radius: 10px;
-  border: 1px solid #e5e7eb;
-  padding: 16px;
-  margin-bottom: 24px;
-  box-shadow: none;
+.mentionsList {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mentionRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: var(--border-radius);
+  padding: 10px;
+  cursor: pointer;
+  background: var(--white);
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+
+  &:hover {
+    border-color: var(--action-300, #87cefa);
+    background: var(--gray-50, #f9fafb);
+  }
+}
+
+.mentionAvatar {
+  flex-shrink: 0;
+  padding-top: 1px;
+}
+
+.mentionContent {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 10px;
+  align-items: start;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.mentionComment {
+  margin: 0;
+  grid-column: 1 / 2;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--gray-900, #111827);
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.mentionMetaRow {
+  grid-column: 2 / 3;
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: end;
+  align-self: start;
+  white-space: nowrap;
+}
+
+.mentionContext {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--gray-700, #374151);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mentionAttachmentIcon {
+  color: var(--gray-500, #6b7280);
+  flex-shrink: 0;
+}
+
+.mentionDate {
+  font-size: 11px;
+  color: var(--gray-500, #6b7280);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.mentionsLoadMore {
+  margin-top: 8px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: var(--border-radius);
+  background: var(--white);
+  color: var(--gray-700, #374151);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-50, #f9fafb);
+    border-color: var(--gray-400, #99a1af);
+  }
+
+  &:disabled {
+    cursor: default;
+    opacity: 0.65;
+  }
+}
+
+.mentionsActions {
+  margin-top: 8px;
+  display: flex;
+  gap: 8px;
+
+  button {
+    flex: 1 1 0;
+  }
+}
+
+.mentionsLoadLess {
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: var(--border-radius);
+  background: var(--white);
+  color: var(--gray-700, #374151);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 10px;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    background: var(--gray-50, #f9fafb);
+    border-color: var(--gray-400, #99a1af);
+  }
 }
 
 @media (max-width: 1024px) {
@@ -843,22 +1025,30 @@
   }
 }
 
-.sectionTitle {
-  font-size: 18px;
-  text-align: center;
-  font-weight: 700;
-  color: var(--gray-900, #111827);
-  margin: 0 0 16px 0;
-}
-
 .starredProjectsList {
   display: flex;
   flex-direction: column;
-  gap: 0;
+  gap: 14px;
+}
+
+.cwoSection {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cwoSectionTitle {
+  margin: 12px 0 0;
+  font-size: 12px;
+  text-align: center;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--gray-500, #6b7280);
 }
 
 .standaloneTasksSection {
-  margin-top: 16px;
+  margin-top: 0;
 }
 
 .projectCard {

@@ -112,6 +112,9 @@ export async function PUT(
       workflow_id,
       target_audience_type,
       audience_filter_criteria,
+      respect_business_hours,
+      daily_limit,
+      exclude_weekends,
     } = body;
 
     // Get existing campaign
@@ -161,6 +164,9 @@ export async function PUT(
         workflow_id: workflow_id ? workflow_id : null,
         target_audience_type,
         audience_filter_criteria,
+        respect_business_hours: respect_business_hours ?? true,
+        daily_limit: daily_limit ?? null,
+        exclude_weekends: exclude_weekends ?? false,
       })
       .eq('id', id)
       .select()

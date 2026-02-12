@@ -278,22 +278,20 @@ export default function CampaignLandingPageEditorStep({
 
   // Ensure selected add-ons stay in sync with available options
   useEffect(() => {
+    // Don't initialize until addons have actually loaded — otherwise we'd
+    // wipe the stored selection before we can validate it against real IDs
+    if (loadingAddons || availableAddons.length === 0) return;
+
     const availableIds = availableAddons.map((addon) => addon.id);
     const currentSelected = data.selected_addon_ids || [];
 
     // Initialize selection when add-ons load or plan changes
     if (!selectionInitializedRef.current) {
-      let initialSelection =
-        currentSelected.length > 0
-          ? currentSelected.filter((id) => availableIds.includes(id))
-          : availableIds;
+      // Respect the stored selection — filter to valid IDs only
+      let initialSelection = currentSelected.filter((id) => availableIds.includes(id));
 
       // Enforce MAX_ADDONS limit on initialization
       if (initialSelection.length > MAX_ADDONS) {
-        console.warn(
-          `Campaign has ${initialSelection.length} add-ons selected. ` +
-          `Limiting to first ${MAX_ADDONS} for display.`
-        );
         initialSelection = initialSelection.slice(0, MAX_ADDONS);
       }
 
@@ -317,7 +315,7 @@ export default function CampaignLandingPageEditorStep({
     if (filteredSelection.length !== currentSelected.length) {
       updateField('selected_addon_ids', filteredSelection);
     }
-  }, [availableAddons]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [availableAddons, loadingAddons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSection = (section: SectionKey) => {
     const newExpanded = new Set(expandedSections);

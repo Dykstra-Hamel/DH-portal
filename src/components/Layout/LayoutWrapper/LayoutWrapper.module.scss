@@ -25,6 +25,7 @@
   padding: 20px;
   background: var(--slate-50);
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
   min-height: 0;
 }
 
@@ -37,7 +38,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-height: 0;
+  min-height: 100%;
   align-items: stretch;
   max-width: none;
   margin: 0;

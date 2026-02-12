@@ -142,7 +142,7 @@
   font-size: 14px;
   color: var(--gray-700, #374151);
   line-height: 1.6;
-  cursor: pointer;
+  cursor: default;
 
   p {
     margin: 0 0 12px;
@@ -172,7 +172,7 @@
 }
 
 .projectDescriptionDisplay:hover,
-.projectDescriptionDisplay:focus-visible {
+.projectDescriptionDisplay:focus-within {
   background: var(--gray-50, #f9fafb);
 }
 
@@ -180,16 +180,31 @@
   position: absolute;
   top: 8px;
   right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
   color: var(--gray-400, #9ca3af);
   opacity: 0;
   transition:
     opacity 0.2s ease,
     color 0.2s ease;
-  pointer-events: none;
+
+  &:focus-visible {
+    opacity: 1;
+    color: var(--gray-600, #4b5563);
+    outline: 2px solid var(--action-500, #0284c7);
+    outline-offset: 1px;
+  }
 }
 
 .projectDescriptionDisplay:hover .projectDescriptionEditIcon,
-.projectDescriptionDisplay:focus-visible .projectDescriptionEditIcon {
+.projectDescriptionDisplay:focus-within .projectDescriptionEditIcon {
   opacity: 1;
   color: var(--gray-500, #6b7280);
 }
@@ -795,9 +810,9 @@
 .attachmentName {
   font-size: 12px;
   color: var(--gray-700, #374151);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .commentEditInput {
