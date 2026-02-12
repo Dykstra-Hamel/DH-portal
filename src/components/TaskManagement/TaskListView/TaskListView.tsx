@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Calendar, Check, ChevronLeft, ChevronRight, Lock, MessageSquare, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, Check, ChevronLeft, ChevronRight, Lock, MessageSquare, Paperclip, Pencil, Trash2 } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/taskManagement';
 import { Project, statusOptions as projectStatusOptions } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
@@ -7,6 +7,7 @@ import { ProjectBadge } from '../shared/ProjectBadge';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { CompanyIcon } from '@/components/Common/CompanyIcon/CompanyIcon';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
 import { formatDateOnlyLocal, parseDateString } from '@/lib/date-utils';
 import { createClient } from '@/lib/supabase/client';
@@ -17,6 +18,30 @@ type SortDirection = 'asc' | 'desc';
 type DueDateFilter = 'all' | 'today' | 'this_week' | 'this_month' | 'next_30_days';
 type ProjectStatus = Project['status'];
 type StatusFilter = 'all' | ProjectStatus;
+const DEFAULT_VISIBLE_MENTIONS = 5;
+
+interface MentionItem {
+  notificationId: string;
+  createdAt: string;
+  read: boolean;
+  title: string;
+  message: string;
+  referenceId: string;
+  referenceType: string;
+  commentText: string;
+  projectId: string | null;
+  projectName: string | null;
+  projectShortcode: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  monthlyServiceId: string | null;
+  monthlyServiceName: string | null;
+  senderFirstName: string | null;
+  senderLastName: string | null;
+  senderEmail: string | null;
+  senderAvatarUrl: string | null;
+  hasAttachments: boolean;
+}
 
 interface TaskListViewProps {
   tasks: Task[];
@@ -43,6 +68,11 @@ interface TaskListViewProps {
       serviceName: string;
     }
   >;
+  mentions?: MentionItem[];
+  hasMoreMentions?: boolean;
+  mentionsLoading?: boolean;
+  onMentionClick?: (mention: MentionItem) => void;
+  onLoadMoreMentions?: () => void | Promise<void>;
   archiveMode?: boolean;
 }
 
@@ -63,11 +93,24 @@ export function TaskListView({
   personalTasks,
   monthlyServices,
   monthlyServiceMetaByTaskId,
+  mentions,
+  hasMoreMentions = false,
+  mentionsLoading = false,
+  onMentionClick,
+  onLoadMoreMentions,
   archiveMode = false,
 }: TaskListViewProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [companyFilter, setCompanyFilter] = useState('all');
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
+  const [archiveDateFrom, setArchiveDateFrom] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    return d.toISOString().split('T')[0];
+  });
+  const [archiveDateTo, setArchiveDateTo] = useState<string>(() => {
+    return new Date().toISOString().split('T')[0];
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('due_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -78,6 +121,7 @@ export function TaskListView({
   const [calendarMonthByTask, setCalendarMonthByTask] = useState<Record<string, Date>>({});
   const [calendarMonthByProject, setCalendarMonthByProject] = useState<Record<string, Date>>({});
   const [expandedWorkingOnProjects, setExpandedWorkingOnProjects] = useState<Record<string, boolean>>({});
+  const [visibleMentionCount, setVisibleMentionCount] = useState(DEFAULT_VISIBLE_MENTIONS);
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -142,6 +186,18 @@ export function TaskListView({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [datePickerProjectId]);
 
+  useEffect(() => {
+    const mentionCount = mentions?.length || 0;
+    setVisibleMentionCount((prev) => {
+      if (mentionCount <= DEFAULT_VISIBLE_MENTIONS) return DEFAULT_VISIBLE_MENTIONS;
+      if (prev < DEFAULT_VISIBLE_MENTIONS) return DEFAULT_VISIBLE_MENTIONS;
+      if (prev > mentionCount && !hasMoreMentions) {
+        return Math.max(DEFAULT_VISIBLE_MENTIONS, mentionCount);
+      }
+      return prev;
+    });
+  }, [mentions, hasMoreMentions]);
+
   // Get project for a task
   const getProjectForTask = useCallback((taskProjectId?: string): Project | null => {
     if (!taskProjectId) return null;
@@ -170,7 +226,29 @@ export function TaskListView({
     return 0;
   }, []);
 
-  const isInDueDateFilter = useCallback((dueDate?: string | null) => {
+  const isInDueDateFilter = useCallback((dueDate?: string | null, completedAt?: string | null) => {
+    // In archive mode, filter by date range using completion date (fallback to due date)
+    if (archiveMode) {
+      const dateToCheck = completedAt || dueDate;
+      if (!dateToCheck) return true;
+
+      const parsed = parseDateString(dateToCheck);
+      if (!parsed) return true;
+
+      const targetDate = new Date(parsed);
+      targetDate.setHours(0, 0, 0, 0);
+
+      if (archiveDateFrom) {
+        const from = new Date(archiveDateFrom + 'T00:00:00');
+        if (targetDate < from) return false;
+      }
+      if (archiveDateTo) {
+        const to = new Date(archiveDateTo + 'T23:59:59');
+        if (targetDate > to) return false;
+      }
+      return true;
+    }
+
     if (dueDateFilter === 'all') return true;
     if (!dueDate) return false;
 
@@ -209,7 +287,7 @@ export function TaskListView({
     }
 
     return true;
-  }, [dueDateFilter]);
+  }, [dueDateFilter, archiveMode, archiveDateFrom, archiveDateTo]);
 
   const matchesTaskFilters = useCallback((
     task: Task,
@@ -222,7 +300,7 @@ export function TaskListView({
       }
     }
 
-    if (!isInDueDateFilter(dueDateValue)) {
+    if (!isInDueDateFilter(dueDateValue, task.completed_date)) {
       return false;
     }
 
@@ -412,7 +490,7 @@ export function TaskListView({
           return false;
         }
 
-        if (!isInDueDateFilter(task.due_date)) {
+        if (!isInDueDateFilter(task.due_date, task.completed_date)) {
           return false;
         }
 
@@ -1197,14 +1275,14 @@ export function TaskListView({
   };
 
 
-  const renderCurrentlyWorkingOn = () => {
+  const renderCurrentlyWorkingOnCard = () => {
     if (archiveMode) {
       return null;
     }
 
     // Build starred items structure similar to main list
     const starredProjectMap = new Map<string, { project: Project; tasks: Task[] }>();
-    const starredStandaloneTasks: Task[] = [];
+    const starredStandaloneTaskMap = new Map<string, Task>();
 
     // First, add all starred projects with all user's tasks
     starredProjects.forEach((project) => {
@@ -1227,13 +1305,47 @@ export function TaskListView({
         }
       } else {
         // Standalone task (no project)
-        starredStandaloneTasks.push(task);
+        starredStandaloneTaskMap.set(task.id, task);
       }
     });
 
-    const starredProjectGroups = Array.from(starredProjectMap.values());
+    // Also include starred personal/monthly tasks from the sidebar sources.
+    [...sidebarPersonalTasks, ...sidebarMonthlyServices].forEach((task) => {
+      if (task.status === 'completed' || !task.is_starred) return;
 
-    if (starredProjectGroups.length === 0 && starredStandaloneTasks.length === 0) {
+      if (task.project_id) {
+        const project = getProjectForTask(task.project_id);
+        if (!project) return;
+
+        const existing = starredProjectMap.get(project.id);
+        if (!existing) {
+          starredProjectMap.set(project.id, { project, tasks: [task] });
+        } else if (!existing.tasks.some((existingTask) => existingTask.id === task.id)) {
+          existing.tasks.push(task);
+        }
+        return;
+      }
+
+      starredStandaloneTaskMap.set(task.id, task);
+    });
+
+    const starredProjectGroups = Array.from(starredProjectMap.values());
+    const starredStandaloneTasks = Array.from(starredStandaloneTaskMap.values());
+    const personalTaskIdSet = new Set(sidebarPersonalTasks.map((task) => task.id));
+    const monthlyServiceTaskIdSet = new Set(sidebarMonthlyServices.map((task) => task.id));
+    const starredMonthlyServiceTasks = starredStandaloneTasks.filter((task) =>
+      monthlyServiceTaskIdSet.has(task.id)
+    );
+    const starredPersonalTasks = starredStandaloneTasks.filter(
+      (task) =>
+        personalTaskIdSet.has(task.id) || !monthlyServiceTaskIdSet.has(task.id)
+    );
+
+    if (
+      starredProjectGroups.length === 0 &&
+      starredPersonalTasks.length === 0 &&
+      starredMonthlyServiceTasks.length === 0
+    ) {
       return null;
     }
 
@@ -1244,11 +1356,12 @@ export function TaskListView({
     };
 
     return (
-      <div className={styles.currentlyWorkingOnSection}>
-        <h2 className={styles.sectionTitle}>Currently Working On</h2>
-
+      <InfoCard title="Currently Working On" isCollapsible={true} startExpanded={true}>
         <div className={styles.starredProjectsList}>
-          {starredProjectGroups.map((projectGroup) => {
+          {starredProjectGroups.length > 0 && (
+            <div className={styles.cwoSection}>
+              <h4 className={styles.cwoSectionTitle}>Projects</h4>
+              {starredProjectGroups.map((projectGroup) => {
             const projectId = projectGroup.project?.id;
             const hasTasks = projectGroup.tasks.length > 0;
             const isExpanded = projectId ? !!expandedWorkingOnProjects[projectId] : false;
@@ -1269,7 +1382,7 @@ export function TaskListView({
               : false;
             const showProjectDatePicker = datePickerProjectId === projectGroup.project?.id;
 
-            return (
+                return (
               <div key={projectGroup.project?.id || 'no-project'} className={styles.projectGroup}>
                 <div
                   className={styles.projectGroupHeader}
@@ -1291,6 +1404,7 @@ export function TaskListView({
                       />
                     </div>
                   )}
+                  <span className={styles.projectGroupTitle}>{projectName}</span>
                   {projectId && hasTasks && (
                     <button
                       type="button"
@@ -1308,8 +1422,6 @@ export function TaskListView({
                       />
                     </button>
                   )}
-
-                  <span className={styles.projectGroupTitle}>{projectName}</span>
                   {projectCode && (
                     <span className={styles.projectGroupCode}>{projectCode}</span>
                   )}
@@ -1434,23 +1546,151 @@ export function TaskListView({
                   </ul>
                 )}
               </div>
-            );
-          })}
+                );
+              })}
+            </div>
+          )}
 
-          {/* Standalone starred tasks */}
-          {starredStandaloneTasks.length > 0 && (
-            <div className={styles.standaloneTasksSection}>
-              <ul className={styles.projectTaskList}>
-                {starredStandaloneTasks.sort((a, b) => sortDueDate(a) - sortDueDate(b)).map((task) => renderGroupedTaskRow(task))}
-              </ul>
+          {starredPersonalTasks.length > 0 && (
+            <div className={styles.cwoSection}>
+              <h4 className={styles.cwoSectionTitle}>Personal Tasks</h4>
+              <div className={styles.standaloneTasksSection}>
+                <ul className={`${styles.projectTaskList} ${styles.projectTaskListCompact}`}>
+                  {starredPersonalTasks
+                    .sort((a, b) => sortDueDate(a) - sortDueDate(b))
+                    .map((task) => renderGroupedTaskRow(task))}
+                </ul>
+              </div>
+            </div>
+          )}
+
+          {starredMonthlyServiceTasks.length > 0 && (
+            <div className={styles.cwoSection}>
+              <h4 className={styles.cwoSectionTitle}>Monthly Services</h4>
+              <div className={styles.standaloneTasksSection}>
+                <ul className={`${styles.projectTaskList} ${styles.projectTaskListCompact}`}>
+                  {starredMonthlyServiceTasks
+                    .sort((a, b) => sortDueDate(a) - sortDueDate(b))
+                    .map((task) => renderGroupedTaskRow(task))}
+                </ul>
+              </div>
             </div>
           )}
         </div>
-      </div>
+      </InfoCard>
     );
   };
 
   const showPersonalTasksCard = personalTasks !== undefined || monthlyServices !== undefined;
+  const showMentionsCard = !archiveMode && mentions !== undefined;
+  const showSidebarCards = showPersonalTasksCard || showMentionsCard;
+
+  const getMentionContextLabel = (mention: MentionItem) => {
+    if (mention.referenceType === 'monthly_service_comment') {
+      return mention.monthlyServiceName || 'Monthly Service';
+    }
+
+    if (mention.referenceType === 'task_comment') {
+      const projectLabel = mention.projectShortcode
+        ? formatProjectShortcode(mention.projectShortcode)
+        : mention.projectName || 'Project';
+
+      return mention.taskTitle
+        ? `${projectLabel} • ${mention.taskTitle}`
+        : projectLabel;
+    }
+
+    if (mention.referenceType === 'project_comment') {
+      return mention.projectShortcode
+        ? formatProjectShortcode(mention.projectShortcode)
+        : mention.projectName || 'Project';
+    }
+
+    return mention.title || 'Mention';
+  };
+
+  const renderMentionsCard = () => {
+    if (!showMentionsCard) return null;
+
+    const mentionItems = mentions || [];
+    const visibleMentions = mentionItems.slice(0, visibleMentionCount);
+    const showLoadMore = visibleMentionCount < mentionItems.length || hasMoreMentions;
+    const showLoadLess = visibleMentionCount > DEFAULT_VISIBLE_MENTIONS;
+
+    const handleLoadMoreMentions = async () => {
+      const nextVisibleCount = visibleMentionCount + DEFAULT_VISIBLE_MENTIONS;
+
+      if (nextVisibleCount > mentionItems.length && hasMoreMentions && onLoadMoreMentions) {
+        await onLoadMoreMentions();
+      }
+
+      setVisibleMentionCount(nextVisibleCount);
+    };
+
+    return (
+      <InfoCard title="Mentions" isCollapsible={true} startExpanded={true}>
+        {mentionItems.length === 0 ? (
+          <p className={styles.emptyPersonalTasks}>No mentions</p>
+        ) : (
+          <>
+            <ul className={styles.mentionsList}>
+              {visibleMentions.map((mention) => (
+                <li
+                  key={mention.notificationId}
+                  className={styles.mentionRow}
+                  onClick={() => onMentionClick?.(mention)}
+                >
+                  <div className={styles.mentionAvatar}>
+                    <MiniAvatar
+                      firstName={mention.senderFirstName || undefined}
+                      lastName={mention.senderLastName || undefined}
+                      email={mention.senderEmail || 'unknown@example.com'}
+                      avatarUrl={mention.senderAvatarUrl}
+                      size="small"
+                      showTooltip={true}
+                    />
+                  </div>
+                  <div className={styles.mentionContent}>
+                    <p className={styles.mentionComment}>{mention.commentText}</p>
+                    <div className={styles.mentionMetaRow}>
+                      <span className={styles.mentionContext}>
+                        {mention.hasAttachments && <Paperclip size={12} className={styles.mentionAttachmentIcon} />}
+                        <span>{getMentionContextLabel(mention)}</span>
+                      </span>
+                      <span className={styles.mentionDate}>{formatDate(mention.createdAt)}</span>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {(showLoadMore || showLoadLess) && (
+              <div className={styles.mentionsActions}>
+                {showLoadMore && (
+                  <button
+                    type="button"
+                    className={styles.mentionsLoadMore}
+                    onClick={handleLoadMoreMentions}
+                    disabled={mentionsLoading}
+                  >
+                    {mentionsLoading ? 'Loading...' : 'Load more'}
+                  </button>
+                )}
+                {showLoadLess && (
+                  <button
+                    type="button"
+                    className={styles.mentionsLoadLess}
+                    onClick={() => setVisibleMentionCount(DEFAULT_VISIBLE_MENTIONS)}
+                  >
+                    Load less
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </InfoCard>
+    );
+  };
 
   const renderPersonalTaskRow = (task: Task) => {
     const overdue = isOverdue(task.due_date, task.status);
@@ -1745,17 +1985,35 @@ export function TaskListView({
           ))}
         </select>
 
-        <select
-          className={styles.filterSelect}
-          value={dueDateFilter}
-          onChange={(e) => setDueDateFilter(e.target.value as DueDateFilter)}
-        >
-          <option value="all">All Due Dates</option>
-          <option value="today">Today</option>
-          <option value="this_week">This Week</option>
-          <option value="this_month">This Month</option>
-          <option value="next_30_days">Next 30 Days</option>
-        </select>
+        {archiveMode ? (
+          <div className={styles.dateRangeFilter}>
+            <input
+              type="date"
+              className={styles.filterDateInput}
+              value={archiveDateFrom}
+              onChange={(e) => setArchiveDateFrom(e.target.value)}
+            />
+            <span className={styles.dateRangeSeparator}>to</span>
+            <input
+              type="date"
+              className={styles.filterDateInput}
+              value={archiveDateTo}
+              onChange={(e) => setArchiveDateTo(e.target.value)}
+            />
+          </div>
+        ) : (
+          <select
+            className={styles.filterSelect}
+            value={dueDateFilter}
+            onChange={(e) => setDueDateFilter(e.target.value as DueDateFilter)}
+          >
+            <option value="all">All Due Dates</option>
+            <option value="today">Today</option>
+            <option value="this_week">This Week</option>
+            <option value="this_month">This Month</option>
+            <option value="next_30_days">Next 30 Days</option>
+          </select>
+        )}
 
         {!archiveMode && (
           <select
@@ -1778,10 +2036,10 @@ export function TaskListView({
       </div>
 
       {/* Tasks List */}
-      {renderCurrentlyWorkingOn()}
       {groupTasksByProject ? (
-        <div className={showPersonalTasksCard ? styles.taskGrid : undefined}>
-          <div className={showPersonalTasksCard ? styles.taskGridMain : undefined}>
+        <div className={showSidebarCards ? styles.taskGrid : undefined}>
+          <div className={showSidebarCards ? styles.taskGridMain : undefined}>
+            {renderCurrentlyWorkingOnCard()}
             <InfoCard title="Projects" isCollapsible={true} startExpanded={true}>
               <div className={styles.groupedTasks}>
           {groupedTasks.projectGroups.length === 0 ? (
@@ -1987,15 +2245,17 @@ export function TaskListView({
               </div>
             </InfoCard>
           </div>
-          {showPersonalTasksCard && (
+          {showSidebarCards && (
             <div className={styles.taskGridSidebar}>
+              {renderMentionsCard()}
               {renderPersonalTasksCard()}
             </div>
           )}
         </div>
       ) : (
-        <div className={showPersonalTasksCard ? styles.taskGrid : undefined}>
-          <div className={showPersonalTasksCard ? styles.taskGridMain : undefined}>
+        <div className={showSidebarCards ? styles.taskGrid : undefined}>
+          <div className={showSidebarCards ? styles.taskGridMain : undefined}>
+            {renderCurrentlyWorkingOnCard()}
             <InfoCard title="Projects" isCollapsible={true} startExpanded={true}>
               <div className={styles.tasksTable}>
           <div className={styles.tableHeader}>
@@ -2071,8 +2331,9 @@ export function TaskListView({
               </div>
             </InfoCard>
           </div>
-          {showPersonalTasksCard && (
+          {showSidebarCards && (
             <div className={styles.taskGridSidebar}>
+              {renderMentionsCard()}
               {renderPersonalTasksCard()}
             </div>
           )}

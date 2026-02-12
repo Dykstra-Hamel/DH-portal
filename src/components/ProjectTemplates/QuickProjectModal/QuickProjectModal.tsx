@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import { ProjectTemplate, Company, projectTypeOptions } from '@/types/project';
+import { SearchableSelect } from '@/components/Common/SearchableSelect/SearchableSelect';
 import styles from './QuickProjectModal.module.scss';
 
 interface QuickProjectModalProps {
@@ -20,15 +21,21 @@ export interface QuickProjectData {
 }
 
 export function QuickProjectModal({ isOpen, onClose, onSubmit, template, companies }: QuickProjectModalProps) {
-  const getDefaultDueDate = (startDate: string) => {
-    if (!startDate) return '';
-    if (template.default_due_date_offset_days === null || template.default_due_date_offset_days === undefined) {
-      return '';
-    }
-    const dueDate = new Date(startDate);
-    dueDate.setDate(dueDate.getDate() + template.default_due_date_offset_days);
-    return dueDate.toISOString().split('T')[0];
-  };
+  const getDefaultDueDate = useCallback(
+    (startDate: string) => {
+      if (!startDate) return '';
+      if (
+        template.default_due_date_offset_days === null ||
+        template.default_due_date_offset_days === undefined
+      ) {
+        return '';
+      }
+      const dueDate = new Date(startDate);
+      dueDate.setDate(dueDate.getDate() + template.default_due_date_offset_days);
+      return dueDate.toISOString().split('T')[0];
+    },
+    [template.default_due_date_offset_days]
+  );
 
   const [formData, setFormData] = useState<QuickProjectData>({
     template_id: template.id,
@@ -48,6 +55,17 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
     return projectTypeOptions.find((option) => option.value === template.project_type)?.code || '';
   }, [template.project_type]);
 
+  const companyOptions = useMemo(
+    () =>
+      [...companies]
+        .sort((a, b) => (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' }))
+        .map((company) => ({
+          value: company.id,
+          label: company.name,
+        })),
+    [companies]
+  );
+
   useEffect(() => {
     if (!isOpen) return;
     setFormData({
@@ -58,7 +76,7 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
       due_date: getDefaultDueDate(new Date().toISOString().split('T')[0]),
     });
     setHasCustomDueDate(false);
-  }, [isOpen, template]);
+  }, [isOpen, template.id, getDefaultDueDate]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -115,11 +133,17 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
       ...prev,
       due_date: getDefaultDueDate(prev.start_date),
     }));
-  }, [formData.start_date, hasCustomDueDate, isOpen, template]);
+  }, [formData.start_date, hasCustomDueDate, isOpen, getDefaultDueDate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+
+    if (!formData.company_id) {
+      setError('Please select a company.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
@@ -213,20 +237,16 @@ export function QuickProjectModal({ isOpen, onClose, onSubmit, template, compani
             <label htmlFor="company_id" className={styles.label}>
               Company <span className={styles.required}>*</span>
             </label>
-            <select
+            <SearchableSelect
               id="company_id"
-              className={styles.select}
               value={formData.company_id}
-              onChange={(e) => setFormData({ ...formData, company_id: e.target.value })}
-              required
-            >
-              <option value="">Select a company</option>
-              {companies.map((company) => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
+              options={companyOptions}
+              onChange={(companyId) => setFormData({ ...formData, company_id: companyId })}
+              placeholder="Select a company"
+              searchPlaceholder="Search companies..."
+              noResultsText="No companies found"
+              ariaLabel="Company"
+            />
           </div>
 
           <div className={styles.formRow}>

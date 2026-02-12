@@ -202,10 +202,7 @@ export default function EditLandingPageModal({
         additional_services_heading: apiData.landingPage.additionalServices.heading || '',
         additional_services: apiData.landingPage.additionalServices.services || [],
         additional_services_image_url: apiData.landingPage.additionalServices.imageUrl || '',
-        selected_addon_ids:
-          apiData.landingPage.selectedAddonIds && apiData.landingPage.selectedAddonIds.length > 0
-            ? apiData.landingPage.selectedAddonIds
-            : (apiData.landingPage.addons || []).map((addon: any) => addon.id),
+        selected_addon_ids: apiData.landingPage.selectedAddonIds ?? [],
 
         // FAQ
         show_faq: apiData.landingPage.faq.show ?? true,

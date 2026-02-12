@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -18,6 +18,11 @@ import { Project, User, Company, ProjectFormData, ProjectTemplate, ProjectCatego
 import { QuickProjectData } from '@/components/ProjectTemplates/QuickProjectModal/QuickProjectModal';
 import { useUser } from '@/hooks/useUser';
 import { createClient } from '@/lib/supabase/client';
+import {
+  createAdminProjectChannel,
+  subscribeToProjectUpdates,
+  ProjectUpdatePayload,
+} from '@/lib/realtime/project-channel';
 import { Search } from 'lucide-react';
 import styles from '../../project-management/projectManagement.module.scss';
 
@@ -65,6 +70,12 @@ export default function AdminProjectManagementDashboard() {
   const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
   const [filterAssignedTo, setFilterAssignedTo] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+
+  // Realtime subscription refs
+  const subscriptionActiveRef = useRef(false);
+  const currentChannelRef = useRef<ReturnType<typeof createAdminProjectChannel> | null>(null);
+  const isFetchingRef = useRef(false);
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Admin-only access check
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
@@ -253,6 +264,57 @@ export default function AdminProjectManagementDashboard() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [fetchProjects, fetchAllProjectsForCounts]);
+
+  // Realtime subscription for project updates (broadcast-based)
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    // Prevent duplicate subscriptions (e.g., Fast Refresh)
+    if (subscriptionActiveRef.current && currentChannelRef.current) {
+      return;
+    }
+
+    const channel = createAdminProjectChannel();
+    currentChannelRef.current = channel;
+
+    subscribeToProjectUpdates(channel, async (payload: ProjectUpdatePayload) => {
+      // Skip if already fetching to avoid thrashing
+      if (isFetchingRef.current) return;
+
+      // Debounce rapid changes (e.g., bulk task updates) by 500ms
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      debounceTimerRef.current = setTimeout(async () => {
+        isFetchingRef.current = true;
+        try {
+          await Promise.all([
+            fetchProjects(),
+            fetchAllProjectsForCounts(),
+            // Also refresh tasks if a project_task changed
+            payload.table === 'project_tasks' ? fetchTasks() : Promise.resolve(),
+          ]);
+        } finally {
+          isFetchingRef.current = false;
+        }
+      }, 500);
+    });
+
+    subscriptionActiveRef.current = true;
+
+    return () => {
+      subscriptionActiveRef.current = false;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      if (currentChannelRef.current) {
+        createClient().removeChannel(currentChannelRef.current);
+        currentChannelRef.current = null;
+      }
+    };
+  }, [isAdmin, fetchProjects, fetchAllProjectsForCounts, fetchTasks]);
 
   // Fetch tasks on mount
   useEffect(() => {
@@ -838,7 +900,7 @@ export default function AdminProjectManagementDashboard() {
           >
             <option value="">All Statuses</option>
           {statusOptions
-            .filter(status => status.value !== 'new')
+            .filter(status => status.value !== 'new' && status.value !== 'complete' && status.value !== 'on_hold')
             .map((status) => (
               <option key={status.value} value={status.value}>
                 {status.label}

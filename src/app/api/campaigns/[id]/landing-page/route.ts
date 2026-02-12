@@ -425,23 +425,24 @@ export async function GET(
         ? additionalServicesConfig
         : [];
 
-    const storedSelectedAddonIds =
+    // Check if addon selection has been explicitly stored (even if empty)
+    const hasStoredSelection =
       additionalServicesConfig &&
       typeof additionalServicesConfig === 'object' &&
-      Array.isArray((additionalServicesConfig as any).selectedAddonIds)
-        ? (additionalServicesConfig as any).selectedAddonIds
-        : null;
+      Array.isArray((additionalServicesConfig as any).selectedAddonIds);
 
-    const selectedAddonIdsSet = storedSelectedAddonIds
-      ? new Set(storedSelectedAddonIds)
+    const storedSelectedAddonIds = hasStoredSelection
+      ? (additionalServicesConfig as any).selectedAddonIds
       : null;
 
-    let selectedAddons = selectedAddonIdsSet
-      ? eligibleAddOns.filter((addon) => selectedAddonIdsSet.has(addon.id))
-      : eligibleAddOns;
+    let selectedAddons: typeof eligibleAddOns;
 
-    // If the stored selection is now invalid (e.g., plan changed), fall back to all eligible add-ons
-    if (selectedAddonIdsSet && selectedAddons.length === 0) {
+    if (hasStoredSelection) {
+      // Explicit selection exists — respect it (even if empty means "none selected")
+      const selectedAddonIdsSet = new Set(storedSelectedAddonIds);
+      selectedAddons = eligibleAddOns.filter((addon) => selectedAddonIdsSet.has(addon.id));
+    } else {
+      // No selection ever stored (legacy/new record) — default to all eligible
       selectedAddons = eligibleAddOns;
     }
 

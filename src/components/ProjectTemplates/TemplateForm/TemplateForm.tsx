@@ -289,25 +289,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     fetchCategories();
   }, []);
 
-  // Clean up task categories when project categories change
-  useEffect(() => {
-    const projectCategoryIds = formData.category_ids || [];
-
-    // Remove task categories that are no longer in project categories
-    setFormData((prev) => ({
-      ...prev,
-      tasks: prev.tasks.map((task) => {
-        const firstValidCategoryId = (task.category_ids || []).find((catId) =>
-          projectCategoryIds.includes(catId)
-        );
-        return {
-          ...task,
-          category_ids: firstValidCategoryId ? [firstValidCategoryId] : [],
-        };
-      }),
-    }));
-  }, [formData.category_ids]);
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -450,6 +431,23 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         task.temp_id === taskId ? { ...task, [field]: value } : task
       ),
     }));
+  };
+
+  const handleTaskCategoryToggle = (taskTempId: string, categoryId: string, isSelected: boolean) => {
+    setFormData((prev) => {
+      const categoryIds = prev.category_ids || [];
+      const shouldAddToTemplate = !isSelected && !categoryIds.includes(categoryId);
+
+      return {
+        ...prev,
+        category_ids: shouldAddToTemplate ? [...categoryIds, categoryId] : categoryIds,
+        tasks: prev.tasks.map((task) =>
+          task.temp_id === taskTempId
+            ? { ...task, category_ids: isSelected ? [] : [categoryId] }
+            : task
+        ),
+      };
+    });
   };
 
   const handleTaskDragStart = (e: React.DragEvent, index: number) => {
@@ -1235,53 +1233,27 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                                 <p className={styles.hint}>Loading categories...</p>
                               ) : (
                                 <div className={styles.categoryMultiSelect}>
-                                  {(() => {
-                                    // Filter task categories to only show those selected for the project
-                                    const projectCategoryIds = formData.category_ids || [];
-                                    const filteredCategories = availableCategories.filter(cat =>
-                                      projectCategoryIds.includes(cat.id)
-                                    );
-
-                                    if (projectCategoryIds.length === 0) {
-                                      return (
-                                        <p className={styles.hint}>
-                                          Please select project categories first to assign them to tasks.
-                                        </p>
-                                      );
-                                    }
-
-                                    if (filteredCategories.length === 0) {
-                                      return (
-                                        <p className={styles.hint}>
-                                          No categories available from selected project categories.
-                                        </p>
-                                      );
-                                    }
-
-                                    return filteredCategories.map((category) => {
+                                  {availableCategories.length === 0 ? (
+                                    <p className={styles.hint}>
+                                      No categories available. Create categories in settings first.
+                                    </p>
+                                  ) : (
+                                    availableCategories.map((category) => {
                                       const isSelected = task.category_ids?.[0] === category.id;
                                       return (
                                         <button
                                           key={category.id}
                                           type="button"
                                           className={`${styles.categoryOption} ${isSelected ? styles.selected : ''}`}
-                                          onClick={() => {
-                                            const newCategories = isSelected ? [] : [category.id];
-                                            setFormData((prev) => ({
-                                              ...prev,
-                                              tasks: prev.tasks.map((t) =>
-                                                t.temp_id === task.temp_id
-                                                  ? { ...t, category_ids: newCategories }
-                                                  : t
-                                              ),
-                                            }));
-                                          }}
+                                          onClick={() =>
+                                            handleTaskCategoryToggle(task.temp_id || '', category.id, isSelected)
+                                          }
                                         >
                                           <CategoryBadge category={category} />
                                         </button>
                                       );
-                                    });
-                                  })()}
+                                    })
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1591,53 +1563,31 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                                               <p className={styles.hint}>Loading categories...</p>
                                             ) : (
                                               <div className={styles.categoryMultiSelect}>
-                                                {(() => {
-                                                  // Filter task categories to only show those selected for the project
-                                                  const projectCategoryIds = formData.category_ids || [];
-                                                  const filteredCategories = availableCategories.filter(cat =>
-                                                    projectCategoryIds.includes(cat.id)
-                                                  );
-
-                                                  if (projectCategoryIds.length === 0) {
-                                                    return (
-                                                      <p className={styles.hint}>
-                                                        Please select project categories first to assign them to tasks.
-                                                      </p>
-                                                    );
-                                                  }
-
-                                                  if (filteredCategories.length === 0) {
-                                                    return (
-                                                      <p className={styles.hint}>
-                                                        No categories available from selected project categories.
-                                                      </p>
-                                                    );
-                                                  }
-
-                                                  return filteredCategories.map((category) => {
+                                                {availableCategories.length === 0 ? (
+                                                  <p className={styles.hint}>
+                                                    No categories available. Create categories in settings first.
+                                                  </p>
+                                                ) : (
+                                                  availableCategories.map((category) => {
                                                     const isSelected = subtask.category_ids?.[0] === category.id;
                                                     return (
                                                       <button
                                                         key={category.id}
                                                         type="button"
                                                         className={`${styles.categoryOption} ${isSelected ? styles.selected : ''}`}
-                                                        onClick={() => {
-                                                          const newCategories = isSelected ? [] : [category.id];
-                                                          setFormData((prev) => ({
-                                                            ...prev,
-                                                            tasks: prev.tasks.map((t) =>
-                                                              t.temp_id === subtask.temp_id
-                                                                ? { ...t, category_ids: newCategories }
-                                                                : t
-                                                            ),
-                                                          }));
-                                                        }}
+                                                        onClick={() =>
+                                                          handleTaskCategoryToggle(
+                                                            subtask.temp_id || '',
+                                                            category.id,
+                                                            isSelected
+                                                          )
+                                                        }
                                                       >
                                                         <CategoryBadge category={category} />
                                                       </button>
                                                     );
-                                                  });
-                                                })()}
+                                                  })
+                                                )}
                                               </div>
                                             )}
                                           </div>

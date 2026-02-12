@@ -18,6 +18,7 @@ import {
 } from '@/types/project';
 import CategoryBadge from '@/components/ProjectManagement/CategorySettings/CategoryBadge';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import { SearchableSelect } from '@/components/Common/SearchableSelect/SearchableSelect';
 import { ProjectTaskBuilder } from './ProjectTaskBuilder';
 import styles from './ProjectForm.module.scss';
 
@@ -186,6 +187,15 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
       (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
     );
   }, [companies]);
+
+  const companyOptions = useMemo(
+    () =>
+      sortedCompanies.map((company) => ({
+        value: company.id,
+        label: company.name,
+      })),
+    [sortedCompanies]
+  );
 
   // Filter status options based on project categories and is_billable
   const availableStatusOptions = useMemo(() => {
@@ -622,20 +632,18 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                   style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
                 />
               ) : (
-                <select
+                <SearchableSelect
+                  id="project-company-id"
                   value={formData.company_id}
-                  onChange={e =>
-                    setFormData({ ...formData, company_id: e.target.value })
+                  options={companyOptions}
+                  onChange={(companyId) =>
+                    setFormData({ ...formData, company_id: companyId })
                   }
-                  required
-                >
-                  <option value="">Select Company</option>
-                  {sortedCompanies.map(company => (
-                    <option key={company.id} value={company.id}>
-                      {company.name}
-                    </option>
-                  ))}
-                </select>
+                  placeholder="Select Company"
+                  searchPlaceholder="Search companies..."
+                  noResultsText="No companies found"
+                  ariaLabel="Company"
+                />
               )}
             </div>
 
