@@ -814,6 +814,21 @@
   color: var(--text-primary, #374151);
   line-height: 1.5;
   white-space: pre-wrap;
+
+  // Mention styling
+  :global(span[data-type='mention']) {
+    color: var(--action-600, #0284c7);
+    font-weight: 600;
+    padding: 2px 4px;
+    border-radius: 3px;
+    background: var(--action-50, #f0f9ff);
+  }
+
+  // Highlight self-mentions
+  :global(span[data-type='mention'][data-mention-self='true']) {
+    background: var(--warning-50, #fffbeb);
+    color: var(--warning-700, #a16207);
+  }
 }
 
 // Activity Feed

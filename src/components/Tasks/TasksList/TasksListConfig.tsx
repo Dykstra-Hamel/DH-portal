@@ -1,4 +1,5 @@
 import React from 'react';
+import Link from 'next/link';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
 import {
   Task,
@@ -7,7 +8,7 @@ import {
   formatTaskDueDateTime,
   isTaskOverdue,
 } from '@/types/task';
-import { Eye, CheckCircle } from 'lucide-react';
+import { Eye, CheckCircle, ArrowUpRight } from 'lucide-react';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 export const getTaskColumns = (
@@ -21,7 +22,19 @@ export const getTaskColumns = (
       sortable: true,
       render: (task: Task) => (
         <div className="flex flex-col">
-          <span className="font-medium">{task.title}</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span className="font-medium">{task.title}</span>
+            {task.monthly_service_id && task.monthly_service && (
+              <Link
+                href={`/admin/monthly-services/${task.monthly_service_id}`}
+                className={styles.monthlyServiceLink}
+                title={`View Monthly Service: ${task.monthly_service.service_name}`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ArrowUpRight size={14} className={styles.monthlyServiceIcon} />
+              </Link>
+            )}
+          </div>
           {task.related_entity && task.related_entity_type && (
             <span className="text-sm text-gray-500">
               Related to:{' '}

@@ -15,18 +15,21 @@ interface GlobalHeaderProps {
   rightActions?: ReactNode;
 }
 
-export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) {
+export function GlobalHeader({
+  onMenuToggle,
+  rightActions,
+}: GlobalHeaderProps) {
   const pathname = usePathname();
   const hideSearchAndCompany =
     pathname === '/project-management' ||
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
     pathname.startsWith('/admin/project-management/') ||
-    pathname.startsWith('/admin/project-management/tasks') ||
-    pathname.startsWith('/admin/project-management/templates');
+    pathname.startsWith('/admin/monthly-services');
   const hideBreadcrumbs =
     pathname === '/admin/project-management' ||
-    pathname.startsWith('/admin/project-management/');
+    pathname.startsWith('/admin/project-management/') ||
+    pathname.startsWith('/admin/monthly-services');
 
   return (
     <header className={styles.globalHeader}>
@@ -43,8 +46,7 @@ export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) 
           )}
           {!hideBreadcrumbs && <Breadcrumbs />}
         </div>
-        <div className={styles.centerSection}>
-        </div>
+        <div className={styles.centerSection}></div>
         <div className={styles.rightSection}>
           {rightActions}
           {!hideSearchAndCompany && <SearchBar />}

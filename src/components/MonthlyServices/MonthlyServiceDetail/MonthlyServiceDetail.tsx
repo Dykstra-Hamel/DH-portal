@@ -7,7 +7,7 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -88,6 +88,7 @@ interface Profile {
   first_name?: string;
   last_name?: string;
   email: string;
+  avatar_url?: string | null;
 }
 
 interface TaskTemplate {
@@ -121,6 +122,8 @@ interface MonthlyServiceTask {
   }[];
   comments?: any[];
   activity?: any[];
+  hasUnreadComments?: boolean;
+  hasUnreadMentions?: boolean;
 }
 
 interface CommentAttachment {
@@ -206,14 +209,27 @@ export function MonthlyServiceDetail({
   onServiceUpdate,
 }: MonthlyServiceDetailProps) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { setPageHeader } = usePageActions();
+
+  // Initialize month from URL query param, or default to current month
   const [selectedMonth, setSelectedMonth] = useState(() => {
+    const monthParam = searchParams.get('month');
+    if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+      return monthParam;
+    }
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
-  const [selectedMonthDayjs, setSelectedMonthDayjs] = useState<Dayjs | null>(
-    () => dayjs()
-  );
+
+  const [selectedMonthDayjs, setSelectedMonthDayjs] = useState<Dayjs | null>(() => {
+    const monthParam = searchParams.get('month');
+    if (monthParam && /^\d{4}-\d{2}$/.test(monthParam)) {
+      const [year, month] = monthParam.split('-').map(Number);
+      return dayjs(new Date(year, month - 1, 1));
+    }
+    return dayjs();
+  });
   const [serviceData, setServiceData] = useState<Service>(service);
   const [loading, setLoading] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -256,6 +272,20 @@ export function MonthlyServiceDetail({
   const dragCounterRef = useRef(0);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
   const { getAvatarUrl, getDisplayName, getInitials } = useUser();
+
+  // Convert users to mention format for RichTextEditor
+  const mentionUsers = useMemo(() => {
+    return users.map(u => {
+      const profile = (u as any).profiles;
+      return {
+        id: profile?.id || u.id,
+        first_name: profile?.first_name || null,
+        last_name: profile?.last_name || null,
+        email: profile?.email || (u as any).email || null,
+        avatar_url: profile?.avatar_url || null,
+      };
+    });
+  }, [users]);
 
   // Helper to get auth headers
   const getAuthHeaders = async () => {
@@ -414,18 +444,6 @@ export function MonthlyServiceDetail({
     setNewComment('');
     setPendingAttachments([]);
   }, [fetchComments]);
-
-  // Convert users to mention format for RichTextEditor
-  const mentionUsers = useMemo(() => {
-    return users.map(u => ({
-      id: u.id,
-      first_name: u.first_name || null,
-      last_name: u.last_name || null,
-      email: u.email || null,
-      avatar_url: null,
-    }));
-  }, [users]);
-
   const handleMonthChange = (newValue: Dayjs | null) => {
     if (newValue) {
       setSelectedMonthDayjs(newValue);
@@ -488,7 +506,7 @@ export function MonthlyServiceDetail({
         first_name: task.profiles.first_name || '',
         last_name: task.profiles.last_name || '',
         email: task.profiles.email,
-        avatar_url: undefined,
+        avatar_url: task.profiles.avatar_url || null,
       };
     } else if (task.assigned_to) {
       // Look up user in users array
@@ -499,7 +517,7 @@ export function MonthlyServiceDetail({
           first_name: matchingUser.first_name || '',
           last_name: matchingUser.last_name || '',
           email: matchingUser.email,
-          avatar_url: undefined,
+          avatar_url: matchingUser.avatar_url || null,
         };
       }
     }
@@ -537,14 +555,44 @@ export function MonthlyServiceDetail({
       // Include comments and activity from the task
       comments: task.comments || [],
       activity: task.activity || [],
+      // Include hasUnreadComments and hasUnreadMentions from API
+      hasUnreadComments: task.hasUnreadComments,
+      hasUnreadMentions: task.hasUnreadMentions,
       // Add monthly_service_id so ProjectTaskDetail can detect this is a monthly service task
       monthly_service_id: service.id,
     } as any; // Use 'as any' since monthly_service_id is not in ProjectTask type
   };
 
-  const handleTaskClick = (task: ProjectTask) => {
+  const handleTaskClick = async (task: ProjectTask) => {
     setSelectedTask(task);
     setIsTaskDetailOpen(true);
+
+    // Optimistically update the task's unread status immediately for instant UI feedback
+    setServiceData(prevData => ({
+      ...prevData,
+      weekProgress: prevData.weekProgress.map(week => ({
+        ...week,
+        tasks: week.tasks.map(t =>
+          t.id === task.id ? { ...t, hasUnreadComments: false, hasUnreadMentions: false } : t
+        ),
+      })),
+    }));
+
+    // Mark task as viewed in the background
+    try {
+      const headers = await getAuthHeaders();
+      await fetch(`/api/admin/tasks/${task.id}/mark-viewed`, {
+        method: 'POST',
+        headers,
+      });
+
+      // Refresh service data in background to ensure consistency
+      onServiceUpdate();
+    } catch (error) {
+      console.error('Error marking task as viewed:', error);
+      // On error, refresh to restore correct state
+      onServiceUpdate();
+    }
   };
 
   const handleToggleComplete = async (taskId: string, isCompleted: boolean) => {
@@ -824,6 +872,11 @@ export function MonthlyServiceDetail({
       }
 
       const comment = await response.json();
+
+      // Ensure attachments field is initialized
+      if (!comment.attachments) {
+        comment.attachments = [];
+      }
 
       if (pendingAttachments.length > 0) {
         const formData = new FormData();
@@ -1427,6 +1480,12 @@ export function MonthlyServiceDetail({
           description: serviceData.description,
           status: serviceData.status,
           is_active: serviceData.is_active,
+          track_google_ads_budget: serviceData.track_google_ads_budget,
+          default_google_ads_budget: serviceData.default_google_ads_budget,
+          track_social_media_budget: serviceData.track_social_media_budget,
+          default_social_media_budget: serviceData.default_social_media_budget,
+          track_lsa_budget: serviceData.track_lsa_budget,
+          default_lsa_budget: serviceData.default_lsa_budget,
           templates: serviceData.templates.map(t => ({
             id: t.id,
             title: t.title,
@@ -1795,6 +1854,12 @@ export function MonthlyServiceDetail({
           description: serviceData.description,
           status: serviceData.status,
           is_active: serviceData.is_active,
+          track_google_ads_budget: serviceData.track_google_ads_budget,
+          default_google_ads_budget: serviceData.default_google_ads_budget,
+          track_social_media_budget: serviceData.track_social_media_budget,
+          default_social_media_budget: serviceData.default_social_media_budget,
+          track_lsa_budget: serviceData.track_lsa_budget,
+          default_lsa_budget: serviceData.default_lsa_budget,
           templates: serviceData.templates.map(t => ({
             id: t.id,
             title: t.title,
@@ -1980,6 +2045,40 @@ export function MonthlyServiceDetail({
           onDelete={() => selectedTask && handleDeleteTask(selectedTask.id)}
           onAddComment={async (comment: string) => {
             if (!selectedTask) return;
+
+            // Use the same user data that's displayed elsewhere in the UI
+            const displayName = getDisplayName();
+            const nameParts = displayName.split(' ');
+            const currentUserProfile = {
+              id: user.id,
+              first_name: nameParts[0] || '',
+              last_name: nameParts.slice(1).join(' ') || '',
+              email: user.email || '',
+              avatar_url: getAvatarUrl(),
+            };
+
+            // Create temporary comment for optimistic UI update
+            const tempCommentId = `temp-${Date.now()}`;
+            const tempComment = {
+              id: tempCommentId,
+              task_id: selectedTask.id,
+              user_id: user.id,
+              comment,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              user_profile: currentUserProfile,
+              attachments: [],
+            };
+
+            // Optimistically add comment to UI immediately
+            setSelectedTask(prev => {
+              if (!prev) return prev;
+              return {
+                ...prev,
+                comments: [...(prev.comments || []), tempComment],
+              };
+            });
+
             try {
               const headers = await getAuthHeaders();
               const response = await fetch(`/api/admin/tasks/${selectedTask.id}/comments`, {
@@ -1990,10 +2089,30 @@ export function MonthlyServiceDetail({
               if (!response.ok) {
                 throw new Error('Failed to add comment');
               }
-              // Refresh service data to show new comment
+
+              // Fetch the updated task with the real comment
+              const updatedTaskResponse = await fetch(`/api/admin/tasks/${selectedTask.id}`, {
+                headers,
+              });
+              if (updatedTaskResponse.ok) {
+                const updatedTaskData = await updatedTaskResponse.json();
+                // Convert to ProjectTask format and update selectedTask with real data
+                const updatedTask = convertToProjectTask(updatedTaskData);
+                setSelectedTask(updatedTask);
+              }
+
+              // Refresh service data to show new comment in the list
               onServiceUpdate();
             } catch (error) {
               console.error('Error adding comment:', error);
+              // On error, remove the temporary comment
+              setSelectedTask(prev => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  comments: (prev.comments || []).filter(c => c.id !== tempCommentId),
+                };
+              });
             }
           }}
           onCreateSubtask={() => {
@@ -2009,6 +2128,7 @@ export function MonthlyServiceDetail({
           onToggleStar={taskId => toggleStar('task', taskId)}
           isStarred={taskId => isStarred('task', taskId)}
           monthlyServiceDepartments={departments}
+          mentionUsers={mentionUsers}
         />
       )}
 

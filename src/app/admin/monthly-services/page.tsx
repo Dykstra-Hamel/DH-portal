@@ -204,7 +204,7 @@ export default function MonthlyServicesPage() {
 
   // Handle service row click
   const handleServiceClick = (serviceId: string) => {
-    router.push(`/admin/monthly-services/${serviceId}`);
+    router.push(`/admin/monthly-services/${serviceId}?month=${selectedMonth}`);
   };
 
   // Handle form submission

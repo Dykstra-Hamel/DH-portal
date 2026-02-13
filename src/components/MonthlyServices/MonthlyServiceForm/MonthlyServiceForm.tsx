@@ -184,57 +184,57 @@ export function MonthlyServiceForm({
     }
   }, [companyId, companies, isEditMode]);
 
-  // Initialize form with service data when editing
+  // Initialize or reset form based on modal state
   useEffect(() => {
-    if (isOpen && service) {
-      setCompanyId(service.company_id);
-      setServiceName(service.service_name);
-      setDescription(service.description || '');
-      setStatus(service.status);
+    if (isOpen) {
+      // Modal is opening - initialize with service data if editing, or reset if creating
+      if (service) {
+        // Editing existing service - populate form
+        setCompanyId(service.company_id);
+        setServiceName(service.service_name);
+        setDescription(service.description || '');
+        setStatus(service.status);
 
-      // Initialize budget tracking fields
-      setTrackGoogleAdsBudget(service.track_google_ads_budget || false);
-      setDefaultGoogleAdsBudget(service.default_google_ads_budget?.toString() || '');
-      setTrackSocialMediaBudget(service.track_social_media_budget || false);
-      setDefaultSocialMediaBudget(service.default_social_media_budget?.toString() || '');
-      setTrackLsaBudget(service.track_lsa_budget || false);
-      setDefaultLsaBudget(service.default_lsa_budget?.toString() || '');
+        // Initialize budget tracking fields - use ?? to handle explicit false values
+        setTrackGoogleAdsBudget(service.track_google_ads_budget ?? false);
+        setDefaultGoogleAdsBudget(service.default_google_ads_budget?.toString() || '');
+        setTrackSocialMediaBudget(service.track_social_media_budget ?? false);
+        setDefaultSocialMediaBudget(service.default_social_media_budget?.toString() || '');
+        setTrackLsaBudget(service.track_lsa_budget ?? false);
+        setDefaultLsaBudget(service.default_lsa_budget?.toString() || '');
 
-      // Convert existing templates to TaskTemplate format
-      const templates = service.templates.map((t, index) => ({
-        id: t.id,
-        title: t.title,
-        description: t.description || '',
-        default_assigned_to: t.default_assigned_to || '',
-        department_id: t.department_id || null,
-        week_of_month: t.week_of_month,
-        due_day_of_week: t.due_day_of_week,
-        display_order: t.display_order,
-      }));
-      setTaskTemplates(templates);
-      setNextTempId(templates.length + 1);
-    }
-  }, [isOpen, service]);
-
-  // Reset form when modal closes
-  useEffect(() => {
-    if (!isOpen) {
-      setCompanyId('');
-      setServiceName('');
-      setDescription('');
-      setStatus('active');
-      setTrackGoogleAdsBudget(false);
-      setDefaultGoogleAdsBudget('');
-      setTrackSocialMediaBudget(false);
-      setDefaultSocialMediaBudget('');
-      setTrackLsaBudget(false);
-      setDefaultLsaBudget('');
-      setTaskTemplates([]);
-      setNextTempId(1);
+        // Convert existing templates to TaskTemplate format
+        const templates = service.templates.map((t, index) => ({
+          id: t.id,
+          title: t.title,
+          description: t.description || '',
+          default_assigned_to: t.default_assigned_to || '',
+          department_id: t.department_id || null,
+          week_of_month: t.week_of_month,
+          due_day_of_week: t.due_day_of_week,
+          display_order: t.display_order,
+        }));
+        setTaskTemplates(templates);
+        setNextTempId(templates.length + 1);
+      } else {
+        // Creating new service - reset to defaults
+        setCompanyId('');
+        setServiceName('');
+        setDescription('');
+        setStatus('active');
+        setTrackGoogleAdsBudget(false);
+        setDefaultGoogleAdsBudget('');
+        setTrackSocialMediaBudget(false);
+        setDefaultSocialMediaBudget('');
+        setTrackLsaBudget(false);
+        setDefaultLsaBudget('');
+        setTaskTemplates([]);
+        setNextTempId(1);
+      }
       setError(null);
       setIsSubmitting(false);
     }
-  }, [isOpen]);
+  }, [isOpen, service]);
 
   const addTaskTemplate = () => {
     const newTemplate: TaskTemplate = {
@@ -287,6 +287,19 @@ export function MonthlyServiceForm({
     // Update display_order
     const reindexed = newTemplates.map((t, i) => ({ ...t, display_order: i }));
     setTaskTemplates(reindexed);
+  };
+
+  const handleCollapseAll = () => {
+    // Check if all tasks are collapsed
+    const allCollapsed = taskTemplates.length > 0 && taskTemplates.every(t => collapsedTasks.has(t.id));
+
+    if (allCollapsed) {
+      // Expand all
+      setCollapsedTasks(new Set());
+    } else {
+      // Collapse all
+      setCollapsedTasks(new Set(taskTemplates.map(t => t.id)));
+    }
   };
 
   const toggleTaskCollapse = (id: string) => {
@@ -602,6 +615,15 @@ export function MonthlyServiceForm({
               <div className={styles.sectionHeader}>
                 <h3 className={styles.sectionTitle}>Task Templates</h3>
                 <div className={styles.headerActions}>
+                  {taskTemplates.length >= 2 && (
+                    <button
+                      type="button"
+                      onClick={handleCollapseAll}
+                      className={styles.collapseAllLink}
+                    >
+                      {taskTemplates.every(t => collapsedTasks.has(t.id)) ? 'Expand All' : 'Collapse All'}
+                    </button>
+                  )}
                   {!isEditMode && defaultTemplates.length > 0 && (
                     <div className={styles.templateDropdownContainer}>
                       <button
