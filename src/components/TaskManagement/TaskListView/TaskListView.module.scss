@@ -520,6 +520,54 @@
   font-weight: 500;
 }
 
+.taskTitleWithLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.monthlyServiceLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  color: var(--gray-500);
+  flex-shrink: 0;
+
+  &:hover {
+    color: var(--action-500);
+    background: var(--action-50);
+  }
+}
+
+.monthlyServiceTooltip {
+  background-color: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 10000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  opacity: 1;
+  visibility: visible;
+}
+
+.monthlyServiceTooltipArrow {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #333;
+}
+
 .taskEditInput {
   flex: 1;
   min-width: 120px;

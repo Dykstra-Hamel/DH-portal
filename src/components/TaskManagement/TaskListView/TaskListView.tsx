@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { Calendar, Check, ChevronLeft, ChevronRight, Lock, MessageSquare, Pencil, Trash2 } from 'lucide-react';
+import Link from 'next/link';
+import { Calendar, Check, ChevronLeft, ChevronRight, Lock, MessageSquare, Pencil, Trash2, ArrowUpRight } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/taskManagement';
 import { Project, statusOptions as projectStatusOptions } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
@@ -76,10 +77,13 @@ export function TaskListView({
   const [calendarMonthByTask, setCalendarMonthByTask] = useState<Record<string, Date>>({});
   const [calendarMonthByProject, setCalendarMonthByProject] = useState<Record<string, Date>>({});
   const [expandedWorkingOnProjects, setExpandedWorkingOnProjects] = useState<Record<string, boolean>>({});
+  const [hoveredMonthlyServiceLink, setHoveredMonthlyServiceLink] = useState<string | null>(null);
+  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
   const projectDatePickerRef = useRef<HTMLDivElement>(null);
+  const monthlyServiceLinkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
 
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
@@ -139,6 +143,20 @@ export function TaskListView({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [datePickerProjectId]);
+
+  // Calculate tooltip position when hovering over monthly service link
+  useEffect(() => {
+    if (hoveredMonthlyServiceLink && monthlyServiceLinkRefs.current[hoveredMonthlyServiceLink]) {
+      const linkElement = monthlyServiceLinkRefs.current[hoveredMonthlyServiceLink];
+      if (linkElement) {
+        const rect = linkElement.getBoundingClientRect();
+        setTooltipPosition({
+          top: rect.top - 8,
+          left: rect.left + rect.width / 2,
+        });
+      }
+    }
+  }, [hoveredMonthlyServiceLink]);
 
   // Get project for a task
   const getProjectForTask = useCallback((taskProjectId?: string): Project | null => {
@@ -1557,6 +1575,7 @@ export function TaskListView({
     const renderMonthlyServiceRow = (task: Task) => {
       const overdue = isOverdue(task.due_date, task.status);
       const serviceMeta = monthlyServiceMetaByTaskId?.[task.id];
+      const monthlyServiceId = (task as any).monthly_service_id;
 
       return (
         <li
@@ -1586,7 +1605,23 @@ export function TaskListView({
             />
           </div>
           <div className={`${styles.taskTitleRow} ${styles.personalTaskTitleRow}`}>
-            <span className={styles.taskTitleText}>{task.title}</span>
+            <div className={styles.taskTitleWithLink}>
+              <span className={styles.taskTitleText}>{task.title}</span>
+              {monthlyServiceId && serviceMeta && (
+                <Link
+                  ref={(el) => {
+                    if (el) monthlyServiceLinkRefs.current[task.id] = el;
+                  }}
+                  href={`/admin/monthly-services/${monthlyServiceId}`}
+                  className={styles.monthlyServiceLink}
+                  onClick={(e) => e.stopPropagation()}
+                  onMouseEnter={() => setHoveredMonthlyServiceLink(task.id)}
+                  onMouseLeave={() => setHoveredMonthlyServiceLink(null)}
+                >
+                  <ArrowUpRight size={14} />
+                </Link>
+              )}
+            </div>
             <div className={styles.taskMetaActions}>
               <span className={`${styles.taskDueDate} ${overdue ? styles.taskDueDateOverdue : ''}`}>
                 <ClockIcon />
@@ -2004,6 +2039,22 @@ export function TaskListView({
               {renderPersonalTasksCard()}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Monthly Service Link Tooltip */}
+      {hoveredMonthlyServiceLink && monthlyServiceMetaByTaskId?.[hoveredMonthlyServiceLink] && (
+        <div
+          className={styles.monthlyServiceTooltip}
+          style={{
+            position: 'fixed',
+            top: `${tooltipPosition.top}px`,
+            left: `${tooltipPosition.left}px`,
+            transform: 'translate(-50%, -100%)',
+          }}
+        >
+          View Monthly Service: {monthlyServiceMetaByTaskId[hoveredMonthlyServiceLink].serviceName}
+          <div className={styles.monthlyServiceTooltipArrow} />
         </div>
       )}
     </div>

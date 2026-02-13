@@ -26,7 +26,7 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Fetch task with monthly service department assignments
+    // Fetch task with monthly service department assignments, comments, and activity
     const { data: task, error } = await supabase
       .from('project_tasks')
       .select(
@@ -39,6 +39,30 @@ export async function GET(
             name,
             icon
           )
+        ),
+        comments:project_task_comments (
+          id,
+          comment,
+          created_at,
+          updated_at,
+          user_id,
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        activity:project_task_activity (
+          id,
+          action_type,
+          old_value,
+          new_value,
+          created_at,
+          user_id,
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        profiles:assigned_to (
+          id,
+          first_name,
+          last_name,
+          email,
+          avatar_url
         )
       `
       )
@@ -54,7 +78,30 @@ export async function GET(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    return NextResponse.json(task);
+    // Calculate hasUnreadComments
+    let hasUnreadComments = false;
+    if (task.comments && task.comments.length > 0) {
+      // Get user's last view time for this task
+      const { data: viewRecord } = await supabase
+        .from('project_task_views')
+        .select('last_viewed_at')
+        .eq('user_id', user.id)
+        .eq('task_id', taskId)
+        .single();
+
+      if (!viewRecord) {
+        // Never viewed - all comments are unread
+        hasUnreadComments = true;
+      } else {
+        // Check if any comment is newer than last view
+        const lastViewedAt = new Date(viewRecord.last_viewed_at);
+        hasUnreadComments = task.comments.some(
+          (comment: any) => new Date(comment.created_at) > lastViewedAt
+        );
+      }
+    }
+
+    return NextResponse.json({ ...task, hasUnreadComments });
   } catch (error) {
     console.error('Error in GET /api/admin/tasks/[taskId]:', error);
     return NextResponse.json(
