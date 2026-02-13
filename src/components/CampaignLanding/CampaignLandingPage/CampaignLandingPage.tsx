@@ -167,6 +167,8 @@ export default function CampaignLandingPage({
   landingPage,
 }: CampaignLandingPageProps) {
   const [isRedeeming, setIsRedeeming] = useState(false);
+  const [showRedemptionModal, setShowRedemptionModal] = useState(false);
+  const [preSelectedAddonId, setPreSelectedAddonId] = useState<string>('');
   const redemptionCardRef = useRef<HTMLDivElement | null>(null);
 
   // Load brand primary font dynamically
@@ -207,6 +209,37 @@ export default function CampaignLandingPage({
 
     window.scrollTo({ top: Math.max(targetY, 0), behavior: 'smooth' });
   }, []);
+
+  // Open redemption modal with optional pre-selected addon
+  const handleAddonClick = useCallback((addonId?: string) => {
+    setPreSelectedAddonId(addonId || '');
+    setShowRedemptionModal(true);
+  }, []);
+
+  // Close redemption modal
+  const handleModalClose = useCallback(() => {
+    setShowRedemptionModal(false);
+    setPreSelectedAddonId('');
+  }, []);
+
+  // Lock body scroll when modal is open + close on Escape
+  useEffect(() => {
+    if (!showRedemptionModal) return;
+
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleModalClose();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [showRedemptionModal, handleModalClose]);
 
   // If already redeemed, show full-page thank you
   if (redemption.isRedeemed) {
@@ -383,10 +416,11 @@ export default function CampaignLandingPage({
 
       {/* Additional Services Section */}
       {landingPage.additionalServices.show &&
-        landingPage.addons.length > 0 && (
+        (landingPage.addons.length > 0 || landingPage.additionalServices.services.length > 0) && (
           <AdditionalServicesSection
             additionalServices={landingPage.additionalServices}
             addons={landingPage.addons}
+            customItems={landingPage.additionalServices.services}
             customer={customer}
             pricing={landingPage.pricing}
             company={company}
@@ -394,6 +428,7 @@ export default function CampaignLandingPage({
             serviceName={landingPage.faq.serviceName}
             buttonText={landingPage.hero.buttonText}
             onCtaClick={scrollToRedemptionCard}
+            onAddonClick={handleAddonClick}
           />
         )}
 
@@ -415,6 +450,36 @@ export default function CampaignLandingPage({
         branding={landingPage.branding}
         serviceName={landingPage.faq.serviceName}
       />
+
+      {/* Redemption Modal */}
+      {showRedemptionModal && (
+        <div className={styles.modalOverlay} onClick={handleModalClose}>
+          <div className={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <InlineRedemptionCard
+              customer={customer}
+              campaign={campaign}
+              pricing={{
+                ...landingPage.pricing,
+                priceAmount: landingPage.pricing.displayPrice.split('/')[0]?.replace('$', '') || '44',
+                priceFrequency: landingPage.pricing.displayPrice.split('/')[1] || 'mo',
+              }}
+              addons={landingPage.addons}
+              landingPage={{
+                redemptionCard: {
+                  heading: landingPage.redemptionCard.heading || undefined,
+                  disclaimer: landingPage.redemptionCard.disclaimer || undefined,
+                },
+              }}
+              company={company}
+              branding={landingPage.branding}
+              serviceName={landingPage.faq.serviceName}
+              initialAddonId={preSelectedAddonId}
+              isModal={true}
+              onRedeem={handleImmediateRedeem}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

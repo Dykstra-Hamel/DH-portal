@@ -83,7 +83,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   );
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
   const [isChangingRequestedBy, setIsChangingRequestedBy] = useState(false);
-  const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name: string }>>([]);
+  const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name: string; is_hidden?: boolean }>>([]);
   const [availableSubtypes, setAvailableSubtypes] = useState<ProjectTypeSubtype[]>([]);
   const [isFetchingSubtypes, setIsFetchingSubtypes] = useState(false);
   const [showAddMember, setShowAddMember] = useState(false);
@@ -795,8 +795,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
             <div>
               <div className={styles.infoLabel}>Project Categories</div>
               <div className={styles.categoryCheckboxes}>
-                {availableCategories.length > 0 ? (
-                  availableCategories.map((category) => (
+                {availableCategories.filter(c => !c.is_hidden).length > 0 ? (
+                  availableCategories.filter(c => !c.is_hidden).map((category) => (
                     <label key={category.id} className={styles.categoryCheckbox}>
                       <input
                         type="checkbox"

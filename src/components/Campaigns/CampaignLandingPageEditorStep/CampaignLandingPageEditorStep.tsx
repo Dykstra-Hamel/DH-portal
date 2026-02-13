@@ -156,6 +156,8 @@ export default function CampaignLandingPageEditorStep({
   const thankyouCol1EditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol2EditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol3EditorRef = useRef<RichTextEditorHandle | null>(null);
+  const featureHeadingEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const additionalServicesHeadingEditorRef = useRef<RichTextEditorHandle | null>(null);
   const [availableAddons, setAvailableAddons] = useState<AddOn[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
   const selectionInitializedRef = useRef(false);
@@ -276,22 +278,20 @@ export default function CampaignLandingPageEditorStep({
 
   // Ensure selected add-ons stay in sync with available options
   useEffect(() => {
+    // Don't initialize until addons have actually loaded — otherwise we'd
+    // wipe the stored selection before we can validate it against real IDs
+    if (loadingAddons || availableAddons.length === 0) return;
+
     const availableIds = availableAddons.map((addon) => addon.id);
     const currentSelected = data.selected_addon_ids || [];
 
     // Initialize selection when add-ons load or plan changes
     if (!selectionInitializedRef.current) {
-      let initialSelection =
-        currentSelected.length > 0
-          ? currentSelected.filter((id) => availableIds.includes(id))
-          : availableIds;
+      // Respect the stored selection — filter to valid IDs only
+      let initialSelection = currentSelected.filter((id) => availableIds.includes(id));
 
       // Enforce MAX_ADDONS limit on initialization
       if (initialSelection.length > MAX_ADDONS) {
-        console.warn(
-          `Campaign has ${initialSelection.length} add-ons selected. ` +
-          `Limiting to first ${MAX_ADDONS} for display.`
-        );
         initialSelection = initialSelection.slice(0, MAX_ADDONS);
       }
 
@@ -315,7 +315,7 @@ export default function CampaignLandingPageEditorStep({
     if (filteredSelection.length !== currentSelected.length) {
       updateField('selected_addon_ids', filteredSelection);
     }
-  }, [availableAddons]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [availableAddons, loadingAddons]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSection = (section: SectionKey) => {
     const newExpanded = new Set(expandedSections);
@@ -343,6 +343,7 @@ export default function CampaignLandingPageEditorStep({
 
   const toggleAddonSelection = (addonId: string) => {
     const current = data.selected_addon_ids || [];
+    const customCount = data.additional_services?.length || 0;
 
     // If deselecting, always allow
     if (current.includes(addonId)) {
@@ -351,8 +352,8 @@ export default function CampaignLandingPageEditorStep({
       return;
     }
 
-    // If selecting, check limit
-    if (current.length >= MAX_ADDONS) {
+    // If selecting, check combined limit (addons + custom items)
+    if (current.length + customCount >= MAX_ADDONS) {
       return; // Do nothing - checkbox will be disabled
     }
 
@@ -412,6 +413,30 @@ export default function CampaignLandingPageEditorStep({
     if (fieldName === 'thankyou_expect_col3_content') {
       if (thankyouCol3EditorRef.current?.insertText) {
         thankyouCol3EditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Features heading RichTextEditor
+    if (fieldName === 'feature_heading') {
+      if (featureHeadingEditorRef.current?.insertText) {
+        featureHeadingEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Additional Services heading RichTextEditor
+    if (fieldName === 'additional_services_heading') {
+      if (additionalServicesHeadingEditorRef.current?.insertText) {
+        additionalServicesHeadingEditorRef.current.insertText(variable);
       } else {
         const currentValue = data[fieldName] as string;
         const newValue = currentValue ? `${currentValue} ${variable}` : variable;
@@ -1047,13 +1072,11 @@ export default function CampaignLandingPageEditorStep({
           <>
             <div className={styles.field}>
               <label className={styles.label}>Features Heading</label>
-              <input
-                type="text"
+              <RichTextEditor
+                ref={featureHeadingEditorRef}
                 value={data.feature_heading}
-                onChange={(e) => updateField('feature_heading', e.target.value)}
+                onChange={(value) => updateField('feature_heading', value)}
                 placeholder="e.g., No initial cost to get started"
-                className={styles.input}
-                id="feature-heading-input"
               />
             </div>
 
@@ -1180,13 +1203,11 @@ export default function CampaignLandingPageEditorStep({
               <>
                 <div className={styles.field}>
                   <label className={styles.label}>Services Heading</label>
-                  <input
-                    type="text"
+                  <RichTextEditor
+                    ref={additionalServicesHeadingEditorRef}
                     value={data.additional_services_heading}
-                    onChange={(e) => updateField('additional_services_heading', e.target.value)}
+                    onChange={(value) => updateField('additional_services_heading', value)}
                     placeholder="e.g., And that's not all, we offer additional add-on programs as well including:"
-                    className={styles.input}
-                    id="services-heading-input"
                   />
                 </div>
 
@@ -1263,8 +1284,8 @@ export default function CampaignLandingPageEditorStep({
                     <>
                       <div className={styles.addonLimitInfo}>
                         <p className={styles.helpText}>
-                          {data.selected_addon_ids?.length || 0} of {MAX_ADDONS} add-ons selected
-                          {data.selected_addon_ids?.length >= MAX_ADDONS &&
+                          {(data.selected_addon_ids?.length || 0) + (data.additional_services?.length || 0)} of {MAX_ADDONS} display items used
+                          {(data.selected_addon_ids?.length || 0) + (data.additional_services?.length || 0) >= MAX_ADDONS &&
                             ` (maximum reached)`
                           }
                         </p>
@@ -1272,7 +1293,7 @@ export default function CampaignLandingPageEditorStep({
                       <div className={styles.checkboxGrid}>
                         {availableAddons.map((addon) => {
                           const isSelected = data.selected_addon_ids?.includes(addon.id);
-                          const isAtLimit = (data.selected_addon_ids?.length || 0) >= MAX_ADDONS;
+                          const isAtLimit = (data.selected_addon_ids?.length || 0) + (data.additional_services?.length || 0) >= MAX_ADDONS;
                           const isDisabled = !isSelected && isAtLimit;
 
                           return (
@@ -1301,6 +1322,85 @@ export default function CampaignLandingPageEditorStep({
                       </div>
                     </>
                   )}
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>Custom Display Items</label>
+                  <p className={styles.helpText}>
+                    Add custom items (e.g., &quot;&amp; So Much More!&quot;) to display alongside add-ons. Combined total limited to {MAX_ADDONS}.
+                  </p>
+                  {(() => {
+                    const selectedCount = data.selected_addon_ids?.length || 0;
+                    const customCount = data.additional_services?.length || 0;
+                    const totalCount = selectedCount + customCount;
+                    const isAtLimit = totalCount >= MAX_ADDONS;
+
+                    return (
+                      <>
+                        <div className={styles.customItemInputRow}>
+                          <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="e.g., & So Much More!"
+                            id="custom-item-input"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                const value = input.value.trim();
+                                if (!value || isAtLimit) return;
+                                const current = data.additional_services || [];
+                                updateField('additional_services', [...current, { name: value }]);
+                                input.value = '';
+                              }
+                            }}
+                            disabled={isAtLimit}
+                          />
+                          <button
+                            type="button"
+                            className={styles.addButton}
+                            disabled={isAtLimit}
+                            onClick={() => {
+                              const input = document.getElementById('custom-item-input') as HTMLInputElement;
+                              const value = input?.value.trim();
+                              if (!value || isAtLimit) return;
+                              const current = data.additional_services || [];
+                              updateField('additional_services', [...current, { name: value }]);
+                              input.value = '';
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {isAtLimit && (
+                          <p className={styles.helpText}>
+                            Maximum of {MAX_ADDONS} combined items reached ({selectedCount} add-ons + {customCount} custom).
+                          </p>
+                        )}
+                        {data.additional_services && data.additional_services.length > 0 && (
+                          <div className={styles.customItemsList}>
+                            {data.additional_services.map((item, index) => (
+                              <div key={index} className={styles.customItemRow}>
+                                <span>{item.name}</span>
+                                <button
+                                  type="button"
+                                  className={styles.customItemDelete}
+                                  onClick={() => {
+                                    const current = [...(data.additional_services || [])];
+                                    current.splice(index, 1);
+                                    updateField('additional_services', current);
+                                  }}
+                                  aria-label={`Remove ${item.name}`}
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <ImagePicker

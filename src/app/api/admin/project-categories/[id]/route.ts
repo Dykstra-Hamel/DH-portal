@@ -95,7 +95,7 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json();
-    const { name, description, color, icon } = body;
+    const { name, description, is_hidden } = body;
 
     // Validate required fields
     if (!name) {
@@ -130,8 +130,7 @@ export async function PUT(
       .update({
         name,
         description: description || null,
-        color: color || null,
-        icon: icon || null,
+        is_hidden: is_hidden ?? false,
       })
       .eq('id', id)
       .is('company_id', null)

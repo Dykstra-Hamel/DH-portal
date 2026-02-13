@@ -265,10 +265,35 @@ export default function ThankYouPage({
           </div>
         </div>
 
+        {/* Office Hours Section */}
+        {businessHours && (() => {
+          const formattedHours = formatBusinessHoursForDisplay(businessHours);
+
+          if (formattedHours.length === 0) return null;
+
+          return (
+            <div className={styles.officeHoursSection}>
+              <span className={styles.officeHoursHeading}>{branding.companyName} Office Hours:</span>
+              {' '}
+              <span className={styles.officeHoursInline}>
+                {formattedHours.map((item, index) => (
+                  <span key={index}>
+                    {index > 0 && <span className={styles.officeHoursPipe}> | </span>}
+                    <span className={styles.officeHourDays}>{item.days}:</span>{' '}
+                    <span className={styles.officeHourTime}>{item.hours}</span>
+                  </span>
+                ))}
+              </span>
+            </div>
+          );
+        })()}
+
         {/* What To Expect Section */}
         {thankYou.showExpect && thankYou.expectColumns.length > 0 && (
           <div className={styles.expectSection}>
-            <h2 className={styles.expectHeading}>{thankYou.expectHeading}</h2>
+            {thankYou.expectHeading && (
+              <h2 className={styles.expectHeading}>{thankYou.expectHeading}</h2>
+            )}
             <div
               className={styles.expectColumns}
               style={{
@@ -282,9 +307,10 @@ export default function ThankYouPage({
                       <Image
                         src={column.imageUrl}
                         alt={column.heading || ''}
-                        width={200}
-                        height={200}
-                        style={{ objectFit: 'contain' }}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        quality={95}
+                        style={{ objectFit: 'cover' }}
                       />
                     </div>
                   )}
@@ -302,27 +328,6 @@ export default function ThankYouPage({
             </div>
           </div>
         )}
-
-        {/* Office Hours Section */}
-        {businessHours && (() => {
-          const formattedHours = formatBusinessHoursForDisplay(businessHours);
-
-          if (formattedHours.length === 0) return null;
-
-          return (
-            <div className={styles.officeHoursSection}>
-              <h3 className={styles.officeHoursHeading}>Office Hours</h3>
-              <div className={styles.officeHoursList}>
-                {formattedHours.map((item, index) => (
-                  <div key={index} className={styles.officeHourRow}>
-                    <span className={styles.officeHourDays}>{item.days}:</span>
-                    <span className={styles.officeHourTime}>{item.hours}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
 
         {/* CTA Button */}
         <div className={styles.ctaSection}>

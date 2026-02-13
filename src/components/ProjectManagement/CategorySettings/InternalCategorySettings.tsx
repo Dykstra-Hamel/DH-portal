@@ -242,6 +242,9 @@ export default function InternalCategorySettings() {
                   {category.is_system_default && (
                     <span className={styles.systemBadge}>System</span>
                   )}
+                  {category.is_hidden && (
+                    <span className={styles.hiddenBadge}>Hidden</span>
+                  )}
                 </div>
 
                 <div className={styles.categoryActions}>

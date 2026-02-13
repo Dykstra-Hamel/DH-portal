@@ -7,6 +7,7 @@ export interface ProjectCategory {
   description: string | null;
   sort_order: number;
   is_system_default: boolean;
+  is_hidden: boolean;
   company_id: string | null; // NULL = internal/system category
   created_at: string;
   updated_at: string;

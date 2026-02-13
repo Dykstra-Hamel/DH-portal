@@ -176,8 +176,8 @@ export default function HeroSection({
               <Image
                 src={hero.buttonIconUrl}
                 alt="Badge"
-                width={80}
-                height={80}
+                width={270}
+                height={270}
                 className={styles.heroButtonIcon}
               />
             )}

@@ -104,6 +104,7 @@
 .headerLogo {
   img {
     width: 248px;
+    height: auto;
 
     @media (max-width: 768px) {
       width: 150px;
@@ -795,6 +796,15 @@
   @media (max-width: 768px) {
     font-size: 28px;
   }
+
+  p {
+    margin: 0;
+  }
+
+  strong,
+  b {
+    color: var(--accent-color);
+  }
 }
 
 .featuresList {
@@ -808,7 +818,7 @@
 
 .featureItem {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   font-size: 16px;
   font-weight: 600;
@@ -818,7 +828,6 @@
 .checkIcon {
   flex-shrink: 0;
   color: var(--accent-color);
-  margin-top: 4px;
 }
 
 .featuresActions {
@@ -945,6 +954,15 @@
   @media (max-width: 768px) {
     font-size: 28px;
   }
+
+  p {
+    margin: 0;
+  }
+
+  strong,
+  b {
+    color: var(--accent-color);
+  }
 }
 
 .additionalServicesImage {
@@ -980,13 +998,22 @@
 
 .serviceItem {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   font-size: 16px;
   font-style: normal;
   font-weight: 600;
   line-height: 33px;
   color: var(--color-text);
+}
+
+.serviceItemClickable {
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--accent-color);
+  }
 }
 
 .additionalServicesImage {
@@ -1098,7 +1125,7 @@
     position: absolute;
     inset: 0;
     background: var(--brand-secondary);
-    opacity: 0.05;
+    opacity: 0.03;
     pointer-events: none;
     border-radius: 16px;
 
@@ -1122,6 +1149,15 @@
   @media (max-width: 768px) {
     display: block;
     padding: 0 20px;
+  }
+}
+
+.faqContainerSingle {
+  grid-template-columns: 1fr;
+
+  .faqHeading,
+  .faqContent {
+    grid-column: 1;
   }
 }
 
@@ -1526,5 +1562,38 @@
 
   span {
     color: var(--color-text-gray);
+  }
+}
+
+// ========================================
+// REDEMPTION MODAL
+// ========================================
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modalContent {
+  max-width: 520px;
+  width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

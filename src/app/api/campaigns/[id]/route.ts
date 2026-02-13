@@ -112,6 +112,9 @@ export async function PUT(
       workflow_id,
       target_audience_type,
       audience_filter_criteria,
+      respect_business_hours,
+      daily_limit,
+      exclude_weekends,
     } = body;
 
     // Get existing campaign
@@ -153,14 +156,17 @@ export async function PUT(
       .update({
         name,
         description,
-        discount_id: discount_id !== undefined ? discount_id : null,
-        service_plan_id: service_plan_id !== undefined ? service_plan_id : null,
-        target_pest_id: target_pest_id !== undefined ? target_pest_id : null,
+        discount_id: discount_id ? discount_id : null,
+        service_plan_id: service_plan_id ? service_plan_id : null,
+        target_pest_id: target_pest_id ? target_pest_id : null,
         start_datetime,
         end_datetime,
-        workflow_id,
+        workflow_id: workflow_id ? workflow_id : null,
         target_audience_type,
         audience_filter_criteria,
+        respect_business_hours: respect_business_hours ?? true,
+        daily_limit: daily_limit ?? null,
+        exclude_weekends: exclude_weekends ?? false,
       })
       .eq('id', id)
       .select()

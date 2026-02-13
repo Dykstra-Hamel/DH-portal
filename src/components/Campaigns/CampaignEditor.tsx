@@ -292,10 +292,7 @@ export default function CampaignEditor({
             'And thats not all, we offer additional add-on programs as well including:',
           additional_services: lp.additionalServices.services || [],
           additional_services_image_url: lp.additionalServices.imageUrl || '',
-          selected_addon_ids:
-            lp.selectedAddonIds && lp.selectedAddonIds.length > 0
-              ? lp.selectedAddonIds
-              : (lp.addons || []).map((addon: any) => addon.id),
+          selected_addon_ids: lp.selectedAddonIds ?? [],
           show_faq: lp.faq.show,
           faq_heading: lp.faq.heading || 'Frequently Asked Questions',
           faq_items: lp.faq.items || [],

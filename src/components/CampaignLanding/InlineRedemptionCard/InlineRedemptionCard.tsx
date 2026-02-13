@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import styles from './InlineRedemptionCard.module.scss';
 import { processTextWithVariables, processRedemptionHeading, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -51,6 +51,8 @@ interface InlineRedemptionCardProps {
   company?: VariableContext['company'];
   branding?: VariableContext['branding'];
   serviceName?: string;
+  initialAddonId?: string;
+  isModal?: boolean;
   onRedeem: (data: {
     startDate: Date | null;
     serviceTime: string;
@@ -68,12 +70,19 @@ export default function InlineRedemptionCard({
   company,
   branding,
   serviceName,
+  initialAddonId,
+  isModal = false,
   onRedeem,
 }: InlineRedemptionCardProps) {
   const [startDate, setStartDate] = useState<string>('');
   const [serviceTime, setServiceTime] = useState<string>('');
   const [phoneNumber, setPhoneNumber] = useState<string>(customer.phone_number || '');
-  const [selectedAddonId, setSelectedAddonId] = useState<string>('');
+  const [selectedAddonId, setSelectedAddonId] = useState<string>(initialAddonId || '');
+
+  // Sync selectedAddonId when initialAddonId changes (e.g., modal reopened with different addon)
+  useEffect(() => {
+    setSelectedAddonId(initialAddonId || '');
+  }, [initialAddonId]);
   const [isRedeeming, setIsRedeeming] = useState(false);
 
   // Create variable context for text processing
@@ -116,6 +125,8 @@ export default function InlineRedemptionCard({
     () => processTextWithVariables(disclaimerText, variableContext),
     [disclaimerText, variableContext]
   );
+
+  const callNumber = branding?.phoneNumber?.trim() || '';
 
   const handleRedeemClick = async () => {
     setIsRedeeming(true);
@@ -316,6 +327,13 @@ export default function InlineRedemptionCard({
         className={styles.disclaimer}
         dangerouslySetInnerHTML={{ __html: processedDisclaimer }}
       />
+
+      {isModal && callNumber && (
+        <p className={styles.modalCallPrompt}>
+          Or Give Us A Call At{' '}
+          <a href={`tel:${callNumber}`}>{callNumber}</a>.
+        </p>
+      )}
     </div>
   );
 }

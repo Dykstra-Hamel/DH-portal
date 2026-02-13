@@ -41,20 +41,30 @@ export async function POST(
       );
     }
 
-    // Verify user has access to this company
-    // Note: Campaign doesn't need to exist yet (we're allowing uploads during campaign creation)
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have access to this company' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (skip for global admins)
+    // Note: Campaign doesn't need to exist yet (we're allowing uploads during campaign creation)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this company' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse form data
@@ -183,20 +193,30 @@ export async function DELETE(
       );
     }
 
-    // Verify user has access to this company
-    // Note: Campaign doesn't need to exist yet (we're allowing deletes during campaign creation)
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isGlobalAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have access to this company' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (skip for global admins)
+    // Note: Campaign doesn't need to exist yet (we're allowing deletes during campaign creation)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this company' },
+          { status: 403 }
+        );
+      }
     }
 
     // Delete from storage

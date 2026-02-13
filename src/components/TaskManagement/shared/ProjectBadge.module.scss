@@ -1,13 +1,12 @@
 .projectBadge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   border-radius: 4px;
   font-weight: 550;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 100%;
+  vertical-align: middle;
 
   &.medium {
     padding: 4px 8px;

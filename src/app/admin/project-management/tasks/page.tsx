@@ -6,7 +6,6 @@ import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
-import { ArchiveView } from '@/components/TaskManagement/ArchiveView/ArchiveView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
 import { Task } from '@/types/taskManagement';
@@ -24,6 +23,31 @@ interface MonthlyServiceTaskMeta {
   serviceName: string;
 }
 
+interface MentionListItem {
+  notificationId: string;
+  createdAt: string;
+  read: boolean;
+  title: string;
+  message: string;
+  referenceId: string;
+  referenceType: string;
+  commentText: string;
+  projectId: string | null;
+  projectName: string | null;
+  projectShortcode: string | null;
+  taskId: string | null;
+  taskTitle: string | null;
+  monthlyServiceId: string | null;
+  monthlyServiceName: string | null;
+  senderFirstName: string | null;
+  senderLastName: string | null;
+  senderEmail: string | null;
+  senderAvatarUrl: string | null;
+  hasAttachments: boolean;
+}
+
+const MENTIONS_PAGE_SIZE = 5;
+
 export default function AdminTasksPage() {
   const { registerPageAction } = usePageActions();
   const { user } = useUser();
@@ -40,6 +64,9 @@ export default function AdminTasksPage() {
   // State for API data
   const [tasks, setTasks] = useState<ProjectTask[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [mentions, setMentions] = useState<MentionListItem[]>([]);
+  const [mentionsHasMore, setMentionsHasMore] = useState(false);
+  const [mentionsLoading, setMentionsLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Helper function to get authentication headers
@@ -194,6 +221,48 @@ export default function AdminTasksPage() {
     }
   }, []);
 
+  const fetchMentions = useCallback(async (options?: { reset?: boolean; offset?: number }) => {
+    const reset = options?.reset ?? false;
+    const offset = options?.offset ?? 0;
+
+    try {
+      setMentionsLoading(true);
+      const headers = await getAuthHeaders();
+      const response = await fetch(
+        `/api/admin/notifications/mentions?unreadOnly=false&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
+        { headers }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const nextMentions: MentionListItem[] = Array.isArray(data.mentions) ? data.mentions : [];
+        if (reset) {
+          setMentions(nextMentions);
+        } else {
+          setMentions((prev) => [
+            ...prev,
+            ...nextMentions.filter((next) => !prev.some((existing) => existing.notificationId === next.notificationId)),
+          ]);
+        }
+        setMentionsHasMore(Boolean(data.hasMore));
+      } else {
+        console.error('Error fetching mentions:', await response.text());
+        if (reset) {
+          setMentions([]);
+        }
+        setMentionsHasMore(false);
+      }
+    } catch (error) {
+      console.error('Error fetching mentions:', error);
+      if (reset) {
+        setMentions([]);
+      }
+      setMentionsHasMore(false);
+    } finally {
+      setMentionsLoading(false);
+    }
+  }, []);
+
   // Open task detail sidebar
   const openTaskDetailById = useCallback(async (taskId: string, projectId?: string | null) => {
     try {
@@ -217,12 +286,12 @@ export default function AdminTasksPage() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchTasks(), fetchProjects(), fetchUsers()]);
+      await Promise.all([fetchTasks(), fetchProjects(), fetchUsers(), fetchMentions({ reset: true, offset: 0 })]);
       setIsLoading(false);
     };
 
     fetchData();
-  }, [fetchTasks, fetchProjects, fetchUsers]);
+  }, [fetchTasks, fetchProjects, fetchUsers, fetchMentions]);
 
   const handleSaveTask = useCallback(async (taskData: any) => {
     try {
@@ -331,6 +400,37 @@ export default function AdminTasksPage() {
     // Navigate to project detail page
     window.location.href = `/admin/project-management/${project.id}`;
   }, []);
+
+  const handleMentionClick = useCallback(async (mention: MentionListItem) => {
+    try {
+      if (!mention.read) {
+        const headers = await getAuthHeaders();
+        await fetch(`/api/notifications/${mention.notificationId}/read`, {
+          method: 'POST',
+          headers,
+        });
+      }
+    } catch (error) {
+      console.error('Error marking mention as read:', error);
+    }
+
+    setMentions((prev) =>
+      prev.map((item) =>
+        item.notificationId === mention.notificationId
+          ? { ...item, read: true }
+          : item
+      )
+    );
+
+    if (mention.referenceType === 'task_comment' && mention.taskId) {
+      await openTaskDetailById(mention.taskId, mention.projectId);
+    } else if (mention.referenceType === 'project_comment' && mention.projectId) {
+      window.location.href = `/admin/project-management/${mention.projectId}?commentId=${mention.referenceId}`;
+    } else if (mention.referenceType === 'monthly_service_comment' && mention.monthlyServiceId) {
+      window.location.href = `/admin/monthly-services/${mention.monthlyServiceId}?commentId=${mention.referenceId}`;
+    }
+
+  }, [openTaskDetailById]);
 
   // Task detail sidebar handlers
   const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
@@ -505,14 +605,54 @@ export default function AdminTasksPage() {
     </div>
   );
 
+  const isProjectCompletedStatus = (status?: string | null) =>
+    status === 'complete' || status === 'completed';
+
+  const activeProjects = projectsWithStarred.filter(
+    (project) => !isProjectCompletedStatus(project.status)
+  );
+  const completedProjects = projectsWithStarred.filter((project) =>
+    isProjectCompletedStatus(project.status)
+  );
+
+  const activeProjectIds = new Set(activeProjects.map((project) => project.id));
+  const completedProjectIds = new Set(completedProjects.map((project) => project.id));
+
   // Separate personal tasks from project-based tasks
   const personalTasks = filteredTasks.filter(
-    (task) => !task.project_id && !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+    (task) =>
+      task.status !== 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
   );
   const monthlyServices = filteredTasks.filter(
-    (task) => !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
+    (task) =>
+      task.status !== 'completed' &&
+      !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
   );
-  const projectTasks = filteredTasks.filter(task => task.project_id);
+  const projectTasks = filteredTasks.filter(
+    (task) =>
+      task.status !== 'completed' &&
+      !!task.project_id &&
+      activeProjectIds.has(task.project_id)
+  );
+  const completedProjectTasks = filteredTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !!task.project_id &&
+      completedProjectIds.has(task.project_id)
+  );
+  const completedPersonalTasks = filteredTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
+  const completedMonthlyServices = filteredTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
 
   return (
     <div className={styles.pageContainer}>
@@ -526,7 +666,7 @@ export default function AdminTasksPage() {
         ) : (
           <div className={styles.taskPageLayout}>
             <div className={styles.taskMainContent}>
-              {currentView !== 'list' && (
+              {currentView === 'calendar' && (
                 <div className={styles.taskViewTabsRow}>
                   {viewTabs}
                 </div>
@@ -534,7 +674,7 @@ export default function AdminTasksPage() {
               {currentView === 'list' && (
                 <TaskListView
                   tasks={projectTasks}
-                  projects={projectsWithStarred}
+                  projects={activeProjects}
                   onTaskClick={handleTaskClick}
                   onDeleteTask={handleDeleteTask}
                   onToggleStar={handleToggleStar}
@@ -549,6 +689,11 @@ export default function AdminTasksPage() {
                   personalTasks={personalTasks}
                   monthlyServices={monthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
+                  mentions={mentions}
+                  hasMoreMentions={mentionsHasMore}
+                  mentionsLoading={mentionsLoading}
+                  onMentionClick={handleMentionClick}
+                  onLoadMoreMentions={() => fetchMentions({ reset: false, offset: mentions.length })}
                 />
               )}
               {currentView === 'calendar' && (
@@ -558,10 +703,29 @@ export default function AdminTasksPage() {
                 />
               )}
               {currentView === 'archive' && (
-                <ArchiveView
-                  tasks={filteredTasks.filter(t => t.status === 'completed')}
-                  projects={projectsWithStarred.filter(p => p.status === 'complete')}
+                <TaskListView
+                  tasks={completedProjectTasks}
+                  projects={completedProjects}
                   onTaskClick={handleTaskClick}
+                  onDeleteTask={handleDeleteTask}
+                  onToggleStar={handleToggleStar}
+                  onProjectClick={handleProjectClick}
+                  onToggleStarProject={handleToggleStarProject}
+                  onProjectUpdate={fetchProjects}
+                  onToggleComplete={handleToggleTaskComplete}
+                  onUpdateTask={handleInlineTaskUpdate}
+                  currentUserId={user?.id}
+                  groupTasksByProject
+                  viewTabsElement={viewTabs}
+                  personalTasks={completedPersonalTasks}
+                  monthlyServices={completedMonthlyServices}
+                  monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
+                  mentions={mentions}
+                  hasMoreMentions={mentionsHasMore}
+                  mentionsLoading={mentionsLoading}
+                  onMentionClick={handleMentionClick}
+                  onLoadMoreMentions={() => fetchMentions({ reset: false, offset: mentions.length })}
+                  archiveMode
                 />
               )}
             </div>

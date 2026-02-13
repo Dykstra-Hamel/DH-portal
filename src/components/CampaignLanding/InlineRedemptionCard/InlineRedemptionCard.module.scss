@@ -123,7 +123,16 @@
     }
   }
 
+  // Clip native browser date picker icons (Firefox, mobile) off the right edge
+  &:has(input[type='date']) {
+    overflow: hidden;
+  }
+
   input[type='date'] {
+    // Make input wider than container so native icon is clipped off-screen
+    width: calc(100% + 40px);
+
+    // Chrome/Safari: make the native indicator a full-area transparent overlay
     &::-webkit-calendar-picker-indicator {
       position: absolute;
       top: 0;
@@ -285,6 +294,25 @@
 
     &:hover {
       opacity: 0.8;
+    }
+  }
+}
+
+.modalCallPrompt {
+  margin: 10px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4e4e4e;
+  text-align: center;
+  line-height: 1.4;
+
+  a {
+    color: var(--accent-color, #00b142);
+    text-decoration: none;
+    font-weight: 700;
+
+    &:hover {
+      text-decoration: underline;
     }
   }
 }

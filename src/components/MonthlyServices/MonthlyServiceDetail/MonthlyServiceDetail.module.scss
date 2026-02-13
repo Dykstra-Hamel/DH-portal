@@ -933,9 +933,9 @@
 .attachmentName {
   font-size: 12px;
   color: var(--gray-700);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .commentActionButton {

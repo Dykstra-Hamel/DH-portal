@@ -202,10 +202,7 @@ export default function EditLandingPageModal({
         additional_services_heading: apiData.landingPage.additionalServices.heading || '',
         additional_services: apiData.landingPage.additionalServices.services || [],
         additional_services_image_url: apiData.landingPage.additionalServices.imageUrl || '',
-        selected_addon_ids:
-          apiData.landingPage.selectedAddonIds && apiData.landingPage.selectedAddonIds.length > 0
-            ? apiData.landingPage.selectedAddonIds
-            : (apiData.landingPage.addons || []).map((addon: any) => addon.id),
+        selected_addon_ids: apiData.landingPage.selectedAddonIds ?? [],
 
         // FAQ
         show_faq: apiData.landingPage.faq.show ?? true,
@@ -238,7 +235,7 @@ export default function EditLandingPageModal({
         thankyou_greeting: apiData.landingPage.thankYou?.greeting || 'Thank you, {first_name}!',
         thankyou_content: apiData.landingPage.thankYou?.content || '<p>Your request has been received and we&apos;ll be in touch soon.</p>',
         thankyou_show_expect: apiData.landingPage.thankYou?.showExpect ?? true,
-        thankyou_expect_heading: apiData.landingPage.thankYou?.expectHeading || 'What to Expect Next',
+        thankyou_expect_heading: apiData.landingPage.thankYou?.expectHeading ?? 'What to Expect Next',
         thankyou_expect_col1_image: apiData.landingPage.thankYou?.expectColumns?.[0]?.imageUrl || '',
         thankyou_expect_col1_heading: apiData.landingPage.thankYou?.expectColumns?.[0]?.heading || '',
         thankyou_expect_col1_content: apiData.landingPage.thankYou?.expectColumns?.[0]?.content || '',

@@ -251,14 +251,15 @@ export async function POST(
 
         // Copy category assignments from template task to project task
         if (templateTask.categories && Array.isArray(templateTask.categories) && templateTask.categories.length > 0) {
-          const categoryAssignments = templateTask.categories.map((cat: any) => ({
-            task_id: projectTaskId,
-            category_id: cat.category_id,
-          }));
+          const firstCategoryId = templateTask.categories[0]?.category_id;
+          if (!firstCategoryId) continue;
 
           const { error: categoryError } = await supabase
             .from('project_task_category_assignments')
-            .insert(categoryAssignments);
+            .insert({
+              task_id: projectTaskId,
+              category_id: firstCategoryId,
+            });
 
           if (categoryError) {
             console.error('Error assigning categories to project task:', categoryError);

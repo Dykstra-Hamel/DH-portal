@@ -19,36 +19,38 @@ import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 
 interface TemplateFormProps {
   template?: ProjectTemplate;
+  initialTemplate?: ProjectTemplate;
   onClose: () => void;
   onSuccess: () => void;
   users?: User[];
 }
 
-const TemplateForm: React.FC<TemplateFormProps> = ({
-  template,
-  onClose,
-  onSuccess,
-  users: propUsers = [],
-}) => {
-  const isEditing = !!template;
-  const createTempId = () => `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-  const [formData, setFormData] = useState<ProjectTemplateFormData>({
-    name: template?.name || '',
-    description: template?.description || '',
-    notes: template?.notes || '',
-    project_type: template?.project_type || '',
-    project_subtype: template?.project_subtype || '',
-    is_active: template?.is_active !== false ? 'true' : 'false',
-    template_data: template?.template_data ? JSON.stringify(template.template_data) : '',
-    default_assigned_to: template?.default_assigned_to || '',
-    default_scope: template?.default_scope || 'internal',
-    default_due_date_offset_days: template?.default_due_date_offset_days?.toString() || '30',
-    default_is_billable: template?.default_is_billable ? 'true' : 'false',
-    initial_department_id: template?.initial_department_id || '',
-    category_ids: template?.categories?.map(c => c.category_id) || [],
-    default_member_ids: template?.default_members?.map(m => m.user_id) || [],
-    tasks: template?.tasks?.map((task) => ({
+const createInitialFormData = (
+  sourceTemplate?: ProjectTemplate,
+  duplicateMode = false
+): ProjectTemplateFormData => ({
+  name:
+    duplicateMode && sourceTemplate?.name
+      ? `${sourceTemplate.name} (Copy)`
+      : sourceTemplate?.name || '',
+  description: sourceTemplate?.description || '',
+  notes: sourceTemplate?.notes || '',
+  project_type: sourceTemplate?.project_type || '',
+  project_subtype: sourceTemplate?.project_subtype || '',
+  is_active: sourceTemplate?.is_active !== false ? 'true' : 'false',
+  template_data: sourceTemplate?.template_data
+    ? JSON.stringify(sourceTemplate.template_data)
+    : '',
+  default_assigned_to: sourceTemplate?.default_assigned_to || '',
+  default_scope: sourceTemplate?.default_scope || 'internal',
+  default_due_date_offset_days:
+    sourceTemplate?.default_due_date_offset_days?.toString() || '30',
+  default_is_billable: sourceTemplate?.default_is_billable ? 'true' : 'false',
+  initial_department_id: sourceTemplate?.initial_department_id || '',
+  category_ids: sourceTemplate?.categories?.map((c) => c.category_id) || [],
+  default_member_ids: sourceTemplate?.default_members?.map((m) => m.user_id) || [],
+  tasks:
+    sourceTemplate?.tasks?.map((task) => ({
       temp_id: task.id,
       parent_temp_id: task.parent_task_id || '',
       title: task.title,
@@ -61,9 +63,25 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       blocks_task_id: task.blocks_task_id || null,
       blocked_by_task_id: task.blocked_by_task_id || null,
       department_id: task.department_id || null,
-      category_ids: task.categories?.map(c => c.category_id) || [],
+      category_ids: (task.categories?.map((c) => c.category_id) || []).slice(0, 1),
     })) || [],
-  });
+});
+
+const TemplateForm: React.FC<TemplateFormProps> = ({
+  template,
+  initialTemplate,
+  onClose,
+  onSuccess,
+  users: propUsers = [],
+}) => {
+  const sourceTemplate = template ?? initialTemplate;
+  const isEditing = !!template;
+  const isDuplicating = !template && !!initialTemplate;
+  const createTempId = () => `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+  const [formData, setFormData] = useState<ProjectTemplateFormData>(() =>
+    createInitialFormData(sourceTemplate, isDuplicating)
+  );
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -100,6 +118,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
   };
 
   useEffect(() => {
+    setFormData(createInitialFormData(sourceTemplate, isDuplicating));
     setCurrentStep(1);
     setHasInitializedTaskCollapse(false);
     setCollapsedTaskCards({});
@@ -107,21 +126,23 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     setCollapsedSubtaskCards({});
 
     // Initialize blocked task departments when template loads
-    if (template?.tasks && Array.isArray(template.tasks)) {
+    if (sourceTemplate?.tasks && Array.isArray(sourceTemplate.tasks)) {
       const initialBlockedDepts: Record<string, string> = {};
-      template.tasks.forEach(task => {
+      sourceTemplate.tasks.forEach(task => {
         // If this task blocks another task, and the blocked task has a department_id,
         // pre-populate it in the state
-        if (task.blocks_task_id && template.tasks) {
-          const blockedTask = template.tasks.find(t => t.id === task.blocks_task_id);
+        if (task.blocks_task_id && sourceTemplate.tasks) {
+          const blockedTask = sourceTemplate.tasks.find(t => t.id === task.blocks_task_id);
           if (blockedTask?.department_id) {
             initialBlockedDepts[task.blocks_task_id] = blockedTask.department_id;
           }
         }
       });
       setBlockedTaskDepartments(initialBlockedDepts);
+      return;
     }
-  }, [template]);
+    setBlockedTaskDepartments({});
+  }, [sourceTemplate, isDuplicating]);
 
   const handleGoToTasksStep = () => {
     if (!formData.name || !formData.project_type || !formData.initial_department_id) {
@@ -268,25 +289,6 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
     fetchCategories();
   }, []);
 
-  // Clean up task categories when project categories change
-  useEffect(() => {
-    const projectCategoryIds = formData.category_ids || [];
-
-    // Remove task categories that are no longer in project categories
-    setFormData((prev) => ({
-      ...prev,
-      tasks: prev.tasks.map((task) => {
-        const validCategoryIds = (task.category_ids || []).filter((catId) =>
-          projectCategoryIds.includes(catId)
-        );
-        return {
-          ...task,
-          category_ids: validCategoryIds,
-        };
-      }),
-    }));
-  }, [formData.category_ids]);
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
@@ -429,6 +431,23 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
         task.temp_id === taskId ? { ...task, [field]: value } : task
       ),
     }));
+  };
+
+  const handleTaskCategoryToggle = (taskTempId: string, categoryId: string, isSelected: boolean) => {
+    setFormData((prev) => {
+      const categoryIds = prev.category_ids || [];
+      const shouldAddToTemplate = !isSelected && !categoryIds.includes(categoryId);
+
+      return {
+        ...prev,
+        category_ids: shouldAddToTemplate ? [...categoryIds, categoryId] : categoryIds,
+        tasks: prev.tasks.map((task) =>
+          task.temp_id === taskTempId
+            ? { ...task, category_ids: isSelected ? [] : [categoryId] }
+            : task
+        ),
+      };
+    });
   };
 
   const handleTaskDragStart = (e: React.DragEvent, index: number) => {
@@ -592,7 +611,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
           blocks_task_id: task.blocks_task_id || null,
           blocked_by_task_id: task.blocked_by_task_id || null,
           department_id: task.department_id || null,
-          category_ids: task.category_ids || [],
+          category_ids: (task.category_ids || []).slice(0, 1),
         })),
       };
 
@@ -624,7 +643,13 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
       <div className={styles.modal}>
         <div className={styles.header}>
           <div className={styles.headerTitle}>
-            <h2>{isEditing ? 'Edit Template' : 'Create New Template'}</h2>
+            <h2>
+              {isEditing
+                ? 'Edit Template'
+                : isDuplicating
+                  ? 'Duplicate Template'
+                  : 'Create New Template'}
+            </h2>
             <p className={styles.stepText}>
               Step {currentStep} of 2: {currentStep === 1 ? 'Template Details' : 'Template Tasks'}
             </p>
@@ -1203,61 +1228,32 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                             </div>
 
                             <div className={styles.formGroup}>
-                              <label className={styles.label}>Task Categories</label>
+                              <label className={styles.label}>Task Category</label>
                               {isFetchingCategories ? (
                                 <p className={styles.hint}>Loading categories...</p>
                               ) : (
                                 <div className={styles.categoryMultiSelect}>
-                                  {(() => {
-                                    // Filter task categories to only show those selected for the project
-                                    const projectCategoryIds = formData.category_ids || [];
-                                    const filteredCategories = availableCategories.filter(cat =>
-                                      projectCategoryIds.includes(cat.id)
-                                    );
-
-                                    if (projectCategoryIds.length === 0) {
-                                      return (
-                                        <p className={styles.hint}>
-                                          Please select project categories first to assign them to tasks.
-                                        </p>
-                                      );
-                                    }
-
-                                    if (filteredCategories.length === 0) {
-                                      return (
-                                        <p className={styles.hint}>
-                                          No categories available from selected project categories.
-                                        </p>
-                                      );
-                                    }
-
-                                    return filteredCategories.map((category) => {
-                                      const isSelected = task.category_ids?.includes(category.id) || false;
+                                  {availableCategories.length === 0 ? (
+                                    <p className={styles.hint}>
+                                      No categories available. Create categories in settings first.
+                                    </p>
+                                  ) : (
+                                    availableCategories.map((category) => {
+                                      const isSelected = task.category_ids?.[0] === category.id;
                                       return (
                                         <button
                                           key={category.id}
                                           type="button"
                                           className={`${styles.categoryOption} ${isSelected ? styles.selected : ''}`}
-                                          onClick={() => {
-                                            const currentCategories = task.category_ids || [];
-                                            const newCategories = isSelected
-                                              ? currentCategories.filter((id) => id !== category.id)
-                                              : [...currentCategories, category.id];
-                                            setFormData((prev) => ({
-                                              ...prev,
-                                              tasks: prev.tasks.map((t) =>
-                                                t.temp_id === task.temp_id
-                                                  ? { ...t, category_ids: newCategories }
-                                                  : t
-                                              ),
-                                            }));
-                                          }}
+                                          onClick={() =>
+                                            handleTaskCategoryToggle(task.temp_id || '', category.id, isSelected)
+                                          }
                                         >
                                           <CategoryBadge category={category} />
                                         </button>
                                       );
-                                    });
-                                  })()}
+                                    })
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1562,61 +1558,36 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
                                           </div>
 
                                           <div className={styles.formGroup}>
-                                            <label className={styles.label}>Task Categories</label>
+                                            <label className={styles.label}>Task Category</label>
                                             {isFetchingCategories ? (
                                               <p className={styles.hint}>Loading categories...</p>
                                             ) : (
                                               <div className={styles.categoryMultiSelect}>
-                                                {(() => {
-                                                  // Filter task categories to only show those selected for the project
-                                                  const projectCategoryIds = formData.category_ids || [];
-                                                  const filteredCategories = availableCategories.filter(cat =>
-                                                    projectCategoryIds.includes(cat.id)
-                                                  );
-
-                                                  if (projectCategoryIds.length === 0) {
-                                                    return (
-                                                      <p className={styles.hint}>
-                                                        Please select project categories first to assign them to tasks.
-                                                      </p>
-                                                    );
-                                                  }
-
-                                                  if (filteredCategories.length === 0) {
-                                                    return (
-                                                      <p className={styles.hint}>
-                                                        No categories available from selected project categories.
-                                                      </p>
-                                                    );
-                                                  }
-
-                                                  return filteredCategories.map((category) => {
-                                                    const isSelected = subtask.category_ids?.includes(category.id) || false;
+                                                {availableCategories.length === 0 ? (
+                                                  <p className={styles.hint}>
+                                                    No categories available. Create categories in settings first.
+                                                  </p>
+                                                ) : (
+                                                  availableCategories.map((category) => {
+                                                    const isSelected = subtask.category_ids?.[0] === category.id;
                                                     return (
                                                       <button
                                                         key={category.id}
                                                         type="button"
                                                         className={`${styles.categoryOption} ${isSelected ? styles.selected : ''}`}
-                                                        onClick={() => {
-                                                          const currentCategories = subtask.category_ids || [];
-                                                          const newCategories = isSelected
-                                                            ? currentCategories.filter((id) => id !== category.id)
-                                                            : [...currentCategories, category.id];
-                                                          setFormData((prev) => ({
-                                                            ...prev,
-                                                            tasks: prev.tasks.map((t) =>
-                                                              t.temp_id === subtask.temp_id
-                                                                ? { ...t, category_ids: newCategories }
-                                                                : t
-                                                            ),
-                                                          }));
-                                                        }}
+                                                        onClick={() =>
+                                                          handleTaskCategoryToggle(
+                                                            subtask.temp_id || '',
+                                                            category.id,
+                                                            isSelected
+                                                          )
+                                                        }
                                                       >
                                                         <CategoryBadge category={category} />
                                                       </button>
                                                     );
-                                                  });
-                                                })()}
+                                                  })
+                                                )}
                                               </div>
                                             )}
                                           </div>
