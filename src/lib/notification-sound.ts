@@ -1,7 +1,8 @@
 let audioContext: AudioContext | null = null;
 
 function getAudioContext(): AudioContext {
-  if (!audioContext) {
+  // Create a fresh context if none exists or if the previous one is closed
+  if (!audioContext || audioContext.state === 'closed') {
     audioContext = new (window.AudioContext ||
       (window as unknown as { webkitAudioContext: typeof AudioContext })
         .webkitAudioContext)();
@@ -31,13 +32,14 @@ function playTone(
   oscillator.stop(startTime + duration);
 }
 
-export function playNotificationSound() {
+export async function playNotificationSound() {
   try {
     const ctx = getAudioContext();
 
-    // Resume context if suspended (browsers require user interaction first)
+    // Resume context if suspended — browsers suspend AudioContext in
+    // background/minimized tabs. Awaiting ensures it's active before scheduling.
     if (ctx.state === 'suspended') {
-      ctx.resume();
+      await ctx.resume();
     }
 
     const now = ctx.currentTime;
