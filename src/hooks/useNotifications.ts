@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Notification, NotificationResponse } from '@/types/notification';
+import { playNotificationSound } from '@/lib/notification-sound';
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -21,6 +22,37 @@ export function useNotifications() {
   // Request deduplication: prevent multiple concurrent fetches
   const fetchInProgressRef = useRef(false);
   const lastFetchParamsRef = useRef<string>('');
+
+  // Show a native browser notification and play a sound
+  const showNativeNotification = useCallback(
+    (notification: Notification) => {
+      // Play the in-app notification sound
+      playNotificationSound();
+
+      // Show a browser notification (appears in Mac Notification Center, bounces dock icon)
+      if (
+        typeof window !== 'undefined' &&
+        'Notification' in window &&
+        Notification.permission === 'granted' &&
+        'serviceWorker' in navigator
+      ) {
+        navigator.serviceWorker.ready.then((registration) => {
+          registration.showNotification(notification.title, {
+            body: notification.message,
+            icon: '/icon-192x192.png',
+            badge: '/icon-192x192.png',
+            tag: notification.id,
+            data: {
+              referenceId: notification.reference_id,
+              referenceType: notification.reference_type,
+              notificationId: notification.id,
+            },
+          });
+        });
+      }
+    },
+    []
+  );
 
   // Fetch notifications from API with deduplication
   const fetchNotifications = useCallback(async () => {
@@ -117,6 +149,7 @@ export function useNotifications() {
               const newNotification = notification as Notification;
               setNotifications(prev => [newNotification, ...prev]);
               setUnreadCount(prev => prev + 1);
+              showNativeNotification(newNotification);
             } else if (action === 'UPDATE') {
               const updatedNotification = notification as Notification;
               setNotifications(prev =>
