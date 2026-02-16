@@ -1016,6 +1016,42 @@ export async function PUT(
               })
               .eq('id', lineItem.id);
           }
+        } else if (lineItem.id && lineItem.addon_service_id) {
+          // Update existing add-on line item (e.g. custom pricing)
+          const { data: addon } = await supabase
+            .from('add_on_services')
+            .select('*')
+            .eq('id', lineItem.addon_service_id)
+            .single();
+
+          if (addon) {
+            const initialPrice = addon.initial_price || 0;
+            const recurringPrice = addon.recurring_price;
+
+            const isCustomPriced = (lineItem as any).is_custom_priced === true;
+            const customInitialPrice = (lineItem as any).custom_initial_price;
+            const customRecurringPrice = (lineItem as any).custom_recurring_price;
+
+            const addonData: any = {
+              addon_service_id: addon.id,
+              plan_name: addon.addon_name,
+              plan_description: addon.addon_description,
+              initial_price: initialPrice,
+              recurring_price: recurringPrice,
+              final_initial_price: isCustomPriced ? Math.max(0, customInitialPrice ?? 0) : initialPrice,
+              final_recurring_price: isCustomPriced ? Math.max(0, customRecurringPrice ?? 0) : recurringPrice,
+              billing_frequency: addon.billing_frequency,
+              display_order: lineItem.display_order,
+              is_custom_priced: isCustomPriced,
+              custom_initial_price: isCustomPriced ? customInitialPrice : null,
+              custom_recurring_price: isCustomPriced ? customRecurringPrice : null,
+            };
+
+            await supabase
+              .from('quote_line_items')
+              .update(addonData)
+              .eq('id', lineItem.id);
+          }
         } else if (lineItem.id) {
           // Update existing line item (only discounts/display order, no service plan change)
           const updateLineItemData: any = {};

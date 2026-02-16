@@ -136,9 +136,6 @@ export function LeadQuoteSection({
   const [addonRequiresQuote, setAddonRequiresQuote] = useState<
     Record<string, boolean>
   >({});
-  const [addonCustomPrices, setAddonCustomPrices] = useState<
-    Record<string, { initial: number; recurring: number }>
-  >({});
 
   const [calculatedPrices, setCalculatedPrices] = useState<
     Record<
@@ -586,6 +583,9 @@ export function LeadQuoteSection({
           displayOrder: lineItem.display_order,
           frequency: frequency,
           discount: lineItem.discount_id || '',
+          isCustomPriced: lineItem.is_custom_priced || false,
+          customInitialPrice: lineItem.is_custom_priced ? lineItem.custom_initial_price : undefined,
+          customRecurringPrice: lineItem.is_custom_priced ? lineItem.custom_recurring_price : undefined,
         };
       });
 
@@ -626,10 +626,10 @@ export function LeadQuoteSection({
     setSelectedAddOns(addonIds); // Sync add-on selections
     initialLineItemCreatedRef.current = true; // Mark as initialized from existing data
 
-    // Auto-expand custom pricing for requires_quote plans
+    // Auto-expand custom pricing for requires_quote plans that don't have custom pricing set yet
     const requiresQuoteExpansions: Record<number, boolean> = {};
     for (const sel of selectionsFromLineItems) {
-      if (sel.servicePlan?.requires_quote) {
+      if (sel.servicePlan?.requires_quote && !sel.isCustomPriced) {
         requiresQuoteExpansions[sel.displayOrder] = true;
       }
     }
@@ -2166,7 +2166,7 @@ export function LeadQuoteSection({
 
                     {/* Custom Pricing - Collapsible Fields */}
                     {(selection.servicePlan?.allow_custom_pricing || selection.servicePlan?.requires_quote) &&
-                      (customPricingExpanded[selection.displayOrder] || selection.servicePlan?.requires_quote) && (
+                      customPricingExpanded[selection.displayOrder] && (
                         <div className={styles.customPricingSection}>
                           <div className={styles.customPricingFields}>
                             <div className={styles.customPriceLabel}>
@@ -2251,18 +2251,25 @@ export function LeadQuoteSection({
                                 type="button"
                                 className={styles.saveCustomPriceButton}
                                 onClick={async () => {
-                                  if (
-                                    selection.servicePlan &&
-                                    selection.customInitialPrice !==
-                                      undefined &&
-                                    selection.customRecurringPrice !== undefined
-                                  ) {
+                                  if (selection.servicePlan) {
+                                    // Use entered values, or fall back to calculated prices
+                                    const initialPrice =
+                                      selection.customInitialPrice ??
+                                      calculatedPrices[selection.displayOrder]?.initial ??
+                                      0;
+                                    const recurringPrice =
+                                      selection.customRecurringPrice ??
+                                      calculatedPrices[selection.displayOrder]?.recurring ??
+                                      0;
+
                                     // Mark as custom priced and clear discount
                                     setServiceSelections(prev =>
                                       prev.map((sel, idx) =>
                                         idx === index
                                           ? {
                                               ...sel,
+                                              customInitialPrice: initialPrice,
+                                              customRecurringPrice: recurringPrice,
                                               isCustomPriced: true,
                                               discount: '', // Clear discount when using custom pricing
                                             }
@@ -2275,14 +2282,18 @@ export function LeadQuoteSection({
                                       selection.servicePlan,
                                       selection.displayOrder,
                                       {
-                                        custom_initial_price:
-                                          selection.customInitialPrice,
-                                        custom_recurring_price:
-                                          selection.customRecurringPrice,
+                                        custom_initial_price: initialPrice,
+                                        custom_recurring_price: recurringPrice,
                                         is_custom_priced: true,
                                         discount_id: null, // Clear discount when using custom pricing
                                       }
                                     );
+
+                                    // Collapse the custom pricing section after saving
+                                    setCustomPricingExpanded(prev => ({
+                                      ...prev,
+                                      [selection.displayOrder]: false,
+                                    }));
                                   }
                                 }}
                               >
@@ -2327,6 +2338,23 @@ export function LeadQuoteSection({
                             </div>
                           </div>
                         </div>
+                      )}
+                    {/* Edit Custom Pricing button - shown when collapsed and custom price is set */}
+                    {(selection.servicePlan?.allow_custom_pricing || selection.servicePlan?.requires_quote) &&
+                      !customPricingExpanded[selection.displayOrder] &&
+                      selection.isCustomPriced && (
+                        <button
+                          type="button"
+                          className={styles.editCustomPricingButton}
+                          onClick={() => {
+                            setCustomPricingExpanded(prev => ({
+                              ...prev,
+                              [selection.displayOrder]: true,
+                            }));
+                          }}
+                        >
+                          Edit Custom Pricing
+                        </button>
                       )}
                   </div>
                 ))}
@@ -2433,6 +2461,43 @@ export function LeadQuoteSection({
                       servicePlanId={serviceSelections[0].servicePlan.id}
                       selectedAddonIds={selectedAddOns}
                       onToggleAddon={handleToggleAddon}
+                      addonLineItems={quote?.line_items?.filter(
+                        (item: any) => item.addon_service_id != null && item.addon_service_id !== ''
+                      )}
+                      onSaveAddonCustomPrice={async ({ addonId, initialPrice, recurringPrice }) => {
+                        if (!quote) return;
+                        const addonLineItem = quote.line_items?.find(
+                          (item: any) => item.addon_service_id === addonId
+                        );
+                        if (!addonLineItem) return;
+
+                        try {
+                          const response = await fetch(`/api/quotes/${quote.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              line_items: [{
+                                id: addonLineItem.id,
+                                addon_service_id: addonLineItem.addon_service_id,
+                                display_order: addonLineItem.display_order,
+                                is_custom_priced: true,
+                                custom_initial_price: initialPrice,
+                                custom_recurring_price: recurringPrice,
+                              }],
+                            }),
+                          });
+                          if (response.ok) {
+                            const data = await response.json();
+                            if (data.success && data.data) {
+                              await broadcastQuoteUpdate(data.data);
+                              onShowToast?.('Custom add-on pricing saved', 'success');
+                            }
+                          }
+                        } catch (error) {
+                          console.error('Error saving add-on custom price:', error);
+                          onShowToast?.('Failed to save custom pricing', 'error');
+                        }
+                      }}
                     />
                   </div>
                 )}
@@ -2464,7 +2529,7 @@ export function LeadQuoteSection({
                                   </div>
                                   {planRequiresQuote && !hasCustomPrice ? (
                                     <div className={styles.recurringPrice}>
-                                      Custom Quote Required
+                                      Custom Pricing Required
                                     </div>
                                   ) : (
                                   <div className={styles.recurringPrice}>
@@ -2642,185 +2707,48 @@ export function LeadQuoteSection({
                                           </div>
                                           {addonNeedsQuote && !addonHasCustomPrice ? (
                                           <div className={styles.addonPrices}>
-                                            <span className={styles.addonRecurring}>
-                                              Custom Quote Required
+                                            <span className={styles.addonCustomQuoteLabel}>
+                                              Custom Pricing Required
                                             </span>
                                           </div>
                                           ) : (
                                           <div className={styles.addonPrices}>
-                                            <span
-                                              className={styles.addonRecurring}
-                                            >
-                                              +$
-                                              {formatRecurringPrice(
-                                                addonItem.final_recurring_price
+                                            <div className={styles.addonPriceColumn}>
+                                              <span
+                                                className={styles.addonRecurring}
+                                              >
+                                                +$
+                                                {formatRecurringPrice(
+                                                  addonItem.final_recurring_price
+                                                )}
+                                                /mo
+                                              </span>
+                                              {addonHasCustomPrice && (
+                                                <span className={styles.originalPrice}>
+                                                  Custom pricing
+                                                </span>
                                               )}
-                                              /mo
-                                            </span>
+                                            </div>
                                             {addonItem.final_initial_price >
                                               0 && (
-                                              <span
-                                                className={styles.addonInitial}
-                                              >
-                                                $
-                                                {Math.round(
-                                                  addonItem.final_initial_price
-                                                )}{' '}
-                                                initial
-                                              </span>
-                                            )}
-                                            {addonHasCustomPrice && (
-                                              <span className={styles.addonInitial}>
-                                                (Custom)
-                                              </span>
+                                              <div className={styles.addonPriceColumn}>
+                                                <span
+                                                  className={styles.addonInitial}
+                                                >
+                                                  $
+                                                  {Math.round(
+                                                    addonItem.final_initial_price
+                                                  )}{' '}
+                                                  initial
+                                                </span>
+                                                {addonHasCustomPrice && (
+                                                  <span className={styles.originalPrice}>
+                                                    Custom pricing
+                                                  </span>
+                                                )}
+                                              </div>
                                             )}
                                           </div>
-                                          )}
-                                          {addonNeedsQuote && (
-                                            <div className={styles.customPricingSection}>
-                                              <div className={styles.customPricingFields}>
-                                                <div className={styles.priceInputRow}>
-                                                  <div className={styles.formField}>
-                                                    <label className={styles.fieldLabel}>
-                                                      Initial ($)
-                                                    </label>
-                                                    <input
-                                                      type="number"
-                                                      min="0"
-                                                      step="0.01"
-                                                      className={styles.priceInput}
-                                                      value={
-                                                        addonCustomPrices[addonItem.addon_service_id]?.initial ??
-                                                        addonItem.custom_initial_price ??
-                                                        ''
-                                                      }
-                                                      onChange={e => {
-                                                        const value = parseFloat(e.target.value) || 0;
-                                                        if (value < 0) return;
-                                                        setAddonCustomPrices(prev => ({
-                                                          ...prev,
-                                                          [addonItem.addon_service_id]: {
-                                                            ...prev[addonItem.addon_service_id],
-                                                            initial: value,
-                                                            recurring: prev[addonItem.addon_service_id]?.recurring ?? addonItem.custom_recurring_price ?? 0,
-                                                          },
-                                                        }));
-                                                      }}
-                                                      placeholder="Initial price"
-                                                    />
-                                                  </div>
-                                                  <div className={styles.formField}>
-                                                    <label className={styles.fieldLabel}>
-                                                      Recurring ($)
-                                                    </label>
-                                                    <input
-                                                      type="number"
-                                                      min="0"
-                                                      step="0.01"
-                                                      className={styles.priceInput}
-                                                      value={
-                                                        addonCustomPrices[addonItem.addon_service_id]?.recurring ??
-                                                        addonItem.custom_recurring_price ??
-                                                        ''
-                                                      }
-                                                      onChange={e => {
-                                                        const value = parseFloat(e.target.value) || 0;
-                                                        if (value < 0) return;
-                                                        setAddonCustomPrices(prev => ({
-                                                          ...prev,
-                                                          [addonItem.addon_service_id]: {
-                                                            initial: prev[addonItem.addon_service_id]?.initial ?? addonItem.custom_initial_price ?? 0,
-                                                            recurring: value,
-                                                          },
-                                                        }));
-                                                      }}
-                                                      placeholder="Recurring price"
-                                                    />
-                                                  </div>
-                                                </div>
-                                                <div className={styles.customPricingActions}>
-                                                  <button
-                                                    type="button"
-                                                    className={styles.saveCustomPriceButton}
-                                                    onClick={async () => {
-                                                      const prices = addonCustomPrices[addonItem.addon_service_id];
-                                                      if (!prices && !addonItem.custom_initial_price) return;
-                                                      const initialPrice = prices?.initial ?? addonItem.custom_initial_price ?? 0;
-                                                      const recurringPrice = prices?.recurring ?? addonItem.custom_recurring_price ?? 0;
-
-                                                      try {
-                                                        const response = await fetch(`/api/quotes/${quote.id}`, {
-                                                          method: 'PUT',
-                                                          headers: { 'Content-Type': 'application/json' },
-                                                          body: JSON.stringify({
-                                                            line_items: [{
-                                                              id: addonItem.id,
-                                                              addon_service_id: addonItem.addon_service_id,
-                                                              display_order: addonItem.display_order,
-                                                              is_custom_priced: true,
-                                                              custom_initial_price: initialPrice,
-                                                              custom_recurring_price: recurringPrice,
-                                                            }],
-                                                          }),
-                                                        });
-                                                        if (response.ok) {
-                                                          const data = await response.json();
-                                                          if (data.success && data.data) {
-                                                            await broadcastQuoteUpdate(data.data);
-                                                            onShowToast?.('Custom add-on pricing saved', 'success');
-                                                          }
-                                                        }
-                                                      } catch (error) {
-                                                        console.error('Error saving add-on custom price:', error);
-                                                        onShowToast?.('Failed to save custom pricing', 'error');
-                                                      }
-                                                    }}
-                                                  >
-                                                    Save
-                                                  </button>
-                                                  {addonHasCustomPrice && (
-                                                  <button
-                                                    type="button"
-                                                    className={styles.clearCustomPriceButton}
-                                                    onClick={async () => {
-                                                      setAddonCustomPrices(prev => {
-                                                        const next = { ...prev };
-                                                        delete next[addonItem.addon_service_id];
-                                                        return next;
-                                                      });
-                                                      try {
-                                                        const response = await fetch(`/api/quotes/${quote.id}`, {
-                                                          method: 'PUT',
-                                                          headers: { 'Content-Type': 'application/json' },
-                                                          body: JSON.stringify({
-                                                            line_items: [{
-                                                              id: addonItem.id,
-                                                              addon_service_id: addonItem.addon_service_id,
-                                                              display_order: addonItem.display_order,
-                                                              is_custom_priced: false,
-                                                              custom_initial_price: undefined,
-                                                              custom_recurring_price: undefined,
-                                                            }],
-                                                          }),
-                                                        });
-                                                        if (response.ok) {
-                                                          const data = await response.json();
-                                                          if (data.success && data.data) {
-                                                            await broadcastQuoteUpdate(data.data);
-                                                            onShowToast?.('Custom pricing cleared', 'success');
-                                                          }
-                                                        }
-                                                      } catch (error) {
-                                                        console.error('Error clearing add-on custom price:', error);
-                                                      }
-                                                    }}
-                                                  >
-                                                    Clear
-                                                  </button>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
                                           )}
                                         </div>
                                         );
@@ -2901,7 +2829,7 @@ export function LeadQuoteSection({
                                             styles.lineItemRecurringPrice
                                           }
                                         >
-                                          Custom Quote Required
+                                          Custom Pricing Required
                                         </div>
                                         ) : (
                                         <div
@@ -3100,7 +3028,7 @@ export function LeadQuoteSection({
                                                 styles.lineItemRecurringPrice
                                               }
                                             >
-                                              Custom Quote Required
+                                              Custom Pricing Required
                                             </div>
                                             ) : (
                                             <div
@@ -3121,6 +3049,11 @@ export function LeadQuoteSection({
                                                 /mo
                                               </span>
                                             </div>
+                                            )}
+                                            {multiAddonHasCustomPrice && (
+                                              <div className={styles.lineItemOriginalPrice}>
+                                                Custom pricing
+                                              </div>
                                             )}
                                           </div>
                                           <div
@@ -3151,6 +3084,11 @@ export function LeadQuoteSection({
                                                   0
                                               )}
                                             </div>
+                                            )}
+                                            {multiAddonHasCustomPrice && (
+                                              <div className={styles.lineItemOriginalPrice}>
+                                                Custom pricing
+                                              </div>
                                             )}
                                           </div>
                                         </div>

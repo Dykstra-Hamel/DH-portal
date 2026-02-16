@@ -1,14 +1,23 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
 import styles from './EligibleAddOnSelector.module.scss';
 import { AddOnEligibility } from '@/types/addon-service';
+
+interface AddonCustomPriceData {
+  addonId: string;
+  initialPrice: number;
+  recurringPrice: number;
+}
 
 interface EligibleAddOnSelectorProps {
   companyId: string;
   servicePlanId: string | null;
   selectedAddonIds: string[];
   onToggleAddon: (addonId: string) => void;
+  addonLineItems?: any[];
+  onSaveAddonCustomPrice?: (data: AddonCustomPriceData) => Promise<void>;
 }
 
 export default function EligibleAddOnSelector({
@@ -16,10 +25,16 @@ export default function EligibleAddOnSelector({
   servicePlanId,
   selectedAddonIds,
   onToggleAddon,
+  addonLineItems,
+  onSaveAddonCustomPrice,
 }: EligibleAddOnSelectorProps) {
   const [addons, setAddons] = useState<AddOnEligibility[]>([]);
   const [loading, setLoading] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true);
+  const [pricingModalAddon, setPricingModalAddon] = useState<AddOnEligibility | null>(null);
+  const [modalInitialPrice, setModalInitialPrice] = useState<number>(0);
+  const [modalRecurringPrice, setModalRecurringPrice] = useState<number>(0);
+  const [savingPrice, setSavingPrice] = useState(false);
 
   useEffect(() => {
     if (servicePlanId) {
@@ -44,6 +59,39 @@ export default function EligibleAddOnSelector({
         const eligibleAddons = result.addons.filter(
           (a: AddOnEligibility) => a.is_eligible
         );
+
+        // If requires_quote is missing from the RPC response, fetch full add-on data
+        const needsRequiresQuote = eligibleAddons.some(
+          (a: AddOnEligibility) => a.requires_quote === undefined
+        );
+
+        if (needsRequiresQuote) {
+          try {
+            const allAddonsResponse = await fetch(
+              `/api/add-on-services/${companyId}`
+            );
+            const allAddonsResult = await allAddonsResponse.json();
+            if (allAddonsResult.success && allAddonsResult.addons) {
+              const addonsMap = new Map(
+                allAddonsResult.addons.map((a: any) => [a.id, a])
+              );
+              for (const addon of eligibleAddons) {
+                const fullAddon = addonsMap.get(addon.addon_id) as any;
+                if (fullAddon && addon.requires_quote === undefined) {
+                  addon.requires_quote = fullAddon.requires_quote ?? false;
+                }
+              }
+            }
+          } catch {
+            // Fallback: set requires_quote to false if fetch fails
+            for (const addon of eligibleAddons) {
+              if (addon.requires_quote === undefined) {
+                addon.requires_quote = false;
+              }
+            }
+          }
+        }
+
         setAddons(eligibleAddons);
       }
     } catch (error) {
@@ -85,6 +133,10 @@ export default function EligibleAddOnSelector({
       </span>
     </button>
   );
+
+  const formatRecurringPrice = (price: number): string => {
+    return price % 1 === 0 ? price.toString() : price.toFixed(2);
+  };
 
   // Helper function to format billing frequency for display
   const formatBillingFrequency = (frequency: string): string => {
@@ -133,6 +185,10 @@ export default function EligibleAddOnSelector({
       <div className={styles.addonList}>
         {addons.map(addon => {
           const isSelected = selectedAddonIds.includes(addon.addon_id);
+          const lineItem = addonLineItems?.find(
+            (item: any) => item.addon_service_id === addon.addon_id
+          );
+          const hasCustomPrice = lineItem?.is_custom_priced;
 
           return (
             <div
@@ -162,9 +218,24 @@ export default function EligibleAddOnSelector({
                 <div className={styles.addonName}>{addon.addon_name}</div>
                 <div className={styles.addonPricing}>
                   {addon.requires_quote ? (
-                    <span className={styles.addonRecurring}>
-                      Custom Quote Required
-                    </span>
+                    isSelected && hasCustomPrice ? (
+                      <>
+                        <span className={styles.addonRecurring}>
+                          +${formatRecurringPrice(lineItem.final_recurring_price)}
+                          {formatBillingFrequency(addon.billing_frequency)}
+                        </span>
+                        {lineItem.final_initial_price > 0 && (
+                          <span className={styles.addonInitial}>
+                            ${Math.round(lineItem.final_initial_price)} initial
+                          </span>
+                        )}
+                        <span className={styles.customBadge}>(Custom)</span>
+                      </>
+                    ) : (
+                      <span className={styles.customQuoteLabel}>
+                        Custom Pricing Required
+                      </span>
+                    )
                   ) : (
                     <>
                       <span className={styles.addonRecurring}>
@@ -182,7 +253,20 @@ export default function EligibleAddOnSelector({
               </div>
 
               <div className={styles.addonAction}>
-                {isSelected ? (
+                {isSelected && addon.requires_quote ? (
+                  <button
+                    type="button"
+                    className={hasCustomPrice ? styles.editPricingButton : styles.addPricingButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setModalInitialPrice(lineItem?.custom_initial_price ?? 0);
+                      setModalRecurringPrice(lineItem?.custom_recurring_price ?? 0);
+                      setPricingModalAddon(addon);
+                    }}
+                  >
+                    {hasCustomPrice ? 'Edit Custom Price' : 'Add Pricing'}
+                  </button>
+                ) : isSelected ? (
                   <button type="button" className={styles.removeButton}>
                     Remove Add-On
                   </button>
@@ -206,6 +290,81 @@ export default function EligibleAddOnSelector({
         addons.length > 0 ? addons.length : undefined
       )}
       {isExpanded && renderExpandedContent()}
+
+      {/* Custom Pricing Modal */}
+      {pricingModalAddon && (
+        <div className={styles.modalOverlay} onClick={() => setPricingModalAddon(null)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>Set Custom Pricing</h3>
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                onClick={() => setPricingModalAddon(null)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p className={styles.modalAddonName}>{pricingModalAddon.addon_name}</p>
+              <div className={styles.modalFields}>
+                <div className={styles.modalField}>
+                  <label>Initial Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={modalInitialPrice}
+                    onChange={e => setModalInitialPrice(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className={styles.modalField}>
+                  <label>Recurring Price ($)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={modalRecurringPrice}
+                    onChange={e => setModalRecurringPrice(parseFloat(e.target.value) || 0)}
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalCancelButton}
+                onClick={() => setPricingModalAddon(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.modalSaveButton}
+                disabled={savingPrice}
+                onClick={async () => {
+                  if (!onSaveAddonCustomPrice) return;
+                  setSavingPrice(true);
+                  try {
+                    await onSaveAddonCustomPrice({
+                      addonId: pricingModalAddon.addon_id,
+                      initialPrice: modalInitialPrice,
+                      recurringPrice: modalRecurringPrice,
+                    });
+                    setPricingModalAddon(null);
+                  } finally {
+                    setSavingPrice(false);
+                  }
+                }}
+              >
+                {savingPrice ? 'Saving...' : 'Save Pricing'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
