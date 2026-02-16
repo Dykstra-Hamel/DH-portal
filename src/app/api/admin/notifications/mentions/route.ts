@@ -218,8 +218,9 @@ export async function GET(request: NextRequest) {
       taskIds.length > 0
         ? await supabase
             .from('project_tasks')
-            .select('id, title, project_id')
+            .select('id, title, project_id, is_completed')
             .in('id', taskIds)
+            .neq('is_completed', true)
         : { data: [], error: null };
 
     if (tasksError) {
@@ -244,8 +245,9 @@ export async function GET(request: NextRequest) {
       projectIds.size > 0
         ? supabase
             .from('projects')
-            .select('id, name, shortcode')
+            .select('id, name, shortcode, status')
             .in('id', Array.from(projectIds))
+            .neq('status', 'complete')
         : Promise.resolve({ data: [], error: null }),
       monthlyServiceIds.size > 0
         ? supabase
@@ -373,7 +375,20 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ mentions: mentionItems, hasMore });
+    // Filter out mentions from completed projects and tasks (excluded by query)
+    const filteredMentions = mentionItems.filter(item => {
+      // If mention has a projectId but project not found (was completed), exclude it
+      if (item.projectId && !projectById.has(item.projectId)) {
+        return false;
+      }
+      // If mention has a taskId but task not found (was completed), exclude it
+      if (item.taskId && !taskById.has(item.taskId)) {
+        return false;
+      }
+      return true;
+    });
+
+    return NextResponse.json({ mentions: filteredMentions, hasMore });
   } catch (error) {
     console.error('Error in GET /api/admin/notifications/mentions:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

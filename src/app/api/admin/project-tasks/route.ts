@@ -182,6 +182,24 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Handle category assignments if provided
+    if (body.category_ids && Array.isArray(body.category_ids) && body.category_ids.length > 0) {
+      const categoryAssignments = body.category_ids.map((categoryId: string) => ({
+        task_id: task.id,
+        category_id: categoryId,
+        category_type: 'internal',
+      }));
+
+      const { error: categoryError } = await supabase
+        .from('project_task_category_assignments')
+        .insert(categoryAssignments);
+
+      if (categoryError) {
+        console.error('Error assigning categories to task:', categoryError);
+        // Don't fail the whole request, just log the error
+      }
+    }
+
     // Log task creation activity
     try {
       await supabase.from('project_task_activity').insert({
@@ -191,7 +209,7 @@ export async function POST(request: NextRequest) {
       });
     } catch (activityError) {
       console.error('Error logging task activity:', activityError);
-      // Don&apos;t fail the request if activity logging fails
+      // Don't fail the request if activity logging fails
     }
 
     return NextResponse.json(task, { status: 201 });

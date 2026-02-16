@@ -34,7 +34,7 @@ export async function GET(
         `
         *,
         user_profile:profiles(id, first_name, last_name, email, avatar_url),
-        attachments:comment_attachments(id, file_path, file_name, file_size, mime_type, created_at)
+        attachments:comment_attachments!project_comment_id(id, file_path, file_name, file_size, mime_type, created_at)
       `
       )
       .eq('project_id', projectId)
