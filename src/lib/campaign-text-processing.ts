@@ -37,6 +37,7 @@ export interface VariableContext {
     phoneNumber: string | null;
   };
   serviceName?: string;
+  tagline?: string;
   signature?: string;
   signatureClassName?: string;
 }
@@ -101,12 +102,16 @@ export function replaceVariables(text: string, context: VariableContext): string
     '{price_amount}': pricingData.amount,
     '{price_frequency}': pricingData.frequency,
     '{original_price}': context.pricing.originalPrice || '',
+    '{original_price_amount}': (context.pricing.originalPrice || '').replace(/^\$/, ''),
     '{savings}': context.pricing.savings || '',
 
     // Service variables
     '{company_name}': context.company.name || '',
     '{service_name}': context.serviceName || '',
     '{company_phone}': context.branding?.phoneNumber || '',
+
+    // Tagline variable
+    '{tagline}': context.tagline || '',
 
     // Formatting variables
     '{line_break}': '<br>',

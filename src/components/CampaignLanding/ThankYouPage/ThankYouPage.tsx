@@ -69,6 +69,7 @@ interface ThankYouPageProps {
     accentColorPreference?: 'primary' | 'secondary';
     fontPrimaryName: string | null;
     fontPrimaryUrl: string | null;
+    fontColor?: string | null;
   };
   header: {
     primaryButtonText: string;
@@ -175,6 +176,7 @@ export default function ThankYouPage({
         '--font-primary': branding.fontPrimaryName
           ? `"${branding.fontPrimaryName}", sans-serif`
           : '"Inter Tight", sans-serif',
+        '--color-text': branding.fontColor || '#2b2b2b',
       } as React.CSSProperties}
     >
       {/* Header Section */}

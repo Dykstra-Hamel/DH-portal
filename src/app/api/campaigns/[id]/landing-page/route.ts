@@ -183,7 +183,7 @@ export async function GET(
     // Fetch company branding (optional)
     const { data: brandData } = await supabase
       .from('brands')
-      .select('logo_url, primary_color_hex, secondary_color_hex, font_primary_name, font_primary_url')
+      .select('logo_url, primary_color_hex, secondary_color_hex, font_color_hex, font_primary_name, font_primary_url')
       .eq('company_id', campaign.company_id)
       .maybeSingle();
 
@@ -415,6 +415,7 @@ export async function GET(
       accentColorPreference: landingPageData?.accent_color_preference || 'primary',
       fontPrimaryName: brandData?.font_primary_name || null,
       fontPrimaryUrl: brandData?.font_primary_url || null,
+      fontColor: brandData?.font_color_hex || null,
     };
 
     // Parse additional services config (supports legacy array or new object structure)
@@ -434,6 +435,13 @@ export async function GET(
     const storedSelectedAddonIds = hasStoredSelection
       ? (additionalServicesConfig as any).selectedAddonIds
       : null;
+    const hasStoredServicePlanSelection =
+      additionalServicesConfig &&
+      typeof additionalServicesConfig === 'object' &&
+      Array.isArray((additionalServicesConfig as any).selectedServicePlanIds);
+    const storedSelectedServicePlanIds: string[] = hasStoredServicePlanSelection
+      ? (additionalServicesConfig as any).selectedServicePlanIds
+      : [];
 
     let selectedAddons: typeof eligibleAddOns;
 
@@ -444,6 +452,41 @@ export async function GET(
     } else {
       // No selection ever stored (legacy/new record) — default to all eligible
       selectedAddons = eligibleAddOns;
+    }
+    let selectedServicePlans: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      price: number | null;
+    }> = [];
+
+    if (storedSelectedServicePlanIds.length > 0) {
+      const { data: selectedPlansData } = await supabase
+        .from('service_plans')
+        .select('id, plan_name, plan_description, recurring_price')
+        .in('id', storedSelectedServicePlanIds)
+        .eq('company_id', campaign.company_id);
+
+      if (selectedPlansData && selectedPlansData.length > 0) {
+        const planMap = new Map(
+          selectedPlansData.map((plan) => [
+            plan.id,
+            {
+              id: plan.id,
+              name: plan.plan_name,
+              description: plan.plan_description,
+              price: plan.recurring_price,
+            },
+          ])
+        );
+
+        selectedServicePlans = storedSelectedServicePlanIds
+          .map((planId) => planMap.get(planId))
+          .filter(
+            (plan): plan is { id: string; name: string; description: string | null; price: number | null } =>
+              !!plan
+          );
+      }
     }
 
     // Build landing page object with defaults
@@ -487,6 +530,11 @@ export async function GET(
         faqs: addon.addon_faqs || [],
         price: addon.recurring_price,
       })),
+      servicePlans: selectedServicePlans,
+      preFooter: {
+        show: landingPageData?.show_pre_footer ?? true,
+        content: landingPageData?.pre_footer_content || null,
+      },
       faq: {
         show: landingPageData?.show_faq ?? true,
         heading: landingPageData?.faq_heading || 'Frequently Asked Questions',
@@ -543,6 +591,7 @@ export async function GET(
       },
       branding,
       selectedAddonIds: selectedAddons.map((addon) => addon.id),
+      selectedServicePlanIds: selectedServicePlans.map((plan) => plan.id),
     };
 
     // Return formatted data
@@ -738,8 +787,13 @@ export async function POST(
         additional_services: {
           items: body.additional_services || [],
           selectedAddonIds: body.selected_addon_ids || [],
+          selectedServicePlanIds: body.selected_service_plan_ids || [],
         },
         additional_services_image_url: body.additional_services_image_url || null,
+
+        // Pre-Footer
+        show_pre_footer: body.show_pre_footer ?? true,
+        pre_footer_content: body.pre_footer_content || null,
 
         // FAQ
         show_faq: body.show_faq ?? true,
@@ -937,13 +991,22 @@ export async function PUT(
     // Additional Services
     if (body.show_additional_services !== undefined) updateData.show_additional_services = body.show_additional_services;
     if (body.additional_services_heading !== undefined) updateData.additional_services_heading = body.additional_services_heading;
-    if (body.additional_services !== undefined || body.selected_addon_ids !== undefined) {
+    if (
+      body.additional_services !== undefined ||
+      body.selected_addon_ids !== undefined ||
+      body.selected_service_plan_ids !== undefined
+    ) {
       updateData.additional_services = {
         items: body.additional_services ?? [],
         selectedAddonIds: body.selected_addon_ids ?? [],
+        selectedServicePlanIds: body.selected_service_plan_ids ?? [],
       };
     }
     if (body.additional_services_image_url !== undefined) updateData.additional_services_image_url = body.additional_services_image_url;
+
+    // Pre-Footer
+    if (body.show_pre_footer !== undefined) updateData.show_pre_footer = body.show_pre_footer;
+    if (body.pre_footer_content !== undefined) updateData.pre_footer_content = body.pre_footer_content;
 
     // FAQ
     if (body.show_faq !== undefined) updateData.show_faq = body.show_faq;

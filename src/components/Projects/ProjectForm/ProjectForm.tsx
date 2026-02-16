@@ -930,6 +930,14 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
               isFetchingCategories={isFetchingCategories}
               departments={availableDepartments}
               title="Project Tasks"
+              onAddProjectCategory={(categoryId) => {
+                if (!formData.category_ids.includes(categoryId)) {
+                  setFormData(prev => ({
+                    ...prev,
+                    category_ids: [...prev.category_ids, categoryId],
+                  }));
+                }
+              }}
             />
           )}
 

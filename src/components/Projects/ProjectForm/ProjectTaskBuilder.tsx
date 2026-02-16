@@ -24,6 +24,7 @@ interface ProjectTaskBuilderProps {
   isFetchingCategories: boolean;
   departments: DepartmentOption[];
   title?: string;
+  onAddProjectCategory?: (categoryId: string) => void;
 }
 
 const createTempId = () => `tmp-${Date.now()}-${Math.random().toString(16).slice(2)}`;
@@ -73,6 +74,7 @@ export function ProjectTaskBuilder({
   isFetchingCategories,
   departments,
   title = 'Project Tasks',
+  onAddProjectCategory,
 }: ProjectTaskBuilderProps) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [collapsedTaskCards, setCollapsedTaskCards] = useState<Record<string, boolean>>({});
@@ -296,27 +298,15 @@ export function ProjectTaskBuilder({
       return <p className={styles.hint}>Loading categories...</p>;
     }
 
-    const filteredCategories = availableCategories.filter((cat) =>
-      projectCategoryIds.includes(cat.id)
-    );
-
-    if (projectCategoryIds.length === 0) {
+    if (availableCategories.length === 0) {
       return (
         <p className={styles.hint}>
-          Please select project categories first to assign them to tasks.
+          No categories available.
         </p>
       );
     }
 
-    if (filteredCategories.length === 0) {
-      return (
-        <p className={styles.hint}>
-          No categories available from selected project categories.
-        </p>
-      );
-    }
-
-    return filteredCategories.map((category) => {
+    return availableCategories.map((category) => {
       const isSelected = task.category_ids?.includes(category.id) || false;
       return (
         <button
@@ -329,6 +319,11 @@ export function ProjectTaskBuilder({
               ? currentCategories.filter((id) => id !== category.id)
               : [...currentCategories, category.id];
             handleTaskChange(task.temp_id || '', 'category_ids', nextCategories as any);
+
+            // Auto-add category to project if not already present
+            if (!isSelected && !projectCategoryIds.includes(category.id) && onAddProjectCategory) {
+              onAddProjectCategory(category.id);
+            }
           }}
         >
           <CategoryBadge category={category} />

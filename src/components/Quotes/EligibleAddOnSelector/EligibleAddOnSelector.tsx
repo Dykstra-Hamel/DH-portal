@@ -161,14 +161,22 @@ export default function EligibleAddOnSelector({
               <div className={styles.addonInfo}>
                 <div className={styles.addonName}>{addon.addon_name}</div>
                 <div className={styles.addonPricing}>
-                  <span className={styles.addonRecurring}>
-                    +${addon.recurring_price}
-                    {formatBillingFrequency(addon.billing_frequency)}
-                  </span>
-                  {addon.initial_price && addon.initial_price > 0 && (
-                    <span className={styles.addonInitial}>
-                      ${addon.initial_price} initial
+                  {addon.requires_quote ? (
+                    <span className={styles.addonRecurring}>
+                      Custom Quote Required
                     </span>
+                  ) : (
+                    <>
+                      <span className={styles.addonRecurring}>
+                        +${addon.recurring_price}
+                        {formatBillingFrequency(addon.billing_frequency)}
+                      </span>
+                      {addon.initial_price && addon.initial_price > 0 && (
+                        <span className={styles.addonInitial}>
+                          ${addon.initial_price} initial
+                        </span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

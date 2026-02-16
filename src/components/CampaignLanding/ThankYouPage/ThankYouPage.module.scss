@@ -22,8 +22,7 @@
   --accent-color: var(--brand-primary);
   --font-primary: 'Inter Tight', sans-serif;
 
-  // Fixed design system colors
-  --color-text: #2b2b2b;
+  // Fixed design system colors (--color-text is set via inline styles from brand font color, fallback #2b2b2b)
   --color-text-gray: #4e4e4e;
   --color-white: #ffffff;
   --color-bg-light: #f9fafb;

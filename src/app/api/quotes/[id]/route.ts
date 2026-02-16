@@ -1316,6 +1316,11 @@ export async function PUT(
             const initialPrice = addon.initial_price || 0;
             const recurringPrice = addon.recurring_price;
 
+            // Check if custom pricing is being used for this add-on
+            const isCustomPriced = (lineItem as any).is_custom_priced === true;
+            const customInitialPrice = (lineItem as any).custom_initial_price;
+            const customRecurringPrice = (lineItem as any).custom_recurring_price;
+
             // Prepare update/insert data for add-on line item
             const addonData: any = {
               addon_service_id: addon.id,
@@ -1324,12 +1329,15 @@ export async function PUT(
               plan_description: addon.addon_description,
               initial_price: initialPrice,
               recurring_price: recurringPrice,
-              final_initial_price: initialPrice,
-              final_recurring_price: recurringPrice,
+              final_initial_price: isCustomPriced ? Math.max(0, customInitialPrice ?? 0) : initialPrice,
+              final_recurring_price: isCustomPriced ? Math.max(0, customRecurringPrice ?? 0) : recurringPrice,
               billing_frequency: addon.billing_frequency,
               display_order: lineItem.display_order,
               discount_percentage: 0, // Add-ons don't get discounts by default
               discount_amount: 0,
+              is_custom_priced: isCustomPriced,
+              custom_initial_price: isCustomPriced ? customInitialPrice : null,
+              custom_recurring_price: isCustomPriced ? customRecurringPrice : null,
             };
 
             if (lineItem.id) {

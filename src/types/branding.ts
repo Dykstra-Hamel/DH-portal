@@ -28,6 +28,7 @@ export interface BrandData {
   secondary_color_hex?: string;
   secondary_color_cmyk?: string;
   secondary_color_pantone?: string;
+  font_color_hex?: string;
   alternative_colors?: ColorInfo[];
   font_primary_name?: string;
   font_primary_example?: string;

@@ -9,7 +9,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server';
 import { STORAGE_CONFIG, cleanCompanyName, getCompanyName, generateImagePath } from '@/lib/storage-utils';
 
 const BUCKET_NAME = STORAGE_CONFIG.BUCKET_NAME; // 'brand-assets'
@@ -68,21 +68,34 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isGlobalAdmin = profile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    // Verify user has access to this company (skip for global admins)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
     }
+
+    // Use service role client for admins to bypass RLS
+    const dbClient = isGlobalAdmin ? createServiceRoleClient() : supabase;
 
     // If folder parameter is in query string, list from storage instead of company_images table
     if (folder !== null) {
-      const companyName = await getCompanyName(supabase, companyId);
+      const companyName = await getCompanyName(dbClient, companyId);
       const cleaned = cleanCompanyName(companyName);
 
       // If folder is empty string, fetch from ALL folders
@@ -93,7 +106,7 @@ export async function GET(
         // Fetch from each folder
         for (const folderName of allFolders) {
           const folderPath = `${cleaned}/${folderName}`;
-          const { data: files } = await supabase.storage
+          const { data: files } = await dbClient.storage
             .from(BUCKET_NAME)
             .list(folderPath, {
               sortBy: { column: 'created_at', order: 'desc' }
@@ -126,7 +139,7 @@ export async function GET(
         // Format response
         const formattedImages = paginatedImages.map(file => {
           const filePath = `${file.folderPath}/${file.name}`;
-          const { data: publicUrlData } = supabase.storage
+          const { data: publicUrlData } = dbClient.storage
             .from(BUCKET_NAME)
             .getPublicUrl(filePath);
 
@@ -167,7 +180,7 @@ export async function GET(
       const folderPath = `${cleaned}/${folder}`;
 
       // Fetch all files from folder (need all for search filtering)
-      const { data: allFiles, error: storageError } = await supabase.storage
+      const { data: allFiles, error: storageError } = await dbClient.storage
         .from(BUCKET_NAME)
         .list(folderPath, {
           sortBy: { column: 'created_at', order: 'desc' }
@@ -194,7 +207,7 @@ export async function GET(
       // Format response
       const formattedImages = paginatedFiles.map(file => {
         const filePath = `${folderPath}/${file.name}`;
-        const { data: publicUrlData } = supabase.storage
+        const { data: publicUrlData } = dbClient.storage
           .from(BUCKET_NAME)
           .getPublicUrl(filePath);
 
@@ -232,7 +245,7 @@ export async function GET(
     }
 
     // Build query (existing company_images logic)
-    let query = supabase
+    let query = dbClient
       .from('company_images')
       .select('*', { count: 'exact' })
       .eq('company_id', companyId);
@@ -267,7 +280,7 @@ export async function GET(
       ?.map((img: CompanyImage) => img.uploaded_by)
       .filter(Boolean) || [];
 
-    const { data: profiles } = await supabase
+    const { data: profiles } = await dbClient
       .from('profiles')
       .select('id, full_name')
       .in('id', uploaderIds);
@@ -278,7 +291,7 @@ export async function GET(
 
     // Format response with public URLs and thumbnails
     const formattedImages = images?.map((image: CompanyImage) => {
-      const { data: publicUrlData } = supabase.storage
+      const { data: publicUrlData } = dbClient.storage
         .from(BUCKET_NAME)
         .getPublicUrl(image.file_path);
 
@@ -348,16 +361,26 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: postProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isPostGlobalAdmin = postProfile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    // Verify user has access to this company (skip for global admins)
+    if (!isPostGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
     }
 
     // Parse form data
@@ -394,36 +417,71 @@ export async function POST(
       );
     }
 
+    // Use service role client for admins to bypass RLS on company_images
+    const dbClient = isPostGlobalAdmin ? createServiceRoleClient() : supabase;
+
     // Generate unique filename for library using brand-assets bucket structure
-    const companyName = await getCompanyName(supabase, companyId);
+    const companyName = await getCompanyName(dbClient, companyId);
     const cleaned = cleanCompanyName(companyName);
-    const fileName = await generateImagePath(cleaned, STORAGE_CONFIG.CATEGORIES.IMAGE_LIBRARY, file.name, supabase);
+    const fileName = await generateImagePath(cleaned, STORAGE_CONFIG.CATEGORIES.IMAGE_LIBRARY, file.name, dbClient);
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Get image dimensions
+    // Get image dimensions by parsing image headers (Node.js compatible)
     let width: number | null = null;
     let height: number | null = null;
     let aspectRatio: number | null = null;
 
     try {
-      // Create a simple check for image dimensions using a canvas approach
-      // Note: In production, you might want to use a library like 'sharp' for server-side processing
-      const blob = new Blob([buffer], { type: file.type });
-      const imageBitmap = await createImageBitmap(blob);
-      width = imageBitmap.width;
-      height = imageBitmap.height;
-      aspectRatio = width / height;
-      imageBitmap.close();
+      if (file.type === 'image/png' && buffer.length >= 24) {
+        // PNG: width at bytes 16-19, height at bytes 20-23 (big-endian)
+        width = buffer.readUInt32BE(16);
+        height = buffer.readUInt32BE(20);
+      } else if ((file.type === 'image/jpeg' || file.type === 'image/jpg') && buffer.length >= 2) {
+        // JPEG: scan for SOF markers (0xFF 0xC0-0xCF, excluding 0xC4 and 0xC8)
+        let offset = 2; // Skip SOI marker
+        while (offset < buffer.length - 8) {
+          if (buffer[offset] !== 0xFF) break;
+          const marker = buffer[offset + 1];
+          if ((marker >= 0xC0 && marker <= 0xCF) && marker !== 0xC4 && marker !== 0xC8) {
+            height = buffer.readUInt16BE(offset + 5);
+            width = buffer.readUInt16BE(offset + 7);
+            break;
+          }
+          const segmentLength = buffer.readUInt16BE(offset + 2);
+          offset += 2 + segmentLength;
+        }
+      } else if (file.type === 'image/webp' && buffer.length >= 30) {
+        // WebP: check for VP8 or VP8L chunk
+        const riffHeader = buffer.toString('ascii', 0, 4);
+        const webpMarker = buffer.toString('ascii', 8, 12);
+        if (riffHeader === 'RIFF' && webpMarker === 'WEBP') {
+          const chunkType = buffer.toString('ascii', 12, 16);
+          if (chunkType === 'VP8 ' && buffer.length >= 30) {
+            // Lossy VP8
+            width = buffer.readUInt16LE(26) & 0x3FFF;
+            height = buffer.readUInt16LE(28) & 0x3FFF;
+          } else if (chunkType === 'VP8L' && buffer.length >= 25) {
+            // Lossless VP8L
+            const bits = buffer.readUInt32LE(21);
+            width = (bits & 0x3FFF) + 1;
+            height = ((bits >> 14) & 0x3FFF) + 1;
+          }
+        }
+      }
+
+      if (width && height) {
+        aspectRatio = width / height;
+      }
     } catch (err) {
       console.warn('Could not extract image dimensions:', err);
       // Continue without dimensions - they're optional
     }
 
     // Upload to Supabase storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    const { data: uploadData, error: uploadError } = await dbClient.storage
       .from(BUCKET_NAME)
       .upload(fileName, buffer, {
         contentType: file.type,
@@ -440,7 +498,7 @@ export async function POST(
     }
 
     // Create database record
-    const { data: imageRecord, error: dbError } = await supabase
+    const { data: imageRecord, error: dbError } = await dbClient
       .from('company_images')
       .insert({
         company_id: companyId,
@@ -461,7 +519,7 @@ export async function POST(
     if (dbError) {
       console.error('Error creating image record:', dbError);
       // Attempt to clean up uploaded file
-      await supabase.storage.from(BUCKET_NAME).remove([uploadData.path]);
+      await dbClient.storage.from(BUCKET_NAME).remove([uploadData.path]);
       return NextResponse.json(
         { error: 'Failed to create image record' },
         { status: 500 }
@@ -469,7 +527,7 @@ export async function POST(
     }
 
     // Get public URL
-    const { data: publicUrlData } = supabase.storage
+    const { data: publicUrlData } = dbClient.storage
       .from(BUCKET_NAME)
       .getPublicUrl(uploadData.path);
 
@@ -532,20 +590,33 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', companyId)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: deleteProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isDeleteGlobalAdmin = deleteProfile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+    // Verify user has access to this company (skip for global admins)
+    if (!isDeleteGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyId)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json({ error: 'Access denied' }, { status: 403 });
+      }
     }
 
+    // Use service role client for admins to bypass RLS
+    const dbClient = isDeleteGlobalAdmin ? createServiceRoleClient() : supabase;
+
     // Get image record
-    const { data: image, error: imageError } = await supabase
+    const { data: image, error: imageError } = await dbClient
       .from('company_images')
       .select('*')
       .eq('id', imageId)
@@ -560,7 +631,7 @@ export async function DELETE(
     }
 
     // Check if image is in use
-    const { data: usageData, error: usageError } = await supabase
+    const { data: usageData, error: usageError } = await dbClient
       .from('campaign_image_usage')
       .select('id')
       .eq('company_image_id', imageId)
@@ -585,7 +656,7 @@ export async function DELETE(
     }
 
     // Delete from storage
-    const { error: deleteStorageError } = await supabase.storage
+    const { error: deleteStorageError } = await dbClient.storage
       .from(BUCKET_NAME)
       .remove([image.file_path]);
 
@@ -598,7 +669,7 @@ export async function DELETE(
     }
 
     // Delete from database
-    const { error: deleteDbError } = await supabase
+    const { error: deleteDbError } = await dbClient
       .from('company_images')
       .delete()
       .eq('id', imageId);
