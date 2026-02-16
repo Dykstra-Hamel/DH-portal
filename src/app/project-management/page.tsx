@@ -771,7 +771,7 @@ export default function ProjectManagementDashboard() {
         onSave={handleSaveTask}
         onDelete={handleDeleteTask}
         task={selectedTask}
-        projects={projects.map(p => ({ id: p.id, name: p.name }))}
+        projects={projects}
         users={users}
         currentUserId={user?.id}
       />

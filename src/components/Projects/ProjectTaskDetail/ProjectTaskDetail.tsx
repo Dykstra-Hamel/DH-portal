@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
 import {
   X,
   Trash2,
@@ -21,6 +21,9 @@ import {
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
+import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
+import { createClient } from '@/lib/supabase/client';
+import { sanitizeFileName } from '@/lib/storage-utils';
 import {
   ProjectTask,
   taskPriorityOptions,
@@ -49,7 +52,7 @@ interface ProjectTaskDetailProps {
     updates: Partial<ProjectTask>
   ) => Promise<void>;
   onDelete: () => void;
-  onAddComment: (comment: string) => Promise<void>;
+  onAddComment: (comment: string) => Promise<any | null>;
   onCreateSubtask: () => void;
   onUpdateProgress: (progress: number) => Promise<void>;
   users: any[]; // List of users for assignment dropdown
@@ -67,6 +70,7 @@ interface ProjectTaskDetailProps {
   }>; // For monthly service tasks
   departments?: ProjectDepartment[];
   mentionUsers?: MentionUser[]; // Users available for @mentions
+  currentUserId?: string; // Current user's ID for checking comment ownership
 }
 
 export default function ProjectTaskDetail({
@@ -87,9 +91,21 @@ export default function ProjectTaskDetail({
   monthlyServiceDepartments = [],
   departments = [],
   mentionUsers,
+  currentUserId,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [editingCommentText, setEditingCommentText] = useState('');
+  const [isUpdatingComment, setIsUpdatingComment] = useState(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
+  const commentComposerDragCounterRef = useRef(0);
+  const commentFileInputRef = useRef<HTMLInputElement>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
+  const [currentLightboxImages, setCurrentLightboxImages] = useState<Array<{ id: string; url: string; name: string }>>([]);
   const [titleDraft, setTitleDraft] = useState(task?.title || '');
   const titleInputRef = useRef<HTMLTextAreaElement>(null);
   const [priorityDraft, setPriorityDraft] = useState(
@@ -342,6 +358,179 @@ export default function ProjectTaskDetail({
     }
   }, [highlightedCommentId, task?.id, task?.comments?.length]);
 
+  // Helper function for validating rich text content
+  const isRichTextEmpty = (html: string): boolean => {
+    const stripped = html
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .trim();
+    return stripped.length === 0;
+  };
+
+  // Comment editing callbacks
+  const handleStartEditComment = useCallback((comment: any) => {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.comment);
+  }, []);
+
+  const handleCancelEditComment = useCallback(() => {
+    setEditingCommentId(null);
+    setEditingCommentText('');
+  }, []);
+
+  const handleUpdateComment = useCallback(async () => {
+    if (!task || !editingCommentId) return;
+
+    if (isRichTextEmpty(editingCommentText)) {
+      alert('Comment cannot be empty.');
+      return;
+    }
+
+    setIsUpdatingComment(true);
+    try {
+      const response = await fetch(`/api/admin/tasks/${task.id}/comments/${editingCommentId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: editingCommentText }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update comment');
+      }
+
+      // Trigger a refresh by calling onUpdate with empty updates
+      // This will cause the parent component to refetch the task data
+      await onUpdate(task.id, {});
+
+      setEditingCommentId(null);
+      setEditingCommentText('');
+    } catch (error) {
+      console.error('Error updating comment:', error);
+      alert('Failed to update comment. Please try again.');
+    } finally {
+      setIsUpdatingComment(false);
+    }
+  }, [editingCommentId, editingCommentText, task, onUpdate]);
+
+  const handleDeleteComment = useCallback(async (commentId: string) => {
+    if (!task) return;
+    if (!confirm('Delete this comment? This action cannot be undone.')) {
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+    try {
+      const response = await fetch(`/api/admin/tasks/${task.id}/comments/${commentId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete comment');
+      }
+
+      // Trigger a refresh by calling onUpdate with empty updates
+      await onUpdate(task.id, {});
+
+      if (editingCommentId === commentId) {
+        setEditingCommentId(null);
+        setEditingCommentText('');
+      }
+    } catch (error) {
+      console.error('Error deleting comment:', error);
+      alert('Failed to delete comment. Please try again.');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  }, [editingCommentId, task, onUpdate]);
+
+  // File attachment handlers
+  const handleCommentFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files && event.target.files.length > 0) {
+      const newFiles = Array.from(event.target.files);
+      setPendingAttachments(prev => [...prev, ...newFiles]);
+      event.target.value = ''; // Reset so same file can be selected again
+    }
+  }, []);
+
+  const removeCommentAttachment = useCallback((index: number) => {
+    setPendingAttachments(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const handleCommentComposerDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    commentComposerDragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDraggingOverCommentComposer(true);
+    }
+  }, []);
+
+  const handleCommentComposerDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    commentComposerDragCounterRef.current--;
+    if (commentComposerDragCounterRef.current === 0) {
+      setIsDraggingOverCommentComposer(false);
+    }
+  }, []);
+
+  const handleCommentComposerDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleCommentComposerDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    commentComposerDragCounterRef.current = 0;
+    setIsDraggingOverCommentComposer(false);
+
+    // Allowed file types for attachments
+    const allowedTypes = [
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/webp',
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/vnd.ms-excel',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ];
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const droppedFiles = Array.from(e.dataTransfer.files);
+      const validFiles = droppedFiles.filter(file => allowedTypes.includes(file.type));
+
+      if (validFiles.length > 0) {
+        setPendingAttachments(prev => [...prev, ...validFiles]);
+      }
+
+      if (validFiles.length < droppedFiles.length) {
+        alert('Some files were not added (unsupported file type)');
+      }
+    }
+  }, []);
+
+  // Image lightbox handlers
+  const handleCommentImageClick = useCallback((commentImages: Array<{ id: string; url: string; name: string }>, imageId: string) => {
+    const index = commentImages.findIndex(img => img.id === imageId);
+    if (index !== -1) {
+      setCurrentLightboxImages(commentImages);
+      setLightboxImageIndex(index);
+      setLightboxOpen(true);
+    }
+  }, []);
+
+  const handleCloseLightbox = useCallback(() => {
+    setLightboxOpen(false);
+    setCurrentLightboxImages([]);
+  }, []);
+
+  const handleNavigateLightbox = useCallback((index: number) => {
+    setLightboxImageIndex(index);
+  }, []);
+
   const getActivityMessage = (activity: any): string => {
     const priorityLabel = (priority: string) =>
       taskPriorityOptions.find(p => p.value === priority)?.label || priority;
@@ -383,14 +572,74 @@ export default function ProjectTaskDetail({
 
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newComment.trim()) return;
+    if (isRichTextEmpty(newComment) && pendingAttachments.length === 0) return;
 
     setIsSubmittingComment(true);
     try {
-      await onAddComment(newComment);
+      // Create comment and get the ID back immediately
+      const createdComment = await onAddComment(newComment);
+
+      if (!createdComment || !createdComment.id) {
+        throw new Error('Failed to create comment');
+      }
+
+      // Upload attachments if any
+      if (pendingAttachments.length > 0) {
+        const supabase = createClient();
+        const fileMetadata = [];
+
+        // Upload each file to storage using the createdComment.id
+        for (const file of pendingAttachments) {
+          const timestamp = Date.now();
+          const sanitizedName = sanitizeFileName(file.name);
+          const filePath = `comment-attachments/tasks/${task.id}/${createdComment.id}/${timestamp}-${sanitizedName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('brand-assets')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+          if (uploadError) {
+            console.error('Storage upload error:', uploadError);
+            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+          }
+
+          fileMetadata.push({
+            file_path: filePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          });
+        }
+
+        // Save metadata via API
+        const attachmentResponse = await fetch(
+          `/api/admin/tasks/${task.id}/comments/${createdComment.id}/attachments`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: fileMetadata }),
+          }
+        );
+
+        if (!attachmentResponse.ok) {
+          // Clean up uploaded files if metadata save fails
+          for (const metadata of fileMetadata) {
+            await supabase.storage.from('brand-assets').remove([metadata.file_path]);
+          }
+          throw new Error('Failed to save attachment metadata');
+        }
+      }
+
       setNewComment('');
+      setPendingAttachments([]);
+      // Final refresh to show attachments
+      await onUpdate(task.id, {});
     } catch (error) {
       console.error('Error adding comment:', error);
+      alert('Failed to post comment. Please try again.');
     } finally {
       setIsSubmittingComment(false);
     }
@@ -673,8 +922,19 @@ export default function ProjectTaskDetail({
   };
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.sidebar} onClick={e => e.stopPropagation()}>
+    <>
+      {/* Image Lightbox */}
+      {lightboxOpen && currentLightboxImages.length > 0 && (
+        <ImageLightbox
+          images={currentLightboxImages}
+          currentIndex={lightboxImageIndex}
+          onClose={handleCloseLightbox}
+          onNavigate={handleNavigateLightbox}
+        />
+      )}
+
+      <div className={styles.overlay} onClick={onClose}>
+        <div className={styles.sidebar} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={styles.header}>
           <div className={styles.headerTop}>
@@ -1172,18 +1432,67 @@ export default function ProjectTaskDetail({
             </div>
 
             {/* Add Comment Form */}
-            <form onSubmit={handleSubmitComment} className={styles.commentForm}>
-              <RichTextEditor
-                value={newComment}
-                onChange={setNewComment}
-                placeholder="Add a comment... Use @ to mention someone"
-                className={styles.commentRichEditor}
-                compact
-                mentionUsers={mentionUsers}
+            <form
+              onSubmit={handleSubmitComment}
+              className={styles.commentForm}
+              onDragEnter={handleCommentComposerDragEnter}
+              onDragLeave={handleCommentComposerDragLeave}
+              onDragOver={handleCommentComposerDragOver}
+              onDrop={handleCommentComposerDrop}
+            >
+              <div className={styles.commentInputWrapper}>
+                <RichTextEditor
+                  value={newComment}
+                  onChange={setNewComment}
+                  placeholder="Add a comment... Use @ to mention someone"
+                  className={styles.commentRichEditor}
+                  compact
+                  mentionUsers={mentionUsers}
+                />
+                {pendingAttachments.length > 0 && (
+                  <div className={styles.pendingAttachments}>
+                    {pendingAttachments.map((file, index) => (
+                      <div key={`${file.name}-${index}`} className={styles.pendingAttachment}>
+                        <span className={styles.pendingAttachmentName}>{file.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => removeCommentAttachment(index)}
+                          className={styles.removeAttachmentButton}
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <input
+                ref={commentFileInputRef}
+                type="file"
+                multiple
+                accept="image/jpeg,image/jpg,image/png,image/webp,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleCommentFileSelect}
+                className={styles.hiddenFileInput}
               />
               <button
+                type="button"
+                className={styles.attachButton}
+                onClick={() => commentFileInputRef.current?.click()}
+                title="Attach file"
+              >
+                <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                  <path
+                    d="M15.75 8.25L9.31 14.69C8.5 15.49 7.41 15.94 6.28 15.94C5.14 15.94 4.05 15.49 3.25 14.69C2.44 13.88 1.99 12.79 1.99 11.66C1.99 10.52 2.44 9.43 3.25 8.62L9.69 2.18C10.22 1.65 10.95 1.35 11.7 1.35C12.46 1.35 13.19 1.65 13.72 2.18C14.26 2.72 14.56 3.45 14.56 4.2C14.56 4.96 14.26 5.69 13.72 6.22L7.28 12.66C7.01 12.93 6.65 13.08 6.27 13.08C5.89 13.08 5.53 12.93 5.26 12.66C4.99 12.39 4.84 12.03 4.84 11.65C4.84 11.27 4.99 10.91 5.26 10.64L11.32 4.58"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
                 type="submit"
-                disabled={isSubmittingComment || !newComment.trim()}
+                disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
                 className={styles.commentSubmitButton}
               >
                 {isSubmittingComment ? 'Posting...' : 'Post Comment'}
@@ -1193,45 +1502,185 @@ export default function ProjectTaskDetail({
             {/* Comments List */}
             {task.comments && task.comments.length > 0 && (
               <div className={styles.comments}>
-                {task.comments.map(comment => (
-                  <div
-                    key={comment.id}
-                    id={`task-comment-${comment.id}`}
-                    className={`${styles.comment} ${
-                      highlightedCommentId === comment.id
-                        ? styles.commentHighlight
-                        : ''
-                    }`}
-                  >
-                    <div className={styles.commentHeader}>
-                      <div className={styles.commentHeaderLeft}>
-                        <MiniAvatar
-                          firstName={
-                            comment.user_profile?.first_name || undefined
-                          }
-                          lastName={
-                            comment.user_profile?.last_name || undefined
-                          }
-                          email={comment.user_profile?.email || ''}
-                          avatarUrl={comment.user_profile?.avatar_url || null}
-                          size="small"
-                          showTooltip={true}
-                        />
-                        <div className={styles.commentAuthor}>
-                          {comment.user_profile?.first_name}{' '}
-                          {comment.user_profile?.last_name}
+                {task.comments.map(comment => {
+                  const isCommentOwner = currentUserId && comment.user_id === currentUserId;
+                  const isEditing = editingCommentId === comment.id;
+                  const isEdited = comment.updated_at && comment.created_at !== comment.updated_at;
+
+                  return (
+                    <div
+                      key={comment.id}
+                      id={`task-comment-${comment.id}`}
+                      className={`${styles.comment} ${
+                        highlightedCommentId === comment.id
+                          ? styles.commentHighlight
+                          : ''
+                      }`}
+                    >
+                      <div className={styles.commentHeader}>
+                        <div className={styles.commentHeaderLeft}>
+                          <MiniAvatar
+                            firstName={
+                              comment.user_profile?.first_name || undefined
+                            }
+                            lastName={
+                              comment.user_profile?.last_name || undefined
+                            }
+                            email={comment.user_profile?.email || ''}
+                            avatarUrl={comment.user_profile?.avatar_url || null}
+                            size="small"
+                            showTooltip={true}
+                          />
+                          <div className={styles.commentAuthor}>
+                            {comment.user_profile?.first_name}{' '}
+                            {comment.user_profile?.last_name}
+                          </div>
+                        </div>
+                        <div className={styles.commentHeaderRight}>
+                          <div className={styles.commentDate}>
+                            {formatDateTime(comment.created_at)}
+                            {isEdited && (
+                              <span className={styles.commentEdited}> (edited)</span>
+                            )}
+                          </div>
+                          {isCommentOwner && (
+                            <div className={styles.commentActions}>
+                              {isEditing ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={styles.commentActionButton}
+                                    onClick={handleUpdateComment}
+                                    aria-label="Save comment"
+                                    disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
+                                  >
+                                    <Check size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={styles.commentActionButton}
+                                    onClick={handleCancelEditComment}
+                                    aria-label="Cancel edit"
+                                    disabled={isUpdatingComment}
+                                  >
+                                    <X size={14} />
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    className={styles.commentActionButton}
+                                    onClick={() => handleStartEditComment(comment)}
+                                    aria-label="Edit comment"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`${styles.commentActionButton} ${styles.commentActionDanger}`}
+                                    onClick={() => handleDeleteComment(comment.id)}
+                                    aria-label="Delete comment"
+                                    disabled={deletingCommentId === comment.id}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className={styles.commentDate}>
-                        {formatDateTime(comment.created_at)}
-                      </div>
+                      {isEditing ? (
+                        <RichTextEditor
+                          value={editingCommentText}
+                          onChange={setEditingCommentText}
+                          placeholder="Edit comment..."
+                          className={styles.commentEditRichEditor}
+                          compact
+                          mentionUsers={mentionUsers}
+                        />
+                      ) : (
+                        <>
+                          <div
+                            className={styles.commentText}
+                            dangerouslySetInnerHTML={{ __html: comment.comment }}
+                          />
+                          {comment.attachments && comment.attachments.length > 0 && (() => {
+                            const imageAttachments = comment.attachments.filter(
+                              (attachment: { mime_type?: string | null }) =>
+                                attachment.mime_type?.startsWith('image/')
+                            );
+                            const fileAttachments = comment.attachments.filter(
+                              (attachment: { mime_type?: string | null }) =>
+                                !attachment.mime_type?.startsWith('image/')
+                            );
+
+                            const commentLightboxImages = imageAttachments.map((att: any) => ({
+                              id: att.id,
+                              url: att.url,
+                              name: att.file_name
+                            }));
+
+                            return (
+                              <>
+                                {imageAttachments.length > 0 && (
+                                  <div className={styles.commentImages}>
+                                    {imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => (
+                                      <div
+                                        key={attachment.id}
+                                        className={styles.commentImage}
+                                        onClick={() => handleCommentImageClick(commentLightboxImages, attachment.id)}
+                                        style={{ cursor: 'pointer' }}
+                                      >
+                                        <img
+                                          src={attachment.url}
+                                          alt={attachment.file_name}
+                                          loading="lazy"
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {fileAttachments.length > 0 && (
+                                  <div className={styles.commentAttachments}>
+                                    {fileAttachments.map((attachment: { id: string; url: string; file_name: string; mime_type?: string | null }) => (
+                                      <a
+                                        key={attachment.id}
+                                        href={attachment.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={styles.commentFile}
+                                      >
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                          <path
+                                            d="M9.33333 1.33334H4C3.46957 1.33334 2.96086 1.54405 2.58579 1.91913C2.21071 2.2942 2 2.80291 2 3.33334V12.6667C2 13.1971 2.21071 13.7058 2.58579 14.0809C2.96086 14.456 3.46957 14.6667 4 14.6667H12C12.5304 14.6667 13.0391 14.456 13.4142 14.0809C13.7893 13.7058 14 13.1971 14 12.6667V6L9.33333 1.33334Z"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          />
+                                          <path
+                                            d="M9.33333 1.33334V6H14"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          />
+                                        </svg>
+                                        <span>{attachment.file_name}</span>
+                                      </a>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </>
+                      )}
                     </div>
-                    <div
-                      className={styles.commentText}
-                      dangerouslySetInnerHTML={{ __html: comment.comment }}
-                    />
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -1327,6 +1776,7 @@ export default function ProjectTaskDetail({
           onCancel={() => setShowErrorModal(false)}
         />
       )}
-    </div>
+      </div>
+    </>
   );
 }

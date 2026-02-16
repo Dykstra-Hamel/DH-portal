@@ -52,7 +52,13 @@ export default function AdminTasksPage() {
   const { registerPageAction } = usePageActions();
   const { user } = useUser();
   const { isStarred, toggleStar, refetch: refetchStarredItems } = useStarredItems();
-  const [currentView, setCurrentView] = useState<ViewType>('list');
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('taskManagement.viewPreference');
+      return (saved as ViewType) || 'list';
+    }
+    return 'list';
+  });
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [selectedTask, setSelectedTask] = useState<Task | undefined>();
 
@@ -229,7 +235,7 @@ export default function AdminTasksPage() {
       setMentionsLoading(true);
       const headers = await getAuthHeaders();
       const response = await fetch(
-        `/api/admin/notifications/mentions?unreadOnly=false&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
+        `/api/admin/notifications/mentions?unreadOnly=true&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
         { headers }
       );
 
@@ -329,6 +335,7 @@ export default function AdminTasksPage() {
             assigned_to: taskData.assigned_to,
             project_id: taskData.project_id,
             is_completed: false,
+            category_ids: (taskData as any).category_ids,
           }),
         });
 
@@ -409,18 +416,15 @@ export default function AdminTasksPage() {
           method: 'POST',
           headers,
         });
+
+        // Remove the mention from the list since it's now read
+        setMentions((prev) =>
+          prev.filter((item) => item.notificationId !== mention.notificationId)
+        );
       }
     } catch (error) {
       console.error('Error marking mention as read:', error);
     }
-
-    setMentions((prev) =>
-      prev.map((item) =>
-        item.notificationId === mention.notificationId
-          ? { ...item, read: true }
-          : item
-      )
-    );
 
     if (mention.referenceType === 'task_comment' && mention.taskId) {
       await openTaskDetailById(mention.taskId, mention.projectId);
@@ -528,10 +532,10 @@ export default function AdminTasksPage() {
   }, [selectedTaskDetail, fetchTasks]);
 
   const handleAddComment = useCallback(async (comment: string) => {
-    if (!selectedTaskDetail?.id) return;
+    if (!selectedTaskDetail?.id) return null;
     if (!selectedTaskDetail.project_id) {
       console.warn('Comments are not available for personal tasks.');
-      return;
+      return null;
     }
 
     try {
@@ -543,15 +547,21 @@ export default function AdminTasksPage() {
       });
 
       if (response.ok) {
+        const createdComment = await response.json();
+
         // Refresh task to get new comment
         const updatedTask = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`, {
           headers,
         }).then(res => res.json());
 
         setSelectedTaskDetail(updatedTask);
+
+        return createdComment;
       }
+      return null;
     } catch (error) {
       console.error('Error adding comment:', error);
+      return null;
     }
   }, [selectedTaskDetail]);
 
@@ -572,6 +582,13 @@ export default function AdminTasksPage() {
       progress_percentage: progress,
     });
   }, [selectedTaskDetail, handleUpdateTask]);
+
+  // Save view preference to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('taskManagement.viewPreference', currentView);
+    }
+  }, [currentView]);
 
   const viewTabs = (
     <div className={styles.viewTabs}>
@@ -763,6 +780,8 @@ export default function AdminTasksPage() {
         onCreateSubtask={handleCreateSubtask}
         onUpdateProgress={handleUpdateProgress}
         users={users}
+        mentionUsers={users}
+        currentUserId={user?.id}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
       />

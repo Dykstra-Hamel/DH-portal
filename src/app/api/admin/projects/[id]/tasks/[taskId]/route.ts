@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { sendTaskUnblockedNotifications } from '@/lib/slack';
+import { STORAGE_CONFIG } from '@/lib/storage-utils';
 
 // GET /api/admin/projects/[id]/tasks/[taskId] - Get a single task
 export async function GET(
@@ -39,7 +40,8 @@ export async function GET(
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         comments:project_task_comments(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url),
+          attachments:comment_attachments!task_comment_id(id, file_path, file_name, file_size, mime_type, created_at)
         ),
         activity:project_task_activity(
           *,
@@ -98,11 +100,26 @@ export async function GET(
       }))
       .filter((category: any) => category !== null) || [];
 
+    // Add public URLs to comment attachments
+    const commentsWithUrls = (task.comments || []).map((comment: any) => ({
+      ...comment,
+      attachments: (comment.attachments || []).map((attachment: any) => {
+        const { data: urlData } = supabase.storage
+          .from(STORAGE_CONFIG.BUCKET_NAME)
+          .getPublicUrl(attachment.file_path);
+        return {
+          ...attachment,
+          url: urlData.publicUrl,
+        };
+      }),
+    }));
+
     const { project_task_category_assignments, ...taskWithoutAssignments } = task;
 
     const taskWithSubtasks = {
       ...taskWithoutAssignments,
       categories,
+      comments: commentsWithUrls,
       subtasks: subtasks || [],
       activity: sortedActivity,
     };

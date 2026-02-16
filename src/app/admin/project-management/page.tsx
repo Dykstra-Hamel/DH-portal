@@ -37,7 +37,13 @@ export default function AdminProjectManagementDashboard() {
   const { isStarred, toggleStar } = useStarredItems();
 
   // View and modal state
-  const [currentView, setCurrentView] = useState<ViewType>('kanban');
+  const [currentView, setCurrentView] = useState<ViewType>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('projectManagement.viewPreference');
+      return (saved as ViewType) || 'kanban';
+    }
+    return 'kanban';
+  });
   const [projectStatusTab, setProjectStatusTab] = useState<ProjectStatusTab>('current');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -811,6 +817,13 @@ export default function AdminProjectManagementDashboard() {
     // The UI will update automatically through the isStarred check in projectsWithStarred
   }, [toggleStar]);
 
+  // Save view preference to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('projectManagement.viewPreference', currentView);
+    }
+  }, [currentView]);
+
   // Don't render for non-admins (after all hooks have been called)
   if (!isAdmin) {
     return null;
@@ -991,7 +1004,7 @@ export default function AdminProjectManagementDashboard() {
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
           task={selectedTask}
-          projects={projects.map(p => ({ id: p.id, name: p.name }))}
+          projects={projects}
           users={users}
           currentUserId={user?.id}
         />

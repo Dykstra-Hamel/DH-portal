@@ -1113,7 +1113,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   }, [project?.id, updateTask, project]);
 
   const handleAddComment = async (comment: string, parentCommentId?: string, attachments?: File[]) => {
-    if (!selectedTask || !project?.id) return;
+    if (!selectedTask || !project?.id) return null;
 
     // First create the comment
     const response = await fetch(
@@ -1196,6 +1196,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
     setSelectedTask(updatedTask);
     onProjectUpdate?.();
+
+    return newComment;
   };
 
   const handleUpdateProgress = async (progress: number) => {
@@ -2618,6 +2620,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         onCreateSubtask={handleCreateSubtask}
         onUpdateProgress={handleUpdateProgress}
         users={users}
+        mentionUsers={mentionUsers}
         highlightedCommentId={highlightedTaskCommentId}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
@@ -2626,6 +2629,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         projectAssignedTo={project.assigned_to_profile?.id}
         availableTasks={tasks}
         departments={departments}
+        currentUserId={user.id}
       />
 
       {/* Apply Template Modal */}
