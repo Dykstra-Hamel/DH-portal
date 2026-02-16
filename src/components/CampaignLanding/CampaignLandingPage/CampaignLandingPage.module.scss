@@ -80,6 +80,7 @@
 
   @media (max-width: 768px) {
     padding: 20px 0 0;
+    z-index: 1;
   }
 }
 
@@ -230,7 +231,14 @@
     pointer-events: none;
 
     @media (max-width: 768px) {
-      background: transparent;
+      inset: auto;
+      top: -94px;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(180deg, var(--brand-secondary) 0%, #fff 100%);
+      opacity: 0.05;
+      z-index: 2;
     }
   }
 
@@ -1433,6 +1441,10 @@
     text-align: center;
     color: var(--faq-color);
   }
+
+  @media (max-width: 768px) {
+    display: none;
+  }
 }
 
 // ========================================
@@ -1470,6 +1482,7 @@
     justify-content: center;
     align-items: center;
     text-align: center;
+    padding-right: 0;
     gap: 40px;
   }
 }
@@ -1512,8 +1525,7 @@
   }
 
   @media (max-width: 768px) {
-    text-align: center;
-    margin: 0;
+    display: none;
   }
 }
 
@@ -1558,6 +1570,10 @@
 
   @media (max-width: 768px) {
     text-align: center;
+
+    h4 {
+      display: none;
+    }
   }
 }
 
