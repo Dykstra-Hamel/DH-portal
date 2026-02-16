@@ -16,7 +16,7 @@ import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
-import { Settings, ChevronDown, Check, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Settings, ChevronDown, Check, Pencil, Trash2, X } from 'lucide-react';
 import { MonthlyServiceForm } from '@/components/MonthlyServices/MonthlyServiceForm/MonthlyServiceForm';
 import { BudgetCard } from '@/components/MonthlyServices/BudgetCard/BudgetCard';
 import ProjectTaskList from '@/components/Projects/ProjectTaskList/ProjectTaskList';
@@ -27,6 +27,7 @@ import { Toast } from '@/components/Common/Toast';
 import { ProjectTask } from '@/types/project';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { useUser } from '@/hooks/useUser';
+import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './MonthlyServiceDetail.module.scss';
 
 const DAYS_OF_WEEK = [
@@ -301,6 +302,10 @@ export function MonthlyServiceDetail({
     };
   };
 
+  const handleBackToMonthlyServices = useCallback(() => {
+    router.push('/admin/monthly-services');
+  }, [router]);
+
   // Fetch companies
   useEffect(() => {
     const fetchCompanies = async () => {
@@ -384,6 +389,16 @@ export function MonthlyServiceDetail({
   useEffect(() => {
     setPageHeader({
       title: serviceData.service_name,
+      titleLeading: (
+        <button
+          type="button"
+          onClick={handleBackToMonthlyServices}
+          className={headerStyles.backButton}
+          aria-label="Back to monthly services"
+        >
+          <ArrowLeft size={16} />
+        </button>
+      ),
       description: `${serviceData.companies.name} • Monthly Service Management`,
       customActions: (
         <div className={styles.headerActions}>
@@ -418,7 +433,7 @@ export function MonthlyServiceDetail({
     });
 
     return () => setPageHeader(null);
-  }, [setPageHeader, serviceData, router, selectedMonthDayjs]);
+  }, [setPageHeader, serviceData, router, selectedMonthDayjs, handleBackToMonthlyServices]);
 
   // Fetch comments for the selected month
   const fetchComments = useCallback(async () => {
