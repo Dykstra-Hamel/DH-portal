@@ -289,6 +289,11 @@
   sup {
     font-size: 30px;
     line-height: 34px;
+
+    @media (max-width: 768px) {
+      font-size: 18px;
+      line-height: 18px;
+    }
   }
 
   @media (max-width: 1200px) {
@@ -306,9 +311,7 @@
 
 .priceHighlight {
   color: var(--accent-color);
-  sup {
-    font-size: 30px;
-  }
+
   @media (max-width: 480px) {
     sup {
       font-size: 18px;
