@@ -96,17 +96,34 @@ export default function HeroSection({
 
   const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+  // Wrap any * characters in <sup> elements
+  const renderWithSuperscript = (text: string, keyPrefix: string | number) => {
+    if (!text.includes('*')) return <span key={keyPrefix}>{text}</span>;
+    const parts = text.split('*');
+    return (
+      <span key={keyPrefix}>
+        {parts.map((part, i) => (
+          <span key={`${keyPrefix}-star${i}`}>
+            {part}
+            {i < parts.length - 1 && <sup>*</sup>}
+          </span>
+        ))}
+      </span>
+    );
+  };
+
   const renderPriceParts = (text: string, keyPrefix: string | number) => {
     // Split by <br> tags first to handle line breaks
     const lines = text.split('<br>');
 
     return lines.flatMap((line, lineIndex) => {
       const parts = line.split('$').map((part, index) => {
-        if (index === 0) return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>{part}</span>;
+        if (index === 0) return renderWithSuperscript(part, `${keyPrefix}-line${lineIndex}-${index}`);
 
         // Extract price pattern like "44/mo"
         const pricePattern = part.match(/^(\d+)(\/mo)/);
         if (pricePattern) {
+          const remainder = part.substring(pricePattern[0].length);
           return (
             <span key={`${keyPrefix}-line${lineIndex}-${index}`}>
               <span className={styles.priceHighlight}>
@@ -114,11 +131,11 @@ export default function HeroSection({
                 {pricePattern[1]}
                 <span className={styles.priceUnit}>{pricePattern[2]}</span>
               </span>
-              {part.substring(pricePattern[0].length)}
+              {renderWithSuperscript(remainder, `${keyPrefix}-line${lineIndex}-${index}-rest`)}
             </span>
           );
         }
-        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>${part}</span>;
+        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}><sup>$</sup>{renderWithSuperscript(part, `${keyPrefix}-line${lineIndex}-${index}-after`)}</span>;
       });
 
       // Add line break between lines (but not after the last line)
@@ -129,6 +146,9 @@ export default function HeroSection({
     });
   };
 
+  // Get original price amount without the $ sign
+  const originalPriceAmount = pricing.originalPrice?.replace(/^\$/, '').trim() || '';
+
   const renderTitleWithStyles = () => {
     const originalPrice = pricing.originalPrice?.trim();
     const titleSegments =
@@ -138,9 +158,13 @@ export default function HeroSection({
 
     return titleSegments.map((segment, idx) => {
       if (originalPrice && segment === originalPrice) {
+        // Render $ and amount as two separate elements:
+        // $ = red, superscript, no strikethrough
+        // amount = red, strikethrough
         return (
-          <span key={`orig-${idx}`} className={styles.strikethrough}>
-            {segment}
+          <span key={`orig-${idx}`}>
+            <sup className={styles.strikethroughDollar}>$</sup>
+            <span className={styles.strikethroughValue}>{originalPriceAmount}</span>
           </span>
         );
       }

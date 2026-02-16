@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import styles from './InlineRedemptionCard.module.scss';
 import { processTextWithVariables, processRedemptionHeading, type VariableContext } from '@/lib/campaign-text-processing';
 
@@ -36,11 +36,17 @@ interface InlineRedemptionCardProps {
     priceAmount: string;
     priceFrequency: string;
   };
+  servicePlans: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    price: number | null;
+  }>;
   addons: Array<{
     id: string;
     name: string;
     description: string | null;
-    price: number;
+    price: number | null;
   }>;
   landingPage?: {
     redemptionCard?: {
@@ -51,13 +57,12 @@ interface InlineRedemptionCardProps {
   company?: VariableContext['company'];
   branding?: VariableContext['branding'];
   serviceName?: string;
-  initialAddonId?: string;
-  isModal?: boolean;
   onRedeem: (data: {
     startDate: Date | null;
     serviceTime: string;
     phoneNumber: string;
     selectedAddonIds: string[];
+    selectedServicePlanId?: string;
   }) => Promise<void>;
 }
 
@@ -65,24 +70,18 @@ export default function InlineRedemptionCard({
   customer,
   campaign,
   pricing,
+  servicePlans,
   addons,
   landingPage,
   company,
   branding,
   serviceName,
-  initialAddonId,
-  isModal = false,
   onRedeem,
 }: InlineRedemptionCardProps) {
   const [startDate, setStartDate] = useState<string>('');
   const [serviceTime, setServiceTime] = useState<string>('');
   const [phoneNumber, setPhoneNumber] = useState<string>(customer.phone_number || '');
-  const [selectedAddonId, setSelectedAddonId] = useState<string>(initialAddonId || '');
-
-  // Sync selectedAddonId when initialAddonId changes (e.g., modal reopened with different addon)
-  useEffect(() => {
-    setSelectedAddonId(initialAddonId || '');
-  }, [initialAddonId]);
+  const [selectedServiceOption, setSelectedServiceOption] = useState<string>('');
   const [isRedeeming, setIsRedeeming] = useState(false);
 
   // Create variable context for text processing
@@ -126,16 +125,28 @@ export default function InlineRedemptionCard({
     [disclaimerText, variableContext]
   );
 
-  const callNumber = branding?.phoneNumber?.trim() || '';
-
   const handleRedeemClick = async () => {
+    let selectedAddonIds: string[] = [];
+    let selectedServicePlanId: string | undefined;
+
+    if (selectedServiceOption.startsWith('addon:')) {
+      const addonId = selectedServiceOption.replace('addon:', '');
+      selectedAddonIds = addonId ? [addonId] : [];
+    }
+
+    if (selectedServiceOption.startsWith('plan:')) {
+      const planId = selectedServiceOption.replace('plan:', '');
+      selectedServicePlanId = planId || undefined;
+    }
+
     setIsRedeeming(true);
     try {
       await onRedeem({
         startDate: startDate ? new Date(startDate) : null,
         serviceTime,
         phoneNumber,
-        selectedAddonIds: selectedAddonId ? [selectedAddonId] : [],
+        selectedAddonIds,
+        selectedServicePlanId,
       });
     } catch (error) {
       console.error('Redemption error:', error);
@@ -281,23 +292,36 @@ export default function InlineRedemptionCard({
         />
       </div>
 
-      {/* Add-on Services Dropdown */}
-      {addons.length > 0 && (
+      {/* Additional Services Dropdown */}
+      {(servicePlans.length > 0 || addons.length > 0) && (
         <div className={styles.addonsField}>
           <label htmlFor="addons">I&apos;m Also Interested In:</label>
           <div className={styles.selectWrapper}>
             <select
               id="addons"
-              value={selectedAddonId}
-              onChange={(e) => setSelectedAddonId(e.target.value)}
-              className={selectedAddonId ? '' : styles.placeholder}
+              value={selectedServiceOption}
+              onChange={(e) => setSelectedServiceOption(e.target.value)}
+              className={selectedServiceOption ? '' : styles.placeholder}
             >
               <option value="">Choose an additional service</option>
-              {addons.map((addon) => (
-                <option key={addon.id} value={addon.id}>
-                  {addon.name}
-                </option>
-              ))}
+              {servicePlans.length > 0 && (
+                <optgroup label="Service Plans">
+                  {servicePlans.map((plan) => (
+                    <option key={plan.id} value={`plan:${plan.id}`}>
+                      {plan.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {addons.length > 0 && (
+                <optgroup label="Add-On Services">
+                  {addons.map((addon) => (
+                    <option key={addon.id} value={`addon:${addon.id}`}>
+                      {addon.name}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
             </select>
             <svg
               className={styles.dropdownArrow}
@@ -327,13 +351,6 @@ export default function InlineRedemptionCard({
         className={styles.disclaimer}
         dangerouslySetInnerHTML={{ __html: processedDisclaimer }}
       />
-
-      {isModal && callNumber && (
-        <p className={styles.modalCallPrompt}>
-          Or Give Us A Call At{' '}
-          <a href={`tel:${callNumber}`}>{callNumber}</a>.
-        </p>
-      )}
     </div>
   );
 }

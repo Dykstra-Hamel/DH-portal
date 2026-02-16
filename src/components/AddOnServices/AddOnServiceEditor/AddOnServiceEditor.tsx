@@ -34,6 +34,7 @@ export default function AddOnServiceEditor({
     eligibility_mode: 'all',
     eligible_plan_ids: [],
     is_active: true,
+    requires_quote: false,
   });
 
   const [servicePlans, setServicePlans] = useState<any[]>([]);
@@ -58,6 +59,7 @@ export default function AddOnServiceEditor({
           eligibility_mode: addon.eligibility_mode,
           eligible_plan_ids: addon.eligible_plan_ids || [],
           is_active: addon.is_active,
+          requires_quote: addon.requires_quote ?? false,
         });
       } else {
         // Reset form for new addon
@@ -74,6 +76,7 @@ export default function AddOnServiceEditor({
           eligibility_mode: 'all',
           eligible_plan_ids: [],
           is_active: true,
+          requires_quote: false,
         });
       }
     }
@@ -281,6 +284,22 @@ export default function AddOnServiceEditor({
                   <option value="annually">Annually</option>
                 </select>
               </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={formData.requires_quote}
+                  onChange={e =>
+                    setFormData({ ...formData, requires_quote: e.target.checked })
+                  }
+                />
+                <span>Requires Custom Quote</span>
+              </label>
+              <p className={styles.helpText}>
+                When enabled, pricing will not be shown. A custom quote must be entered for each customer.
+              </p>
             </div>
           </div>
 

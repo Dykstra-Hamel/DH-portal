@@ -671,7 +671,13 @@
   .addonPrices {
     display: flex;
     gap: 16px;
-    align-items: center;
+    align-items: flex-start;
+  }
+
+  .addonPriceColumn {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .addonRecurring {
@@ -684,6 +690,12 @@
     font-size: 13px;
     font-weight: 500;
     color: var(--gray-600);
+  }
+
+  .addonCustomQuoteLabel {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--warning-600, #b45309);
   }
 
   // Single Plan Total
@@ -1157,6 +1169,25 @@
 
   &:active {
     background: var(--error-600);
+  }
+}
+
+.editCustomPricingButton {
+  padding: 6px 12px;
+  background: none;
+  color: var(--action-500);
+  border: 1px solid var(--action-500);
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 4px;
+
+  &:hover {
+    background: var(--action-50, rgba(0, 105, 224, 0.06));
+    color: var(--action-600);
+    border-color: var(--action-600);
   }
 }
 

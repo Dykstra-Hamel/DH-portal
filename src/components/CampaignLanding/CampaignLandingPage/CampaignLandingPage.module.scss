@@ -24,8 +24,7 @@
   --font-primary:
     'Inter Tight', sans-serif; // Default fallback, overridden by inline styles
 
-  // Fixed design system colors
-  --color-text: #2b2b2b;
+  // Fixed design system colors (--color-text is set via inline styles from brand font color, fallback #2b2b2b)
   --color-text-gray: #4e4e4e;
   --Gray-Text: #4e4e4e;
   --color-border-gray: #bfbfbf;
@@ -287,6 +286,11 @@
   color: var(--Gray-Text);
   margin: 0;
 
+  sup {
+    font-size: 30px;
+    line-height: 34px;
+  }
+
   @media (max-width: 1200px) {
     font-size: 48px;
   }
@@ -303,7 +307,7 @@
 .priceHighlight {
   color: var(--accent-color);
   sup {
-    font-size: 27px;
+    font-size: 30px;
   }
   @media (max-width: 480px) {
     sup {
@@ -324,13 +328,25 @@
   color: #e52c51;
 }
 
+.strikethroughDollar {
+  color: #e52c51;
+  text-decoration: none !important;
+}
+
+.strikethroughValue {
+  text-decoration: line-through;
+  text-decoration-skip-ink: none;
+  color: #e52c51;
+  display: inline-block;
+}
+
 .heroDescription {
   font-size: 24px;
   line-height: 1.3;
   font-weight: 500;
   letter-spacing: -0.24px;
   color: var(--color-text);
-  margin: 0;
+  margin: 15px 0 10px 0;
 
   @media (max-width: 768px) {
     font-size: 18px;
@@ -505,7 +521,6 @@
   display: grid;
   grid-template-columns: 1fr 400px;
   gap: 60px;
-  align-items: center;
 
   // When only redemption card (no letter), center it
   &:has(.redemptionColumn:only-child) {
@@ -544,7 +559,6 @@
   line-height: 28px;
   font-weight: 500;
   letter-spacing: -0.2px;
-  color: var(--nw-ext-colors-text-color, #2b2b2b);
 }
 
 .letterText {
@@ -804,6 +818,7 @@
   strong,
   b {
     color: var(--accent-color);
+    font-weight: 700;
   }
 }
 
@@ -1003,17 +1018,8 @@
   font-size: 16px;
   font-style: normal;
   font-weight: 600;
-  line-height: 33px;
+  line-height: 24px;
   color: var(--color-text);
-}
-
-.serviceItemClickable {
-  cursor: pointer;
-  transition: color 0.2s ease;
-
-  &:hover {
-    color: var(--accent-color);
-  }
 }
 
 .additionalServicesImage {
@@ -1167,7 +1173,7 @@
   text-align: left;
   letter-spacing: -0.33px;
   color: var(--color-text);
-  margin-bottom: 48px;
+  margin-bottom: 34px;
   grid-column: 2; // Align with content column
 
   @media (max-width: 768px) {
@@ -1354,7 +1360,7 @@
   align-items: center;
   text-align: left;
   font-size: 17px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--color-text);
   transition: background 0.2s;
 
@@ -1396,6 +1402,33 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+// ========================================
+// PRE-FOOTER SECTION
+// ========================================
+
+.preFooterSection {
+  max-width: 510px;
+  margin: 0 auto;
+  padding: 40px 20px;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--color-text);
+  text-align: center;
+
+  > div {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  h3 {
+    font-size: 24px;
+    font-weight: 700;
+    text-align: center;
+    color: var(--faq-color);
   }
 }
 
@@ -1562,38 +1595,5 @@
 
   span {
     color: var(--color-text-gray);
-  }
-}
-
-// ========================================
-// REDEMPTION MODAL
-// ========================================
-
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.2s ease-out;
-}
-
-.modalContent {
-  max-width: 520px;
-  width: 90%;
-  max-height: 90vh;
-  overflow-y: auto;
-  animation: fadeIn 0.2s ease-out;
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
   }
 }

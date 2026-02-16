@@ -52,7 +52,10 @@ export default function EditLandingPageModal({
     additional_services_heading: '',
     additional_services: [],
     additional_services_image_url: '',
+    selected_service_plan_ids: [],
     selected_addon_ids: [],
+    show_pre_footer: true,
+    pre_footer_content: '',
     show_faq: true,
     faq_heading: '',
     faq_items: [],
@@ -131,7 +134,10 @@ export default function EditLandingPageModal({
               'And thats not all, we offer additional add-on programs as well including:',
             additional_services: [],
             additional_services_image_url: '',
+            selected_service_plan_ids: [],
             selected_addon_ids: [],
+            show_pre_footer: true,
+            pre_footer_content: '',
             show_faq: true,
             faq_heading: 'Frequently Asked Questions',
             faq_items: [],
@@ -202,7 +208,12 @@ export default function EditLandingPageModal({
         additional_services_heading: apiData.landingPage.additionalServices.heading || '',
         additional_services: apiData.landingPage.additionalServices.services || [],
         additional_services_image_url: apiData.landingPage.additionalServices.imageUrl || '',
+        selected_service_plan_ids: apiData.landingPage.selectedServicePlanIds ?? [],
         selected_addon_ids: apiData.landingPage.selectedAddonIds ?? [],
+
+        // Pre-Footer
+        show_pre_footer: apiData.landingPage.preFooter?.show ?? true,
+        pre_footer_content: apiData.landingPage.preFooter?.content || '',
 
         // FAQ
         show_faq: apiData.landingPage.faq.show ?? true,

@@ -25,6 +25,7 @@ interface RedeemRequest {
     language?: string;
   };
   selected_addon_ids?: string[];
+  selected_service_plan_id?: string;
 }
 
 export async function POST(
@@ -44,7 +45,17 @@ export async function POST(
     }
 
     // Field whitelisting to prevent unauthorized field injection
-    const allowedFields = ['customerId', 'signature_data', 'terms_accepted', 'requested_date', 'requested_time', 'phone_number', 'client_device_data', 'selected_addon_ids'];
+    const allowedFields = [
+      'customerId',
+      'signature_data',
+      'terms_accepted',
+      'requested_date',
+      'requested_time',
+      'phone_number',
+      'client_device_data',
+      'selected_addon_ids',
+      'selected_service_plan_id',
+    ];
     const requestedFields = Object.keys(body);
     const unauthorizedFields = requestedFields.filter(field => !allowedFields.includes(field));
 
@@ -365,6 +376,10 @@ export async function POST(
 
     let lead;
     const signedAt = new Date().toLocaleDateString();
+    const hasDropdownSelection =
+      (body.selected_addon_ids?.length || 0) > 0 ||
+      !!body.selected_service_plan_id;
+    const leadStatus = hasDropdownSelection ? 'new' : 'scheduling';
 
     if (existingLead) {
       // Update existing lead to 'ready_to_schedule' stage
@@ -376,7 +391,7 @@ export async function POST(
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')
         .update({
-          lead_status: 'scheduling',
+          lead_status: leadStatus,
           service_address_id: addressData?.id || existingLead.service_address_id,
           requested_date: body.requested_date || null,
           requested_time: body.requested_time || null,
@@ -396,9 +411,9 @@ export async function POST(
       }
 
       lead = updatedLead;
-      console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to 'scheduling'`);
+      console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to '${leadStatus}'`);
     } else {
-      // Create new lead in 'scheduling' stage (no prior email engagement)
+      // Create new lead based on redemption selections.
       const { data: newLead, error: createError } = await supabase
         .from('leads')
         .insert({
@@ -407,7 +422,7 @@ export async function POST(
           service_address_id: addressData?.id || null,
           campaign_id: campaign.id,
           lead_source: 'campaign',
-          lead_status: 'scheduling',
+          lead_status: leadStatus,
           pest_type: targetPestName,
           comments: leadComments,
           requested_date: body.requested_date || null,
@@ -425,7 +440,7 @@ export async function POST(
       }
 
       lead = newLead;
-      console.log(`Created new lead ${lead.id} in 'scheduling' stage`);
+      console.log(`Created new lead ${lead.id} in '${leadStatus}' stage`);
     }
 
     // UPDATE CUSTOMER PHONE NUMBER: If phone number provided and different from existing
@@ -473,7 +488,7 @@ export async function POST(
 
         // 3. Calculate service plan pricing with discount
         let planInitialPrice = servicePlan.initial_price || 0;
-        let planRecurringPrice = servicePlan.recurring_price;
+        let planRecurringPrice = servicePlan.recurring_price || 0;
         let discountPercentage = 0;
         let discountAmount = 0;
 
@@ -547,16 +562,36 @@ export async function POST(
           }
         }
 
-        // 5. Calculate total pricing (service plan + add-ons)
+        // 5. Fetch selected service plan from dropdown (if any)
+        let selectedServicePlan: any | null = null;
+        if (body.selected_service_plan_id) {
+          const { data: additionalServicePlan } = await supabase
+            .from('service_plans')
+            .select('id, plan_name, plan_description, initial_price, recurring_price, billing_frequency, treatment_frequency')
+            .eq('id', body.selected_service_plan_id)
+            .eq('company_id', campaign.company_id)
+            .maybeSingle();
+
+          if (additionalServicePlan) {
+            selectedServicePlan = additionalServicePlan;
+          }
+        }
+
+        // 6. Calculate total pricing (campaign plan + selected plan + add-ons)
         let totalInitialPrice = planInitialPrice;
         let totalRecurringPrice = planRecurringPrice;
 
+        if (selectedServicePlan) {
+          totalInitialPrice += selectedServicePlan.initial_price || 0;
+          totalRecurringPrice += selectedServicePlan.recurring_price || 0;
+        }
+
         selectedAddOns.forEach(addon => {
           totalInitialPrice += (addon.initial_price || 0);
-          totalRecurringPrice += addon.recurring_price;
+          totalRecurringPrice += addon.recurring_price || 0;
         });
 
-        // 6. Check for existing quote (avoid duplicates)
+        // 7. Check for existing quote (avoid duplicates)
         const { data: existingQuote } = await supabase
           .from('quotes')
           .select('id')
@@ -615,9 +650,10 @@ export async function POST(
           }
         }
 
-        // 7. Create quote line items (service plan + add-ons)
+        // 8. Create quote line items (campaign plan + selected plan + add-ons)
         if (quoteId) {
           const lineItems: any[] = [];
+          let displayOrder = 0;
 
           // Service plan line item
           lineItems.push({
@@ -635,11 +671,32 @@ export async function POST(
             discount_amount: discountAmount,
             final_initial_price: planInitialPrice,
             final_recurring_price: planRecurringPrice,
-            display_order: 0,
+            display_order: displayOrder++,
           });
 
+          // Optional selected service plan line item (no campaign discount applied)
+          if (selectedServicePlan) {
+            lineItems.push({
+              quote_id: quoteId,
+              service_plan_id: selectedServicePlan.id,
+              addon_service_id: null,
+              plan_name: selectedServicePlan.plan_name,
+              plan_description: selectedServicePlan.plan_description,
+              initial_price: selectedServicePlan.initial_price || 0,
+              recurring_price: selectedServicePlan.recurring_price || 0,
+              billing_frequency: selectedServicePlan.billing_frequency,
+              service_frequency: selectedServicePlan.treatment_frequency || null,
+              discount_id: null,
+              discount_percentage: 0,
+              discount_amount: 0,
+              final_initial_price: selectedServicePlan.initial_price || 0,
+              final_recurring_price: selectedServicePlan.recurring_price || 0,
+              display_order: displayOrder++,
+            });
+          }
+
           // Add-on line items
-          selectedAddOns.forEach((addon, index) => {
+          selectedAddOns.forEach((addon) => {
             lineItems.push({
               quote_id: quoteId,
               service_plan_id: null,
@@ -654,7 +711,7 @@ export async function POST(
               discount_amount: 0,
               final_initial_price: addon.initial_price || 0,
               final_recurring_price: addon.recurring_price,
-              display_order: index + 1,
+              display_order: displayOrder++,
             });
           });
 
@@ -784,8 +841,9 @@ export async function POST(
           requested_time: body.requested_time,
           device_data: completeDeviceData,
           previous_lead_status: existingLead?.lead_status || null,
-          new_lead_status: 'scheduling',
+          new_lead_status: leadStatus,
           selected_addon_ids: body.selected_addon_ids || [],
+          selected_service_plan_id: body.selected_service_plan_id || null,
           workflow_cancelled: !!campaignExecution?.automation_execution_id,
           cancelled_execution_id: campaignExecution?.automation_execution_id || null,
         },
@@ -803,8 +861,8 @@ export async function POST(
       console.error('Campaign lead notification failed:', error);
     });
 
-    // If updating existing lead to scheduling status, trigger status-changed event
-    if (existingLead && existingLead.lead_status !== 'scheduling') {
+    // If updating existing lead status, trigger status-changed event
+    if (existingLead && existingLead.lead_status !== leadStatus) {
       try {
         await inngest.send({
           name: 'lead/status-changed',
@@ -812,7 +870,7 @@ export async function POST(
             leadId: existingLead.id,
             companyId: campaign.company_id,
             fromStatus: existingLead.lead_status,
-            toStatus: 'scheduling',
+            toStatus: leadStatus,
             assignedUserId: existingLead.assigned_to,
             userId: 'system',
             timestamp: new Date().toISOString(),
