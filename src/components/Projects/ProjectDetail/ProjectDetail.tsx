@@ -89,6 +89,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const [showAddMember, setShowAddMember] = useState(false);
   const [isAddingMember, setIsAddingMember] = useState(false);
   const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
   const hasUserEditedRef = React.useRef(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = React.useRef<string>('');
@@ -388,8 +390,10 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       saveTimeoutRef.current = null;
     }
 
-    // Check if data has actually changed from last saved state
-    const currentData = JSON.stringify(editFormData);
+    // Exclude notes from autosave - create a version without notes for comparison
+    const { notes, ...dataWithoutNotes } = editFormData;
+    const currentData = JSON.stringify(dataWithoutNotes);
+
     if (currentData === lastSavedDataRef.current) {
       return;
     }
@@ -402,7 +406,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     saveTimeoutRef.current = setTimeout(() => {
       handleSaveEdit();
       lastSavedDataRef.current = currentData;
-    }, 700);
+    }, 1500);
 
     return () => {
       if (saveTimeoutRef.current) {
@@ -419,6 +423,64 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     hasUserEditedRef.current = true;
     setEditFormData({ ...editFormData, [field]: value });
   };
+
+  // Special handler for notes that doesn't trigger autosave
+  const handleNotesChange = (value: string) => {
+    setEditFormData({ ...editFormData, notes: value });
+    setHasUnsavedNotes(true);
+  };
+
+  // Save notes manually
+  const handleSaveNotes = React.useCallback(async () => {
+    setIsSavingNotes(true);
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editFormData.name,
+          description: editFormData.description,
+          notes: editFormData.notes,
+          status: editFormData.status,
+          priority: editFormData.priority,
+          assigned_to: editFormData.assigned_to || null,
+          requested_by: editFormData.requested_by || null,
+          due_date: editFormData.due_date,
+          start_date: editFormData.start_date || null,
+          completion_date: editFormData.completion_date || null,
+          project_type: editFormData.project_type,
+          project_subtype: editFormData.project_subtype || null,
+          is_billable: editFormData.is_billable,
+          quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
+          scope: editFormData.scope || null,
+          category_ids: editFormData.category_ids,
+          company_id: editFormData.company_id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update notes');
+      }
+
+      // Call callback to refresh project data
+      if (onProjectUpdate) {
+        onProjectUpdate();
+      }
+      setHasUnsavedNotes(false);
+      setToastMessage('Notes saved successfully.');
+      setToastType('success');
+      setShowToast(true);
+    } catch (error) {
+      console.error('Error updating notes:', error);
+      setToastMessage('Failed to save notes.');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  }, [editFormData, onProjectUpdate, project.id]);
 
   const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
 
@@ -909,11 +971,19 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           <div className={styles.textBlock}>
             <RichTextEditor
               value={editFormData.notes}
-              onChange={(value) => handleFieldChange('notes', value)}
+              onChange={handleNotesChange}
               placeholder="Add notes..."
               className={styles.notesEditor}
               compact
             />
+            <button
+              type="button"
+              className={styles.notesSaveButton}
+              onClick={handleSaveNotes}
+              disabled={!hasUnsavedNotes || isSavingNotes}
+            >
+              {isSavingNotes ? 'Saving...' : 'Save Notes'}
+            </button>
           </div>
         </div>
       </InfoCard>

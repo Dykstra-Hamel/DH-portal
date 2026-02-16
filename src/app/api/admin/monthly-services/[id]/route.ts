@@ -127,7 +127,8 @@ export async function GET(
           id,
           first_name,
           last_name,
-          email
+          email,
+          avatar_url
         ),
         monthly_service_task_department_assignments (
           department_id,
@@ -181,6 +182,59 @@ export async function GET(
       console.log(`[Monthly Service ${id}] Task due dates:`, tasks.map(t => ({ title: t.title, due_date: t.due_date })));
     }
 
+    // Calculate hasUnreadComments for each task
+    const taskIds = (tasks || []).map(t => t.id);
+    let tasksWithUnreadFlags = tasks || [];
+
+    if (taskIds.length > 0) {
+      // Get all view records for current user for these tasks
+      const { data: viewRecords } = await supabase
+        .from('project_task_views')
+        .select('task_id, last_viewed_at')
+        .eq('user_id', user.id)
+        .in('task_id', taskIds);
+
+      // Create a map of task_id -> last_viewed_at
+      const viewMap = new Map(
+        (viewRecords || []).map(v => [v.task_id, new Date(v.last_viewed_at)])
+      );
+
+      // Add hasUnreadComments and hasUnreadMentions flags to each task
+      tasksWithUnreadFlags = (tasks || []).map(task => {
+        let hasUnreadComments = false;
+        let hasUnreadMentions = false;
+
+        if (task.comments && task.comments.length > 0) {
+          const lastViewedAt = viewMap.get(task.id);
+
+          if (!lastViewedAt) {
+            // Never viewed - all comments are unread
+            hasUnreadComments = true;
+            // Check if any comment mentions the current user
+            hasUnreadMentions = task.comments.some((comment: any) => {
+              const html = comment.comment || '';
+              return html.includes(`data-id="${user.id}"`);
+            });
+          } else {
+            // Get unread comments (newer than last view)
+            const unreadComments = task.comments.filter(
+              (comment: any) => new Date(comment.created_at) > lastViewedAt
+            );
+
+            hasUnreadComments = unreadComments.length > 0;
+
+            // Check if any unread comment mentions the current user
+            hasUnreadMentions = unreadComments.some((comment: any) => {
+              const html = comment.comment || '';
+              return html.includes(`data-id="${user.id}"`);
+            });
+          }
+        }
+
+        return { ...task, hasUnreadComments, hasUnreadMentions };
+      });
+    }
+
     // Fetch budgets for the selected month
     const [budgetYear, budgetMonth] = month.split('-').map(Number);
     const { data: budgets, error: budgetsError } = await supabase
@@ -197,10 +251,10 @@ export async function GET(
 
     console.log(`[Monthly Service ${id}] Budgets fetched: ${budgets?.length || 0}`);
 
-    // Calculate progress by week
+    // Calculate progress by week (use tasksWithUnreadFlags instead of tasks)
     const weekProgress = [1, 2, 3, 4].map(week => {
       const weekTemplates = (templates || []).filter(t => t.week_of_month === week);
-      const weekTasks = (tasks || []).filter(t => {
+      const weekTasks = tasksWithUnreadFlags.filter(t => {
         // Calculate week from due_date
         // Parse day directly from ISO date string to avoid timezone issues
         const dayOfMonth = parseInt(t.due_date.split('-')[2], 10);
@@ -225,7 +279,7 @@ export async function GET(
       service: {
         ...service,
         templates: templates || [],
-        tasks: tasks || [],
+        tasks: tasksWithUnreadFlags,
         weekProgress,
         budgets: budgets || [],
       },

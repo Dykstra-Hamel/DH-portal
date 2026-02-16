@@ -32,6 +32,14 @@ import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import styles from './ProjectTaskDetail.module.scss';
 
+interface MentionUser {
+  id: string;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  avatar_url?: string | null;
+}
+
 interface ProjectTaskDetailProps {
   task: ProjectTask | null;
   onClose: () => void;
@@ -58,6 +66,7 @@ interface ProjectTaskDetailProps {
     icon?: string;
   }>; // For monthly service tasks
   departments?: ProjectDepartment[];
+  mentionUsers?: MentionUser[]; // Users available for @mentions
 }
 
 export default function ProjectTaskDetail({
@@ -77,6 +86,7 @@ export default function ProjectTaskDetail({
   availableTasks = [],
   monthlyServiceDepartments = [],
   departments = [],
+  mentionUsers,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -1163,12 +1173,13 @@ export default function ProjectTaskDetail({
 
             {/* Add Comment Form */}
             <form onSubmit={handleSubmitComment} className={styles.commentForm}>
-              <textarea
+              <RichTextEditor
                 value={newComment}
-                onChange={e => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
-                className={styles.commentInput}
-                rows={3}
+                onChange={setNewComment}
+                placeholder="Add a comment... Use @ to mention someone"
+                className={styles.commentRichEditor}
+                compact
+                mentionUsers={mentionUsers}
               />
               <button
                 type="submit"
@@ -1215,7 +1226,10 @@ export default function ProjectTaskDetail({
                         {formatDateTime(comment.created_at)}
                       </div>
                     </div>
-                    <div className={styles.commentText}>{comment.comment}</div>
+                    <div
+                      className={styles.commentText}
+                      dangerouslySetInnerHTML={{ __html: comment.comment }}
+                    />
                   </div>
                 ))}
               </div>

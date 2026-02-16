@@ -15,19 +15,17 @@
     border-radius: 0;
     box-shadow: none;
     border: none;
+    border-bottom: 1px solid var(--gray-200);
 
     .header {
       margin: 0;
       border-radius: 0;
       padding: 16px 16px;
-      border-bottom: 1px solid var(--gray-200);
       background: #fff;
     }
 
     // When card is expanded in sidebar, style icon/arrow and remove border
     &:has(.header.expanded) {
-      border-bottom: none;
-
       .icon {
         color: var(--action-500);
       }
