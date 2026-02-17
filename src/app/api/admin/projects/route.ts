@@ -296,6 +296,7 @@ export async function POST(request: NextRequest) {
       current_department_id,
       type_code, // Project type code for shortcode generation
       tasks = [],
+      member_ids = [],
     } = body;
 
     // Validate required fields
@@ -324,7 +325,7 @@ export async function POST(request: NextRequest) {
     // Validate type_code and company short_code
     if (type_code) {
       // Validate type_code format
-      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'SFT'];
+      const validTypeCodes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'CAM', 'SFT'];
       if (!validTypeCodes.includes(type_code)) {
         return NextResponse.json(
           { error: `Invalid type_code. Must be one of: ${validTypeCodes.join(', ')}` },
@@ -433,6 +434,24 @@ export async function POST(request: NextRequest) {
       if (categoryError) {
         console.error('Error assigning categories to project:', categoryError);
         // Don't fail the whole request, just log the error
+      }
+    }
+
+    // Handle project member assignments if provided
+    if (member_ids && Array.isArray(member_ids) && member_ids.length > 0) {
+      const memberInserts = member_ids.map((userId: string) => ({
+        project_id: project.id,
+        user_id: userId,
+        added_via: 'manual',
+        added_by: user.id,
+      }));
+
+      const { error: memberError } = await supabase
+        .from('project_members')
+        .insert(memberInserts);
+
+      if (memberError) {
+        console.error('Error adding members to project:', memberError);
       }
     }
 

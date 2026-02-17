@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser, getSupabaseClient } from '@/lib/api-utils';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import type { NormalizedLeadData } from '@/lib/gemini/csv-parser';
+import {
+  createOrFindServiceAddress,
+  linkCustomerToServiceAddress,
+} from '@/lib/service-addresses';
 
 export async function POST(request: NextRequest) {
   try {
@@ -76,6 +80,7 @@ export async function POST(request: NextRequest) {
     for (const contactData of members as NormalizedLeadData[]) {
       try {
         let customerId: string | null = null;
+        let isNewCustomer = false;
 
         // Try to find existing customer by email first, then fall back to phone
         if (contactData.email) {
@@ -131,7 +136,49 @@ export async function POST(request: NextRequest) {
           }
 
           customerId = newCustomer.id;
+          isNewCustomer = true;
           newCustomersCount++;
+        }
+
+        // Create/link service address if we have address data
+        const hasAddressData = contactData.street_address || contactData.city || contactData.state || contactData.zip;
+        if (customerId && hasAddressData) {
+          try {
+            // For existing customers, only create/link an address if they have no primary service address yet
+            let shouldCreateAddress = isNewCustomer;
+
+            if (!isNewCustomer) {
+              // Skip if customer already has any linked service address
+              const { data: anyLinkedAddress } = await adminSupabase
+                .from('customer_service_addresses')
+                .select('id')
+                .eq('customer_id', customerId)
+                .maybeSingle();
+
+              shouldCreateAddress = !anyLinkedAddress;
+            }
+
+            if (shouldCreateAddress) {
+              const addressResult = await createOrFindServiceAddress(company_id, {
+                street_address: contactData.street_address ?? undefined,
+                city: contactData.city ?? undefined,
+                state: contactData.state ?? undefined,
+                zip_code: contactData.zip ?? undefined,
+              });
+
+              if (addressResult.success && addressResult.serviceAddressId) {
+                await linkCustomerToServiceAddress(
+                  customerId,
+                  addressResult.serviceAddressId,
+                  'owner',
+                  true
+                );
+              }
+            }
+          } catch (addressError) {
+            console.warn('Failed to create/link service address for customer:', customerId, addressError);
+            // Don't fail the contact — address linking is best-effort
+          }
         }
 
         // Add to contact list

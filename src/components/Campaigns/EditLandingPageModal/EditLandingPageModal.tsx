@@ -34,6 +34,7 @@ export default function EditLandingPageModal({
   const [formData, setFormData] = useState<LandingPageFormData>({
     hero_title: '',
     hero_subtitle: '',
+    hero_subheading: '',
     hero_description: '',
     hero_button_text: '',
     hero_button_icon_url: '',
@@ -115,6 +116,7 @@ export default function EditLandingPageModal({
           setFormData({
             hero_title: 'Quarterly Pest Control starting at only $44/mo',
             hero_subtitle: 'Special Offer',
+            hero_subheading: '',
             hero_description: '',
             hero_button_text: 'Upgrade Today!',
             hero_image_url: '',
@@ -182,6 +184,7 @@ export default function EditLandingPageModal({
         // Hero
         hero_title: apiData.landingPage.hero.title || '',
         hero_subtitle: apiData.landingPage.hero.subtitle || '',
+        hero_subheading: apiData.landingPage.hero.subheading || '',
         hero_description: apiData.landingPage.hero.description || '',
         hero_button_text: apiData.landingPage.hero.buttonText || '',
         hero_image_url: apiData.landingPage.hero.imageUrl || '',

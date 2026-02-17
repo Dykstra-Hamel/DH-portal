@@ -911,7 +911,9 @@ export default function AdminProjectManagementDashboard() {
       </div>
 
       {/* View Content */}
-      <div className={styles.viewContent}>
+      <div
+        className={`${styles.viewContent} ${currentView !== 'kanban' ? styles.constrainedViewMode : ''}`}
+      >
         {isLoading ? (
           <div className={styles.loading}>
             <div className={styles.spinner} />
@@ -942,20 +944,24 @@ export default function AdminProjectManagementDashboard() {
               )
             )}
             {currentView === 'list' && (
-              <ProjectsView
-                projects={visibleProjects}
-                tasks={tasks.map(convertToTask)}
-                onEditProject={handleEditProject}
-                onDeleteProject={handleDeleteProject}
-                onToggleStar={handleToggleStar}
-                onProjectClick={handleProjectClick}
-              />
+              <div className={styles.constrainedViewPane}>
+                <ProjectsView
+                  projects={visibleProjects}
+                  tasks={tasks.map(convertToTask)}
+                  onEditProject={handleEditProject}
+                  onDeleteProject={handleDeleteProject}
+                  onToggleStar={handleToggleStar}
+                  onProjectClick={handleProjectClick}
+                />
+              </div>
             )}
             {currentView === 'calendar' && (
-              <ProjectCalendarView
-                projects={visibleProjects}
-                onProjectClick={handleProjectClick}
-              />
+              <div className={styles.constrainedViewPane}>
+                <ProjectCalendarView
+                  projects={visibleProjects}
+                  onProjectClick={handleProjectClick}
+                />
+              </div>
             )}
           </>
         )}

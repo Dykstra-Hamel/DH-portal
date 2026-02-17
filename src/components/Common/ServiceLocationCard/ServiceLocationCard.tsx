@@ -43,6 +43,7 @@ interface ServiceLocationCardProps {
   hasCompleteUnchangedAddress?: boolean;
   currentFormattedAddress?: string;
   onExpand?: () => void;
+  onCollapse?: () => void;
   forceCollapse?: boolean;
   isCompact?: boolean;
   inSidebar?: boolean;
@@ -66,6 +67,7 @@ export function ServiceLocationCard({
   hasCompleteUnchangedAddress = false,
   currentFormattedAddress = '',
   onExpand,
+  onCollapse,
   forceCollapse = false,
   isCompact = false,
   inSidebar = false,
@@ -211,6 +213,7 @@ export function ServiceLocationCard({
         icon={<MapPinned size={20} />}
         startExpanded={startExpanded}
         onExpand={onExpand}
+        onCollapse={onCollapse}
         forceCollapse={forceCollapse}
         isCompact={isCompact}
         inSidebar={inSidebar}
@@ -306,6 +309,7 @@ export function ServiceLocationCard({
       icon={<MapPinned size={20} />}
       startExpanded={startExpanded}
       onExpand={onExpand}
+      onCollapse={onCollapse}
       forceCollapse={forceCollapse}
       isCompact={isCompact}
       inSidebar={inSidebar}

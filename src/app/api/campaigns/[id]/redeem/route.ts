@@ -422,6 +422,7 @@ export async function POST(
           service_address_id: addressData?.id || null,
           campaign_id: campaign.id,
           lead_source: 'campaign',
+          lead_type: 'web_form',
           lead_status: leadStatus,
           pest_type: targetPestName,
           comments: leadComments,
@@ -735,6 +736,48 @@ export async function POST(
       .from('campaign_contact_list_members')
       .update({ lead_id: lead.id })
       .eq('id', updatedMember.id);
+
+    // Create form_submissions record for campaign redemption
+    const sourceUrl = request.headers.get('referer') || request.headers.get('origin') || null;
+    const sourceDomain = sourceUrl
+      ? (() => { try { return new URL(sourceUrl).hostname; } catch { return sourceUrl; } })()
+      : null;
+
+    const normalizedData: Record<string, string | null> = {
+      first_name: customer.first_name || null,
+      last_name: customer.last_name || null,
+      email: customer.email || null,
+      phone_number: body.phone_number || customer.phone || null,
+      street_address: addressData?.street_address || null,
+      city: addressData?.city || null,
+      state: addressData?.state || null,
+      zip: addressData?.zip_code || null,
+    };
+
+    const { error: formSubmissionError } = await supabase
+      .from('form_submissions')
+      .insert({
+        company_id: campaign.company_id,
+        campaign_id: campaign.id,
+        lead_id: lead.id,
+        customer_id: body.customerId,
+        raw_payload: body,
+        normalized_data: normalizedData,
+        processing_status: 'processed',
+        processed_at: new Date().toISOString(),
+        source_url: sourceUrl,
+        source_domain: sourceDomain,
+        ip_address: request.headers.get('x-forwarded-for')?.split(',')[0] ||
+                    request.headers.get('x-real-ip') || null,
+        user_agent: request.headers.get('user-agent') || null,
+      });
+
+    if (formSubmissionError) {
+      console.error('[REDEEM] Error creating form submission:', formSubmissionError);
+      // Don't fail redemption if form submission creation fails
+    } else {
+      console.log('[REDEEM] Form submission record created for lead:', lead.id);
+    }
 
     // CANCEL WORKFLOW: If a workflow execution is running for this customer + campaign, cancel it
     // This prevents unnecessary follow-up steps (like AI calls) after the customer has already redeemed

@@ -969,10 +969,10 @@ export function GlobalLowerHeader({
                 <Building2 size={18} aria-hidden="true" />
               </label>
               <button
-                className={styles.controlDropdown}
+                className={`${styles.controlDropdown} ${styles.companyControlDropdown}`}
                 onClick={() => setIsProjectCompanyOpen(!isProjectCompanyOpen)}
               >
-                <span className={styles.controlValue}>
+                <span className={`${styles.controlValue} ${styles.companyControlValue}`}>
                   {getProjectCompanyDisplay()}
                 </span>
                 <ChevronDown
@@ -981,7 +981,7 @@ export function GlobalLowerHeader({
                 />
               </button>
               {isProjectCompanyOpen && (
-                <div className={styles.dropdownMenu}>
+                <div className={`${styles.dropdownMenu} ${styles.companyDropdownMenu}`}>
                   <div className={styles.searchContainer}>
                     <input
                       type="text"
@@ -993,7 +993,7 @@ export function GlobalLowerHeader({
                     />
                   </div>
                   <button
-                    className={`${styles.dropdownOption} ${!projectFilterControls.selectedCompanyId ? styles.selected : ''}`}
+                    className={`${styles.dropdownOption} ${styles.companyDropdownOption} ${!projectFilterControls.selectedCompanyId ? styles.selected : ''}`}
                     onClick={() => {
                       projectFilterControls.onCompanyChange(null);
                       setIsProjectCompanyOpen(false);
@@ -1010,7 +1010,7 @@ export function GlobalLowerHeader({
                     .map((company) => (
                       <button
                         key={company.id}
-                        className={`${styles.dropdownOption} ${projectFilterControls.selectedCompanyId === company.id ? styles.selected : ''}`}
+                        className={`${styles.dropdownOption} ${styles.companyDropdownOption} ${projectFilterControls.selectedCompanyId === company.id ? styles.selected : ''}`}
                         onClick={() => {
                           projectFilterControls.onCompanyChange(company.id);
                           setIsProjectCompanyOpen(false);
@@ -1035,10 +1035,10 @@ export function GlobalLowerHeader({
                   <Tag size={18} aria-hidden="true" />
                 </label>
                 <button
-                  className={styles.controlDropdown}
+                  className={`${styles.controlDropdown} ${styles.categoryControlDropdown}`}
                   onClick={() => setIsProjectCategoryOpen(!isProjectCategoryOpen)}
                 >
-                  <span className={styles.controlValue}>
+                  <span className={`${styles.controlValue} ${styles.categoryControlValue}`}>
                     {getProjectCategoryDisplay()}
                   </span>
                   <ChevronDown
@@ -1047,9 +1047,9 @@ export function GlobalLowerHeader({
                   />
                 </button>
                 {isProjectCategoryOpen && (
-                  <div className={styles.dropdownMenu}>
+                  <div className={`${styles.dropdownMenu} ${styles.categoryDropdownMenu}`}>
                     <button
-                      className={`${styles.dropdownOption} ${!projectFilterControls.selectedCategoryId ? styles.selected : ''}`}
+                      className={`${styles.dropdownOption} ${styles.categoryDropdownOption} ${!projectFilterControls.selectedCategoryId ? styles.selected : ''}`}
                       onClick={() => {
                         projectFilterControls.onCategoryChange?.(null);
                         setIsProjectCategoryOpen(false);
@@ -1060,7 +1060,7 @@ export function GlobalLowerHeader({
                     {projectFilterControls.categories.map((category) => (
                       <button
                         key={category.id}
-                        className={`${styles.dropdownOption} ${projectFilterControls.selectedCategoryId === category.id ? styles.selected : ''}`}
+                        className={`${styles.dropdownOption} ${styles.categoryDropdownOption} ${projectFilterControls.selectedCategoryId === category.id ? styles.selected : ''}`}
                         onClick={() => {
                           projectFilterControls.onCategoryChange?.(category.id);
                           setIsProjectCategoryOpen(false);
@@ -1085,7 +1085,7 @@ export function GlobalLowerHeader({
                 <UserRound size={18} aria-hidden="true" />
               </label>
               <button
-                className={styles.controlDropdown}
+                className={`${styles.controlDropdown} ${styles.usersControlDropdown}`}
                 onClick={() => setIsProjectAssignedToOpen(!isProjectAssignedToOpen)}
               >
                 <div className={styles.assignedToContent}>
@@ -1104,7 +1104,7 @@ export function GlobalLowerHeader({
                     }
                     return <DefaultAvatar name={display.name} />;
                   })()}
-                  <span className={styles.controlValue}>
+                  <span className={`${styles.controlValue} ${styles.usersControlValue}`}>
                     {getProjectAssignedToDisplay().name}
                   </span>
                 </div>
@@ -1114,10 +1114,10 @@ export function GlobalLowerHeader({
                 />
               </button>
               {isProjectAssignedToOpen && (
-                <div className={styles.dropdownMenu}>
+                <div className={`${styles.dropdownMenu} ${styles.usersDropdownMenu}`}>
                   {/* All Users option */}
                   <button
-                    className={`${styles.dropdownOption} ${!projectFilterControls.selectedAssignedTo ? styles.selected : ''}`}
+                    className={`${styles.dropdownOption} ${styles.usersDropdownOption} ${!projectFilterControls.selectedAssignedTo ? styles.selected : ''}`}
                     onClick={() => {
                       projectFilterControls.onAssignedToChange(null);
                       setIsProjectAssignedToOpen(false);
@@ -1133,7 +1133,7 @@ export function GlobalLowerHeader({
 
                   {/* Current User option */}
                   <button
-                    className={`${styles.dropdownOption} ${projectFilterControls.selectedAssignedTo === projectFilterControls.currentUser.id ? styles.selected : ''}`}
+                    className={`${styles.dropdownOption} ${styles.usersDropdownOption} ${projectFilterControls.selectedAssignedTo === projectFilterControls.currentUser.id ? styles.selected : ''}`}
                     onClick={() => {
                       projectFilterControls.onAssignedToChange(projectFilterControls.currentUser.id);
                       setIsProjectAssignedToOpen(false);
@@ -1166,7 +1166,7 @@ export function GlobalLowerHeader({
                     .map(user => (
                       <button
                         key={user.id}
-                        className={`${styles.dropdownOption} ${projectFilterControls.selectedAssignedTo === user.id ? styles.selected : ''}`}
+                        className={`${styles.dropdownOption} ${styles.usersDropdownOption} ${projectFilterControls.selectedAssignedTo === user.id ? styles.selected : ''}`}
                         onClick={() => {
                           projectFilterControls.onAssignedToChange(user.id);
                           setIsProjectAssignedToOpen(false);

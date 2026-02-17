@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { User as SupabaseUser } from '@supabase/supabase-js';
-import { X } from 'lucide-react';
+import { X, Plus } from 'lucide-react';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import {
   Project,
   ProjectFormData,
@@ -122,6 +123,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState<1 | 2>(1);
   const [projectTasks, setProjectTasks] = useState<ProjectTaskDraft[]>([]);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [memberIds, setMemberIds] = useState<string[]>(
+    editingProject?.members?.map(m => m.user_id) || []
+  );
 
   const shouldUseTwoStep = mode === 'full' && !editingProject;
 
@@ -145,6 +150,24 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
     const name = `${firstName} ${lastName}`.trim();
     return name ? (email ? `${name} (${email})` : name) : email || 'User';
   };
+
+  const handleAddMember = (userId: string) => {
+    if (!userId) return;
+    setMemberIds(prev => [...prev, userId]);
+    setShowAddMember(false);
+  };
+
+  const handleRemoveMember = (userId: string) => {
+    setMemberIds(prev => prev.filter(id => id !== userId));
+  };
+
+  const availableUsersNotMembers = users.filter(
+    user => !memberIds.includes(user.id)
+  );
+
+  const selectedMembers = users.filter(user =>
+    memberIds.includes(user.id)
+  );
 
   const assignableUsers = useMemo(() => {
     const shouldFilterByRole = users.some(user => getUserRole(user));
@@ -447,6 +470,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         ...formData,
         type_code: formData.type_code || undefined, // Include type_code if set
         tasks: shouldUseTwoStep ? orderedTasks : undefined,
+        member_ids: memberIds.length > 0 ? memberIds : undefined,
       };
       await onSubmit(submitData);
       onClose();
@@ -474,6 +498,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
   const handleClose = () => {
     setCurrentStep(1);
     setProjectTasks([]);
+    setMemberIds([]);
+    setShowAddMember(false);
     setFormData({
       name: '',
       description: '',
@@ -770,6 +796,90 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div className={styles.formGroup}>
+                  <label>Project Members</label>
+                  {selectedMembers.length > 0 ? (
+                    <div className={styles.membersList}>
+                      {selectedMembers.map(user => {
+                        const profile = user?.profiles;
+                        const firstName = profile?.first_name || (user as any).first_name || '';
+                        const lastName = profile?.last_name || (user as any).last_name || '';
+                        const email = profile?.email || user?.email || '';
+                        const name = `${firstName} ${lastName}`.trim();
+                        const avatarUrl = profile?.avatar_url || (user as any).avatar_url || null;
+                        const displayName = name || email || 'Unknown User';
+
+                        return (
+                          <div key={user.id} className={styles.memberItem}>
+                            <div className={styles.memberInfo}>
+                              <MiniAvatar
+                                firstName={firstName || undefined}
+                                lastName={lastName || undefined}
+                                email={email}
+                                avatarUrl={avatarUrl}
+                                size="small"
+                                showTooltip={true}
+                              />
+                              <div className={styles.memberDetails}>
+                                <div className={styles.memberName}>{displayName}</div>
+                                {name && email && (
+                                  <div className={styles.memberEmail}>{email}</div>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className={styles.removeMemberBtn}
+                              onClick={() => handleRemoveMember(user.id)}
+                              title="Remove member"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className={styles.hint}>No members added yet</p>
+                  )}
+
+                  {showAddMember ? (
+                    <div className={styles.addMemberSection}>
+                      <select
+                        className={styles.memberSelect}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            handleAddMember(e.target.value);
+                          }
+                        }}
+                        value=""
+                      >
+                        <option value="">Select user...</option>
+                        {availableUsersNotMembers.map(user => (
+                          <option key={user.id} value={user.id}>
+                            {getUserDisplayName(user)}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        className={styles.cancelMemberBtn}
+                        onClick={() => setShowAddMember(false)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.addMemberBtn}
+                      onClick={() => setShowAddMember(true)}
+                    >
+                      <Plus size={16} /> Add Member
+                    </button>
+                  )}
                 </div>
 
                 <div className={styles.formGroup}>

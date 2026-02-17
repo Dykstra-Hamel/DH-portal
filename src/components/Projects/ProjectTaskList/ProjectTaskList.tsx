@@ -453,7 +453,13 @@ export default function ProjectTaskList({
             }
           >
             {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
-              <Lock size={14} />
+              <span className={styles.blockedTooltipWrapper}>
+                <Lock size={14} />
+                <span className={styles.blockedTooltip}>
+                  Blocked by: {task.blocked_by_task.title}
+                  <span className={styles.blockedTooltipArrow} />
+                </span>
+              </span>
             ) : task.is_completed ? (
               <Check size={14} />
             ) : null}

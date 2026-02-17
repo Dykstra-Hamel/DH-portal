@@ -13,6 +13,7 @@ interface HeroSectionProps {
   hero: {
     title: string;
     subtitle: string;
+    subheading: string | null;
     description: string | null;
     buttonText: string;
     imageUrl: string | null; // Changed from imageUrls array to single image
@@ -51,39 +52,45 @@ export default function HeroSection({
     [customer, pricing, company, branding, serviceName]
   );
 
-  // Process text fields with variables
+  // Process text fields with variables and price styling
   const processHeroTextWithOriginalPriceStyling = useCallback(
     (text: string) => {
       if (!text) return '';
 
-      const styledText =
-        pricing.originalPrice && text.includes('{original_price}')
-          ? text.replace(
-              /\{original_price\}/g,
-              `<span class="${styles.strikethrough}">{original_price}</span>`
-            )
-          : text;
+      let styledText = text;
+
+      if (pricing.originalPrice && styledText.includes('{original_price}')) {
+        styledText = styledText.replace(
+          /\{original_price\}/g,
+          `<span class="${styles.strikethrough}">{original_price}</span>`
+        );
+      }
+
+      if (styledText.includes('{display_price}')) {
+        styledText = styledText.replace(
+          /\{display_price\}/g,
+          `<span class="${styles.priceHighlight}">{display_price}</span>`
+        );
+      }
 
       return processTextWithVariables(styledText, variableContext);
     },
     [pricing.originalPrice, variableContext]
   );
 
-  // Decode HTML entities for rendering as JSX
-  const decodeHtmlEntities = (text: string): string => {
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
-
   const processedTitle = useMemo(
-    () => decodeHtmlEntities(processTextWithVariables(hero.title, variableContext)),
-    [hero.title, variableContext]
+    () => processHeroTextWithOriginalPriceStyling(hero.title),
+    [hero.title, processHeroTextWithOriginalPriceStyling]
   );
 
   const processedSubtitle = useMemo(
     () => processHeroTextWithOriginalPriceStyling(hero.subtitle),
     [hero.subtitle, processHeroTextWithOriginalPriceStyling]
+  );
+
+  const processedSubheading = useMemo(
+    () => hero.subheading ? processHeroTextWithOriginalPriceStyling(hero.subheading) : null,
+    [hero.subheading, processHeroTextWithOriginalPriceStyling]
   );
 
   const processedDescription = useMemo(
@@ -93,85 +100,6 @@ export default function HeroSection({
         : null,
     [hero.description, processHeroTextWithOriginalPriceStyling]
   );
-
-  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-  // Wrap any * characters in <sup> elements
-  const renderWithSuperscript = (text: string, keyPrefix: string | number) => {
-    if (!text.includes('*')) return <span key={keyPrefix}>{text}</span>;
-    const parts = text.split('*');
-    return (
-      <span key={keyPrefix}>
-        {parts.map((part, i) => (
-          <span key={`${keyPrefix}-star${i}`}>
-            {part}
-            {i < parts.length - 1 && <sup>*</sup>}
-          </span>
-        ))}
-      </span>
-    );
-  };
-
-  const renderPriceParts = (text: string, keyPrefix: string | number) => {
-    // Split by <br> tags first to handle line breaks
-    const lines = text.split('<br>');
-
-    return lines.flatMap((line, lineIndex) => {
-      const parts = line.split('$').map((part, index) => {
-        if (index === 0) return renderWithSuperscript(part, `${keyPrefix}-line${lineIndex}-${index}`);
-
-        // Extract price pattern like "44/mo"
-        const pricePattern = part.match(/^(\d+)(\/mo)/);
-        if (pricePattern) {
-          const remainder = part.substring(pricePattern[0].length);
-          return (
-            <span key={`${keyPrefix}-line${lineIndex}-${index}`}>
-              <span className={styles.priceHighlight}>
-                <sup>$</sup>
-                {pricePattern[1]}
-                <span className={styles.priceUnit}>{pricePattern[2]}</span>
-              </span>
-              {renderWithSuperscript(remainder, `${keyPrefix}-line${lineIndex}-${index}-rest`)}
-            </span>
-          );
-        }
-        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}><sup>$</sup>{renderWithSuperscript(part, `${keyPrefix}-line${lineIndex}-${index}-after`)}</span>;
-      });
-
-      // Add line break between lines (but not after the last line)
-      if (lineIndex < lines.length - 1) {
-        return [...parts, <br key={`${keyPrefix}-br${lineIndex}`} />];
-      }
-      return parts;
-    });
-  };
-
-  // Get original price amount without the $ sign
-  const originalPriceAmount = pricing.originalPrice?.replace(/^\$/, '').trim() || '';
-
-  const renderTitleWithStyles = () => {
-    const originalPrice = pricing.originalPrice?.trim();
-    const titleSegments =
-      originalPrice && processedTitle
-        ? processedTitle.split(new RegExp(`(${escapeRegExp(originalPrice)})`, 'g')).filter(Boolean)
-        : [processedTitle];
-
-    return titleSegments.map((segment, idx) => {
-      if (originalPrice && segment === originalPrice) {
-        // Render $ and amount as two separate elements:
-        // $ = red, superscript, no strikethrough
-        // amount = red, strikethrough
-        return (
-          <span key={`orig-${idx}`}>
-            <sup className={styles.strikethroughDollar}>$</sup>
-            <span className={styles.strikethroughValue}>{originalPriceAmount}</span>
-          </span>
-        );
-      }
-
-      return renderPriceParts(segment, `seg-${idx}`);
-    });
-  };
 
   return (
     <section id="hero-section" className={styles.heroSection}>
@@ -183,7 +111,17 @@ export default function HeroSection({
             dangerouslySetInnerHTML={{ __html: processedSubtitle }}
           />
 
-          <h1 className={styles.heroTitle}>{renderTitleWithStyles()}</h1>
+          <h1
+            className={styles.heroTitle}
+            dangerouslySetInnerHTML={{ __html: processedTitle }}
+          />
+
+          {processedSubheading && (
+            <h2
+              className={styles.heroSubheading}
+              dangerouslySetInnerHTML={{ __html: processedSubheading }}
+            />
+          )}
 
           {processedDescription && (
             <p

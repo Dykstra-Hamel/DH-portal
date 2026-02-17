@@ -128,6 +128,11 @@ export interface Lead {
     last_name?: string;
     avatar_url?: string | null;
   };
+  campaign?: {
+    id: string;
+    name: string;
+    campaign_id: string;
+  };
   company?: {
     id: string;
     name: string;

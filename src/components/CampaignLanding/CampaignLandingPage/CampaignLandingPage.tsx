@@ -69,6 +69,7 @@ interface CampaignLandingPageProps {
     hero: {
       title: string;
       subtitle: string;
+      subheading: string | null;
       description: string | null;
       buttonText: string;
       imageUrl: string | null; // Changed from imageUrls array to single image

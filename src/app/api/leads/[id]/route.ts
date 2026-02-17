@@ -40,7 +40,7 @@ export async function GET(
 
     const { id } = await params;
 
-    // Get lead with customer and company info
+    // Get lead with customer, company, and campaign info
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(
@@ -66,6 +66,11 @@ export async function GET(
           name,
           slug,
           website
+        ),
+        campaign:campaigns(
+          id,
+          name,
+          campaign_id
         )
       `
       )

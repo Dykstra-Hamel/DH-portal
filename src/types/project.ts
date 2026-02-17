@@ -46,7 +46,7 @@ export interface ProjectCategoryAssignment {
 }
 
 // Project type codes for shortcode generation
-export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'ADS';
+export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'ADS' | 'CAM' | 'SFT';
 
 // Project scope types
 export type ProjectScope = 'internal' | 'external' | 'both';
@@ -62,6 +62,8 @@ export const PROJECT_TYPE_CODES: Record<ProjectTypeCode, { label: string; descri
   VEH: { label: 'Vehicle Design', description: 'Vehicle wraps and graphics' },
   DIG: { label: 'Digital Designs', description: 'Digital ads for magazines, websites, etc.' },
   ADS: { label: 'Paid Ad Designs', description: 'Google, Bing, Yelp, YouTube ads' },
+  CAM: { label: 'Campaigns', description: 'Campaign planning, execution, and assets' },
+  SFT: { label: 'Software', description: 'Software and engineering projects' },
 };
 
 export interface ProjectMember {
@@ -169,6 +171,7 @@ export interface ProjectFormData {
   category_ids: string[]; // Array of category IDs for many-to-many relationship
   current_department_id?: string; // Optional department ID
   tasks?: ProjectTaskDraft[]; // Optional tasks to create with the project
+  member_ids?: string[]; // Optional member user IDs to add to the project
 }
 
 export interface User {
@@ -216,6 +219,7 @@ export const projectTypeOptions = [
   { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
   { value: 'digital', label: 'Digital Designs', code: 'DIG' },
   { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
+  { value: 'campaigns', label: 'Campaigns', code: 'CAM' },
   { value: 'software', label: 'Software', code: 'SFT' },
 ];
 
