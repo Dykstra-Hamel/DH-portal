@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Lead } from '@/types/lead';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import styles from './LeadCallFormInfo.module.scss';
@@ -71,7 +72,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
 
   return (
     <>
-      {lead.lead_type === 'web_form' ? (
+      {lead.lead_type === 'web_form' || lead.lead_source === 'campaign' ? (
         <>
           {/* Widget Details Section - only for widget submissions */}
           {lead.lead_source === 'widget_submission' && (
@@ -136,12 +137,21 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                   {getLeadSourceDisplay(lead.lead_source)}
                 </span>
               </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>UTM Source</span>
-                <span className={cardStyles.dataText}>
-                  {lead.utm_source || 'Direct'}
-                </span>
-              </div>
+              {lead.campaign ? (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Campaign</span>
+                  <Link href={`/campaigns/${lead.campaign.id}`} className={styles.campaignLink}>
+                    {lead.campaign.name}
+                  </Link>
+                </div>
+              ) : (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>UTM Source</span>
+                  <span className={cardStyles.dataText}>
+                    {lead.utm_source || 'Direct'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

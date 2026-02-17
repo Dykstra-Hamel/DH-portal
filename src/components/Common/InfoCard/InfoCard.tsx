@@ -9,6 +9,7 @@ interface InfoCardProps {
   isCollapsible?: boolean;
   startExpanded?: boolean;
   onExpand?: () => void;
+  onCollapse?: () => void;
   forceCollapse?: boolean;
   forceExpand?: boolean;
   isCompact?: boolean;
@@ -23,6 +24,7 @@ export function InfoCard({
   isCollapsible = true,
   startExpanded = false,
   onExpand,
+  onCollapse,
   forceCollapse = false,
   forceExpand = false,
   isCompact = false,
@@ -51,9 +53,11 @@ export function InfoCard({
     const newExpandedState = !isExpanded;
     setIsExpanded(newExpandedState);
 
-    // Call onExpand callback when expanding (going from collapsed to expanded)
     if (newExpandedState && onExpand) {
       onExpand();
+    }
+    if (!newExpandedState && onCollapse) {
+      onCollapse();
     }
   };
 

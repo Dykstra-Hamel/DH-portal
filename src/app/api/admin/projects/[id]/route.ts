@@ -177,6 +177,7 @@ export async function PUT(
       'vehicle': 'VEH',
       'digital': 'DIG',
       'ads': 'ADS',
+      'campaigns': 'CAM',
       'software': 'SFT',
     };
 

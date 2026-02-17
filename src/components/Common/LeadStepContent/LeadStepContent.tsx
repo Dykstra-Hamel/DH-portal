@@ -46,7 +46,7 @@ export function LeadStepContent({
   onReadyToSchedule,
 }: LeadStepContentProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [shouldExpandActivity, setShouldExpandActivity] = useState(false);
   const [showCompleteTaskModal, setShowCompleteTaskModal] = useState(false);
   const [pendingActivity, setPendingActivity] = useState<{

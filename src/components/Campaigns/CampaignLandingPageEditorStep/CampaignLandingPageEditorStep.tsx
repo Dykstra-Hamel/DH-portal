@@ -18,6 +18,7 @@ export interface LandingPageFormData {
   // Hero
   hero_title: string;
   hero_subtitle: string;
+  hero_subheading: string;
   hero_description: string;
   hero_button_text: string;
   hero_image_url: string; // Changed from hero_image_urls array to single image
@@ -159,6 +160,8 @@ export default function CampaignLandingPageEditorStep({
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
   const [loadingServicePlans, setLoadingServicePlans] = useState(true);
+  const heroTitleEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const heroSubheadingEditorRef = useRef<RichTextEditorHandle | null>(null);
   const letterEditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouContentEditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol1EditorRef = useRef<RichTextEditorHandle | null>(null);
@@ -446,6 +449,30 @@ export default function CampaignLandingPageEditorStep({
   };
 
   const insertVariableIntoField = (textareaId: string, fieldName: keyof LandingPageFormData, variable: string) => {
+    // Special handling for Hero Title RichTextEditor
+    if (fieldName === 'hero_title') {
+      if (heroTitleEditorRef.current?.insertText) {
+        heroTitleEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Hero Subheading RichTextEditor
+    if (fieldName === 'hero_subheading') {
+      if (heroSubheadingEditorRef.current?.insertText) {
+        heroSubheadingEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
     // Special handling for RichTextEditor (letter_content)
     if (fieldName === 'letter_content') {
       if (letterEditorRef.current?.insertText) {
@@ -739,16 +766,25 @@ export default function CampaignLandingPageEditorStep({
           'Main banner with title, description, and image',
           <>
             <div className={styles.field}>
+              <label className={styles.label}>Hero Eyebrow</label>
+              <input
+                type="text"
+                value={data.hero_subtitle}
+                onChange={(e) => updateField('hero_subtitle', e.target.value)}
+                placeholder="e.g., Special Offer"
+                className={styles.input}
+              />
+            </div>
+
+            <div className={styles.field}>
               <label className={styles.label}>
                 Hero Title <span className={styles.required}>*</span>
               </label>
-              <textarea
+              <RichTextEditor
+                ref={heroTitleEditorRef}
                 value={data.hero_title}
-                onChange={(e) => updateField('hero_title', e.target.value)}
+                onChange={(value) => updateField('hero_title', value)}
                 placeholder="e.g., Quarterly Pest Control starting at only $44/mo"
-                className={styles.textarea}
-                rows={2}
-                id="hero-title-textarea"
               />
               <p className={styles.helpText}>
                 Use variables like {'{first_name}'}, {'{display_price}'}, {'{company_name}'} for personalization.
@@ -815,14 +851,75 @@ export default function CampaignLandingPageEditorStep({
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Hero Subtitle</label>
-              <input
-                type="text"
-                value={data.hero_subtitle}
-                onChange={(e) => updateField('hero_subtitle', e.target.value)}
-                placeholder="e.g., Special Offer"
-                className={styles.input}
+              <label className={styles.label}>Hero Subheading</label>
+              <RichTextEditor
+                ref={heroSubheadingEditorRef}
+                value={data.hero_subheading}
+                onChange={(value) => updateField('hero_subheading', value)}
+                placeholder="e.g., Protect your home year-round"
               />
+              <p className={styles.helpText}>
+                Use variables like {'{first_name}'}, {'{display_price}'}, {'{company_name}'} for personalization.
+              </p>
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{tagline}')}>
+                  {'{tagline}'}
+                </button>
+              </div>
             </div>
 
             <div className={styles.field}>

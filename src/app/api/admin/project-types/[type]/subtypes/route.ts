@@ -27,7 +27,7 @@ export async function GET(
     }
 
     // Validate project type
-    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'CAM', 'SFT'];
     if (!validTypes.includes(projectType.toUpperCase())) {
       return NextResponse.json({ error: 'Invalid project type' }, { status: 400 });
     }
@@ -79,7 +79,7 @@ export async function POST(
     }
 
     // Validate project type
-    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'CAM', 'SFT'];
     if (!validTypes.includes(projectType.toUpperCase())) {
       return NextResponse.json({ error: 'Invalid project type' }, { status: 400 });
     }

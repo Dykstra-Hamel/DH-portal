@@ -1,6 +1,5 @@
 .projectsContainer {
   width: 100%;
-  padding: 24px;
   max-width: none;
   margin: 0;
 }
@@ -88,7 +87,7 @@
 
 .tableHeader {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 0.8fr 1fr 0.8fr;
+  grid-template-columns: 1fr 1.4fr 2fr 1fr 0.9fr 1.2fr 0.9fr;
   gap: 16px;
   padding: 16px 20px;
   background: #f9fafb;
@@ -110,7 +109,7 @@
 
 .tableRow {
   display: grid;
-  grid-template-columns: 2fr 1.5fr 1.5fr 1fr 1fr 0.8fr 1fr 0.8fr;
+  grid-template-columns: 1fr 1.4fr 2fr 1fr 0.9fr 1.2fr 0.9fr;
   gap: 16px;
   padding: 16px 20px;
   border-bottom: 1px solid #f3f4f6;
@@ -254,6 +253,6 @@
 @media (max-width: 1200px) {
   .tableHeader,
   .tableRow {
-    grid-template-columns: 2fr 1.5fr 1.2fr 1fr 1fr 0.8fr 1fr 0.8fr;
+    grid-template-columns: 1fr 1.2fr 1.8fr 1fr 0.9fr 1.1fr 0.9fr;
   }
 }

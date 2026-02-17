@@ -41,15 +41,21 @@ export function DetailsCardsSidebar({
       onClick={onSectionClick}
     >
       <div className={styles.sidebarContent}>
-        <div className={styles.sidebarHeader}>
-          <h3>Details</h3>
-          <button
-            title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
-            onClick={
-              isSidebarExpanded
-                ? () => setIsSidebarExpanded(false)
-                : () => setIsSidebarExpanded(true)
+        <div
+          className={styles.sidebarHeader}
+          role="button"
+          tabIndex={0}
+          title={isSidebarExpanded ? 'Collapse sidebar' : 'Expand sidebar'}
+          onClick={() => setIsSidebarExpanded(prev => !prev)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              setIsSidebarExpanded(prev => !prev);
             }
+          }}
+        >
+          <h3>Details</h3>
+          <span
             className={
               isSidebarExpanded
                 ? styles.sidebarCollapseButton
@@ -57,7 +63,7 @@ export function DetailsCardsSidebar({
             }
           >
             <ExpandIcon />
-          </button>
+          </span>
         </div>
         <div className={styles.sidebarCardsWrapper}>{children}</div>
       </div>

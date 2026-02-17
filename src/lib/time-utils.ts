@@ -24,7 +24,7 @@ export function getTimeAgo(dateString: string | null | undefined): string {
   const diffHours = Math.floor(diffMinutes / 60);
   const diffDays = Math.floor(diffHours / 24);
   const diffWeeks = Math.floor(diffDays / 7);
-  const diffMonths = Math.floor(diffDays / 30);
+  const diffMonthsRaw = diffDays / 30;
 
   if (diffSeconds < 60) {
     return 'Just now';
@@ -41,10 +41,11 @@ export function getTimeAgo(dateString: string | null | undefined): string {
     return `${diffDays}d ago`;
   } else if (diffWeeks < 4) {
     return `${diffWeeks}w ago`;
-  } else if (diffMonths < 12) {
-    return `${diffMonths}mo ago`;
+  } else if (diffMonthsRaw < 12) {
+    const roundedMonths = Math.max(1, Math.round(diffMonthsRaw));
+    return `${roundedMonths}mo ago`;
   } else {
-    const diffYears = Math.floor(diffMonths / 12);
+    const diffYears = Math.floor(diffMonthsRaw / 12);
     return `${diffYears}y ago`;
   }
 }

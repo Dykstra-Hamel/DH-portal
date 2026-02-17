@@ -521,6 +521,17 @@
   overflow-x: auto;
 }
 
+.constrainedViewMode {
+  padding-left: 0;
+  overflow-x: visible;
+}
+
+.constrainedViewPane {
+  width: 100%;
+  max-width: 1309px;
+  margin: 0 auto;
+}
+
 .loading {
   display: flex;
   flex-direction: column;

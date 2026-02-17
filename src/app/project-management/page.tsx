@@ -704,7 +704,9 @@ export default function ProjectManagementDashboard() {
       </div>
 
       {/* View Content */}
-      <div className={styles.viewContent}>
+      <div
+        className={`${styles.viewContent} ${currentView !== 'kanban' ? styles.constrainedViewMode : ''}`}
+      >
         {/* Show message if non-admin without company */}
         {!isAdmin && !selectedCompany && !companyLoading ? (
           <div className={styles.noCompanyMessage}>
@@ -726,19 +728,23 @@ export default function ProjectManagementDashboard() {
               />
             )}
             {currentView === 'list' && (
-              <ProjectsView
-                projects={filteredProjects}
-                tasks={tasks}
-                onEditProject={handleEditProject}
-                onDeleteProject={handleDeleteProject}
-                onProjectClick={handleProjectClick}
-              />
+              <div className={styles.constrainedViewPane}>
+                <ProjectsView
+                  projects={filteredProjects}
+                  tasks={tasks}
+                  onEditProject={handleEditProject}
+                  onDeleteProject={handleDeleteProject}
+                  onProjectClick={handleProjectClick}
+                />
+              </div>
             )}
             {currentView === 'calendar' && (
-              <ProjectCalendarView
-                projects={filteredProjects}
-                onProjectClick={handleProjectClick}
-              />
+              <div className={styles.constrainedViewPane}>
+                <ProjectCalendarView
+                  projects={filteredProjects}
+                  onProjectClick={handleProjectClick}
+                />
+              </div>
             )}
           </>
         )}

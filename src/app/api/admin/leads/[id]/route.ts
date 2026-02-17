@@ -21,7 +21,7 @@ export async function GET(
     // Use admin client to fetch lead with all related data
     const supabase = createAdminClient();
 
-    // Get lead with customer, company info, and primary service address
+    // Get lead with customer, company, campaign info, and primary service address
     const { data: lead, error: leadError } = await supabase
       .from('leads')
       .select(
@@ -47,6 +47,11 @@ export async function GET(
           name,
           slug,
           website
+        ),
+        campaign:campaigns(
+          id,
+          name,
+          campaign_id
         )
       `
       )
