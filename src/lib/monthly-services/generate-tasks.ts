@@ -8,6 +8,7 @@ interface TaskTemplate {
   due_day_of_week: number | null;
   default_assigned_to: string | null;
   department_id: string | null;
+  content_type: string | null;
   display_order: number;
 }
 
@@ -161,20 +162,38 @@ export async function generateTasksForMonth(
     return [];
   }
 
-  // Create department assignments for tasks that have a department
+  // Create department assignments and content pieces for tasks that have a department
   if (createdTasks && createdTasks.length > 0) {
-    const departmentAssignments = createdTasks
-      .map((task, index) => {
-        const template = templates[index];
-        if (template.department_id) {
-          return {
+    // Resolve the Content department ID once
+    const { data: contentDept } = await supabase
+      .from('monthly_services_departments')
+      .select('id')
+      .eq('name', 'Content')
+      .single();
+    const contentDeptId = contentDept?.id || null;
+
+    const departmentAssignments: { task_id: string; department_id: string }[] = [];
+    const contentPieces: { monthly_service_id: string; task_id: string; content_type: string | null }[] = [];
+
+    createdTasks.forEach((task, index) => {
+      const template = templates[index];
+      if (template.department_id) {
+        departmentAssignments.push({
+          task_id: task.id,
+          department_id: template.department_id,
+        });
+
+        // Auto-create a content piece for Content-department tasks
+        if (contentDeptId && template.department_id === contentDeptId) {
+          contentPieces.push({
+            monthly_service_id: serviceId,
             task_id: task.id,
-            department_id: template.department_id,
-          };
+            content_type: template.content_type || null,
+            service_month: targetMonth, // YYYY-MM
+          });
         }
-        return null;
-      })
-      .filter((assignment): assignment is { task_id: string; department_id: string } => assignment !== null);
+      }
+    });
 
     if (departmentAssignments.length > 0) {
       const { error: deptError } = await supabase
@@ -183,6 +202,17 @@ export async function generateTasksForMonth(
 
       if (deptError) {
         console.error(`[generateTasksForMonth] Error creating department assignments:`, deptError);
+        // Don't fail the whole operation, just log the error
+      }
+    }
+
+    if (contentPieces.length > 0) {
+      const { error: contentError } = await supabase
+        .from('monthly_service_content_pieces')
+        .insert(contentPieces);
+
+      if (contentError) {
+        console.error(`[generateTasksForMonth] Error creating content pieces:`, contentError);
         // Don't fail the whole operation, just log the error
       }
     }

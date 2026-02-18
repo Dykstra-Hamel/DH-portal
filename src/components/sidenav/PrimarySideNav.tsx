@@ -261,7 +261,10 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       return pathname.startsWith('/campaigns');
     }
     if (href === '/admin/project-management') {
-      return pathname.startsWith('/admin/project-management') || pathname.startsWith('/project-management');
+      return pathname.startsWith('/admin/project-management') ||
+        pathname.startsWith('/project-management') ||
+        pathname.startsWith('/admin/monthly-services') ||
+        pathname.startsWith('/admin/content-calendar');
     }
     return pathname.startsWith(href);
   };

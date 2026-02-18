@@ -517,6 +517,41 @@ export function SecondarySideNav({
                 ),
               },
               {
+                text: 'Content Calendar',
+                href: '/admin/content-calendar',
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <path
+                      d="M12 2L2 7L12 12L22 7L12 2Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M2 17L12 22L22 17"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M2 12L12 17L22 12"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ),
+              },
+              {
                 text: 'My Tasks',
                 href: '/admin/project-management/tasks',
                 icon: (
@@ -729,7 +764,9 @@ export function SecondarySideNav({
                     (item.href === '/admin/project-management' &&
                       pathname.startsWith('/admin/project-management/') &&
                       !pathname.startsWith('/admin/project-management/tasks') &&
-                      !pathname.startsWith('/admin/project-management/templates')) ||
+                      !pathname.startsWith(
+                        '/admin/project-management/templates'
+                      )) ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
                     (item.href === '/tickets/new' &&

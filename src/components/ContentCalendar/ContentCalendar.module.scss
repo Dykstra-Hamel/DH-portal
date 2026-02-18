@@ -1,0 +1,324 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// Year navigation
+.yearNav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.yearNavBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+  color: #374151;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    background: #f3f4f6;
+    border-color: #d1d5db;
+  }
+}
+
+.yearLabel {
+  font-size: 18px;
+  font-weight: 600;
+  color: #111827;
+  min-width: 52px;
+  text-align: center;
+}
+
+// Loading / empty states
+.loading,
+.empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 14px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+}
+
+// Table
+.tableWrapper {
+  width: 100%;
+  overflow-x: auto;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+
+  thead {
+    background-color: #f9fafb;
+    border-bottom: 1px solid #e5e7eb;
+
+    th {
+      padding: 10px 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+    }
+  }
+
+  tbody {
+    tr {
+      border-bottom: 1px solid #e5e7eb;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      &:hover {
+        background-color: #fafafa;
+      }
+    }
+  }
+}
+
+.serviceCol {
+  width: 180px;
+  min-width: 160px;
+}
+
+.monthCol {
+  width: calc((100% - 180px) / 12);
+  min-width: 72px;
+}
+
+.serviceCell {
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.serviceName {
+  font-size: 13px;
+  font-weight: 600;
+  color: #111827;
+  line-height: 1.4;
+}
+
+.companyName {
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: 2px;
+}
+
+.monthCell {
+  padding: 6px 8px;
+  vertical-align: top;
+}
+
+// Content type badges
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: white;
+  background-color: var(--badge-color, #6b7280);
+  border: none;
+  cursor: pointer;
+  margin: 2px 2px 2px 0;
+  transition: opacity 0.15s ease;
+  line-height: 1.4;
+
+  &:hover {
+    opacity: 0.85;
+  }
+
+  &.badgePlanned {
+    background-color: transparent;
+    color: var(--badge-color, #6b7280);
+    border: 1.5px dashed var(--badge-color, #6b7280);
+    opacity: 0.75;
+  }
+
+  &.badgeCompleted {
+    opacity: 0.6;
+  }
+}
+
+.checkmark {
+  font-size: 10px;
+  line-height: 1;
+}
+
+// Popover
+.popover {
+  position: absolute;
+  z-index: 1000;
+  width: 280px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.popoverHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.popoverTypeBadge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: white;
+}
+
+.popoverPlannedTag {
+  font-size: 11px;
+  color: #9ca3af;
+  font-style: italic;
+}
+
+// Edit form fields
+.popoverFields {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 4px;
+
+  &:first-child {
+    margin-top: 0;
+  }
+}
+
+.fieldInput,
+.fieldSelect {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  color: #111827;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  outline: none;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: #3b82f6;
+    background: white;
+  }
+}
+
+// Action buttons
+.popoverActions {
+  display: flex;
+  gap: 8px;
+  border-top: 1px solid #f3f4f6;
+  padding-top: 10px;
+}
+
+.saveBtn {
+  flex: 1;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: white;
+  background: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: #2563eb;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.cancelBtn {
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  background: transparent;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:hover {
+    background: #f3f4f6;
+    color: #374151;
+  }
+}
+
+// Legacy (kept for reference, unused)
+.popoverMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #374151;
+}
+
+.popoverMetaLabel {
+  color: #6b7280;
+  font-size: 11px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.popoverLink {
+  color: #3b82f6;
+  text-decoration: none;
+  font-size: 12px;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.statusComplete {
+  color: #10b981;
+  font-weight: 500;
+}
+
+.statusPending {
+  color: #f59e0b;
+  font-weight: 500;
+}
