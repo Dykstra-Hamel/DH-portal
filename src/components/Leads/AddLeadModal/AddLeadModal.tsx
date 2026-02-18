@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import SearchableDropdown from '@/components/Common/SearchableDropdown/SearchableDropdown';
 import { useUser } from '@/hooks/useUser';
@@ -20,6 +21,7 @@ type TabType = 'single' | 'bulk';
 type BulkStep = 'upload' | 'preview' | 'schedule' | 'processing' | 'complete';
 
 export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadModalProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('single');
   const [bulkStep, setBulkStep] = useState<BulkStep>('upload');
   const [isLoading, setIsLoading] = useState(false);
@@ -57,9 +59,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     city: '',
     state: '',
     zip: '',
-    pestType: '',
-    comments: '',
-    priority: 'medium',
   });
 
   // Bulk upload state
@@ -150,9 +149,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
       city: '',
       state: '',
       zip: '',
-      pestType: '',
-      comments: '',
-      priority: 'medium',
     });
     setCsvFile(null);
     setParsedData(null);
@@ -208,9 +204,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
         body: JSON.stringify({
           companyId,
           customerId,
-          pestType: singleLeadData.pestType,
-          comments: singleLeadData.comments,
-          priority: singleLeadData.priority,
           assignedTo: isTeamAssignment() ? undefined : (selectedAssignee || undefined),
           status: selectedAssignee ? 'assigned' : 'unassigned',
         }),
@@ -221,8 +214,10 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
         throw new Error(error.error || 'Failed to create lead');
       }
 
+      const data = await response.json();
       onSuccess?.();
       handleClose();
+      router.push(`/tickets/leads/${data.lead.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -693,53 +688,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Lead-Specific Fields */}
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label>Pest Type</label>
-                <select
-                  value={singleLeadData.pestType}
-                  onChange={(e) => setSingleLeadData({ ...singleLeadData, pestType: e.target.value })}
-                >
-                  <option value="">Select Pest Type</option>
-                  <option value="General Pest Control">General Pest Control</option>
-                  <option value="Ant Control">Ant Control</option>
-                  <option value="Bed Bug Control">Bed Bug Control</option>
-                  <option value="Cockroach Control">Cockroach Control</option>
-                  <option value="Flea Control">Flea Control</option>
-                  <option value="Mosquito Control">Mosquito Control</option>
-                  <option value="Rodent Control">Rodent Control</option>
-                  <option value="Spider Control">Spider Control</option>
-                  <option value="Termite Control">Termite Control</option>
-                  <option value="Wasp/Bee Control">Wasp/Bee Control</option>
-                  <option value="Wildlife Control">Wildlife Control</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Priority</label>
-                <select
-                  value={singleLeadData.priority}
-                  onChange={(e) => setSingleLeadData({ ...singleLeadData, priority: e.target.value })}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Comments</label>
-              <textarea
-                rows={3}
-                value={singleLeadData.comments}
-                onChange={(e) => setSingleLeadData({ ...singleLeadData, comments: e.target.value })}
-              />
             </div>
 
             <div className={styles.formActions}>

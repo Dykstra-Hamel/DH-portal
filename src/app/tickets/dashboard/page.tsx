@@ -31,7 +31,6 @@ import {
   subscribeToTicketReviewUpdates,
   TicketReviewPayload,
 } from '@/lib/realtime/ticket-review-channel';
-import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import {
@@ -1017,12 +1016,6 @@ function TicketsDashboardContent() {
     };
   }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchTotalCounts]);
 
-  // Filter live tickets for LiveCallBar
-  const liveTickets = useMemo(
-    () => tickets.filter(ticket => ticket.status === 'live'),
-    [tickets]
-  );
-
   // Handle create ticket
   const handleCreateTicket = useCallback(
     async (ticketFormData: TicketFormData & { newCustomerData?: any }) => {
@@ -1668,8 +1661,6 @@ function TicketsDashboardContent() {
             <Search size={18} className={styles.searchIcon} />
           </div>
         </div>
-
-        {dashboardTab === 'new' && <LiveCallBar liveTickets={liveTickets} />}
 
         {/* Data Table */}
         {selectedCompany && (

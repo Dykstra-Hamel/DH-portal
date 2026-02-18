@@ -6,7 +6,6 @@ import {
   useCallback,
   useRef,
   Suspense,
-  useMemo,
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { adminAPI } from '@/lib/api-client';
@@ -950,19 +949,12 @@ function TicketsPageContent() {
     return () => unregisterPageAction('add');
   }, [registerPageAction, unregisterPageAction]);
 
-  // Filter live tickets for LiveCallBar component
-  const liveTickets = useMemo(
-    () => tickets.filter(ticket => ticket.status === 'live'),
-    [tickets]
-  );
-
   return (
     <div style={{ width: '100%' }}>
       {selectedCompany && (
         <Suspense fallback={<TicketsListSkeleton />}>
           <TicketsList
             tickets={tickets}
-            liveTickets={liveTickets}
             callRecords={callRecords}
             loading={loading}
             onTicketUpdated={() => {

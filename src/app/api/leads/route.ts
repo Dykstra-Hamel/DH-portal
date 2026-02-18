@@ -299,6 +299,7 @@ export async function POST(request: NextRequest) {
       priority,
       estimatedValue,
       serviceType,
+      assignedTo,
     } = body;
 
     // Validate required fields
@@ -450,14 +451,15 @@ export async function POST(request: NextRequest) {
           company_id: companyId,
           customer_id: customerId,
           service_address_id: serviceAddressId,
-          lead_type: 'web_form',
+          lead_type: 'other',
           lead_source: leadSource || 'other',
-          lead_status: 'new',
+          lead_status: assignedTo ? 'in_process' : 'new',
           priority: priority || 'medium',
           pest_type: pestType,
           comments,
           service_type: serviceType,
           estimated_value: estimatedValue,
+          assigned_to: assignedTo || null,
           created_at: new Date().toISOString(),
         },
       ])
@@ -504,7 +506,7 @@ export async function POST(request: NextRequest) {
 
     // Send lead creation notification (non-blocking)
     notifyLeadCreated(newLead.id, companyId, {
-      assignedUserId: undefined, // Manual leads are unassigned
+      assignedUserId: assignedTo || undefined,
     }).catch(error => {
       console.error('Lead notification failed:', error);
     });
