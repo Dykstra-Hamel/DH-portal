@@ -930,9 +930,10 @@ function extractCallData(
     extractedData.customer_last_name =
       callAnalysis.custom_analysis_data.customer_last_name || null;
 
-    // Extract action_required field
+    // Extract action_required field (normalize to string to handle boolean true from Retell)
+    const rawActionRequired = callAnalysis.custom_analysis_data.action_required;
     extractedData.action_required =
-      callAnalysis.custom_analysis_data.action_required || null;
+      rawActionRequired != null ? String(rawActionRequired) : null;
   }
 
   // Extract sentiment and summary from call analysis (highest priority)
@@ -996,7 +997,9 @@ function extractCallData(
         retellVariables.customer_last_name || null;
     }
     if (!extractedData.action_required) {
-      extractedData.action_required = retellVariables.action_required || null;
+      const rawRetellActionRequired = retellVariables.action_required;
+      extractedData.action_required =
+        rawRetellActionRequired != null ? String(rawRetellActionRequired) : null;
     }
   }
 
