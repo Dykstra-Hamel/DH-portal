@@ -391,6 +391,7 @@ export async function POST(
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')
         .update({
+          lead_type: 'web_form',
           lead_status: leadStatus,
           service_address_id: addressData?.id || existingLead.service_address_id,
           requested_date: body.requested_date || null,

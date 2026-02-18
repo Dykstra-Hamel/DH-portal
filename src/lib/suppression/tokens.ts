@@ -242,6 +242,21 @@ export function getUnsubscribeUrl(token: string, baseUrl?: string): string {
 }
 
 /**
+ * Get the RFC 8058 one-click unsubscribe API URL for a token.
+ * This is used in the List-Unsubscribe email header and points to
+ * the API endpoint that email clients POST to directly.
+ *
+ * @param token - Token string
+ * @param baseUrl - Base URL for the application (optional, defaults to current origin)
+ * @returns Full one-click unsubscribe API URL
+ */
+export function getOneClickUnsubscribeUrl(token: string, baseUrl?: string): string {
+  const base =
+    baseUrl || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+  return `${base}/api/unsubscribe/one-click?token=${token}`;
+}
+
+/**
  * Get all tokens for a company (admin function)
  *
  * @param companyId - UUID of the company

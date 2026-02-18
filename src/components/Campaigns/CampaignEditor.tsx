@@ -324,7 +324,7 @@ export default function CampaignEditor({
           thankyou_content: lp.thankYou?.content || '',
           thankyou_show_expect: lp.thankYou?.showExpect ?? true,
           thankyou_expect_heading:
-            lp.thankYou?.expectHeading || 'What To Expect',
+            lp.thankYou?.expectHeading ?? 'What To Expect',
           thankyou_expect_col1_image:
             lp.thankYou?.expectColumns?.[0]?.imageUrl || '',
           thankyou_expect_col1_heading:

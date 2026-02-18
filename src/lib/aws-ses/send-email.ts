@@ -12,7 +12,7 @@ import { isEmailSuppressed } from '@/lib/suppression';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateTenantName } from './tenants';
 import { generateConfigSetName } from './config-sets';
-import { generateUnsubscribeToken, getUnsubscribeUrl } from '@/lib/suppression/tokens';
+import { generateUnsubscribeToken, getUnsubscribeUrl, getOneClickUnsubscribeUrl } from '@/lib/suppression/tokens';
 import { generateUnsubscribeFooter, generatePlainTextUnsubscribeFooter } from '@/lib/email/unsubscribe-footer';
 import { injectFooterIntoHtml, injectFooterIntoPlainText } from '@/lib/email/inject-footer';
 import { shouldSkipUnsubscribeFooter } from '@/lib/email/config';
@@ -73,6 +73,8 @@ export async function sendEmail(
     let finalHtml = html;
     let finalText = text;
     let footerInjected = false;
+    let listUnsubscribeUrl: string | null = null;
+    let listUnsubscribeOneClickUrl: string | null = null;
 
     if (!shouldSkipUnsubscribeFooter(source)) {
       // Get company info for footer
@@ -102,6 +104,8 @@ export async function sendEmail(
 
       if (tokenResult.success && tokenResult.data) {
         const unsubscribeUrl = getUnsubscribeUrl(tokenResult.data.token);
+        listUnsubscribeUrl = unsubscribeUrl;
+        listUnsubscribeOneClickUrl = getOneClickUnsubscribeUrl(tokenResult.data.token);
 
         // Generate footer HTML and plain text
         const footerHtml = generateUnsubscribeFooter({
@@ -163,6 +167,21 @@ export async function sendEmail(
             },
           }),
         },
+        // RFC 2369 / RFC 8058: List-Unsubscribe headers for deliverability
+        // Email clients (Gmail, Outlook, Yahoo) use these to surface an
+        // unsubscribe button and to honour one-click unsubscribe requests.
+        ...(listUnsubscribeOneClickUrl && listUnsubscribeUrl && {
+          Headers: [
+            {
+              Name: 'List-Unsubscribe',
+              Value: `<${listUnsubscribeOneClickUrl}>, <${listUnsubscribeUrl}>`,
+            },
+            {
+              Name: 'List-Unsubscribe-Post',
+              Value: 'List-Unsubscribe=One-Click',
+            },
+          ],
+        }),
       },
     };
 
