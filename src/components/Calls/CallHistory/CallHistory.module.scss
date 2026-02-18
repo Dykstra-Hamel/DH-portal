@@ -195,7 +195,7 @@
 .transcriptContent {
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 1rem;
   margin-top: 0.5rem;
   font-size: 0.875rem;

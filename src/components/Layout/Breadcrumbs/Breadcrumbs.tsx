@@ -75,6 +75,8 @@ export function Breadcrumbs() {
             return { label: 'Tasks', href: '/tickets' };
           case 'brand':
             return { label: 'Brand', href: '/brand' };
+          case 'project-management':
+            return { label: 'Dashboard', href: '/admin/project-management' };
           default:
             return { label: 'Dashboard', href: '/dashboard' };
         }
@@ -335,6 +337,58 @@ export function Breadcrumbs() {
           break;
 
         case 'admin':
+          if (pathSegments[1] === 'project-management') {
+            if (!pathSegments[2]) {
+              setBreadcrumbs([{ label: 'Dashboard' }]);
+              return;
+            }
+
+            if (params?.id) {
+              try {
+                setLoading(true);
+                const response = await fetch(`/api/admin/projects/${params.id}`);
+                if (response.ok) {
+                  const project = await response.json();
+                  const projectLabel =
+                    project?.shortcode || project?.name || 'Project';
+                  crumbs.push({ label: projectLabel });
+                } else {
+                  crumbs.push({ label: 'Project' });
+                }
+              } catch (error) {
+                console.error('Error fetching project for breadcrumb:', error);
+                crumbs.push({ label: 'Project' });
+              } finally {
+                setLoading(false);
+              }
+            }
+            break;
+          }
+
+          if (pathSegments[1] === 'monthly-services') {
+            crumbs.push({ label: 'Monthly Services', href: '/admin/monthly-services' });
+
+            if (pathSegments[2] && params?.id) {
+              try {
+                setLoading(true);
+                const response = await fetch(`/api/admin/monthly-services/${params.id}`);
+                if (response.ok) {
+                  const data = await response.json();
+                  const serviceName = data.service?.service_name || 'Service';
+                  crumbs.push({ label: serviceName });
+                } else {
+                  crumbs.push({ label: 'Service' });
+                }
+              } catch (error) {
+                console.error('Error fetching monthly service for breadcrumb:', error);
+                crumbs.push({ label: 'Service' });
+              } finally {
+                setLoading(false);
+              }
+            }
+            break;
+          }
+
           crumbs.push({ label: 'Admin Dashboard' });
           break;
 

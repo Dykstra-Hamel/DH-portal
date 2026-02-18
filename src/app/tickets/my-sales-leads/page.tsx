@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -15,16 +16,56 @@ import {
   subscribeToLeadUpdates,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
+import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 export default function MySalesLeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const { selectedCompany } = useCompany();
   const { registerPageAction, unregisterPageAction } = usePageActions();
   const router = useRouter();
+
+  // Get tabs configuration
+  const tabs = useMemo(() => getUserLeadTabs(), []);
+
+  // Handle tab change
+  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(newTab);
+  }, []);
+
+  // Handle search change
+  const handleSearchChange = useCallback((newQuery: string) => {
+    setSearchQuery(newQuery);
+  }, []);
+
+  // Filter data based on active tab
+  const filteredByTab = useMemo(() => {
+    if (!tabs || tabs.length === 0) return leads;
+    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
+    if (!activeTabConfig) return leads;
+    return activeTabConfig.filter(leads);
+  }, [leads, activeTab, tabs]);
+
+  // Apply search filter
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByTab;
+
+    const query = searchQuery.toLowerCase();
+    return filteredByTab.filter(lead => {
+      const customerName =
+        `${lead.customer?.first_name || ''} ${lead.customer?.last_name || ''}`.toLowerCase();
+      if (customerName.includes(query)) return true;
+      if (lead.customer?.phone?.toLowerCase().includes(query)) return true;
+      if (lead.customer?.email?.toLowerCase().includes(query)) return true;
+      if (lead.lead_status?.toLowerCase().includes(query)) return true;
+      return false;
+    });
+  }, [filteredByTab, searchQuery]);
 
   // Fetch leads assigned to current user
   const fetchMyLeads = async () => {
@@ -195,15 +236,47 @@ export default function MySalesLeadsPage() {
 
   return (
     <div style={{ width: '100%' }}>
+      {/* Tabs and Search Row */}
+      {tabs && tabs.length > 0 && (
+        <div className={styles.tabsRow}>
+          <div className={styles.tabsSection}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
+                onClick={() => handleTabChange(tab.key)}
+              >
+                {tab.label}
+                {tab.getCount && (
+                  <span className={styles.tabCount}>
+                    {tab.getCount(leads)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className={styles.searchSection}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+            />
+            <Search size={18} className={styles.searchIcon} />
+          </div>
+        </div>
+      )}
+
       <DataTable<Lead>
-        data={leads}
+        data={filteredData}
         title="My Sales Leads"
         columns={getLeadColumns()}
-        tabs={getUserLeadTabs()}
         loading={loading}
         emptyStateMessage="No leads assigned to you yet."
         tableType="leads"
         onItemAction={handleAction}
+        searchEnabled={false}
       />
 
       {/* Add Lead Modal */}

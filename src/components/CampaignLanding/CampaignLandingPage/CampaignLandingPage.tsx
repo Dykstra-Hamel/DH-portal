@@ -16,6 +16,7 @@ import LetterSection from './sections/LetterSection';
 import FeaturesSection from './sections/FeaturesSection';
 import AdditionalServicesSection from './sections/AdditionalServicesSection';
 import TabbedFAQSection from './sections/TabbedFAQSection';
+import PreFooterSection from './sections/PreFooterSection';
 import FooterSection from './sections/FooterSection';
 
 interface CampaignLandingPageProps {
@@ -68,6 +69,7 @@ interface CampaignLandingPageProps {
     hero: {
       title: string;
       subtitle: string;
+      subheading: string | null;
       description: string | null;
       buttonText: string;
       imageUrl: string | null; // Changed from imageUrls array to single image
@@ -100,8 +102,18 @@ interface CampaignLandingPageProps {
       name: string;
       description: string | null;
       faqs: Array<{ question: string; answer: string }>;
-      price: number;
+      price: number | null;
     }>;
+    servicePlans: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      price: number | null;
+    }>;
+    preFooter: {
+      show: boolean;
+      content: string | null;
+    };
     faq: {
       show: boolean;
       heading: string;
@@ -141,6 +153,7 @@ interface CampaignLandingPageProps {
       accentColorPreference: 'primary' | 'secondary';
       fontPrimaryName: string | null;
       fontPrimaryUrl: string | null;
+      fontColor: string | null;
     };
     thankYou: {
       greeting: string;
@@ -155,6 +168,8 @@ interface CampaignLandingPageProps {
       ctaText: string;
       ctaUrl: string | null;
     };
+    selectedAddonIds: string[];
+    selectedServicePlanIds: string[];
   };
 }
 
@@ -230,6 +245,7 @@ export default function CampaignLandingPage({
     serviceTime: string;
     phoneNumber: string;
     selectedAddonIds: string[];
+    selectedServicePlanId?: string;
   }) => {
     if (isRedeeming) return;
 
@@ -251,6 +267,7 @@ export default function CampaignLandingPage({
           requested_time: data?.serviceTime || null,
           phone_number: data?.phoneNumber || customer.phone_number,
           selected_addon_ids: data?.selectedAddonIds || [],
+          selected_service_plan_id: data?.selectedServicePlanId || null,
           client_device_data: deviceData,
         }),
       });
@@ -294,6 +311,7 @@ export default function CampaignLandingPage({
         '--font-primary': landingPage.branding.fontPrimaryName
           ? `"${landingPage.branding.fontPrimaryName}", sans-serif`
           : '"Inter Tight", sans-serif',
+        '--color-text': landingPage.branding.fontColor || '#2b2b2b',
       } as React.CSSProperties}
     >
       {/* Header */}
@@ -350,6 +368,7 @@ export default function CampaignLandingPage({
                   priceAmount: landingPage.pricing.displayPrice.split('/')[0]?.replace('$', '') || '44',
                   priceFrequency: landingPage.pricing.displayPrice.split('/')[1] || 'mo',
                 }}
+                servicePlans={landingPage.servicePlans}
                 addons={landingPage.addons}
                 landingPage={{
                   redemptionCard: {
@@ -383,10 +402,14 @@ export default function CampaignLandingPage({
 
       {/* Additional Services Section */}
       {landingPage.additionalServices.show &&
-        landingPage.addons.length > 0 && (
+        (landingPage.servicePlans.length > 0 ||
+          landingPage.addons.length > 0 ||
+          landingPage.additionalServices.services.length > 0) && (
           <AdditionalServicesSection
             additionalServices={landingPage.additionalServices}
+            servicePlans={landingPage.servicePlans}
             addons={landingPage.addons}
+            customItems={landingPage.additionalServices.services}
             customer={customer}
             pricing={landingPage.pricing}
             company={company}
@@ -406,6 +429,19 @@ export default function CampaignLandingPage({
           company={company}
           branding={landingPage.branding}
           serviceName={landingPage.faq.serviceName}
+        />
+      )}
+
+      {/* Pre-Footer Section */}
+      {landingPage.preFooter.show && landingPage.preFooter.content && (
+        <PreFooterSection
+          content={landingPage.preFooter.content}
+          customer={customer}
+          company={company}
+          pricing={landingPage.pricing}
+          branding={landingPage.branding}
+          serviceName={landingPage.faq.serviceName}
+          tagline={landingPage.footer.tagline}
         />
       )}
 

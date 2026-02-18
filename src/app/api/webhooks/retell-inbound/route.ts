@@ -5,6 +5,11 @@ import { normalizePhoneNumber } from '@/lib/utils';
 import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
 import { CallSummaryEmailData } from '@/lib/email/types';
 import { findCompanyByAgentId, findCompanyAndDirectionByAgentId } from '@/lib/agent-utils';
+import {
+  createOrFindServiceAddress,
+  getCustomerPrimaryServiceAddress,
+  linkCustomerToServiceAddress,
+} from '@/lib/service-addresses';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -478,7 +483,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('call_id', call_id)
-    .select('*, leads(id, customer_id, comments)')
+    .select('*, leads(id, customer_id, comments, service_address_id)')
     .single();
 
   if (updateError) {
@@ -551,7 +556,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('call_id', call_id)
-    .select('*, leads(id, customer_id, comments)')
+    .select('*, leads(id, customer_id, comments, service_address_id)')
     .single();
 
   if (updateError) {
@@ -608,7 +613,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     // Get existing customer data first
     const { data: existingCustomer, error: customerFetchError } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, address, city, state, zip_code')
+      .select('id, first_name, last_name, address, city, state, zip_code, company_id')
       .eq('id', callRecord.customer_id)
       .single();
 
@@ -686,6 +691,83 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
 
         if (customerUpdateError) {
           console.error('Customer update failed:', customerUpdateError.message);
+        }
+      }
+
+      const primaryServiceAddress = await getCustomerPrimaryServiceAddress(
+        existingCustomer.id
+      );
+      if (!primaryServiceAddress.serviceAddress && existingCustomer.company_id) {
+        const isValidValue = (value: string | null | undefined): boolean => {
+          return !!(
+            value &&
+            value.trim() !== '' &&
+            value.toLowerCase() !== 'none'
+          );
+        };
+        const existingServiceAddressId =
+          callRecord?.leads?.service_address_id || null;
+        let serviceAddressId = existingServiceAddressId;
+
+        if (!serviceAddressId) {
+          const streetAddress = isValidValue(customerStreetAddress)
+            ? customerStreetAddress.trim()
+            : existingCustomer.address?.trim() || '';
+          const city = isValidValue(customerCity)
+            ? customerCity.trim()
+            : existingCustomer.city?.trim() || '';
+          const state = isValidValue(customerState)
+            ? customerState.trim()
+            : existingCustomer.state?.trim() || '';
+          const zip = isValidValue(customerZip)
+            ? customerZip.trim()
+            : existingCustomer.zip_code?.trim() || '';
+          const hasAddressData = [streetAddress, city, state, zip].some(
+            value => value !== ''
+          );
+
+          if (hasAddressData) {
+            const serviceAddressResult = await createOrFindServiceAddress(
+              existingCustomer.company_id,
+              {
+                street_address: streetAddress || undefined,
+                city: city || undefined,
+                state: state || undefined,
+                zip_code: zip || undefined,
+              }
+            );
+
+            if (
+              serviceAddressResult.success &&
+              serviceAddressResult.serviceAddressId
+            ) {
+              serviceAddressId = serviceAddressResult.serviceAddressId;
+            }
+          }
+        }
+
+        if (serviceAddressId) {
+          const linkResult = await linkCustomerToServiceAddress(
+            existingCustomer.id,
+            serviceAddressId,
+            'owner',
+            true
+          );
+
+          if (!linkResult.success && linkResult.error) {
+            console.warn(
+              'Failed to link service address to customer:',
+              linkResult.error
+            );
+          }
+
+          if (callRecord?.leads?.id) {
+            await supabase
+              .from('leads')
+              .update({ service_address_id: serviceAddressId })
+              .eq('id', callRecord.leads.id)
+              .is('service_address_id', null);
+          }
         }
       }
     }

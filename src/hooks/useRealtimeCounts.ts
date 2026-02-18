@@ -15,7 +15,8 @@ interface Counts {
   scheduling: number; // Won leads count
   my_leads: number; // Leads assigned to current user
   my_cases: number; // Support cases assigned to current user
-  my_tasks: number; // Tasks assigned to current user (excluding completed)
+  my_tasks: number; // Tasks assigned to current user (excluding completed, no cadence_step_id)
+  my_actions: number; // Actions assigned to current user (tasks with cadence_step_id)
 }
 
 interface CountAnimation {
@@ -25,6 +26,84 @@ interface CountAnimation {
 interface NewItemIndicators {
   [key: string]: boolean;
 }
+
+// Helper functions for per-task seen tracking (outside component to avoid recreation)
+const getSeenTaskIds = (companyId: string): string[] => {
+  try {
+    const key = `seenTasks_${companyId}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+const getSeenActionIds = (companyId: string): string[] => {
+  try {
+    const key = `seenActions_${companyId}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+  } catch {
+    return [];
+  }
+};
+
+const setSeenTaskIds = (companyId: string, ids: string[]): void => {
+  try {
+    const key = `seenTasks_${companyId}`;
+    localStorage.setItem(key, JSON.stringify(ids));
+  } catch {
+    // Ignore localStorage errors
+  }
+};
+
+const setSeenActionIds = (companyId: string, ids: string[]): void => {
+  try {
+    const key = `seenActions_${companyId}`;
+    localStorage.setItem(key, JSON.stringify(ids));
+  } catch {
+    // Ignore localStorage errors
+  }
+};
+
+// Custom event for notifying all hook instances when seen status changes
+const SEEN_STATUS_CHANGED_EVENT = 'seenStatusChanged';
+
+const dispatchSeenStatusChanged = (): void => {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(SEEN_STATUS_CHANGED_EVENT));
+  }
+};
+
+// Exported functions for marking tasks/actions as seen
+export const markTaskAsSeen = (taskId: string, companyId: string): void => {
+  const seen = getSeenTaskIds(companyId);
+  if (!seen.includes(taskId)) {
+    seen.push(taskId);
+    setSeenTaskIds(companyId, seen);
+    dispatchSeenStatusChanged();
+  }
+};
+
+export const markActionAsSeen = (taskId: string, companyId: string): void => {
+  const seen = getSeenActionIds(companyId);
+  if (!seen.includes(taskId)) {
+    seen.push(taskId);
+    setSeenActionIds(companyId, seen);
+    dispatchSeenStatusChanged();
+  }
+};
+
+// Check if there are unseen tasks/actions
+const hasUnseenTasks = (taskIds: string[], companyId: string): boolean => {
+  const seen = getSeenTaskIds(companyId);
+  return taskIds.some(id => !seen.includes(id));
+};
+
+const hasUnseenActions = (actionIds: string[], companyId: string): boolean => {
+  const seen = getSeenActionIds(companyId);
+  return actionIds.some(id => !seen.includes(id));
+};
 
 export function useRealtimeCounts() {
   const [counts, setCounts] = useState<Counts>({
@@ -38,6 +117,7 @@ export function useRealtimeCounts() {
     my_leads: 0,
     my_cases: 0,
     my_tasks: 0,
+    my_actions: 0,
   });
 
   const [animations, setAnimations] = useState<CountAnimation>({});
@@ -117,7 +197,7 @@ export function useRealtimeCounts() {
           apiEndpoint = `/api/leads?companyId=${companyId}&assignedTo=${user.id}`;
         } else if (pageType === 'my_cases') {
           apiEndpoint = `/api/support-cases?companyId=${companyId}&assignedTo=${user.id}`;
-        } else if (pageType === 'my_tasks') {
+        } else if (pageType === 'my_tasks' || pageType === 'my_actions') {
           apiEndpoint = `/api/tasks?companyId=${companyId}&assignedTo=${user.id}&includeArchived=false`;
         } else {
           return false;
@@ -129,11 +209,19 @@ export function useRealtimeCounts() {
         const data = await response.json();
         let items = [];
 
-        if (pageType === 'my_tasks') {
+        if (pageType === 'my_tasks' || pageType === 'my_actions') {
           // Tasks API returns { tasks: [...] } structure
           items = data.tasks || [];
-          // Filter out completed tasks for my_tasks
+          // Filter out completed tasks
           items = items.filter((task: any) => task.status !== 'completed');
+          // Further filter based on pageType
+          if (pageType === 'my_actions') {
+            // Actions are tasks with cadence_step_id
+            items = items.filter((task: any) => task.cadence_step_id);
+          } else {
+            // Regular tasks don't have cadence_step_id
+            items = items.filter((task: any) => !task.cadence_step_id);
+          }
         } else {
           // Other APIs return arrays directly
           items = Array.isArray(data) ? data : [];
@@ -188,6 +276,7 @@ export function useRealtimeCounts() {
         my_leads: 0,
         my_cases: 0,
         my_tasks: 0,
+        my_actions: 0,
       });
       setLoading(false);
       return;
@@ -258,6 +347,7 @@ export function useRealtimeCounts() {
         my_leads: 0,
         my_cases: 0,
         my_tasks: 0,
+        my_actions: 0,
       };
 
       // Process tickets
@@ -351,7 +441,11 @@ export function useRealtimeCounts() {
         const activeTasks = Array.isArray(myTasksData.tasks)
           ? myTasksData.tasks.filter((task: any) => task.status !== 'completed')
           : [];
-        newCounts.my_tasks = activeTasks.length;
+        // Separate actions (tasks with cadence_step_id) from regular tasks
+        const actions = activeTasks.filter((task: any) => task.cadence_step_id);
+        const regularTasks = activeTasks.filter((task: any) => !task.cadence_step_id);
+        newCounts.my_tasks = regularTasks.length;
+        newCounts.my_actions = actions.length;
       }
 
       setCounts(newCounts);
@@ -368,19 +462,54 @@ export function useRealtimeCounts() {
     if (!selectedCompany?.id || !user?.id) return;
 
     try {
-      // Check for new leads, cases, and tasks since last view
-      const [hasNewLeads, hasNewCases, hasNewTasks] = await Promise.all([
+      // Check for new leads and cases since last view (timestamp-based)
+      const [hasNewLeads, hasNewCases] = await Promise.all([
         hasNewItemsSinceLastView('my_leads', selectedCompany.id),
         hasNewItemsSinceLastView('my_cases', selectedCompany.id),
-        hasNewItemsSinceLastView('my_tasks', selectedCompany.id),
       ]);
+
+      // For tasks and actions, use per-task seen tracking
+      const tasksApiEndpoint = `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`;
+      const tasksResponse = await fetch(tasksApiEndpoint);
+
+      let hasNewTasksIndicator = false;
+      let hasNewActionsIndicator = false;
+
+      if (tasksResponse.ok) {
+        const data = await tasksResponse.json();
+        const allTasks = data.tasks || [];
+
+        // Filter out completed tasks
+        const activeTasks = allTasks.filter((task: any) => task.status !== 'completed');
+
+        // Separate actions (tasks with cadence_step_id) from regular tasks
+        const actions = activeTasks.filter((task: any) => task.cadence_step_id);
+        const regularTasks = activeTasks.filter((task: any) => !task.cadence_step_id);
+
+        const currentTaskIds = regularTasks.map((t: any) => t.id);
+        const currentActionIds = actions.map((t: any) => t.id);
+
+        // Clean up seen lists - remove IDs that no longer exist
+        const seenTasks = getSeenTaskIds(selectedCompany.id);
+        const prunedSeenTasks = seenTasks.filter((id: string) => currentTaskIds.includes(id));
+        setSeenTaskIds(selectedCompany.id, prunedSeenTasks);
+
+        const seenActions = getSeenActionIds(selectedCompany.id);
+        const prunedSeenActions = seenActions.filter((id: string) => currentActionIds.includes(id));
+        setSeenActionIds(selectedCompany.id, prunedSeenActions);
+
+        // Check if there are unseen tasks/actions
+        hasNewTasksIndicator = hasUnseenTasks(currentTaskIds, selectedCompany.id);
+        hasNewActionsIndicator = hasUnseenActions(currentActionIds, selectedCompany.id);
+      }
 
       // Update indicators if there are new items
       setNewItemIndicators(prev => ({
         ...prev,
         my_leads: hasNewLeads,
         my_cases: hasNewCases,
-        my_tasks: hasNewTasks,
+        my_tasks: hasNewTasksIndicator,
+        my_actions: hasNewActionsIndicator,
       }));
     } catch (error) {
       console.error('Error checking persistent indicators:', error);
@@ -393,6 +522,30 @@ export function useRealtimeCounts() {
     fetchInitialCounts();
     checkPersistentIndicators();
   }, [companyLoading, fetchInitialCounts, checkPersistentIndicators]);
+
+  // Re-check indicators when page becomes visible or when seen status changes
+  useEffect(() => {
+    if (companyLoading) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkPersistentIndicators();
+      }
+    };
+
+    // Listen for custom event when a task is marked as seen
+    const handleSeenStatusChanged = () => {
+      checkPersistentIndicators();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener(SEEN_STATUS_CHANGED_EVENT, handleSeenStatusChanged);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener(SEEN_STATUS_CHANGED_EVENT, handleSeenStatusChanged);
+    };
+  }, [companyLoading, checkPersistentIndicators]);
 
   // Broadcast-based realtime subscription for all count updates
   // This replaces individual Postgres Changes subscriptions with a single Broadcast channel
@@ -565,7 +718,11 @@ export function useRealtimeCounts() {
                         (task: any) => task.status !== 'completed'
                       )
                     : [];
-                  updateCount('my_tasks', activeTasks.length);
+                  // Separate actions (tasks with cadence_step_id) from regular tasks
+                  const actions = activeTasks.filter((task: any) => task.cadence_step_id);
+                  const regularTasks = activeTasks.filter((task: any) => !task.cadence_step_id);
+                  updateCount('my_tasks', regularTasks.length);
+                  updateCount('my_actions', actions.length);
                 }
                 break;
 
@@ -642,5 +799,6 @@ export function useRealtimeCounts() {
     error,
     refreshCounts: fetchInitialCounts,
     clearNewItemIndicator,
+    refreshIndicators: checkPersistentIndicators,
   };
 }

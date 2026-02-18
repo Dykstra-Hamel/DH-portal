@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 
+/**
+ * Escape special characters that have meaning in PostgREST filter syntax
+ * Characters: ( ) , . are used in filter expressions and need to be escaped
+ */
+function escapePostgrestFilter(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')  // Escape backslashes first
+    .replace(/\(/g, '\\(')   // Escape opening parenthesis
+    .replace(/\)/g, '\\)')   // Escape closing parenthesis
+    .replace(/,/g, '\\,')    // Escape commas
+    .replace(/\./g, '\\.');  // Escape dots
+}
+
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -69,18 +82,22 @@ export async function GET(request: NextRequest) {
 
     // Handle different search patterns
     const searchWords = searchTerm.split(/\s+/).filter(word => word.length > 0);
-    
-    if (searchWords.length > 1) {
+
+    // Escape special PostgREST characters in search terms
+    const escapedSearchTerm = escapePostgrestFilter(searchTerm);
+    const escapedSearchWords = searchWords.map(word => escapePostgrestFilter(word));
+
+    if (escapedSearchWords.length > 1) {
       // Multi-word search - likely a full name
       // Try to match combinations of words against first_name and last_name
       const nameSearchConditions = [];
-      
+
       // Try different combinations for first and last name
-      for (let i = 0; i < searchWords.length; i++) {
-        for (let j = i + 1; j <= searchWords.length; j++) {
-          const firstPart = searchWords.slice(0, j).join(' ');
-          const lastPart = searchWords.slice(j).join(' ');
-          
+      for (let i = 0; i < escapedSearchWords.length; i++) {
+        for (let j = i + 1; j <= escapedSearchWords.length; j++) {
+          const firstPart = escapedSearchWords.slice(0, j).join(' ');
+          const lastPart = escapedSearchWords.slice(j).join(' ');
+
           if (firstPart && lastPart) {
             nameSearchConditions.push(
               `and(first_name.ilike.%${firstPart}%,last_name.ilike.%${lastPart}%)`
@@ -88,9 +105,9 @@ export async function GET(request: NextRequest) {
           }
         }
       }
-      
+
       // Also try each word individually against any field
-      const individualWordConditions = searchWords.map(word => 
+      const individualWordConditions = escapedSearchWords.map(word =>
         `first_name.ilike.%${word}%,` +
         `last_name.ilike.%${word}%,` +
         `email.ilike.%${word}%,` +
@@ -99,35 +116,35 @@ export async function GET(request: NextRequest) {
         `city.ilike.%${word}%,` +
         `zip_code.ilike.%${word}%`
       ).join(',');
-      
+
       // Try the full search term as well
-      const fullTermConditions = 
-        `first_name.ilike.%${searchTerm}%,` +
-        `last_name.ilike.%${searchTerm}%,` +
-        `email.ilike.%${searchTerm}%,` +
-        `phone.ilike.%${searchTerm}%,` +
-        `address.ilike.%${searchTerm}%,` +
-        `city.ilike.%${searchTerm}%,` +
-        `zip_code.ilike.%${searchTerm}%`;
-      
+      const fullTermConditions =
+        `first_name.ilike.%${escapedSearchTerm}%,` +
+        `last_name.ilike.%${escapedSearchTerm}%,` +
+        `email.ilike.%${escapedSearchTerm}%,` +
+        `phone.ilike.%${escapedSearchTerm}%,` +
+        `address.ilike.%${escapedSearchTerm}%,` +
+        `city.ilike.%${escapedSearchTerm}%,` +
+        `zip_code.ilike.%${escapedSearchTerm}%`;
+
       // Combine all conditions with OR
       const allConditions = [
         ...nameSearchConditions,
         individualWordConditions,
         fullTermConditions
       ].filter(Boolean).join(',');
-      
+
       customersQuery = customersQuery.or(allConditions);
     } else {
       // Single word search - use original logic
       customersQuery = customersQuery.or(
-        `first_name.ilike.%${searchTerm}%,` +
-        `last_name.ilike.%${searchTerm}%,` +
-        `email.ilike.%${searchTerm}%,` +
-        `phone.ilike.%${searchTerm}%,` +
-        `address.ilike.%${searchTerm}%,` +
-        `city.ilike.%${searchTerm}%,` +
-        `zip_code.ilike.%${searchTerm}%`
+        `first_name.ilike.%${escapedSearchTerm}%,` +
+        `last_name.ilike.%${escapedSearchTerm}%,` +
+        `email.ilike.%${escapedSearchTerm}%,` +
+        `phone.ilike.%${escapedSearchTerm}%,` +
+        `address.ilike.%${escapedSearchTerm}%,` +
+        `city.ilike.%${escapedSearchTerm}%,` +
+        `zip_code.ilike.%${escapedSearchTerm}%`
       );
     }
 

@@ -7,8 +7,8 @@ export default function TicketsPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to tickets page which is now the main tickets page
-    router.replace('/tickets/new');
+    // Redirect to tickets dashboard which is the main tickets page
+    router.replace('/tickets/dashboard');
   }, [router]);
 
   return null;

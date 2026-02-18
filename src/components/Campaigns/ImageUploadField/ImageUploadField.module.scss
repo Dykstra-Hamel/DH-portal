@@ -132,7 +132,7 @@
   right: 8px;
   background: rgba(0, 0, 0, 0.6);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   width: 36px;
   height: 36px;
   display: flex;

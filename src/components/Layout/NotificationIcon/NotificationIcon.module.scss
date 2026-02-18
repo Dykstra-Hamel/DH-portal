@@ -29,6 +29,50 @@
 .bellIcon {
   width: 22px;
   height: 25px;
+  transform-origin: 50% 10%;
+}
+
+.bellRinging {
+  animation: bellRing 0.9s ease-in-out 1;
+}
+
+@keyframes bellRing {
+  0% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(-16deg);
+  }
+  20% {
+    transform: rotate(16deg);
+  }
+  30% {
+    transform: rotate(-12deg);
+  }
+  40% {
+    transform: rotate(12deg);
+  }
+  50% {
+    transform: rotate(-8deg);
+  }
+  60% {
+    transform: rotate(8deg);
+  }
+  70% {
+    transform: rotate(-4deg);
+  }
+  80% {
+    transform: rotate(4deg);
+  }
+  100% {
+    transform: rotate(0deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bellRinging {
+    animation: none;
+  }
 }
 
 .notificationBadge {
@@ -192,7 +236,7 @@
   color: #374151;
   font-size: 14px;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
 

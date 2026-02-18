@@ -164,7 +164,7 @@
     width: 100%;
     padding: 10px 14px;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     font-family: inherit;
     color: #111827;
@@ -216,7 +216,7 @@
 .button {
   padding: 10px 20px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -340,7 +340,7 @@
   .colorPreview {
     width: 40px;
     height: 40px;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     border: 2px solid #d1d5db;
     flex-shrink: 0;
     cursor: pointer;
@@ -358,7 +358,7 @@
   padding: 16px;
   background: white;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   margin-bottom: 12px;
 
   &:last-child {

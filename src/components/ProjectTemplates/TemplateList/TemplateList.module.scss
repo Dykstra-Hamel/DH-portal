@@ -87,10 +87,16 @@
   flex-direction: column;
   gap: 1rem;
   transition: all 0.2s;
+  cursor: pointer;
 
   &:hover {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     border-color: var(--primary-color, #3b82f6);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--action-500, #0284c7);
+    outline-offset: 2px;
   }
 }
 

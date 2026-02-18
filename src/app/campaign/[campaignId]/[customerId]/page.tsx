@@ -62,6 +62,7 @@ interface CampaignData {
     hero: {
       title: string;
       subtitle: string;
+      subheading: string | null;
       description: string | null;
       buttonText: string;
       imageUrl: string | null;
@@ -94,8 +95,18 @@ interface CampaignData {
       name: string;
       description: string | null;
       faqs: Array<{ question: string; answer: string }>;
-      price: number;
+      price: number | null;
     }>;
+    servicePlans: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      price: number | null;
+    }>;
+    preFooter: {
+      show: boolean;
+      content: string | null;
+    };
     faq: {
       show: boolean;
       heading: string;
@@ -135,6 +146,7 @@ interface CampaignData {
       accentColorPreference: 'primary' | 'secondary';
       fontPrimaryName: string | null;
       fontPrimaryUrl: string | null;
+      fontColor: string | null;
     };
     thankYou: {
       greeting: string;
@@ -149,6 +161,8 @@ interface CampaignData {
       ctaText: string;
       ctaUrl: string | null;
     };
+    selectedAddonIds: string[];
+    selectedServicePlanIds: string[];
   };
 }
 

@@ -1,74 +1,134 @@
 'use client';
 
-import React, { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import React, { useState, useMemo, Dispatch, SetStateAction } from 'react';
 import { User } from '@supabase/supabase-js';
 import {
-  ArrowLeft,
-  Edit,
-  Trash2,
   Calendar,
   User as UserIcon,
   Building,
   Clock,
   DollarSign,
-  Tag,
+  LayoutGrid,
+  Users,
+  Flag,
   FileText,
+  Hash,
   AlertCircle,
-  MessageSquare,
   Activity as ActivityIcon,
   CheckSquare,
+  Plus,
   X,
 } from 'lucide-react';
-import { Project, ProjectComment, ProjectActivity, statusOptions, priorityOptions } from '@/types/project';
+import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
+import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
+import { Toast } from '@/components/Common/Toast';
+import {
+  Project,
+  ProjectActivity,
+  ProjectTask,
+  ProjectTypeSubtype,
+  User as ProjectUser,
+  statusOptions,
+  priorityOptions,
+  projectTypeOptions,
+} from '@/types/project';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import { createClient } from '@/lib/supabase/client';
 import styles from './ProjectDetail.module.scss';
-
-const PRESET_PROJECT_TAGS = [
-  'seo', 'social-media', 'content', 'design', 'development',
-  'ppc', 'google-ads', 'facebook-ads', 'email', 'analytics',
-  'branding', 'website', 'blog', 'video', 'photography',
-  'local-seo', 'gmb', 'reviews', 'reporting', 'strategy',
-  'print', 'digital', 'billboard', 'business-cards',
-  'door-hangers', 'vehicle-wrap',
-];
 
 interface ProjectDetailProps {
   project: Project;
   user: User;
+  users: ProjectUser[];
+  tasks: ProjectTask[];
   onProjectUpdate?: () => void;
+  isSidebarExpanded: boolean;
+  setIsSidebarExpanded: Dispatch<SetStateAction<boolean>>;
 }
 
-const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectUpdate }) => {
-  const router = useRouter();
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [comments, setComments] = useState<ProjectComment[]>([]);
-  const [newComment, setNewComment] = useState('');
-  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [users, setUsers] = useState<any[]>([]);
-  const [editFormData, setEditFormData] = useState({
+const ProjectDetail: React.FC<ProjectDetailProps> = ({
+  project,
+  user: _user,
+  users,
+  tasks,
+  onProjectUpdate,
+  isSidebarExpanded,
+  setIsSidebarExpanded,
+}) => {
+  const [editFormData, setEditFormData] = useState(() => ({
     name: project.name || '',
     description: project.description || '',
     notes: project.notes || '',
-    status: project.status || 'coming_up',
+    status: project.status || 'in_progress',
     priority: project.priority || 'medium',
     assigned_to: project.assigned_to_profile?.id || '',
+    requested_by: project.requested_by_profile?.id || '',
     due_date: project.due_date || '',
     start_date: project.start_date || '',
     completion_date: project.completion_date || '',
-    tags: project.tags || [],
     project_type: project.project_type || '',
     project_subtype: project.project_subtype || '',
     is_billable: project.is_billable || false,
     quoted_price: project.quoted_price?.toString() || '',
-  });
+    scope: project.scope || '',
+    category_ids: project.categories?.map(c => c.category_id) || [],
+    company_id: project.company?.id || '',
+  }));
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error'>('success');
+  const [showToast, setShowToast] = useState(false);
+  const [pendingExpandCard, setPendingExpandCard] = useState<string | null>(
+    null
+  );
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [isChangingRequestedBy, setIsChangingRequestedBy] = useState(false);
+  const [availableCategories, setAvailableCategories] = useState<Array<{ id: string; name: string; is_hidden?: boolean }>>([]);
+  const [availableSubtypes, setAvailableSubtypes] = useState<ProjectTypeSubtype[]>([]);
+  const [isFetchingSubtypes, setIsFetchingSubtypes] = useState(false);
+  const [showAddMember, setShowAddMember] = useState(false);
+  const [isAddingMember, setIsAddingMember] = useState(false);
+  const [companies, setCompanies] = useState<Array<{ id: string; name: string }>>([]);
+  const [hasUnsavedNotes, setHasUnsavedNotes] = useState(false);
+  const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const hasUserEditedRef = React.useRef(false);
+  const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSavedDataRef = React.useRef<string>('');
 
-  const getStatusColor = (status: string) => {
-    return statusOptions.find(s => s.value === status)?.color || '#6b7280';
-  };
+  // Filter status options based on project categories and is_billable
+  const availableStatusOptions = useMemo(() => {
+    const hasPrintCategory = availableCategories.some(
+      cat => editFormData.category_ids.includes(cat.id) && cat.name === 'Print'
+    );
+    const isBillable = editFormData.is_billable || project.is_billable || false;
 
-  const getPriorityColor = (priority: string) => {
-    return priorityOptions.find(p => p.value === priority)?.color || '#6b7280';
+    return statusOptions.filter(status => {
+      if (status.value === 'new') {
+        return false;
+      }
+      // Using extended statusOptions with requiresCategory and requiresBillable
+      if (status.requiresCategory === 'Print' && !hasPrintCategory) {
+        return false;
+      }
+      // Using extended statusOptions with requiresCategory and requiresBillable
+      if (status.requiresBillable && !isBillable) {
+        return false;
+      }
+      return true;
+    });
+  }, [availableCategories, editFormData.category_ids, editFormData.is_billable, project.is_billable]);
+
+  const formatScope = (scope?: string | null) => {
+    switch (scope) {
+      case 'internal':
+        return 'Internal Only';
+      case 'external':
+        return 'External Only';
+      case 'both':
+        return 'Internal + External';
+      default:
+        return 'Not set';
+    }
   };
 
   const formatDate = (dateString: string | null) => {
@@ -78,19 +138,6 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectU
       month: 'long',
       day: 'numeric',
     });
-  };
-
-  const formatCurrency = (amount: number | null) => {
-    if (!amount) return 'Not set';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatHours = (hours: number | null) => {
-    if (!hours) return 'Not set';
-    return `${hours} hours`;
   };
 
   const formatDateTime = (dateString: string) => {
@@ -186,89 +233,111 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectU
     }
   };
 
-  // Fetch comments and users on mount
+  const resetFormData = React.useCallback((source: Project) => {
+    const newFormData = {
+      name: source.name || '',
+      description: source.description || '',
+      notes: source.notes || '',
+      status: source.status || 'in_progress',
+      priority: source.priority || 'medium',
+      assigned_to: source.assigned_to_profile?.id || '',
+      requested_by: source.requested_by_profile?.id || '',
+      due_date: source.due_date || '',
+      start_date: source.start_date || '',
+      completion_date: source.completion_date || '',
+      project_type: source.project_type || '',
+      project_subtype: source.project_subtype || '',
+      is_billable: source.is_billable || false,
+      quoted_price: source.quoted_price?.toString() || '',
+      scope: source.scope || '',
+      category_ids: source.categories?.map(c => c.category_id) || [],
+      company_id: source.company?.id || '',
+    };
+
+    // Store the initial state to compare against later
+    lastSavedDataRef.current = JSON.stringify(newFormData);
+    hasUserEditedRef.current = false;
+
+    setEditFormData(newFormData);
+  }, []);
+
   React.useEffect(() => {
-    fetchComments();
-    fetchUsers();
-  }, [project.id]);
+    resetFormData(project);
+  }, [project, resetFormData]);
 
-  const fetchUsers = async () => {
-    try {
-      const response = await fetch('/api/admin/users');
-      if (response.ok) {
-        const data = await response.json();
-        setUsers(data);
+  // Fetch available categories
+  React.useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const response = await fetch('/api/admin/project-categories');
+        if (response.ok) {
+          const categories = await response.json();
+          setAvailableCategories(categories);
+        }
+      } catch (error) {
+        console.error('Error fetching categories:', error);
       }
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
-  };
+    };
+    fetchCategories();
+  }, []);
 
-  const fetchComments = async () => {
-    try {
-      const response = await fetch(`/api/admin/projects/${project.id}/comments`);
-      if (response.ok) {
-        const data = await response.json();
-        setComments(data);
+  // Fetch available companies
+  React.useEffect(() => {
+    const fetchCompanies = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers = {
+          'Content-Type': 'application/json',
+          ...(session?.access_token && { 'Authorization': `Bearer ${session.access_token}` })
+        };
+
+        const response = await fetch('/api/admin/companies', { headers });
+        if (response.ok) {
+          const data = await response.json();
+          setCompanies(data);
+        }
+      } catch (error) {
+        console.error('Error fetching companies:', error);
       }
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-    }
-  };
+    };
+    fetchCompanies();
+  }, []);
 
-  const handleSubmitComment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newComment.trim()) return;
+  // Fetch available subtypes when project type changes
+  React.useEffect(() => {
+    const fetchSubtypes = async () => {
+      // Get the type_code from the selected project_type
+      const selectedType = projectTypeOptions.find(opt => opt.value === editFormData.project_type);
+      const typeCode = selectedType?.code;
 
-    setIsSubmittingComment(true);
-    try {
-      const response = await fetch(`/api/admin/projects/${project.id}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: newComment }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to post comment');
+      if (!typeCode) {
+        setAvailableSubtypes([]);
+        return;
       }
 
-      const comment = await response.json();
-      setComments([...comments, comment]);
-      setNewComment('');
-    } catch (error) {
-      console.error('Error posting comment:', error);
-      alert('Failed to post comment. Please try again.');
-    } finally {
-      setIsSubmittingComment(false);
-    }
-  };
+      setIsFetchingSubtypes(true);
+      try {
+        const response = await fetch(`/api/admin/project-types/${typeCode}/subtypes`);
+        if (response.ok) {
+          const data = await response.json();
+          setAvailableSubtypes(data);
+        } else {
+          setAvailableSubtypes([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch subtypes:', error);
+        setAvailableSubtypes([]);
+      } finally {
+        setIsFetchingSubtypes(false);
+      }
+    };
 
-  const handleEdit = () => {
-    // Initialize form data when entering edit mode
-    setEditFormData({
-      name: project.name,
-      description: project.description || '',
-      notes: project.notes || '',
-      status: project.status,
-      priority: project.priority,
-      assigned_to: project.assigned_to_profile?.id || '',
-      due_date: project.due_date || '',
-      start_date: project.start_date || '',
-      completion_date: project.completion_date || '',
-      tags: project.tags || [],
-      project_type: project.project_type,
-      project_subtype: project.project_subtype || '',
-      is_billable: project.is_billable || false,
-      quoted_price: project.quoted_price?.toString() || '',
-    });
-    setIsEditMode(true);
-  };
+    fetchSubtypes();
+  }, [editFormData.project_type]);
 
-  const handleCancelEdit = () => {
-    setIsEditMode(false);
-  };
+  const handleSaveEdit = React.useCallback(async () => {
 
-  const handleSaveEdit = async () => {
     try {
       const response = await fetch(`/api/admin/projects/${project.id}`, {
         method: 'PUT',
@@ -282,14 +351,17 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectU
           status: editFormData.status,
           priority: editFormData.priority,
           assigned_to: editFormData.assigned_to || null,
+          requested_by: editFormData.requested_by || null,
           due_date: editFormData.due_date,
           start_date: editFormData.start_date || null,
           completion_date: editFormData.completion_date || null,
-          tags: editFormData.tags,
           project_type: editFormData.project_type,
           project_subtype: editFormData.project_subtype || null,
           is_billable: editFormData.is_billable,
           quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
+          scope: editFormData.scope || null,
+          category_ids: editFormData.category_ids,
+          company_id: editFormData.company_id,
         }),
       });
 
@@ -297,522 +369,924 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project, user, onProjectU
         throw new Error('Failed to update project');
       }
 
-      setIsEditMode(false);
+      // Call callback to refresh project data
+      if (onProjectUpdate) {
+        onProjectUpdate();
+      }
+      setToastMessage('Project updated.');
+      setToastType('success');
+      setShowToast(true);
+    } catch (error) {
+      console.error('Error updating project:', error);
+      setToastMessage('Failed to update project.');
+      setToastType('error');
+      setShowToast(true);
+    }
+  }, [editFormData, onProjectUpdate, project.id]);
+
+  React.useEffect(() => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+
+    // Exclude notes from autosave - create a version without notes for comparison
+    const { notes, ...dataWithoutNotes } = editFormData;
+    const currentData = JSON.stringify(dataWithoutNotes);
+
+    if (currentData === lastSavedDataRef.current) {
+      return;
+    }
+
+    // Only autosave after user has made edits
+    if (!hasUserEditedRef.current) {
+      return;
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      handleSaveEdit();
+      lastSavedDataRef.current = currentData;
+    }, 1500);
+
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
+  }, [editFormData, handleSaveEdit]);
+
+  // Helper to mark form as edited when user changes a field
+  const handleFieldChange = <K extends keyof typeof editFormData>(
+    field: K,
+    value: typeof editFormData[K]
+  ) => {
+    hasUserEditedRef.current = true;
+    setEditFormData({ ...editFormData, [field]: value });
+  };
+
+  // Special handler for notes that doesn't trigger autosave
+  const handleNotesChange = (value: string) => {
+    setEditFormData({ ...editFormData, notes: value });
+    setHasUnsavedNotes(true);
+  };
+
+  // Save notes manually
+  const handleSaveNotes = React.useCallback(async () => {
+    setIsSavingNotes(true);
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: editFormData.name,
+          description: editFormData.description,
+          notes: editFormData.notes,
+          status: editFormData.status,
+          priority: editFormData.priority,
+          assigned_to: editFormData.assigned_to || null,
+          requested_by: editFormData.requested_by || null,
+          due_date: editFormData.due_date,
+          start_date: editFormData.start_date || null,
+          completion_date: editFormData.completion_date || null,
+          project_type: editFormData.project_type,
+          project_subtype: editFormData.project_subtype || null,
+          is_billable: editFormData.is_billable,
+          quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
+          scope: editFormData.scope || null,
+          category_ids: editFormData.category_ids,
+          company_id: editFormData.company_id,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update notes');
+      }
 
       // Call callback to refresh project data
       if (onProjectUpdate) {
         onProjectUpdate();
       }
+      setHasUnsavedNotes(false);
+      setToastMessage('Notes saved successfully.');
+      setToastType('success');
+      setShowToast(true);
     } catch (error) {
-      console.error('Error updating project:', error);
-      alert('Failed to update project. Please try again.');
+      console.error('Error updating notes:', error);
+      setToastMessage('Failed to save notes.');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsSavingNotes(false);
+    }
+  }, [editFormData, onProjectUpdate, project.id]);
+
+  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+
+  const getUserRole = (user: any) => {
+    if (user?.profiles?.role) return user.profiles.role;
+    if (user?.role) return user.role;
+    if (Array.isArray(user?.roles)) {
+      if (user.roles.includes('admin')) return 'admin';
+      if (user.roles.includes('super_admin')) return 'super_admin';
+    }
+    return null;
+  };
+
+  const getUserDisplayName = (user: any) => {
+    const profile = user?.profiles;
+    const firstName = profile?.first_name || user?.first_name || '';
+    const lastName = profile?.last_name || user?.last_name || '';
+    const email = profile?.email || user?.email || '';
+    const name = `${firstName} ${lastName}`.trim();
+    return name ? (email ? `${name} (${email})` : name) : email || 'User';
+  };
+
+  const assignableUsers = useMemo(() => {
+    const shouldFilterByRole = users.some(user => getUserRole(user));
+    const adminUsers = shouldFilterByRole
+      ? users.filter(user => {
+          const role = getUserRole(user);
+          return role ? isAdminRole(role) : false;
+        })
+      : users;
+
+    const assignedId = editFormData.assigned_to || project.assigned_to_profile?.id;
+    if (assignedId && !adminUsers.some(user => user.id === assignedId)) {
+      const assignedUser = users.find(user => user.id === assignedId);
+      if (assignedUser) {
+        return [...adminUsers, assignedUser];
+      }
+      if (project.assigned_to_profile) {
+        return [
+          ...adminUsers,
+          {
+            id: assignedId,
+            profiles: project.assigned_to_profile,
+            email: project.assigned_to_profile.email,
+          },
+        ];
+      }
+    }
+
+    return adminUsers;
+  }, [editFormData.assigned_to, project.assigned_to_profile, users]);
+
+  const requestedByProfile = useMemo(() => {
+    const requestedId = editFormData.requested_by;
+    if (!requestedId) return project.requested_by_profile || null;
+    const match = users.find(user => (user.profiles?.id || user.id) === requestedId);
+    return match?.profiles || project.requested_by_profile || null;
+  }, [editFormData.requested_by, project.requested_by_profile, users]);
+
+  const assignedTaskSummaries = useMemo(() => {
+    const profilesById = new Map<string, ProjectUser['profiles']>();
+    users.forEach(projectUser => {
+      profilesById.set(projectUser.id, projectUser.profiles);
+    });
+
+    const counts = new Map<
+      string,
+      {
+        id: string;
+        name: string;
+        email?: string;
+        count: number;
+        avatarUrl?: string | null;
+        firstName?: string;
+        lastName?: string;
+      }
+    >();
+
+    tasks.forEach(task => {
+      if (!task.assigned_to) return;
+
+      const profile =
+        task.assigned_to_profile || profilesById.get(task.assigned_to);
+      const firstName = profile?.first_name || '';
+      const lastName = profile?.last_name || '';
+      const nameParts = [firstName, lastName].filter(Boolean);
+      const name = nameParts.length > 0 ? nameParts.join(' ') : profile?.email || 'Unknown User';
+      const email = profile?.email;
+      const avatarUrl = profile?.avatar_url ?? null;
+
+      const existing = counts.get(task.assigned_to);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        counts.set(task.assigned_to, {
+          id: task.assigned_to,
+          name,
+          email,
+          avatarUrl,
+          firstName: firstName || undefined,
+          lastName: lastName || undefined,
+          count: 1,
+        });
+      }
+    });
+
+    return Array.from(counts.values()).sort((a, b) => {
+      if (b.count !== a.count) {
+        return b.count - a.count;
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [tasks, users]);
+
+  const memberTaskCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+
+    tasks.forEach(task => {
+      if (task.assigned_to) {
+        counts.set(task.assigned_to, (counts.get(task.assigned_to) || 0) + 1);
+      }
+    });
+
+    return counts;
+  }, [tasks]);
+
+  const availableUsersNotMembers = useMemo(() => {
+    const memberIds = new Set(project.members?.map(m => m.user_id) || []);
+    const companyUserIds = new Set(
+      users
+        .filter(u => u.profiles?.id)
+        .map(u => u.profiles!.id)
+    );
+
+    return users.filter(u => {
+      const userId = u.profiles?.id || u.id;
+      return companyUserIds.has(userId) && !memberIds.has(userId);
+    });
+  }, [project.members, users]);
+
+  const sortedCompanies = useMemo(() => {
+    // Make sure current company is in the list
+    const companiesList = [...companies];
+
+    // If project has a company and it's not in the list, add it
+    if (project.company && !companiesList.some(c => c.id === project.company!.id)) {
+      companiesList.push({
+        id: project.company.id,
+        name: project.company.name,
+      });
+    }
+
+    return companiesList.sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: 'base' })
+    );
+  }, [companies, project.company]);
+
+  const handleAddMember = async (userId: string) => {
+    if (!userId) return;
+
+    setIsAddingMember(true);
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/members`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to add member');
+      }
+
+      setToastMessage('Member added successfully');
+      setToastType('success');
+      setShowToast(true);
+      setShowAddMember(false);
+
+      if (onProjectUpdate) {
+        onProjectUpdate();
+      }
+    } catch (error: any) {
+      setToastMessage(error.message || 'Failed to add member');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsAddingMember(false);
     }
   };
 
-  const handleDelete = async () => {
-    if (!confirm(`Are you sure you want to delete project "${project.name}"? This action cannot be undone.`)) {
+  const handleRemoveMember = async (userId: string) => {
+    if (!confirm('Are you sure you want to remove this member from the project?')) {
       return;
     }
 
-    setIsDeleting(true);
     try {
-      const response = await fetch(`/api/admin/projects/${project.id}`, {
+      const response = await fetch(`/api/admin/projects/${project.id}/members/${userId}`, {
         method: 'DELETE',
       });
 
       if (!response.ok) {
-        throw new Error('Failed to delete project');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to remove member');
       }
 
-      // Navigate back to list
-      router.push('/project-management');
-    } catch (error) {
-      console.error('Error deleting project:', error);
-      alert('Failed to delete project. Please try again.');
-      setIsDeleting(false);
+      setToastMessage('Member removed successfully');
+      setToastType('success');
+      setShowToast(true);
+
+      if (onProjectUpdate) {
+        onProjectUpdate();
+      }
+    } catch (error: any) {
+      setToastMessage(error.message || 'Failed to remove member');
+      setToastType('error');
+      setShowToast(true);
     }
   };
 
-  const handleBack = () => {
-    router.push('/project-management');
-  };
-
-  const handleToggleTag = (tag: string) => {
-    const tags = editFormData.tags || [];
-    if (tags.includes(tag)) {
-      setEditFormData({ ...editFormData, tags: tags.filter(t => t !== tag) });
-    } else {
-      setEditFormData({ ...editFormData, tags: [...tags, tag] });
+  const handleCardExpand = (cardId: string) => {
+    setExpandedCardId(cardId);
+    if (!isSidebarExpanded) {
+      setPendingExpandCard(cardId);
+      setIsSidebarExpanded(true);
     }
   };
+
+  const handleCardCollapse = (cardId: string) => {
+    if (expandedCardId === cardId) {
+      setExpandedCardId(null);
+      setIsSidebarExpanded(false);
+    }
+  };
+
+  React.useEffect(() => {
+    if (isSidebarExpanded && pendingExpandCard) {
+      const timer = setTimeout(() => {
+        setPendingExpandCard(null);
+      }, 200);
+      return () => clearTimeout(timer);
+    }
+    return undefined;
+  }, [isSidebarExpanded, pendingExpandCard]);
+
+  const shouldForceExpand = (cardId: string) =>
+    pendingExpandCard === cardId;
+
+  const shouldForceCollapse = (cardId: string) =>
+    !isSidebarExpanded || (!!expandedCardId && expandedCardId !== cardId);
 
   return (
-    <div className={styles.projectDetail}>
-      {/* Breadcrumbs */}
-      <div className={styles.breadcrumbs}>
-        <button onClick={handleBack} className={styles.breadcrumbLink}>
-          Project Management
-        </button>
-        <span className={styles.breadcrumbSeparator}>/</span>
-        <span className={styles.breadcrumbCurrent}>{project.name}</span>
-      </div>
-
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.headerLeft}>
-          <button onClick={handleBack} className={styles.backButton}>
-            <ArrowLeft size={20} />
-            Back to Projects
-          </button>
-          {isEditMode ? (
-            <input
-              type="text"
-              className={styles.editNameInput}
-              value={editFormData.name}
-              onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-            />
-          ) : (
-            <h1 className={styles.projectName}>{project.name}</h1>
-          )}
-          <div className={styles.badges}>
-            {isEditMode ? (
-              <>
-                <select
-                  className={styles.editSelectBadge}
-                  value={editFormData.status}
-                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
-                  style={{ backgroundColor: getStatusColor(editFormData.status), color: 'white' }}
-                >
-                  {statusOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className={styles.editSelectBadge}
-                  value={editFormData.priority}
-                  onChange={(e) => setEditFormData({ ...editFormData, priority: e.target.value as any })}
-                  style={{ backgroundColor: getPriorityColor(editFormData.priority), color: 'white' }}
-                >
-                  {priorityOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <>
-                <span
-                  className={styles.statusBadge}
-                  style={{ backgroundColor: getStatusColor(project.status) }}
-                >
-                  {statusOptions.find(s => s.value === project.status)?.label}
-                </span>
-                <span
-                  className={styles.priorityBadge}
-                  style={{ backgroundColor: getPriorityColor(project.priority) }}
-                >
-                  {priorityOptions.find(p => p.value === project.priority)?.label}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-        <div className={styles.headerActions}>
-          {isEditMode ? (
-            <>
-              <button onClick={handleSaveEdit} className={styles.saveButton}>
-                <CheckSquare size={18} />
-                Save
-              </button>
-              <button onClick={handleCancelEdit} className={styles.cancelEditButton}>
-                <X size={18} />
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              <button onClick={handleEdit} className={styles.editButton}>
-                <Edit size={18} />
-                Edit
-              </button>
-              <button
-                onClick={handleDelete}
-                className={styles.deleteButton}
-                disabled={isDeleting}
-              >
-                <Trash2 size={18} />
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Main Content Grid */}
-      <div className={styles.content}>
-        {/* Left Column */}
-        <div className={styles.mainColumn}>
-          {/* Description */}
-          {(project.description || isEditMode) && (
-            <div className={styles.section}>
-              <h2 className={styles.sectionTitle}>
-                <FileText size={20} />
-                Description
-              </h2>
-              {isEditMode ? (
-                <textarea
-                  className={styles.editTextarea}
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  rows={4}
-                  placeholder="Add a description..."
-                />
-              ) : (
-                <p className={styles.description}>{project.description}</p>
-              )}
-            </div>
-          )}
-
-          {/* Notes */}
-          {(project.notes || isEditMode) && (
-            <div className={styles.section}>
-              <h2 className={styles.sectionTitle}>
-                <AlertCircle size={20} />
-                Notes
-              </h2>
-              {isEditMode ? (
-                <textarea
-                  className={styles.editTextarea}
-                  value={editFormData.notes}
-                  onChange={(e) => setEditFormData({ ...editFormData, notes: e.target.value })}
-                  rows={4}
-                  placeholder="Add notes..."
-                />
-              ) : (
-                <p className={styles.notes}>{project.notes}</p>
-              )}
-            </div>
-          )}
-
-          {/* Tags */}
-          {((project.tags && project.tags.length > 0) || isEditMode) && (
-            <div className={styles.section}>
-              <h2 className={styles.sectionTitle}>
-                <Tag size={20} />
-                Tags
-              </h2>
-              {isEditMode ? (
-                <div className={styles.tagCloud}>
-                  {PRESET_PROJECT_TAGS.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={`${styles.tagButton} ${
-                        (editFormData.tags || []).includes(tag) ? styles.tagSelected : ''
-                      }`}
-                      onClick={() => handleToggleTag(tag)}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className={styles.tags}>
-                  {project.tags?.map((tag, index) => (
-                    <span key={index} className={styles.tag}>
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Comments */}
-          <div className={styles.section}>
-            <h2 className={styles.sectionTitle}>
-              <MessageSquare size={20} />
-              Comments ({comments.length})
-            </h2>
-
-            {/* Add Comment Form */}
-            <form onSubmit={handleSubmitComment} className={styles.commentForm}>
-              <textarea
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                placeholder="Add a comment..."
-                className={styles.commentInput}
-                rows={3}
+    <>
+      <Toast
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+        type={toastType}
+      />
+      <DetailsCardsSidebar
+        isSidebarExpanded={isSidebarExpanded}
+        setIsSidebarExpanded={setIsSidebarExpanded}
+      >
+      <InfoCard
+        title="Overview"
+        icon={<LayoutGrid size={20} />}
+        startExpanded={false}
+        onExpand={() => handleCardExpand('overview')}
+        onCollapse={() => handleCardCollapse('overview')}
+        forceCollapse={shouldForceCollapse('overview')}
+        forceExpand={shouldForceExpand('overview')}
+        isCompact={!isSidebarExpanded}
+        inSidebar={true}
+      >
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Project Name</div>
+              <input
+                type="text"
+                className={styles.editInput}
+                value={editFormData.name}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
               />
-              <button
-                type="submit"
-                disabled={isSubmittingComment || !newComment.trim()}
-                className={styles.commentSubmitButton}
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Company</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.company_id}
+                onChange={(e) => handleFieldChange('company_id', e.target.value)}
               >
-                {isSubmittingComment ? 'Posting...' : 'Post Comment'}
-              </button>
-            </form>
-
-            {/* Comments List */}
-            {comments.length > 0 && (
-              <div className={styles.comments}>
-                {comments.map(comment => (
-                  <div key={comment.id} className={styles.comment}>
-                    <div className={styles.commentHeader}>
-                      <div className={styles.commentAuthor}>
-                        {comment.user_profile?.first_name} {comment.user_profile?.last_name}
-                      </div>
-                      <div className={styles.commentDate}>
-                        {formatDateTime(comment.created_at)}
-                      </div>
-                    </div>
-                    <div className={styles.commentText}>{comment.comment}</div>
-                  </div>
+                <option value="">Select Company</option>
+                {sortedCompanies.map(company => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
                 ))}
-              </div>
-            )}
+              </select>
+            </div>
           </div>
 
-          {/* Activity Log */}
-          {project.activity && project.activity.length > 0 && (
-            <div className={styles.section}>
-              <h2 className={styles.sectionTitle}>
-                <ActivityIcon size={20} />
-                Activity
-              </h2>
-              <div className={styles.activityFeed}>
-                {project.activity.map(activity => (
-                  <div key={activity.id} className={styles.activityItem}>
-                    <div className={styles.activityAvatar}>
-                      {activity.user_profile?.first_name?.[0]}
-                      {activity.user_profile?.last_name?.[0]}
-                    </div>
-                    <div className={styles.activityContent}>
-                      <div className={styles.activityText}>
-                        <span className={styles.activityUser}>
-                          {activity.user_profile?.first_name} {activity.user_profile?.last_name}
-                        </span>{' '}
-                        <span className={styles.activityAction}>
-                          {getProjectActivityMessage(activity)}
-                        </span>
-                      </div>
-                      <div className={styles.activityTime}>
-                        {getRelativeTime(activity.created_at)}
-                      </div>
-                    </div>
-                  </div>
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Shortcode</div>
+              <div className={styles.infoValue}>{project.shortcode || 'Not set'}</div>
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Project Type</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.project_type}
+                onChange={(e) => {
+                  hasUserEditedRef.current = true;
+                  setEditFormData({
+                    ...editFormData,
+                    project_type: e.target.value,
+                    project_subtype: '',
+                  });
+                }}
+              >
+                <option value="">Select Project Type</option>
+                {projectTypeOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
-          )}
-        </div>
+          </div>
 
-        {/* Right Column - Metadata */}
-        <div className={styles.sideColumn}>
-          {/* Project Info */}
-          <div className={styles.infoCard}>
-            <h3 className={styles.infoCardTitle}>Project Information</h3>
-
-            <div className={styles.infoItem}>
-              <Building size={16} />
-              <div>
-                <div className={styles.infoLabel}>Company</div>
-                <div className={styles.infoValue}>{project.company.name}</div>
-              </div>
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Project Subtype</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.project_subtype}
+                onChange={(e) => {
+                  hasUserEditedRef.current = true;
+                  setEditFormData({
+                    ...editFormData,
+                    project_subtype: e.target.value,
+                  });
+                }}
+                disabled={isFetchingSubtypes}
+              >
+                <option value="">
+                  {isFetchingSubtypes ? 'Loading subtypes...' : availableSubtypes.length === 0 ? 'No subtypes available' : 'Select Subtype'}
+                </option>
+                {availableSubtypes.map(subtype => (
+                  <option key={subtype.id} value={subtype.name}>
+                    {subtype.name}
+                  </option>
+                ))}
+              </select>
             </div>
+          </div>
 
-            <div className={styles.infoItem}>
-              <FileText size={16} />
-              <div>
-                <div className={styles.infoLabel}>Project Type</div>
-                <div className={styles.infoValue}>{project.project_type}</div>
-              </div>
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Project Scope</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.scope}
+                onChange={(e) => handleFieldChange('scope', e.target.value)}
+              >
+                <option value="">Not set</option>
+                <option value="internal">Internal Only</option>
+                <option value="external">External Only</option>
+                <option value="both">Internal + External</option>
+              </select>
             </div>
+          </div>
 
-            <div className={styles.infoItem}>
-              <UserIcon size={16} />
-              <div>
-                <div className={styles.infoLabel}>Requested By</div>
-                <div className={styles.infoValue}>
-                  {project.requested_by_profile.first_name}{' '}
-                  {project.requested_by_profile.last_name}
-                </div>
-                <div className={styles.infoEmail}>
-                  {project.requested_by_profile.email}
-                </div>
-              </div>
-            </div>
-
-            <div className={styles.infoItem}>
-              <UserIcon size={16} />
-              <div>
-                <div className={styles.infoLabel}>Assigned To</div>
-                {isEditMode ? (
-                  <select
-                    className={styles.editSelect}
-                    value={editFormData.assigned_to || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, assigned_to: e.target.value })}
-                  >
-                    <option value="">Unassigned</option>
-                    {users.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {user.profiles?.first_name} {user.profiles?.last_name}
-                      </option>
-                    ))}
-                  </select>
-                ) : project.assigned_to_profile ? (
-                  <>
-                    <div className={styles.infoValue}>
-                      {project.assigned_to_profile.first_name}{' '}
-                      {project.assigned_to_profile.last_name}
-                    </div>
-                    <div className={styles.infoEmail}>
-                      {project.assigned_to_profile.email}
-                    </div>
-                  </>
+          <div className={styles.infoItem}>
+            <LayoutGrid size={16} />
+            <div>
+              <div className={styles.infoLabel}>Project Categories</div>
+              <div className={styles.categoryCheckboxes}>
+                {availableCategories.filter(c => !c.is_hidden).length > 0 ? (
+                  availableCategories.filter(c => !c.is_hidden).map((category) => (
+                    <label key={category.id} className={styles.categoryCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={editFormData.category_ids.includes(category.id)}
+                        onChange={(e) => {
+                          hasUserEditedRef.current = true;
+                          const newCategoryIds = e.target.checked
+                            ? [...editFormData.category_ids, category.id]
+                            : editFormData.category_ids.filter((id) => id !== category.id);
+                          setEditFormData({ ...editFormData, category_ids: newCategoryIds });
+                        }}
+                      />
+                      <span>{category.name}</span>
+                    </label>
+                  ))
                 ) : (
-                  <div className={styles.infoValue}>Unassigned</div>
+                  <div className={styles.infoValue}>No categories available</div>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Dates */}
-          <div className={styles.infoCard}>
-            <h3 className={styles.infoCardTitle}>Timeline</h3>
-
-            <div className={styles.infoItem}>
-              <Calendar size={16} />
-              <div>
-                <div className={styles.infoLabel}>Due Date</div>
-                {isEditMode ? (
-                  <input
-                    type="date"
-                    className={styles.editInput}
-                    value={editFormData.due_date || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, due_date: e.target.value })}
-                  />
-                ) : (
-                  <div className={styles.infoValue}>{formatDate(project.due_date)}</div>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.infoItem}>
-              <Calendar size={16} />
-              <div>
-                <div className={styles.infoLabel}>Start Date</div>
-                {isEditMode ? (
-                  <input
-                    type="date"
-                    className={styles.editInput}
-                    value={editFormData.start_date || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, start_date: e.target.value })}
-                  />
-                ) : (
-                  <div className={styles.infoValue}>{formatDate(project.start_date)}</div>
-                )}
-              </div>
-            </div>
-
-            <div className={styles.infoItem}>
-              <Calendar size={16} />
-              <div>
-                <div className={styles.infoLabel}>Completion Date</div>
-                {isEditMode ? (
-                  <input
-                    type="date"
-                    className={styles.editInput}
-                    value={editFormData.completion_date || ''}
-                    onChange={(e) => setEditFormData({ ...editFormData, completion_date: e.target.value })}
-                  />
-                ) : (
-                  <div className={styles.infoValue}>{formatDate(project.completion_date)}</div>
-                )}
+          <div className={styles.infoItem}>
+            <CheckSquare size={16} />
+            <div>
+              <div className={styles.infoLabel}>Status</div>
+              <div className={styles.infoValue}>
+                {statusOptions.find(option => option.value === editFormData.status)?.label || editFormData.status}
               </div>
             </div>
           </div>
 
-          {/* Billing */}
-          <div className={styles.infoCard}>
-            <h3 className={styles.infoCardTitle}>Billing</h3>
+          <div className={styles.infoItem}>
+            <AlertCircle size={16} />
+            <div>
+              <div className={styles.infoLabel}>Priority</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.priority}
+                onChange={(e) => handleFieldChange('priority', e.target.value as typeof editFormData.priority)}
+              >
+                {priorityOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
 
-            <div className={styles.infoItem}>
-              <DollarSign size={16} />
-              <div>
-                <div className={styles.infoLabel}>Is Billable</div>
-                {isEditMode ? (
-                  <label className={styles.checkboxLabel}>
-                    <input
-                      type="checkbox"
-                      checked={editFormData.is_billable}
-                      onChange={(e) => setEditFormData({
+          <div className={styles.infoItem}>
+            <DollarSign size={16} />
+            <div>
+              <div className={styles.infoLabel}>Is Billable</div>
+              <div className={styles.toggleRow}>
+                <label className={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={editFormData.is_billable}
+                    onChange={(e) => {
+                      hasUserEditedRef.current = true;
+                      setEditFormData({
                         ...editFormData,
                         is_billable: e.target.checked,
                         quoted_price: e.target.checked ? editFormData.quoted_price : '',
-                      })}
-                    />
-                    <span>Yes</span>
-                  </label>
-                ) : (
-                  <div className={styles.infoValue}>
-                    {project.is_billable ? 'Yes' : 'No'}
-                  </div>
-                )}
+                      });
+                    }}
+                    aria-label="Is billable"
+                  />
+                  <span className={styles.toggleSlider}></span>
+                </label>
+                <span className={styles.toggleText}>
+                  {editFormData.is_billable ? 'Yes' : 'No'}
+                </span>
               </div>
             </div>
-
-            {(project.is_billable || (isEditMode && editFormData.is_billable)) && (
-              <div className={styles.infoItem}>
-                <DollarSign size={16} />
-                <div>
-                  <div className={styles.infoLabel}>Quoted Price</div>
-                  {isEditMode ? (
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      className={styles.editInput}
-                      value={editFormData.quoted_price}
-                      onChange={(e) => setEditFormData({ ...editFormData, quoted_price: e.target.value })}
-                      placeholder="0.00"
-                    />
-                  ) : (
-                    <div className={styles.infoValue}>
-                      {formatCurrency(project.quoted_price)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Metadata */}
-          <div className={styles.infoCard}>
-            <h3 className={styles.infoCardTitle}>Metadata</h3>
-
+          {editFormData.is_billable && (
             <div className={styles.infoItem}>
-              <Calendar size={16} />
+              <DollarSign size={16} />
               <div>
-                <div className={styles.infoLabel}>Created</div>
-                <div className={styles.infoValue}>{formatDate(project.created_at)}</div>
+                <div className={styles.infoLabel}>Quoted Price</div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className={styles.editInput}
+                  value={editFormData.quoted_price}
+                  onChange={(e) => handleFieldChange('quoted_price', e.target.value)}
+                  placeholder="0.00"
+                />
               </div>
             </div>
+          )}
+        </div>
+      </InfoCard>
 
-            <div className={styles.infoItem}>
-              <Calendar size={16} />
-              <div>
-                <div className={styles.infoLabel}>Last Updated</div>
-                <div className={styles.infoValue}>{formatDate(project.updated_at)}</div>
-              </div>
+      <InfoCard
+        title="Notes"
+        icon={<FileText size={20} />}
+        startExpanded={false}
+        onExpand={() => handleCardExpand('notes')}
+        onCollapse={() => handleCardCollapse('notes')}
+        forceCollapse={shouldForceCollapse('notes')}
+        forceExpand={shouldForceExpand('notes')}
+        isCompact={!isSidebarExpanded}
+        inSidebar={true}
+      >
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
+          <div className={styles.textBlock}>
+            <RichTextEditor
+              value={editFormData.notes}
+              onChange={handleNotesChange}
+              placeholder="Add notes..."
+              className={styles.notesEditor}
+              compact
+            />
+            <button
+              type="button"
+              className={styles.notesSaveButton}
+              onClick={handleSaveNotes}
+              disabled={!hasUnsavedNotes || isSavingNotes}
+            >
+              {isSavingNotes ? 'Saving...' : 'Save Notes'}
+            </button>
+          </div>
+        </div>
+      </InfoCard>
+
+      <InfoCard
+        title="Timeline"
+        icon={<Calendar size={20} />}
+        startExpanded={false}
+        onExpand={() => handleCardExpand('timeline')}
+        onCollapse={() => handleCardCollapse('timeline')}
+        forceCollapse={shouldForceCollapse('timeline')}
+        forceExpand={shouldForceExpand('timeline')}
+        isCompact={!isSidebarExpanded}
+        inSidebar={true}
+      >
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Due Date</div>
+              <input
+                type="date"
+                className={styles.editInput}
+                value={editFormData.due_date || ''}
+                onChange={(e) => handleFieldChange('due_date', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Start Date</div>
+              <input
+                type="date"
+                className={styles.editInput}
+                value={editFormData.start_date || ''}
+                onChange={(e) => handleFieldChange('start_date', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Completion Date</div>
+              <input
+                type="date"
+                className={styles.editInput}
+                value={editFormData.completion_date || ''}
+                onChange={(e) => handleFieldChange('completion_date', e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Created</div>
+              <div className={styles.infoValue}>{formatDate(project.created_at)}</div>
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Last Updated</div>
+              <div className={styles.infoValue}>{formatDate(project.updated_at)}</div>
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </InfoCard>
+
+      <InfoCard
+        title="People"
+        icon={<Users size={20} />}
+        startExpanded={false}
+        onExpand={() => handleCardExpand('people')}
+        onCollapse={() => handleCardCollapse('people')}
+        forceCollapse={shouldForceCollapse('people')}
+        forceExpand={shouldForceExpand('people')}
+        isCompact={!isSidebarExpanded}
+        inSidebar={true}
+      >
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoHeaderRow}>
+                <div className={styles.infoLabel}>Requested By</div>
+                <button
+                  type="button"
+                  className={styles.changeLink}
+                  onClick={() => setIsChangingRequestedBy(prev => !prev)}
+                >
+                  {isChangingRequestedBy ? 'Done' : 'Change'}
+                </button>
+              </div>
+              {isChangingRequestedBy ? (
+                <select
+                  className={styles.editSelect}
+                  value={editFormData.requested_by || ''}
+                  onChange={(e) => {
+                    handleFieldChange('requested_by', e.target.value);
+                    setIsChangingRequestedBy(false);
+                  }}
+                >
+                  <option value="">Select User</option>
+                  {assignableUsers.map((projectUser) => (
+                    <option key={projectUser.id} value={projectUser.id}>
+                      {getUserDisplayName(projectUser)}
+                    </option>
+                  ))}
+                </select>
+              ) : requestedByProfile ? (
+                <div className={styles.infoPerson}>
+                  <MiniAvatar
+                    firstName={requestedByProfile.first_name || undefined}
+                    lastName={requestedByProfile.last_name || undefined}
+                    email={requestedByProfile.email}
+                    avatarUrl={requestedByProfile.avatar_url || null}
+                    size="small"
+                    showTooltip={true}
+                  />
+                  <div>
+                    <div className={styles.infoValue}>
+                      {requestedByProfile.first_name} {requestedByProfile.last_name}
+                    </div>
+                    <div className={styles.infoEmail}>
+                      {requestedByProfile.email}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className={styles.infoValue}>Not set</div>
+              )}
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Assigned To</div>
+              <select
+                className={styles.editSelect}
+                value={editFormData.assigned_to || ''}
+                onChange={(e) => handleFieldChange('assigned_to', e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {assignableUsers.map((projectUser) => (
+                  <option key={projectUser.id} value={projectUser.id}>
+                    {getUserDisplayName(projectUser)}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className={styles.infoItem}>
+            <div>
+              <div className={styles.infoLabel}>Project Members</div>
+              {project.members && project.members.length > 0 ? (
+                <div className={styles.membersList}>
+                  {project.members.map(member => {
+                    const taskCount = memberTaskCounts.get(member.user_id) || 0;
+                    return (
+                      <div key={member.id} className={styles.memberChip}>
+                        <div className={styles.memberInfo}>
+                          <MiniAvatar
+                            firstName={member.user_profile?.first_name || undefined}
+                            lastName={member.user_profile?.last_name || undefined}
+                            email={member.user_profile?.email || ''}
+                            avatarUrl={member.user_profile?.avatar_url || null}
+                            size="small"
+                            showTooltip={true}
+                          />
+                          <div className={styles.memberDetails}>
+                            <div className={styles.memberName}>
+                              {member.user_profile?.first_name} {member.user_profile?.last_name}
+                            </div>
+                            {member.user_profile?.email && (
+                              <div className={styles.memberEmail}>
+                                {member.user_profile.email}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className={styles.memberActions}>
+                          {taskCount > 0 && (
+                            <div className={styles.memberTaskCount}>{taskCount}</div>
+                          )}
+                          {member.added_via === 'manual' && (
+                            <button
+                              className={styles.removeMemberButton}
+                              onClick={() => handleRemoveMember(member.user_id)}
+                              title="Remove member"
+                              type="button"
+                            >
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className={styles.infoValue}>No members yet</div>
+              )}
+
+              {showAddMember ? (
+                <div className={styles.addMemberDropdown}>
+                  <select
+                    className={styles.editSelect}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        handleAddMember(e.target.value);
+                      }
+                    }}
+                    value=""
+                    disabled={isAddingMember}
+                  >
+                    <option value="">Select user...</option>
+                    {availableUsersNotMembers.map((projectUser) => (
+                      <option key={projectUser.id} value={projectUser.profiles?.id || projectUser.id}>
+                        {getUserDisplayName(projectUser)}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className={styles.cancelAddMemberButton}
+                    onClick={() => setShowAddMember(false)}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className={styles.addMemberButton}
+                  onClick={() => setShowAddMember(true)}
+                  type="button"
+                >
+                  <Plus size={14} /> Add Member
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </InfoCard>
+
+      <InfoCard
+        title="Activity"
+        icon={<ActivityIcon size={20} />}
+        startExpanded={false}
+        onExpand={() => handleCardExpand('activity')}
+        onCollapse={() => handleCardCollapse('activity')}
+        forceCollapse={shouldForceCollapse('activity')}
+        forceExpand={shouldForceExpand('activity')}
+        isCompact={!isSidebarExpanded}
+        inSidebar={true}
+      >
+        <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
+          {project.activity && project.activity.length > 0 ? (
+            <div className={styles.activityFeed}>
+              {project.activity.map(activity => (
+                <div key={activity.id} className={styles.activityItem}>
+                  <MiniAvatar
+                    firstName={activity.user_profile?.first_name || undefined}
+                    lastName={activity.user_profile?.last_name || undefined}
+                    email={activity.user_profile?.email || ''}
+                    avatarUrl={activity.user_profile?.avatar_url || null}
+                    size="small"
+                    showTooltip={true}
+                    className={styles.activityAvatar}
+                  />
+                  <div className={styles.activityContent}>
+                    <div className={styles.activityText}>
+                      <span className={styles.activityUser}>
+                        {activity.user_profile?.first_name}{' '}
+                        {activity.user_profile?.last_name}
+                      </span>{' '}
+                      <span className={styles.activityAction}>
+                        {getProjectActivityMessage(activity)}
+                      </span>
+                    </div>
+                    <div className={styles.activityTime}>
+                      {getRelativeTime(activity.created_at)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className={styles.emptyState}>No activity yet.</div>
+          )}
+        </div>
+      </InfoCard>
+
+    </DetailsCardsSidebar>
+  </>
   );
 };
 

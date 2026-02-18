@@ -58,7 +58,7 @@
   padding: 10px 14px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.2s ease;
 
   &:focus-within {
@@ -107,7 +107,7 @@
   gap: 8px;
   background: white;
   padding: 4px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   border: 1px solid var(--gray-300);
 }
 

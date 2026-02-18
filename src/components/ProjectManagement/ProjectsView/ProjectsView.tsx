@@ -1,44 +1,92 @@
 import React, { useState, useMemo } from 'react';
-import { Project } from '@/types/project';
+import { Project, ProjectStatus, statusOptions } from '@/types/project';
 import { Task } from '@/types/taskManagement';
-import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
+import { StarButton } from '@/components/Common/StarButton/StarButton';
+import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectsView.module.scss';
-
-type ProjectStatus = 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
 
 interface ProjectsViewProps {
   projects: Project[];
   tasks: Task[];
   onEditProject: (project: Project) => void;
   onDeleteProject: (projectId: string) => void;
+  onToggleStar?: (projectId: string) => void;
+  onProjectClick?: (project: Project) => void | Promise<void>;
 }
 
-export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }: ProjectsViewProps) {
-  const [statusFilter, setStatusFilter] = useState<ProjectStatus | 'all'>('all');
-  const [typeFilter, setTypeFilter] = useState<string | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+type SortField =
+  | 'due_date'
+  | 'client'
+  | 'project_name'
+  | 'status'
+  | 'tasks'
+  | 'progress';
 
-  // Calculate project task counts
+export function ProjectsView({
+  projects,
+  tasks,
+  onEditProject,
+  onDeleteProject,
+  onToggleStar,
+  onProjectClick,
+}: ProjectsViewProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState<{
+    key: SortField;
+    direction: 'asc' | 'desc';
+  }>({
+    key: 'due_date',
+    direction: 'asc',
+  });
+
+  const projectTaskStats = useMemo(() => {
+    const stats = new Map<string, { total: number; completed: number }>();
+
+    tasks.forEach(task => {
+      if (!task.project_id) return;
+
+      const current = stats.get(task.project_id) || { total: 0, completed: 0 };
+      current.total += 1;
+      if (task.status === 'completed') {
+        current.completed += 1;
+      }
+      stats.set(task.project_id, current);
+    });
+
+    return stats;
+  }, [tasks]);
+
   const getProjectTaskCount = (projectId: string) => {
-    const projectTasks = tasks.filter(t => t.project_id === projectId);
-    const completed = projectTasks.filter(t => t.status === 'completed').length;
-    return { total: projectTasks.length, completed };
+    return projectTaskStats.get(projectId) || { total: 0, completed: 0 };
+  };
+
+  const getProjectProgress = (projectId: string) => {
+    const stats = getProjectTaskCount(projectId);
+    if (stats.total === 0) return 0;
+    return Math.round((stats.completed / stats.total) * 100);
+  };
+
+  const handleSort = (field: SortField) => {
+    setSortConfig(prev => {
+      if (prev.key === field) {
+        return {
+          key: field,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        };
+      }
+
+      return {
+        key: field,
+        direction: 'asc',
+      };
+    });
   };
 
   // Filter and sort projects
   const filteredProjects = useMemo(() => {
-    return projects
+    const filtered = projects
       .filter(project => {
-        // Status filter
-        if (statusFilter !== 'all' && project.status !== statusFilter) {
-          return false;
-        }
-
-        // Type filter
-        if (typeFilter !== 'all' && project.project_type !== typeFilter) {
-          return false;
-        }
-
         // Search filter
         if (searchQuery.trim()) {
           const query = searchQuery.toLowerCase();
@@ -49,31 +97,93 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
         }
 
         return true;
-      })
-      .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-  }, [projects, statusFilter, typeFilter, searchQuery]);
+      });
+
+    const statusOrder = statusOptions.reduce<Record<string, number>>(
+      (acc, option, index) => {
+        acc[option.value] = index;
+        return acc;
+      },
+      {}
+    );
+
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortConfig.key) {
+        case 'due_date':
+          comparison =
+            (parseDateString(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY) -
+            (parseDateString(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY);
+          break;
+        case 'client':
+          comparison = a.company.name.localeCompare(b.company.name);
+          break;
+        case 'project_name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'status':
+          comparison =
+            (statusOrder[a.status] ?? Number.MAX_SAFE_INTEGER) -
+            (statusOrder[b.status] ?? Number.MAX_SAFE_INTEGER);
+          break;
+        case 'tasks': {
+          const aStats = getProjectTaskCount(a.id);
+          const bStats = getProjectTaskCount(b.id);
+          comparison = aStats.total - bStats.total;
+          if (comparison === 0) {
+            comparison = aStats.completed - bStats.completed;
+          }
+          break;
+        }
+        case 'progress':
+          comparison = getProjectProgress(a.id) - getProjectProgress(b.id);
+          break;
+        default:
+          comparison = 0;
+      }
+
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [projects, searchQuery, sortConfig, projectTaskStats]);
 
   const formatDate = (dateString: string): string => {
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const date = parseDateString(dateString);
+    if (!date) return 'Not Set';
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { color: string; textColor: string; label: string }> = {
-      coming_up: { color: '#f3f4f6', textColor: '#6b7280', label: 'Coming Up' },
-      design: { color: '#ddd6fe', textColor: '#5b21b6', label: 'Design' },
-      development: { color: '#dbeafe', textColor: '#1e40af', label: 'Development' },
-      out_to_client: { color: '#fef3c7', textColor: '#b45309', label: 'Out To Client' },
-      waiting_on_client: { color: '#fee2e2', textColor: '#991b1b', label: 'Waiting On Client' },
-      bill_client: { color: '#d1fae5', textColor: '#065f46', label: 'Bill Client' },
-    };
+  const isPastDue = (dateString?: string | null): boolean => {
+    const date = parseDateString(dateString);
+    if (!date) return false;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const compareDate = new Date(date);
+    compareDate.setHours(0, 0, 0, 0);
+    return compareDate < today;
+  };
 
-    const config = statusConfig[status] || statusConfig.coming_up;
+  const hexToRgba = (hex: string, alpha: number) => {
+    const sanitized = hex.replace('#', '');
+    if (sanitized.length !== 6) return hex;
+    const r = parseInt(sanitized.slice(0, 2), 16);
+    const g = parseInt(sanitized.slice(2, 4), 16);
+    const b = parseInt(sanitized.slice(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  };
+
+  const getStatusBadge = (status: ProjectStatus) => {
+    const option = statusOptions.find(item => item.value === status);
+    const color = option?.color ?? '#6b7280';
+    const label = option?.label ?? status;
     return (
       <span
         className={styles.statusBadge}
-        style={{ background: config.color, color: config.textColor }}
+        style={{ background: hexToRgba(color, 0.16), color }}
       >
-        {config.label}
+        {label}
       </span>
     );
   };
@@ -112,41 +222,53 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
           />
         </div>
 
-        <select
-          className={styles.filterSelect}
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as ProjectStatus | 'all')}
-        >
-          <option value="all">All Status</option>
-          <option value="coming_up">Coming Up</option>
-          <option value="design">Design</option>
-          <option value="development">Development</option>
-          <option value="out_to_client">Out To Client</option>
-          <option value="waiting_on_client">Waiting On Client</option>
-          <option value="bill_client">Bill Client</option>
-        </select>
-
-        <select
-          className={styles.filterSelect}
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-        >
-          <option value="all">All Types</option>
-          <option value="print">Print</option>
-          <option value="digital">Digital</option>
-        </select>
       </div>
 
       {/* Projects Table */}
       <div className={styles.projectsTable}>
         <div className={styles.tableHeader}>
-          <div className={styles.headerCell}>Project Name</div>
-          <div className={styles.headerCell}>Client</div>
-          <div className={styles.headerCell}>Type</div>
-          <div className={styles.headerCell}>Status</div>
-          <div className={styles.headerCell}>Progress</div>
-          <div className={styles.headerCell}>Tasks</div>
-          <div className={styles.headerCell}>Deadline</div>
+          <SortableColumnHeader
+            title="Deadline"
+            sortKey="due_date"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Client"
+            sortKey="client"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Project Name"
+            sortKey="project_name"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Status"
+            sortKey="status"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Tasks"
+            sortKey="tasks"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Progress"
+            sortKey="progress"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
           <div className={styles.headerCell}>Actions</div>
         </div>
 
@@ -169,21 +291,47 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
           ) : (
             filteredProjects.map((project) => {
               const taskStats = getProjectTaskCount(project.id);
-              const progress = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0;
+              const progress = getProjectProgress(project.id);
 
               return (
-                <div key={project.id} className={styles.tableRow}>
+                <div
+                  key={project.id}
+                  className={`${styles.tableRow} ${onProjectClick ? styles.clickableRow : ''}`}
+                  onClick={() => onProjectClick?.(project)}
+                  role={onProjectClick ? 'button' : undefined}
+                  tabIndex={onProjectClick ? 0 : undefined}
+                  onKeyDown={(e) => {
+                    if (!onProjectClick) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      onProjectClick(project);
+                    }
+                  }}
+                >
                   <div className={styles.cell}>
-                    <div className={styles.projectName}>{project.name}</div>
+                    <div
+                      className={`${styles.deadline} ${
+                        project.due_date && isPastDue(project.due_date)
+                          ? styles.deadlineOverdue
+                          : ''
+                      }`}
+                    >
+                      {formatDate(project.due_date)}
+                    </div>
                   </div>
                   <div className={styles.cell}>
                     <div className={styles.clientName}>{project.company.name}</div>
                   </div>
                   <div className={styles.cell}>
-                    <ProjectBadge projectName={project.project_type} projectType={project.project_type as any} size="small" />
+                    <div className={styles.projectName}>{project.name}</div>
                   </div>
                   <div className={styles.cell}>
                     {getStatusBadge(project.status)}
+                  </div>
+                  <div className={styles.cell}>
+                    <div className={styles.taskCount}>
+                      {taskStats.completed}/{taskStats.total}
+                    </div>
                   </div>
                   <div className={styles.cell}>
                     <div className={styles.progressContainer}>
@@ -197,15 +345,18 @@ export function ProjectsView({ projects, tasks, onEditProject, onDeleteProject }
                     </div>
                   </div>
                   <div className={styles.cell}>
-                    <div className={styles.taskCount}>
-                      {taskStats.completed}/{taskStats.total}
-                    </div>
-                  </div>
-                  <div className={styles.cell}>
-                    <div className={styles.deadline}>{formatDate(project.due_date)}</div>
-                  </div>
-                  <div className={styles.cell}>
-                    <div className={styles.actions}>
+                    <div
+                      className={styles.actions}
+                      onClick={(e) => e.stopPropagation()}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    >
+                      {onToggleStar && (
+                        <StarButton
+                          isStarred={project.is_starred || false}
+                          onToggle={() => onToggleStar(project.id)}
+                          size="small"
+                        />
+                      )}
                       <button
                         className={styles.actionButton}
                         onClick={() => onEditProject(project)}

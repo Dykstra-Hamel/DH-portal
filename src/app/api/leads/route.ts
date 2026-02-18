@@ -30,6 +30,8 @@ export async function GET(request: NextRequest) {
     const unassigned = searchParams.get('unassigned') === 'true';
     const unassignedScheduler = searchParams.get('unassignedScheduler') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const sortBy = searchParams.get('sortBy') || 'created_at';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     if (!companyId) {
       return NextResponse.json(
@@ -142,6 +144,9 @@ export async function GET(request: NextRequest) {
       query = query.is('assigned_scheduler', null);
     }
 
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
+
     const { data: leads, error } = await query;
 
     if (error) {
@@ -192,16 +197,68 @@ export async function GET(request: NextRequest) {
     // Create a map of user profiles for quick lookup
     const profileMap = new Map(profiles.map(p => [p.id, p]));
 
+    // Fetch primary service addresses for lead customers
+    const customerIds = new Set<string>();
+    leads.forEach((lead: Lead) => {
+      const customerId = lead.customer_id || lead.customer?.id;
+      if (customerId) {
+        customerIds.add(customerId);
+      }
+    });
+
+    let primaryServiceAddressMap = new Map<string, any>();
+    if (customerIds.size > 0) {
+      const addressClient = createAdminClient();
+      const { data: primaryServiceAddresses, error: primaryServiceAddressError } =
+        await addressClient
+          .from('customer_service_addresses')
+          .select(`
+            customer_id,
+            service_address:service_addresses(
+              id,
+              street_address,
+              apartment_unit,
+              address_line_2,
+              city,
+              state,
+              zip_code,
+              home_size_range,
+              yard_size_range,
+              latitude,
+              longitude
+            )
+          `)
+          .eq('is_primary_address', true)
+          .in('customer_id', Array.from(customerIds));
+
+      if (primaryServiceAddressError) {
+        console.error('Error fetching primary service addresses:', primaryServiceAddressError);
+      } else {
+        primaryServiceAddressMap = new Map(
+          (primaryServiceAddresses || []).map(address => [
+            address.customer_id,
+            address.service_address,
+          ])
+        );
+      }
+    }
+
     // Enhance leads with profile data
-    const enhancedLeads = leads.map((lead: Lead) => ({
-      ...lead,
-      assigned_user: lead.assigned_to
-        ? profileMap.get(lead.assigned_to) || null
-        : null,
-      scheduler_user: lead.assigned_scheduler
-        ? profileMap.get(lead.assigned_scheduler) || null
-        : null,
-    }));
+    const enhancedLeads = leads.map((lead: Lead) => {
+      const customerId = lead.customer_id || lead.customer?.id;
+      return {
+        ...lead,
+        assigned_user: lead.assigned_to
+          ? profileMap.get(lead.assigned_to) || null
+          : null,
+        scheduler_user: lead.assigned_scheduler
+          ? profileMap.get(lead.assigned_scheduler) || null
+          : null,
+        primary_service_address: customerId
+          ? primaryServiceAddressMap.get(customerId) || null
+          : null,
+      };
+    });
 
     return NextResponse.json(enhancedLeads);
   } catch (error) {
@@ -242,6 +299,7 @@ export async function POST(request: NextRequest) {
       priority,
       estimatedValue,
       serviceType,
+      assignedTo,
     } = body;
 
     // Validate required fields
@@ -393,14 +451,15 @@ export async function POST(request: NextRequest) {
           company_id: companyId,
           customer_id: customerId,
           service_address_id: serviceAddressId,
-          lead_type: 'web_form',
+          lead_type: 'other',
           lead_source: leadSource || 'other',
-          lead_status: 'new',
+          lead_status: assignedTo ? 'in_process' : 'new',
           priority: priority || 'medium',
           pest_type: pestType,
           comments,
           service_type: serviceType,
           estimated_value: estimatedValue,
+          assigned_to: assignedTo || null,
           created_at: new Date().toISOString(),
         },
       ])
@@ -447,7 +506,7 @@ export async function POST(request: NextRequest) {
 
     // Send lead creation notification (non-blocking)
     notifyLeadCreated(newLead.id, companyId, {
-      assignedUserId: undefined, // Manual leads are unassigned
+      assignedUserId: assignedTo || undefined,
     }).catch(error => {
       console.error('Lead notification failed:', error);
     });

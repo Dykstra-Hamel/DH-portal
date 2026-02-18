@@ -171,7 +171,7 @@
   padding: 14px 20px;
   background: var(--accent-color);
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-family: var(--font-primary, 'Inter Tight', sans-serif);
   font-size: 16px;
   font-weight: 700;

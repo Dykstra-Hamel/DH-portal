@@ -73,6 +73,7 @@ export interface AddOnServiceFormData {
   eligibility_mode: 'all' | 'specific';
   eligible_plan_ids: string[];
   is_active: boolean;
+  requires_quote: boolean;
 }
 
 /**
@@ -88,4 +89,5 @@ export interface AddOnEligibility {
   billing_frequency: 'monthly' | 'quarterly' | 'semi-annually' | 'annually';
   eligibility_mode: 'all' | 'specific';
   is_eligible: boolean; // True if this add-on can be added to the service plan
+  requires_quote: boolean;
 }

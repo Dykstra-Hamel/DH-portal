@@ -217,7 +217,7 @@
     background: #dc2626;
     color: white;
     border: none;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     cursor: pointer;
     font-size: 12px;
     font-weight: 500;

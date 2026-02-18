@@ -127,7 +127,7 @@
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   color: #2b2b2b;
   background: #ffffff;
@@ -181,7 +181,7 @@
   height: 48px;
   padding: 4px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   background: #ffffff;
 
@@ -202,7 +202,7 @@
   padding: 8px 14px;
   background: #f3f4f6;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   color: #2b2b2b;
@@ -222,7 +222,7 @@
   padding: 16px;
   background: #f9fafb;
   border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 }
 
 .previewHeader {
@@ -291,7 +291,7 @@
   padding: 12px;
   background: #eff6ff;
   border: 1px solid #bfdbfe;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   margin-bottom: 16px;
 
   p {
@@ -360,7 +360,7 @@
   font-family: 'Courier New', monospace;
   background: white;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s;
   color: #374151;
@@ -388,7 +388,7 @@
   padding: 10px 12px;
   background: #f0f9ff;
   border: 1px solid #bfdbfe;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
 
   p {
     margin: 0;
@@ -429,6 +429,73 @@
   font-size: 13px;
   color: #111827;
   margin-top: 4px;
+}
+
+// Custom Display Items
+.customItemInputRow {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+
+  .input {
+    flex: 1;
+  }
+}
+
+.addButton {
+  padding: 10px 20px;
+  background: #3b82f6;
+  color: #ffffff;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: #2563eb;
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.customItemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.customItemRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  color: #111827;
+}
+
+.customItemDelete {
+  background: none;
+  border: none;
+  font-size: 18px;
+  color: #9ca3af;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: #ef4444;
+  }
 }
 
 .expectColumnEditor {

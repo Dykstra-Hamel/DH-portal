@@ -8,6 +8,7 @@ export interface TicketReviewPayload {
   reviewed_by_email?: string; // User's email
   reviewed_by_first_name?: string; // User's first name
   reviewed_by_last_name?: string; // User's last name
+  reviewed_by_avatar_url?: string | null; // User's avatar URL
   reviewed_at?: string;
   review_expires_at?: string;
   timestamp: string;

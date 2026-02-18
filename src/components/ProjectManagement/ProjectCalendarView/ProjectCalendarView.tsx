@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { Project } from '@/types/project';
+import { Project, statusOptions } from '@/types/project';
+import { Modal, ModalMiddle, ModalTop } from '@/components/Common/Modal/Modal';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectCalendarView.module.scss';
 
 interface ProjectCalendarViewProps {
@@ -9,6 +11,9 @@ interface ProjectCalendarViewProps {
 
 export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [isDayModalOpen, setIsDayModalOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [selectedProjects, setSelectedProjects] = useState<Project[]>([]);
 
   const getDaysInMonth = (date: Date): Date[] => {
     const year = date.getFullYear();
@@ -42,7 +47,8 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
 
   const getProjectsForDate = (date: Date): Project[] => {
     return projects.filter(project => {
-      const deadlineDate = new Date(project.due_date);
+      const deadlineDate = parseDateString(project.due_date);
+      if (!deadlineDate) return false;
       return (
         deadlineDate.getDate() === date.getDate() &&
         deadlineDate.getMonth() === date.getMonth() &&
@@ -78,15 +84,28 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
   const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 
   const getStatusColor = (status: string) => {
-    const statusColors: { [key: string]: string } = {
-      'coming_up': '#6b7280',
-      'design': '#8b5cf6',
-      'development': '#3b82f6',
-      'out_to_client': '#f59e0b',
-      'waiting_on_client': '#ef4444',
-      'bill_client': '#10b981',
-    };
-    return statusColors[status] || '#6b7280';
+    const option = statusOptions.find(item => item.value === status);
+    return option?.color ?? '#6b7280';
+  };
+
+  const openDayModal = (date: Date, dayProjects: Project[]) => {
+    setSelectedDate(date);
+    setSelectedProjects(dayProjects);
+    setIsDayModalOpen(true);
+  };
+
+  const closeDayModal = () => {
+    setIsDayModalOpen(false);
+  };
+
+  const formatModalDate = (date: Date | null) => {
+    if (!date) return 'Projects';
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -116,6 +135,8 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
       <div className={styles.calendarGrid}>
         {days.map((date, index) => {
           const dayProjects = getProjectsForDate(date);
+          const visibleProjects = dayProjects.slice(0, 2);
+          const remainingCount = dayProjects.length - visibleProjects.length;
           const isCurrentDay = isToday(date);
           const isOtherMonth = !isCurrentMonth(date);
 
@@ -123,15 +144,23 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
             <div
               key={index}
               className={`${styles.calendarDay} ${isCurrentDay ? styles.today : ''} ${isOtherMonth ? styles.otherMonth : ''}`}
+              onClick={() => openDayModal(date, dayProjects)}
+              role="button"
+              tabIndex={0}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  openDayModal(date, dayProjects);
+                }
+              }}
             >
               <div className={styles.dayNumber}>{date.getDate()}</div>
               <div className={styles.projectsList}>
-                {dayProjects.map(project => {
+                {visibleProjects.map(project => {
                   return (
                     <div
                       key={project.id}
                       className={styles.projectItem}
-                      onClick={() => onProjectClick(project)}
                       style={{ borderLeftColor: getStatusColor(project.status) }}
                     >
                       <div className={styles.projectItemName}>{project.name}</div>
@@ -141,11 +170,40 @@ export function ProjectCalendarView({ projects, onProjectClick }: ProjectCalenda
                     </div>
                   );
                 })}
+                {remainingCount > 0 && (
+                  <div className={styles.moreProjects}>+ {remainingCount} more</div>
+                )}
               </div>
             </div>
           );
         })}
       </div>
+
+      <Modal isOpen={isDayModalOpen} onClose={closeDayModal} size="medium">
+        <ModalTop title={formatModalDate(selectedDate)} onClose={closeDayModal} />
+        <ModalMiddle className={styles.dayModalContent}>
+          {selectedProjects.length === 0 ? (
+            <div className={styles.noProjects}>No projects for this day.</div>
+          ) : (
+            <div className={styles.modalProjectList}>
+              {selectedProjects.map(project => (
+                <button
+                  key={project.id}
+                  type="button"
+                  className={styles.modalProjectItem}
+                  onClick={() => {
+                    closeDayModal();
+                    onProjectClick(project);
+                  }}
+                >
+                  <span className={styles.modalProjectName}>{project.name}</span>
+                  <span className={styles.modalProjectMeta}>{project.company.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </ModalMiddle>
+      </Modal>
     </div>
   );
 }

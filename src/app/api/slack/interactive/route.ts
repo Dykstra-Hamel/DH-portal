@@ -444,7 +444,7 @@ async function handleProjectAssignmentSubmission(
             type: 'plain_text',
             text: '📋 View Project Details',
           },
-          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin`,
+          url: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/admin/project-management/${projectId}`,
           style: 'primary',
         },
       ],

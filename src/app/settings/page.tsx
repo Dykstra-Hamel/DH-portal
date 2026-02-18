@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useCompanyRole, useIsCompanyAdminAny } from '@/hooks/useCompanyRole';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -20,6 +21,7 @@ import KnowledgeBase from '@/components/KnowledgeBase/KnowledgeBase';
 import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import AutomationSettings from '@/components/Automation/AutomationSettings';
 import NotificationPreferences from '@/components/NotificationPreferences/NotificationPreferences';
+import AnnouncementsManager from '@/components/Admin/AnnouncementsManager';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -65,9 +67,9 @@ export default function SettingsPage() {
     type: 'success' | 'error';
     text: string;
   } | null>(null);
-  const [activeTab, setActiveTab] = useState<'knowledge-base' | 'automation'>(
-    'automation'
-  );
+  const [activeTab, setActiveTab] = useState<
+    'knowledge-base' | 'automation' | 'announcements' | 'project-management'
+  >('automation');
   const [activeSection, setActiveSection] = useState<'user' | 'company'>(
     'user'
   );
@@ -321,6 +323,18 @@ export default function SettingsPage() {
                   >
                     Knowledge Base
                   </button>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'project-management' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('project-management')}
+                  >
+                    Project Management
+                  </button>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'announcements' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('announcements')}
+                  >
+                    Announcements
+                  </button>
                 </div>
 
                 {settingsLoading ? (
@@ -340,6 +354,35 @@ export default function SettingsPage() {
                     {activeTab === 'knowledge-base' && (
                       <div className={styles.knowledgeBaseSection}>
                         <KnowledgeBase companyId={selectedCompany.id} />
+                      </div>
+                    )}
+
+                    {/* Project Management Tab */}
+                    {activeTab === 'project-management' && (
+                      <div className={styles.projectManagementSection}>
+                        <div className={styles.settingsInfo}>
+                          <p>
+                            Manage project categories and settings for{' '}
+                            <strong>{selectedCompany.name}</strong>.
+                          </p>
+                          <p>
+                            <Link
+                              href="/settings/project-management"
+                              style={{
+                                color: 'var(--action-500)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              Go to Project Management Settings →
+                            </Link>
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Announcements Tab */}
+                    {activeTab === 'announcements' && (
+                      <div className={styles.announcementsSection}>
+                        <AnnouncementsManager companyId={selectedCompany.id} />
                       </div>
                     )}
                   </div>

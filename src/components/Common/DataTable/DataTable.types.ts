@@ -34,7 +34,7 @@ export interface DataTableProps<T> {
   // Configuration
   title: string;
   columns: ColumnDefinition<T>[];
-  tabs: TabDefinition<T>[];
+  tabs?: TabDefinition<T>[];
 
   // Behavior
   onItemAction?: (action: string, item: T) => void;

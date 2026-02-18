@@ -26,9 +26,12 @@ export async function GET(request: NextRequest) {
     const issueType = searchParams.get('issueType');
     const priority = searchParams.get('priority');
     const assignedTo = searchParams.get('assignedTo');
+    const unassigned = searchParams.get('unassigned') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
+    const sortBy = searchParams.get('sortBy') || 'created_at';
+    const sortOrder = searchParams.get('sortOrder') || 'desc';
 
     // If companyId is provided, verify access
     if (companyId) {
@@ -100,7 +103,12 @@ export async function GET(request: NextRequest) {
     if (assignedTo) {
       query = query.eq('assigned_to', assignedTo);
     }
-    
+
+    if (unassigned) {
+      // Filter for support cases without an assigned user (assigned_to IS NULL)
+      query = query.is('assigned_to', null);
+    }
+
     if (!includeArchived) {
       query = query.eq('archived', false);
     }
@@ -112,6 +120,9 @@ export async function GET(request: NextRequest) {
     if (dateTo) {
       query = query.lte('created_at', dateTo);
     }
+
+    // Apply sorting
+    query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
     const { data: supportCases, error } = await query;
 
@@ -157,13 +168,67 @@ export async function GET(request: NextRequest) {
     // Create a map of user profiles for quick lookup
     const profileMap = new Map(profiles.map(p => [p.id, p]));
 
+    // Fetch primary service addresses for support case customers
+    const customerIds = new Set<string>();
+    supportCases.forEach((supportCase: { customer_id?: string; customer?: { id?: string } }) => {
+      const customerId = supportCase.customer_id || supportCase.customer?.id;
+      if (customerId) {
+        customerIds.add(customerId);
+      }
+    });
+
+    let primaryServiceAddressMap = new Map<string, any>();
+    if (customerIds.size > 0) {
+      const addressClient = createAdminClient();
+      const { data: primaryServiceAddresses, error: primaryServiceAddressError } =
+        await addressClient
+          .from('customer_service_addresses')
+          .select(`
+            customer_id,
+            service_address:service_addresses(
+              id,
+              street_address,
+              apartment_unit,
+              address_line_2,
+              city,
+              state,
+              zip_code,
+              home_size_range,
+              yard_size_range,
+              latitude,
+              longitude
+            )
+          `)
+          .eq('is_primary_address', true)
+          .in('customer_id', Array.from(customerIds));
+
+      if (primaryServiceAddressError) {
+        console.error('Error fetching primary service addresses:', primaryServiceAddressError);
+      } else {
+        primaryServiceAddressMap = new Map(
+          (primaryServiceAddresses || []).map(address => [
+            address.customer_id,
+            address.service_address,
+          ])
+        );
+      }
+    }
+
     // Enhance support cases with profile data
-    const enhancedSupportCases = supportCases.map((supportCase: { assigned_to?: string; [key: string]: any }) => ({
-      ...supportCase,
-      assigned_user: supportCase.assigned_to
-        ? profileMap.get(supportCase.assigned_to) || null
-        : null,
-    }));
+    const enhancedSupportCases = supportCases.map(
+      (supportCase: { assigned_to?: string; customer_id?: string; customer?: { id?: string }; [key: string]: any }) => {
+        const customerId = supportCase.customer_id || supportCase.customer?.id;
+        return {
+          ...supportCase,
+          assigned_user: supportCase.assigned_to
+            ? profileMap.get(supportCase.assigned_to) || null
+            : null,
+          primary_service_address: customerId
+            ? primaryServiceAddressMap.get(customerId) || null
+            : null,
+        };
+      }
+    );
 
     return NextResponse.json(enhancedSupportCases);
   } catch (error) {

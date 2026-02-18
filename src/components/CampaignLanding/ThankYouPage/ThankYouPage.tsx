@@ -69,6 +69,7 @@ interface ThankYouPageProps {
     accentColorPreference?: 'primary' | 'secondary';
     fontPrimaryName: string | null;
     fontPrimaryUrl: string | null;
+    fontColor?: string | null;
   };
   header: {
     primaryButtonText: string;
@@ -175,6 +176,7 @@ export default function ThankYouPage({
         '--font-primary': branding.fontPrimaryName
           ? `"${branding.fontPrimaryName}", sans-serif`
           : '"Inter Tight", sans-serif',
+        '--color-text': branding.fontColor || '#2b2b2b',
       } as React.CSSProperties}
     >
       {/* Header Section */}
@@ -199,6 +201,39 @@ export default function ThankYouPage({
       <div className={styles.container}>
         {/* Greeting Section */}
         <div className={styles.greetingSection}>
+          {/* We got it! Banner */}
+          <div className={styles.successBanner}>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="47"
+              height="47"
+              viewBox="0 0 20 20"
+              fill="none"
+            >
+              <g clipPath="url(#clip0_thankyou_check)">
+                <path
+                  d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
+                  stroke="var(--accent-color)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <path
+                  d="M7.5 9.16671L10 11.6667L18.3333 3.33337"
+                  stroke="var(--accent-color)"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </g>
+              <defs>
+                <clipPath id="clip0_thankyou_check">
+                  <rect width="20" height="20" fill="white" />
+                </clipPath>
+              </defs>
+            </svg>
+            <span className={styles.successBannerText}>We got it!</span>
+          </div>
           <h1 className={styles.greeting}>{greeting}</h1>
           {content && (
             <div
@@ -265,10 +300,35 @@ export default function ThankYouPage({
           </div>
         </div>
 
+        {/* Office Hours Section */}
+        {businessHours && (() => {
+          const formattedHours = formatBusinessHoursForDisplay(businessHours);
+
+          if (formattedHours.length === 0) return null;
+
+          return (
+            <div className={styles.officeHoursSection}>
+              <span className={styles.officeHoursHeading}>{branding.companyName} Office Hours:</span>
+              {' '}
+              <span className={styles.officeHoursInline}>
+                {formattedHours.map((item, index) => (
+                  <span key={index}>
+                    {index > 0 && <span className={styles.officeHoursPipe}> | </span>}
+                    <span className={styles.officeHourDays}>{item.days}:</span>{' '}
+                    <span className={styles.officeHourTime}>{item.hours}</span>
+                  </span>
+                ))}
+              </span>
+            </div>
+          );
+        })()}
+
         {/* What To Expect Section */}
         {thankYou.showExpect && thankYou.expectColumns.length > 0 && (
           <div className={styles.expectSection}>
-            <h2 className={styles.expectHeading}>{thankYou.expectHeading}</h2>
+            {thankYou.expectHeading && (
+              <h2 className={styles.expectHeading}>{thankYou.expectHeading}</h2>
+            )}
             <div
               className={styles.expectColumns}
               style={{
@@ -282,9 +342,10 @@ export default function ThankYouPage({
                       <Image
                         src={column.imageUrl}
                         alt={column.heading || ''}
-                        width={200}
-                        height={200}
-                        style={{ objectFit: 'contain' }}
+                        fill
+                        sizes="(max-width: 1024px) 100vw, 50vw"
+                        quality={95}
+                        style={{ objectFit: 'cover' }}
                       />
                     </div>
                   )}
@@ -302,27 +363,6 @@ export default function ThankYouPage({
             </div>
           </div>
         )}
-
-        {/* Office Hours Section */}
-        {businessHours && (() => {
-          const formattedHours = formatBusinessHoursForDisplay(businessHours);
-
-          if (formattedHours.length === 0) return null;
-
-          return (
-            <div className={styles.officeHoursSection}>
-              <h3 className={styles.officeHoursHeading}>Office Hours</h3>
-              <div className={styles.officeHoursList}>
-                {formattedHours.map((item, index) => (
-                  <div key={index} className={styles.officeHourRow}>
-                    <span className={styles.officeHourDays}>{item.days}:</span>
-                    <span className={styles.officeHourTime}>{item.hours}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          );
-        })()}
 
         {/* CTA Button */}
         <div className={styles.ctaSection}>

@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import styles from './CampaignLandingPageEditorStep.module.scss';
 import ImageUploadField from '../ImageUploadField/ImageUploadField';
 import ImagePicker from '../ImagePicker/ImagePicker';
@@ -18,6 +18,7 @@ export interface LandingPageFormData {
   // Hero
   hero_title: string;
   hero_subtitle: string;
+  hero_subheading: string;
   hero_description: string;
   hero_button_text: string;
   hero_image_url: string; // Changed from hero_image_urls array to single image
@@ -44,7 +45,12 @@ export interface LandingPageFormData {
   additional_services_heading: string;
   additional_services: Array<{ name: string; description?: string }>;
   additional_services_image_url: string;
+  selected_service_plan_ids: string[];
   selected_addon_ids: string[];
+
+  // Pre-Footer
+  show_pre_footer: boolean;
+  pre_footer_content: string;
 
   // FAQ
   show_faq: boolean;
@@ -109,6 +115,7 @@ type SectionKey =
   | 'features'
   | 'services'
   | 'faq'
+  | 'prefooter'
   | 'header'
   | 'footer'
   | 'terms'
@@ -118,6 +125,8 @@ type SectionKey =
 interface ServicePlan {
   id: string;
   plan_name: string;
+  plan_description?: string | null;
+  recurring_price?: number | null;
   plan_faqs?: Array<{ question: string; answer: string }>;
   plan_features?: string[];
 }
@@ -129,7 +138,7 @@ interface AddOn {
   recurring_price: number | null;
 }
 
-// Maximum number of add-ons that can be displayed on landing page
+// Maximum number of total display items in Additional Services
 const MAX_ADDONS = 6;
 
 export default function CampaignLandingPageEditorStep({
@@ -151,13 +160,19 @@ export default function CampaignLandingPageEditorStep({
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
   const [loadingServicePlans, setLoadingServicePlans] = useState(true);
+  const heroTitleEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const heroSubheadingEditorRef = useRef<RichTextEditorHandle | null>(null);
   const letterEditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouContentEditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol1EditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol2EditorRef = useRef<RichTextEditorHandle | null>(null);
   const thankyouCol3EditorRef = useRef<RichTextEditorHandle | null>(null);
+  const featureHeadingEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const additionalServicesHeadingEditorRef = useRef<RichTextEditorHandle | null>(null);
+  const preFooterEditorRef = useRef<RichTextEditorHandle | null>(null);
   const [availableAddons, setAvailableAddons] = useState<AddOn[]>([]);
   const [loadingAddons, setLoadingAddons] = useState(false);
+  const addonsLoadedRef = useRef(false);
   const selectionInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -191,7 +206,7 @@ export default function CampaignLandingPageEditorStep({
         setLoadingServicePlans(true);
         const { data: plans, error } = await supabase
           .from('service_plans')
-          .select('id, plan_name, plan_faqs, plan_features')
+          .select('id, plan_name, plan_description, recurring_price, plan_faqs, plan_features')
           .eq('company_id', companyId)
           .order('plan_name');
 
@@ -221,9 +236,11 @@ export default function CampaignLandingPageEditorStep({
 
   // Fetch eligible add-ons for the selected service plan
   useEffect(() => {
+    addonsLoadedRef.current = false;
     const fetchAddons = async () => {
       if (!servicePlanId) {
         setAvailableAddons([]);
+        addonsLoadedRef.current = true;
         return;
       }
 
@@ -259,6 +276,7 @@ export default function CampaignLandingPageEditorStep({
         setAvailableAddons([]);
       } finally {
         setLoadingAddons(false);
+        addonsLoadedRef.current = true;
       }
     };
 
@@ -273,26 +291,68 @@ export default function CampaignLandingPageEditorStep({
     data.override_secondary_color ||
     brandDefaults.secondaryColorHex ||
     '#00B142';
+  const selectedServicePlanCount = data.selected_service_plan_ids?.length || 0;
+  const selectedAddonCount = data.selected_addon_ids?.length || 0;
+  const customDisplayItemCount = data.additional_services?.length || 0;
+  const totalDisplayItemCount =
+    selectedServicePlanCount + selectedAddonCount + customDisplayItemCount;
+  const availableAdditionalServicePlans = useMemo(
+    () => servicePlans.filter((plan) => plan.id !== servicePlanId),
+    [servicePlans, servicePlanId]
+  );
+
+  // Ensure selected additional service plans stay in sync and never include
+  // the campaign's linked base plan.
+  useEffect(() => {
+    // Don't prune until service plans have loaded
+    if (loadingServicePlans) return;
+
+    const currentSelected = data.selected_service_plan_ids || [];
+    const availableIds = new Set(availableAdditionalServicePlans.map((plan) => plan.id));
+    const maxSelectablePlans = Math.max(
+      0,
+      MAX_ADDONS - selectedAddonCount - customDisplayItemCount
+    );
+
+    let filteredSelection = currentSelected.filter((id) => availableIds.has(id));
+
+    if (filteredSelection.length > maxSelectablePlans) {
+      filteredSelection = filteredSelection.slice(0, maxSelectablePlans);
+    }
+
+    if (filteredSelection.join('|') !== currentSelected.join('|')) {
+      updateField('selected_service_plan_ids', filteredSelection);
+    }
+  }, [
+    availableAdditionalServicePlans,
+    customDisplayItemCount,
+    data.selected_service_plan_ids,
+    loadingServicePlans,
+    selectedAddonCount,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Ensure selected add-ons stay in sync with available options
   useEffect(() => {
+    // Don't initialize until add-ons have actually loaded — otherwise we'd
+    // wipe the stored selection before we can validate it against real IDs.
+    if (loadingAddons) return;
+    if (!addonsLoadedRef.current) return;
+
     const availableIds = availableAddons.map((addon) => addon.id);
     const currentSelected = data.selected_addon_ids || [];
+    const maxSelectableAddons = Math.max(
+      0,
+      MAX_ADDONS - selectedServicePlanCount - customDisplayItemCount
+    );
 
     // Initialize selection when add-ons load or plan changes
     if (!selectionInitializedRef.current) {
-      let initialSelection =
-        currentSelected.length > 0
-          ? currentSelected.filter((id) => availableIds.includes(id))
-          : availableIds;
+      // Respect the stored selection — filter to valid IDs only
+      let initialSelection = currentSelected.filter((id) => availableIds.includes(id));
 
-      // Enforce MAX_ADDONS limit on initialization
-      if (initialSelection.length > MAX_ADDONS) {
-        console.warn(
-          `Campaign has ${initialSelection.length} add-ons selected. ` +
-          `Limiting to first ${MAX_ADDONS} for display.`
-        );
-        initialSelection = initialSelection.slice(0, MAX_ADDONS);
+      // Enforce remaining display item limit on initialization
+      if (initialSelection.length > maxSelectableAddons) {
+        initialSelection = initialSelection.slice(0, maxSelectableAddons);
       }
 
       selectionInitializedRef.current = true;
@@ -308,14 +368,20 @@ export default function CampaignLandingPageEditorStep({
       availableIds.includes(id)
     );
 
-    if (filteredSelection.length > MAX_ADDONS) {
-      filteredSelection = filteredSelection.slice(0, MAX_ADDONS);
+    if (filteredSelection.length > maxSelectableAddons) {
+      filteredSelection = filteredSelection.slice(0, maxSelectableAddons);
     }
 
     if (filteredSelection.length !== currentSelected.length) {
       updateField('selected_addon_ids', filteredSelection);
     }
-  }, [availableAddons]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [
+    availableAddons,
+    customDisplayItemCount,
+    data.selected_addon_ids,
+    loadingAddons,
+    selectedServicePlanCount,
+  ]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const toggleSection = (section: SectionKey) => {
     const newExpanded = new Set(expandedSections);
@@ -341,6 +407,24 @@ export default function CampaignLandingPageEditorStep({
     }
   };
 
+  const toggleServicePlanSelection = (planId: string) => {
+    const current = data.selected_service_plan_ids || [];
+
+    // If deselecting, always allow
+    if (current.includes(planId)) {
+      const next = current.filter((id) => id !== planId);
+      updateField('selected_service_plan_ids', next);
+      return;
+    }
+
+    // If selecting, enforce shared display item limit.
+    if (current.length + selectedAddonCount + customDisplayItemCount >= MAX_ADDONS) {
+      return;
+    }
+
+    updateField('selected_service_plan_ids', [...current, planId]);
+  };
+
   const toggleAddonSelection = (addonId: string) => {
     const current = data.selected_addon_ids || [];
 
@@ -351,8 +435,11 @@ export default function CampaignLandingPageEditorStep({
       return;
     }
 
-    // If selecting, check limit
-    if (current.length >= MAX_ADDONS) {
+    // If selecting, check combined limit (service plans + add-ons + custom items)
+    if (
+      selectedServicePlanCount + current.length + customDisplayItemCount >=
+      MAX_ADDONS
+    ) {
       return; // Do nothing - checkbox will be disabled
     }
 
@@ -362,6 +449,30 @@ export default function CampaignLandingPageEditorStep({
   };
 
   const insertVariableIntoField = (textareaId: string, fieldName: keyof LandingPageFormData, variable: string) => {
+    // Special handling for Hero Title RichTextEditor
+    if (fieldName === 'hero_title') {
+      if (heroTitleEditorRef.current?.insertText) {
+        heroTitleEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Hero Subheading RichTextEditor
+    if (fieldName === 'hero_subheading') {
+      if (heroSubheadingEditorRef.current?.insertText) {
+        heroSubheadingEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
     // Special handling for RichTextEditor (letter_content)
     if (fieldName === 'letter_content') {
       if (letterEditorRef.current?.insertText) {
@@ -412,6 +523,42 @@ export default function CampaignLandingPageEditorStep({
     if (fieldName === 'thankyou_expect_col3_content') {
       if (thankyouCol3EditorRef.current?.insertText) {
         thankyouCol3EditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Features heading RichTextEditor
+    if (fieldName === 'feature_heading') {
+      if (featureHeadingEditorRef.current?.insertText) {
+        featureHeadingEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Pre-Footer content RichTextEditor
+    if (fieldName === 'pre_footer_content') {
+      if (preFooterEditorRef.current?.insertText) {
+        preFooterEditorRef.current.insertText(variable);
+      } else {
+        const currentValue = data[fieldName] as string;
+        const newValue = currentValue ? `${currentValue} ${variable}` : variable;
+        updateField(fieldName, newValue);
+      }
+      return;
+    }
+
+    // Special handling for Additional Services heading RichTextEditor
+    if (fieldName === 'additional_services_heading') {
+      if (additionalServicesHeadingEditorRef.current?.insertText) {
+        additionalServicesHeadingEditorRef.current.insertText(variable);
       } else {
         const currentValue = data[fieldName] as string;
         const newValue = currentValue ? `${currentValue} ${variable}` : variable;
@@ -619,16 +766,25 @@ export default function CampaignLandingPageEditorStep({
           'Main banner with title, description, and image',
           <>
             <div className={styles.field}>
+              <label className={styles.label}>Hero Eyebrow</label>
+              <input
+                type="text"
+                value={data.hero_subtitle}
+                onChange={(e) => updateField('hero_subtitle', e.target.value)}
+                placeholder="e.g., Special Offer"
+                className={styles.input}
+              />
+            </div>
+
+            <div className={styles.field}>
               <label className={styles.label}>
                 Hero Title <span className={styles.required}>*</span>
               </label>
-              <textarea
+              <RichTextEditor
+                ref={heroTitleEditorRef}
                 value={data.hero_title}
-                onChange={(e) => updateField('hero_title', e.target.value)}
+                onChange={(value) => updateField('hero_title', value)}
                 placeholder="e.g., Quarterly Pest Control starting at only $44/mo"
-                className={styles.textarea}
-                rows={2}
-                id="hero-title-textarea"
               />
               <p className={styles.helpText}>
                 Use variables like {'{first_name}'}, {'{display_price}'}, {'{company_name}'} for personalization.
@@ -688,18 +844,82 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-title-textarea', 'hero_title', '{tagline}')}>
+                  {'{tagline}'}
+                </button>
               </div>
             </div>
 
             <div className={styles.field}>
-              <label className={styles.label}>Hero Subtitle</label>
-              <input
-                type="text"
-                value={data.hero_subtitle}
-                onChange={(e) => updateField('hero_subtitle', e.target.value)}
-                placeholder="e.g., Special Offer"
-                className={styles.input}
+              <label className={styles.label}>Hero Subheading</label>
+              <RichTextEditor
+                ref={heroSubheadingEditorRef}
+                value={data.hero_subheading}
+                onChange={(value) => updateField('hero_subheading', value)}
+                placeholder="e.g., Protect your home year-round"
               />
+              <p className={styles.helpText}>
+                Use variables like {'{first_name}'}, {'{display_price}'}, {'{company_name}'} for personalization.
+              </p>
+            </div>
+
+            <div className={styles.variableButtons}>
+              <label className={styles.label}>Insert Variables:</label>
+              <div className={styles.buttonGrid}>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{first_name}')}>
+                  {'{first_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{last_name}')}>
+                  {'{last_name}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{email}')}>
+                  {'{email}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{phone_number}')}>
+                  {'{phone_number}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{service_address}')}>
+                  {'{service_address}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{city}')}>
+                  {'{city}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{state}')}>
+                  {'{state}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{zip_code}')}>
+                  {'{zip_code}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{display_price}')}>
+                  {'{display_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{original_price}')}>
+                  {'{original_price}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{savings}')}>
+                  {'{savings}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{price_amount}')}>
+                  {'{price_amount}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{price_frequency}')}>
+                  {'{price_frequency}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{company_name}')}>
+                  {'{company_name}'}
+                </button>
+                {servicePlanId && (
+                  <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{service_name}')}>
+                    {'{service_name}'}
+                  </button>
+                )}
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{company_phone}')}>
+                  {'{company_phone}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-subheading-textarea', 'hero_subheading', '{tagline}')}>
+                  {'{tagline}'}
+                </button>
+              </div>
             </div>
 
             <div className={styles.field}>
@@ -769,6 +989,9 @@ export default function CampaignLandingPageEditorStep({
                 )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{company_phone}')}>
                   {'{company_phone}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('hero-description-textarea', 'hero_description', '{tagline}')}>
+                  {'{tagline}'}
                 </button>
               </div>
             </div>
@@ -927,6 +1150,9 @@ export default function CampaignLandingPageEditorStep({
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{company_phone}')}>
                   {'{company_phone}'}
                 </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('redemption-heading-textarea', 'redemption_card_heading', '{tagline}')}>
+                  {'{tagline}'}
+                </button>
               </div>
             </div>
           </>
@@ -1014,6 +1240,9 @@ export default function CampaignLandingPageEditorStep({
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{company_phone}')}>
                       {'{company_phone}'}
                     </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{tagline}')}>
+                      {'{tagline}'}
+                    </button>
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'letter_content', '{signature}')}>
                       {'{signature}'}
                     </button>
@@ -1047,13 +1276,11 @@ export default function CampaignLandingPageEditorStep({
           <>
             <div className={styles.field}>
               <label className={styles.label}>Features Heading</label>
-              <input
-                type="text"
+              <RichTextEditor
+                ref={featureHeadingEditorRef}
                 value={data.feature_heading}
-                onChange={(e) => updateField('feature_heading', e.target.value)}
+                onChange={(value) => updateField('feature_heading', value)}
                 placeholder="e.g., No initial cost to get started"
-                className={styles.input}
-                id="feature-heading-input"
               />
             </div>
 
@@ -1109,6 +1336,9 @@ export default function CampaignLandingPageEditorStep({
                 )}
                 <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{company_phone}')}>
                   {'{company_phone}'}
+                </button>
+                <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('feature-heading-input', 'feature_heading', '{tagline}')}>
+                  {'{tagline}'}
                 </button>
               </div>
             </div>
@@ -1180,13 +1410,11 @@ export default function CampaignLandingPageEditorStep({
               <>
                 <div className={styles.field}>
                   <label className={styles.label}>Services Heading</label>
-                  <input
-                    type="text"
+                  <RichTextEditor
+                    ref={additionalServicesHeadingEditorRef}
                     value={data.additional_services_heading}
-                    onChange={(e) => updateField('additional_services_heading', e.target.value)}
+                    onChange={(value) => updateField('additional_services_heading', value)}
                     placeholder="e.g., And that's not all, we offer additional add-on programs as well including:"
-                    className={styles.input}
-                    id="services-heading-input"
                   />
                 </div>
 
@@ -1243,7 +1471,66 @@ export default function CampaignLandingPageEditorStep({
                     <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{company_phone}')}>
                       {'{company_phone}'}
                     </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('services-heading-input', 'additional_services_heading', '{tagline}')}>
+                      {'{tagline}'}
+                    </button>
                   </div>
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>Additional Service Plans</label>
+                  {loadingServicePlans && (
+                    <p className={styles.helpText}>Loading service plans…</p>
+                  )}
+                  {!loadingServicePlans &&
+                    availableAdditionalServicePlans.length === 0 && (
+                      <p className={styles.helpText}>
+                        No additional service plans available.
+                      </p>
+                    )}
+                  {availableAdditionalServicePlans.length > 0 && (
+                    <>
+                      <div className={styles.addonLimitInfo}>
+                        <p className={styles.helpText}>
+                          {totalDisplayItemCount} of {MAX_ADDONS} display items used
+                          {totalDisplayItemCount >= MAX_ADDONS &&
+                            ` (maximum reached)`}
+                        </p>
+                      </div>
+                      <div className={styles.checkboxGrid}>
+                        {availableAdditionalServicePlans.map((plan) => {
+                          const isSelected = data.selected_service_plan_ids?.includes(plan.id);
+                          const isAtLimit = totalDisplayItemCount >= MAX_ADDONS;
+                          const isDisabled = !isSelected && isAtLimit;
+
+                          return (
+                            <label
+                              key={plan.id}
+                              className={`${styles.checkboxLabel} ${isDisabled ? styles.disabled : ''}`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleServicePlanSelection(plan.id)}
+                                disabled={isDisabled}
+                              />
+                              <div>
+                                <div className={styles.addonName}>{plan.plan_name}</div>
+                                {plan.plan_description && (
+                                  <div className={styles.addonDescription}>
+                                    {plan.plan_description}
+                                  </div>
+                                )}
+                                {plan.recurring_price !== null && plan.recurring_price !== undefined && (
+                                  <div className={styles.addonPrice}>${plan.recurring_price}</div>
+                                )}
+                              </div>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 <div className={styles.field}>
@@ -1263,8 +1550,8 @@ export default function CampaignLandingPageEditorStep({
                     <>
                       <div className={styles.addonLimitInfo}>
                         <p className={styles.helpText}>
-                          {data.selected_addon_ids?.length || 0} of {MAX_ADDONS} add-ons selected
-                          {data.selected_addon_ids?.length >= MAX_ADDONS &&
+                          {totalDisplayItemCount} of {MAX_ADDONS} display items used
+                          {totalDisplayItemCount >= MAX_ADDONS &&
                             ` (maximum reached)`
                           }
                         </p>
@@ -1272,7 +1559,7 @@ export default function CampaignLandingPageEditorStep({
                       <div className={styles.checkboxGrid}>
                         {availableAddons.map((addon) => {
                           const isSelected = data.selected_addon_ids?.includes(addon.id);
-                          const isAtLimit = (data.selected_addon_ids?.length || 0) >= MAX_ADDONS;
+                          const isAtLimit = totalDisplayItemCount >= MAX_ADDONS;
                           const isDisabled = !isSelected && isAtLimit;
 
                           return (
@@ -1301,6 +1588,86 @@ export default function CampaignLandingPageEditorStep({
                       </div>
                     </>
                   )}
+                </div>
+
+                <div className={styles.field}>
+                  <label className={styles.label}>Custom Display Items</label>
+                  <p className={styles.helpText}>
+                    Add custom items (e.g., &quot;&amp; So Much More!&quot;) to display alongside service plans and add-ons. Combined total limited to {MAX_ADDONS}.
+                  </p>
+                  {(() => {
+                    const servicePlanCount = data.selected_service_plan_ids?.length || 0;
+                    const selectedCount = data.selected_addon_ids?.length || 0;
+                    const customCount = data.additional_services?.length || 0;
+                    const totalCount = servicePlanCount + selectedCount + customCount;
+                    const isAtLimit = totalCount >= MAX_ADDONS;
+
+                    return (
+                      <>
+                        <div className={styles.customItemInputRow}>
+                          <input
+                            type="text"
+                            className={styles.input}
+                            placeholder="e.g., & So Much More!"
+                            id="custom-item-input"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                const input = e.currentTarget;
+                                const value = input.value.trim();
+                                if (!value || isAtLimit) return;
+                                const current = data.additional_services || [];
+                                updateField('additional_services', [...current, { name: value }]);
+                                input.value = '';
+                              }
+                            }}
+                            disabled={isAtLimit}
+                          />
+                          <button
+                            type="button"
+                            className={styles.addButton}
+                            disabled={isAtLimit}
+                            onClick={() => {
+                              const input = document.getElementById('custom-item-input') as HTMLInputElement;
+                              const value = input?.value.trim();
+                              if (!value || isAtLimit) return;
+                              const current = data.additional_services || [];
+                              updateField('additional_services', [...current, { name: value }]);
+                              input.value = '';
+                            }}
+                          >
+                            Add
+                          </button>
+                        </div>
+                        {isAtLimit && (
+                          <p className={styles.helpText}>
+                            Maximum of {MAX_ADDONS} combined items reached ({servicePlanCount} service plans + {selectedCount} add-ons + {customCount} custom).
+                          </p>
+                        )}
+                        {data.additional_services && data.additional_services.length > 0 && (
+                          <div className={styles.customItemsList}>
+                            {data.additional_services.map((item, index) => (
+                              <div key={index} className={styles.customItemRow}>
+                                <span>{item.name}</span>
+                                <button
+                                  type="button"
+                                  className={styles.customItemDelete}
+                                  onClick={() => {
+                                    const current = [...(data.additional_services || [])];
+                                    current.splice(index, 1);
+                                    updateField('additional_services', current);
+                                  }}
+                                  aria-label={`Remove ${item.name}`}
+                                >
+                                  &times;
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
 
                 <ImagePicker
@@ -1427,6 +1794,9 @@ export default function CampaignLandingPageEditorStep({
                         <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{company_phone}')}>
                           {'{company_phone}'}
                         </button>
+                        <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('faq-heading-input', 'faq_heading', '{tagline}')}>
+                          {'{tagline}'}
+                        </button>
                       </div>
                     </div>
 
@@ -1440,6 +1810,98 @@ export default function CampaignLandingPageEditorStep({
                     />
                   </>
                 )}
+              </>
+            )}
+          </>
+        )}
+
+        {/* Pre-Footer Section */}
+        {renderSection(
+          'prefooter',
+          'Pre-Footer',
+          'Rich text section between FAQ and footer',
+          <>
+            <div className={styles.field}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={data.show_pre_footer}
+                  onChange={(e) => updateField('show_pre_footer', e.target.checked)}
+                />
+                <span>Show pre-footer section</span>
+              </label>
+            </div>
+
+            {data.show_pre_footer && (
+              <>
+                <div className={styles.field}>
+                  <label className={styles.label}>Pre-Footer Content</label>
+                  <RichTextEditor
+                    ref={preFooterEditorRef}
+                    value={data.pre_footer_content}
+                    onChange={(value) => updateField('pre_footer_content', value)}
+                    placeholder="Enter pre-footer content (supports rich text and variables)"
+                  />
+                </div>
+
+                <div className={styles.variableButtons}>
+                  <label className={styles.label}>Insert Variables:</label>
+                  <div className={styles.buttonGrid}>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{first_name}')}>
+                      {'{first_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{last_name}')}>
+                      {'{last_name}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{email}')}>
+                      {'{email}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{phone_number}')}>
+                      {'{phone_number}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{service_address}')}>
+                      {'{service_address}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{city}')}>
+                      {'{city}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{state}')}>
+                      {'{state}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{zip_code}')}>
+                      {'{zip_code}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{display_price}')}>
+                      {'{display_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{original_price}')}>
+                      {'{original_price}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{savings}')}>
+                      {'{savings}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{price_amount}')}>
+                      {'{price_amount}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{price_frequency}')}>
+                      {'{price_frequency}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{company_name}')}>
+                      {'{company_name}'}
+                    </button>
+                    {servicePlanId && (
+                      <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{service_name}')}>
+                        {'{service_name}'}
+                      </button>
+                    )}
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{company_phone}')}>
+                      {'{company_phone}'}
+                    </button>
+                    <button type="button" className={styles.variableButton} onClick={() => insertVariableIntoField('', 'pre_footer_content', '{tagline}')}>
+                      {'{tagline}'}
+                    </button>
+                  </div>
+                </div>
               </>
             )}
           </>

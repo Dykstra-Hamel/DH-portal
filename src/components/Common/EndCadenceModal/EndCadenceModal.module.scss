@@ -46,7 +46,7 @@
   justify-content: center;
   background-color: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   color: #6a7282;
   transition: all 0.2s;
@@ -160,7 +160,7 @@
 
 .cancelButton {
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
@@ -185,7 +185,7 @@
   align-items: center;
   gap: 4px;
   padding: 10px 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;

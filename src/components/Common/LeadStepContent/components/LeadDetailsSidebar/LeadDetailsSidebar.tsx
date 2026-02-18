@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, Dispatch, SetStateAction } from 'react';
+import { useState, useMemo, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
 import { CustomerInformation } from '@/components/Tickets/TicketContent';
@@ -19,6 +19,7 @@ import {
   NotebookPen,
   Phone,
   TextCursorInput,
+  ClipboardList,
 } from 'lucide-react';
 import { Lead } from '@/types/lead';
 import {
@@ -452,12 +453,47 @@ export function LeadDetailsSidebar({
       : '';
   }, [serviceLocationData]);
 
-  // Handler to expand sidebar when any card is expanded
-  const handleCardExpand = () => {
+  // Accordion: track which single card is expanded
+  const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+  const [autoExpandCallForm, setAutoExpandCallForm] = useState(false);
+
+  // Auto-expand Call/Form Details card only once on initial mount
+  useEffect(() => {
+    setAutoExpandCallForm(true);
+    const timer = setTimeout(() => setAutoExpandCallForm(false), 200);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // When activity is force-expanded externally, sync accordion state
+  useEffect(() => {
+    if (shouldExpandActivity) {
+      setExpandedCardId('activity');
+    }
+  }, [shouldExpandActivity]);
+
+  // Handler: expand sidebar if collapsed, set this card as the only expanded one
+  const handleCardExpand = useCallback((cardId: string) => {
+    setExpandedCardId(cardId);
     if (!isSidebarExpanded) {
       setIsSidebarExpanded(true);
     }
-  };
+  }, [isSidebarExpanded, setIsSidebarExpanded]);
+
+  // Handler: clear expanded card and collapse sidebar
+  const handleCardCollapse = useCallback((cardId: string) => {
+    setExpandedCardId(prev => (prev === cardId ? null : prev));
+    if (isSidebarExpanded) {
+      setIsSidebarExpanded(false);
+    }
+  }, [isSidebarExpanded, setIsSidebarExpanded]);
+
+  // Returns true if a card should be force-collapsed:
+  // - sidebar is collapsed, OR
+  // - another card is currently expanded
+  const isForceCollapsed = useCallback((cardId: string) => {
+    if (!isSidebarExpanded) return true;
+    return expandedCardId !== null && expandedCardId !== cardId;
+  }, [isSidebarExpanded, expandedCardId]);
 
   return (
     <DetailsCardsSidebar
@@ -467,12 +503,42 @@ export function LeadDetailsSidebar({
       onSectionClick={() => setActiveSection('sidebar')}
     >
           <InfoCard
-            title="Contact Information"
+            title={
+              lead.lead_type === 'web_form'
+                ? 'Form Details'
+                : lead.lead_type === 'other' || lead.lead_source === 'campaign'
+                ? 'Attribution Details'
+                : 'Call Information'
+            }
+            icon={
+              lead.lead_type === 'web_form' ? (
+                <TextCursorInput size={20} />
+              ) : lead.lead_type === 'other' || lead.lead_source === 'campaign' ? (
+                <ClipboardList size={20} />
+              ) : (
+                <Phone size={20} />
+              )
+            }
+            startExpanded={false}
+            onExpand={() => handleCardExpand('callFormDetails')}
+            onCollapse={() => handleCardCollapse('callFormDetails')}
+            forceCollapse={isForceCollapsed('callFormDetails')}
+            forceExpand={autoExpandCallForm}
+            isCompact={!isSidebarExpanded}
+            inSidebar={true}
+          >
+            <LeadCallFormInfo lead={lead} />
+          </InfoCard>
+
+          <InfoCard
+            title="Contact Info"
             icon={<SquareUserRound size={20} />}
             startExpanded={false}
-            onExpand={handleCardExpand}
-            forceCollapse={!isSidebarExpanded}
+            onExpand={() => handleCardExpand('contactInfo')}
+            onCollapse={() => handleCardCollapse('contactInfo')}
+            forceCollapse={isForceCollapsed('contactInfo')}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <CustomerInformation
               ticket={createTicketFromLead}
@@ -540,9 +606,11 @@ export function LeadDetailsSidebar({
               onServiceLocationChange={handleServiceLocationChange}
               hasCompleteUnchangedAddress={hasCompleteUnchangedAddress}
               currentFormattedAddress={currentFormattedAddress}
-              onExpand={handleCardExpand}
-              forceCollapse={!isSidebarExpanded}
+              onExpand={() => handleCardExpand('serviceLocation')}
+              onCollapse={() => handleCardCollapse('serviceLocation')}
+              forceCollapse={isForceCollapsed('serviceLocation')}
               isCompact={!isSidebarExpanded}
+              inSidebar={true}
             />
           </div>
 
@@ -550,10 +618,12 @@ export function LeadDetailsSidebar({
             title="Activity"
             icon={<SquareActivity size={20} />}
             startExpanded={false}
-            onExpand={handleCardExpand}
-            forceCollapse={!isSidebarExpanded}
+            onExpand={() => handleCardExpand('activity')}
+            onCollapse={() => handleCardCollapse('activity')}
+            forceCollapse={isForceCollapsed('activity')}
             forceExpand={shouldExpandActivity}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <ActivityFeed
               entityType="lead"
@@ -566,9 +636,11 @@ export function LeadDetailsSidebar({
             title="Notes"
             icon={<NotebookPen size={20} />}
             startExpanded={false}
-            onExpand={handleCardExpand}
-            forceCollapse={!isSidebarExpanded}
+            onExpand={() => handleCardExpand('notes')}
+            onCollapse={() => handleCardCollapse('notes')}
+            forceCollapse={isForceCollapsed('notes')}
             isCompact={!isSidebarExpanded}
+            inSidebar={true}
           >
             <NotesSection
               entityType="lead"
@@ -576,26 +648,6 @@ export function LeadDetailsSidebar({
               companyId={lead.company_id}
               userId={user?.id || ''}
             />
-          </InfoCard>
-          <InfoCard
-            title={
-              lead.lead_type === 'web_form'
-                ? 'Form Details'
-                : 'Call Information'
-            }
-            icon={
-              lead.lead_type === 'web_form' ? (
-                <TextCursorInput size={20} />
-              ) : (
-                <Phone size={20} />
-              )
-            }
-            startExpanded={false}
-            onExpand={handleCardExpand}
-            forceCollapse={!isSidebarExpanded}
-            isCompact={!isSidebarExpanded}
-          >
-            <LeadCallFormInfo lead={lead} />
           </InfoCard>
     </DetailsCardsSidebar>
   );

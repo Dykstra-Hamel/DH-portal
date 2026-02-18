@@ -22,7 +22,7 @@
       color: white;
       border: none;
       padding: 0.75rem 1.5rem;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       font-weight: 500;
       cursor: pointer;
       transition: background-color 0.2s;
@@ -86,7 +86,7 @@
       color: white;
       border: none;
       padding: 0.75rem 1.5rem;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       font-weight: 500;
       cursor: pointer;
       transition: background-color 0.2s;
@@ -149,7 +149,7 @@
 
       button {
         padding: 0.5rem 1rem;
-        border-radius: 6px;
+        border-radius: var(--border-radius);
         border: 1px solid #d1d5db;
         background: white;
         color: #374151;
@@ -257,7 +257,7 @@
           width: 100%;
           padding: 0.75rem;
           border: 1px solid #d1d5db;
-          border-radius: 6px;
+          border-radius: var(--border-radius);
           font-size: 1rem;
           transition: border-color 0.2s;
 
@@ -289,7 +289,7 @@
             color: white;
             border: none;
             padding: 0.5rem 1rem;
-            border-radius: 6px;
+            border-radius: var(--border-radius);
             font-size: 0.875rem;
             cursor: pointer;
 
@@ -311,7 +311,7 @@
             color: white;
             border: none;
             padding: 0.75rem;
-            border-radius: 6px;
+            border-radius: var(--border-radius);
             font-size: 0.875rem;
             cursor: pointer;
             white-space: nowrap;
@@ -408,7 +408,7 @@
             color: white;
             border: none;
             padding: 0.75rem 1.5rem;
-            border-radius: 6px;
+            border-radius: var(--border-radius);
             font-weight: 500;
             cursor: pointer;
 
@@ -422,7 +422,7 @@
             color: white;
             border: none;
             padding: 0.75rem 1.5rem;
-            border-radius: 6px;
+            border-radius: var(--border-radius);
             font-weight: 500;
             cursor: pointer;
 
@@ -444,7 +444,7 @@
 
       button {
         padding: 0.75rem 1.5rem;
-        border-radius: 6px;
+        border-radius: var(--border-radius);
         font-weight: 500;
         cursor: pointer;
         transition: all 0.2s;

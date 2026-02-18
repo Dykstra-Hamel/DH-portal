@@ -879,7 +879,7 @@ select.dh-form-input {
   border: 1px solid ${primaryColor};
   color: ${primaryColor};
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   font-family: "${fontName}", sans-serif;
   font-size: 14px;
@@ -1078,7 +1078,7 @@ select.dh-form-input {
   color: ${primaryColor};
   border: 1px solid ${primaryColor};
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   font-size: 13px;
   font-weight: 500;

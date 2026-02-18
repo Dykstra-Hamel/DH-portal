@@ -34,9 +34,9 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
-    // Filter by company if specified
+    // Filter by company if specified, but always include mention notifications
     if (companyId) {
-      query = query.eq('company_id', companyId);
+      query = query.or(`company_id.eq.${companyId},type.eq.mention`);
     }
 
     // Filter by read status if requested
@@ -63,9 +63,9 @@ export async function GET(request: NextRequest) {
       .eq('user_id', user.id)
       .eq('read', false);
 
-    // Filter unread count by company if specified
+    // Filter unread count by company if specified, but always include mention notifications
     if (companyId) {
-      unreadQuery = unreadQuery.eq('company_id', companyId);
+      unreadQuery = unreadQuery.or(`company_id.eq.${companyId},type.eq.mention`);
     }
 
     const { count: unreadCount, error: countError } = await unreadQuery;

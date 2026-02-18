@@ -181,6 +181,7 @@
   --notification-red: #e52c51;
 
   /* Border Radius Variables */
+  --border-radius: 8px;
   --border-radius-sm: 4px;
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
@@ -217,15 +218,14 @@ body {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  min-height: 100vh;
   width: 100%;
-  max-width: 1240px;
+  max-width: 1309px;
   margin: 0 auto;
 }
 
 .container {
   width: 100%;
-  max-width: 1240px;
+  max-width: 1309px;
   margin: 0 auto;
 }
 

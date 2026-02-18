@@ -30,7 +30,7 @@
   color: #1f2937;
   background-color: #fff;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   transition: all 0.15s ease;
 
   &:focus {

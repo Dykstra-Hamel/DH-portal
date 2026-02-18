@@ -274,8 +274,8 @@ export function SecondarySideNav({
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
-            height="24"
-            viewBox="0 0 20 20"
+            height="20"
+            viewBox="0 0 24 20"
             fill="none"
           >
             <path
@@ -294,6 +294,20 @@ export function SecondarySideNav({
             />
             <path
               d="M13 2H23"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M13 10H23"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M13 18H23"
               stroke="currentColor"
               strokeWidth="2"
               strokeLinecap="round"
@@ -433,8 +447,8 @@ export function SecondarySideNav({
           {
             items: [
               {
-                text: 'Dashboard',
-                href: '/project-management',
+                text: 'Projects',
+                href: '/admin/project-management',
                 icon: (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -475,8 +489,36 @@ export function SecondarySideNav({
                 ),
               },
               {
-                text: 'Tasks',
-                href: '/project-management/tasks',
+                text: 'Monthly Services',
+                href: '/admin/monthly-services',
+                icon: (
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="18"
+                    height="18"
+                    viewBox="0 0 18 18"
+                    fill="none"
+                  >
+                    <path
+                      d="M14.25 3H3.75C2.92157 3 2.25 3.67157 2.25 4.5V15C2.25 15.8284 2.92157 16.5 3.75 16.5H14.25C15.0784 16.5 15.75 15.8284 15.75 15V4.5C15.75 3.67157 15.0784 3 14.25 3Z"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M12 1.5V4.5M6 1.5V4.5M2.25 7.5H15.75M5.25 10.5H5.2575M9 10.5H9.0075M12.75 10.5H12.7575M5.25 13.5H5.2575M9 13.5H9.0075M12.75 13.5H12.7575"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                ),
+              },
+              {
+                text: 'My Tasks',
+                href: '/admin/project-management/tasks',
                 icon: (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -503,8 +545,8 @@ export function SecondarySideNav({
                 ),
               },
               {
-                text: 'Reports',
-                href: '/project-management/reports',
+                text: 'Project Templates',
+                href: '/admin/project-management/templates',
                 icon: (
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -514,14 +556,14 @@ export function SecondarySideNav({
                     fill="none"
                   >
                     <path
-                      d="M15 2H3C2.44772 2 2 2.44772 2 3V15C2 15.5523 2.44772 16 3 16H15C15.5523 16 16 15.5523 16 15V3C16 2.44772 15.5523 2 15 2Z"
+                      d="M10.5 2H3C2.44772 2 2 2.44772 2 3V15C2 15.5523 2.44772 16 3 16H15C15.5523 16 16 15.5523 16 15V7.5M10.5 2L16 7.5M10.5 2V7.5H16"
                       stroke="currentColor"
                       strokeWidth="1.5"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                     <path
-                      d="M6 13V10M9 13V7M12 13V4"
+                      d="M5 10H13M5 13H10"
                       stroke="currentColor"
                       strokeWidth="1.5"
                       strokeLinecap="round"
@@ -538,6 +580,10 @@ export function SecondarySideNav({
         return [
           {
             items: [
+              {
+                text: 'Dashboard',
+                href: '/tickets/dashboard',
+              },
               {
                 text: 'New Tickets',
                 href: '/tickets/new',
@@ -680,6 +726,10 @@ export function SecondarySideNav({
                 {group.items.map(item => {
                   const isActive =
                     pathname === item.href ||
+                    (item.href === '/admin/project-management' &&
+                      pathname.startsWith('/admin/project-management/') &&
+                      !pathname.startsWith('/admin/project-management/tasks') &&
+                      !pathname.startsWith('/admin/project-management/templates')) ||
                     (item.href === '/customers' &&
                       pathname.startsWith('/customers/')) ||
                     (item.href === '/tickets/new' &&

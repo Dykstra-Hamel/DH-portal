@@ -192,7 +192,7 @@
   background: var(--action-500);
   color: #ffffff;
   border: 1px solid var(--action-500);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
   cursor: pointer;
@@ -212,7 +212,7 @@
   background: var(--error-500);
   color: #ffffff;
   border: 1px solid var(--error-600);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
   cursor: pointer;
@@ -220,6 +220,191 @@
 
   &:hover {
     background: var(--error-600);
+  }
+}
+
+.customQuoteLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warning-600, #b45309);
+}
+
+.customBadge {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-500);
+}
+
+.addPricingButton {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--warning-500, #f59e0b);
+  color: #ffffff;
+  border: 1px solid var(--warning-600, #d97706);
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--warning-600, #d97706);
+  }
+}
+
+.editPricingButton {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  background: var(--action-500);
+  color: #ffffff;
+  border: 1px solid var(--action-500);
+  border-radius: var(--border-radius);
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: var(--action-600);
+  }
+}
+
+// Modal styles
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  width: 380px;
+  max-width: 90vw;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--gray-200);
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 0;
+    color: var(--gray-900);
+  }
+}
+
+.modalCloseButton {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  color: var(--gray-500);
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+  }
+}
+
+.modalBody {
+  padding: 20px;
+}
+
+.modalAddonName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800);
+  margin: 0 0 16px;
+}
+
+.modalFields {
+  display: flex;
+  gap: 12px;
+}
+
+.modalField {
+  flex: 1;
+
+  label {
+    display: block;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--gray-600);
+    margin-bottom: 4px;
+  }
+
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--gray-900);
+    outline: none;
+    transition: border-color 0.2s;
+
+    &:focus {
+      border-color: var(--action-500);
+      box-shadow: 0 0 0 2px rgba(0, 105, 224, 0.15);
+    }
+  }
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+}
+
+.modalCancelButton {
+  padding: 8px 16px;
+  background: #fff;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
+.modalSaveButton {
+  padding: 8px 16px;
+  background: var(--action-500);
+  border: 1px solid var(--action-500);
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--action-600);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
   }
 }
 

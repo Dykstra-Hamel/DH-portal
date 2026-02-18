@@ -21,6 +21,12 @@ export interface Client {
   company: string;
 }
 
+export interface TaskCategory {
+  id: string;
+  name: string;
+  category_type: 'internal' | 'external'; // Indicates internal or external categorization
+}
+
 export interface Task {
   id: string;
   title: string;
@@ -38,6 +44,15 @@ export interface Task {
   recurring_end_date?: string;
   created_at: string;
   updated_at: string;
+  is_starred?: boolean; // Whether the current user has starred this task
+  categories?: TaskCategory[]; // Categories assigned to this task
+  blocked_by_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The task blocking this task
 }
 
 export interface Project {
@@ -70,6 +85,16 @@ export interface ProjectTemplate {
   defaultTasks: Omit<Task, 'id' | 'project_id' | 'client_id' | 'assigned_to' | 'created_at' | 'updated_at'>[];
 }
 
+export interface CommentAttachment {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  url: string; // computed public URL
+  created_at: string;
+}
+
 export interface Comment {
   id: string;
   content: string;
@@ -77,6 +102,7 @@ export interface Comment {
   project_id?: string; // For project comments
   task_id?: string; // For task comments
   parent_comment_id?: string; // For threaded replies
+  attachments?: CommentAttachment[];
   created_at: string;
   updated_at: string;
 }

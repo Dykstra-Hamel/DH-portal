@@ -2,6 +2,7 @@
 
 import { Menu } from 'lucide-react';
 import { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import { Breadcrumbs } from '../Breadcrumbs/Breadcrumbs';
 import { SearchBar } from '../SearchBar/SearchBar';
 import { NotificationIcon } from '../NotificationIcon/NotificationIcon';
@@ -14,7 +15,22 @@ interface GlobalHeaderProps {
   rightActions?: ReactNode;
 }
 
-export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) {
+export function GlobalHeader({
+  onMenuToggle,
+  rightActions,
+}: GlobalHeaderProps) {
+  const pathname = usePathname();
+  const hideSearchAndCompany =
+    pathname === '/project-management' ||
+    pathname.startsWith('/project-management/') ||
+    pathname === '/admin/project-management' ||
+    pathname.startsWith('/admin/project-management/') ||
+    pathname.startsWith('/admin/monthly-services');
+  const hideBreadcrumbs =
+    pathname === '/admin/project-management' ||
+    pathname.startsWith('/admin/project-management/') ||
+    pathname.startsWith('/admin/monthly-services');
+
   return (
     <header className={styles.globalHeader}>
       <div className={styles.headerContent}>
@@ -28,14 +44,13 @@ export function GlobalHeader({ onMenuToggle, rightActions }: GlobalHeaderProps) 
               <Menu size={24} />
             </button>
           )}
-          <Breadcrumbs />
+          {!hideBreadcrumbs && <Breadcrumbs />}
         </div>
-        <div className={styles.centerSection}>
-        </div>
+        <div className={styles.centerSection}></div>
         <div className={styles.rightSection}>
           {rightActions}
-          <SearchBar />
-          <GlobalCompanyDropdown />
+          {!hideSearchAndCompany && <SearchBar />}
+          {!hideSearchAndCompany && <GlobalCompanyDropdown />}
           <NotificationIcon />
           <UserAvatar />
         </div>

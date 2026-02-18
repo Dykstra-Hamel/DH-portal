@@ -899,6 +899,29 @@ export default function BrandManager() {
               </div>
             </div>
 
+            {/* Font Color */}
+            <div className={styles.formGroup}>
+              <label>Font Color</label>
+              <p className={styles.helpText} style={{ fontSize: '13px', color: '#666', marginBottom: '8px' }}>
+                Base text color used on campaign landing pages. Defaults to #2b2b2b if not set.
+              </p>
+              <div className={styles.formRow}>
+                <div className={styles.colorInputGroup}>
+                  <div
+                    className={styles.colorPreview}
+                    style={{ backgroundColor: brandData.font_color_hex || '#2b2b2b' }}
+                    title="Color preview"
+                  />
+                  <input
+                    type="text"
+                    value={brandData.font_color_hex || ''}
+                    onChange={e => setBrandData(prev => prev ? { ...prev, font_color_hex: e.target.value || undefined } : prev)}
+                    placeholder="Hex (e.g., #2b2b2b)"
+                  />
+                </div>
+              </div>
+            </div>
+
             {/* Alternative Colors */}
             <div className={styles.formGroup}>
               <label>Alternative Colors</label>

@@ -17,11 +17,39 @@ export async function GET(
         *,
         company:companies(
           id,
-          name
+          name,
+          branding:brands!company_id(
+            icon_logo_url
+          )
         ),
         activity:project_activity(
           *,
-          user_profile:profiles(id, first_name, last_name, email)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        ),
+        categories:project_category_assignments(
+          id,
+          category_id,
+          category:project_categories(
+            id,
+            name,
+            description,
+            sort_order
+          )
+        ),
+        members:project_members(
+          id,
+          user_id,
+          added_via,
+          added_by,
+          created_at,
+          updated_at,
+          user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url)
+        ),
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
         )
       `
       )
@@ -48,7 +76,7 @@ export async function GET(
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email')
+      .select('id, first_name, last_name, email, avatar_url')
       .in('id', userIds);
 
     if (profilesError) {
@@ -98,6 +126,7 @@ export async function PUT(
       description,
       project_type,
       project_subtype,
+      requested_by,
       assigned_to,
       status,
       priority,
@@ -109,6 +138,10 @@ export async function PUT(
       tags,
       notes,
       primary_file_path,
+      scope,
+      current_department_id,
+      category_ids,
+      company_id,
     } = body;
 
     // Validate required fields
@@ -121,26 +154,69 @@ export async function PUT(
       );
     }
 
+    // Parse tags - can be string (comma-separated), array, or null
+    let parsedTags: string[] | null = null;
+    if (tags) {
+      if (Array.isArray(tags)) {
+        parsedTags = tags.filter((t: string) => t.trim());
+      } else if (typeof tags === 'string') {
+        parsedTags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+      }
+      if (parsedTags && parsedTags.length === 0) {
+        parsedTags = null;
+      }
+    }
+
+    // Map project_type to type_code for shortcode generation
+    const projectTypeToCode: Record<string, string | null> = {
+      'none': null,
+      'website': 'WEB',
+      'social': 'SOC',
+      'email': 'EML',
+      'print': 'PRT',
+      'vehicle': 'VEH',
+      'digital': 'DIG',
+      'ads': 'ADS',
+      'campaigns': 'CAM',
+      'software': 'SFT',
+    };
+
+    const updateData: Record<string, any> = {
+      name,
+      description,
+      project_type,
+      type_code: projectTypeToCode[project_type] || null, // Update type_code to trigger shortcode regeneration
+      project_subtype: project_subtype || null,
+      assigned_to: assigned_to || null,
+      status,
+      priority,
+      due_date,
+      start_date: start_date || null,
+      completion_date: completion_date || null,
+      is_billable: is_billable === 'true' || is_billable === true,
+      quoted_price: quoted_price ? parseFloat(quoted_price) : null,
+      tags: parsedTags,
+      notes,
+      primary_file_path: primary_file_path || null,
+      scope: scope || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (requested_by !== undefined) {
+      updateData.requested_by = requested_by || null;
+    }
+
+    if (current_department_id !== undefined) {
+      updateData.current_department_id = current_department_id || null;
+    }
+
+    if (company_id !== undefined) {
+      updateData.company_id = company_id;
+    }
+
     const { data: project, error } = await supabase
       .from('projects')
-      .update({
-        name,
-        description,
-        project_type,
-        project_subtype: project_subtype || null,
-        assigned_to: assigned_to || null,
-        status,
-        priority,
-        due_date,
-        start_date: start_date || null,
-        completion_date: completion_date || null,
-        is_billable: is_billable === 'true' || is_billable === true,
-        quoted_price: quoted_price ? parseFloat(quoted_price) : null,
-        tags,
-        notes,
-        primary_file_path: primary_file_path || null,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', id)
       .select(
         `
@@ -148,6 +224,12 @@ export async function PUT(
         company:companies(
           id,
           name
+        ),
+        current_department:project_departments(
+          id,
+          name,
+          icon,
+          sort_order
         )
       `
       )
@@ -159,6 +241,46 @@ export async function PUT(
         { error: 'Failed to update project' },
         { status: 500 }
       );
+    }
+
+    // Handle category assignments if category_ids is provided
+    if (category_ids !== undefined) {
+      // Use admin client for category assignment updates
+      const adminSupabase = createAdminClient();
+
+      // Delete all existing category assignments
+      const { error: deleteError } = await adminSupabase
+        .from('project_category_assignments')
+        .delete()
+        .eq('project_id', id);
+
+      if (deleteError) {
+        console.error('Error deleting category assignments:', deleteError);
+        return NextResponse.json(
+          { error: 'Failed to update category assignments' },
+          { status: 500 }
+        );
+      }
+
+      // Create new category assignments if category_ids is not empty
+      if (Array.isArray(category_ids) && category_ids.length > 0) {
+        const assignments = category_ids.map(category_id => ({
+          project_id: id,
+          category_id,
+        }));
+
+        const { error: insertError } = await adminSupabase
+          .from('project_category_assignments')
+          .insert(assignments);
+
+        if (insertError) {
+          console.error('Error creating category assignments:', insertError);
+          return NextResponse.json(
+            { error: 'Failed to create category assignments' },
+            { status: 500 }
+          );
+        }
+      }
     }
 
     // Get profiles for the users involved in this project

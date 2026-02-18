@@ -71,7 +71,7 @@
 .cancelButton,
 .confirmButton {
   padding: 0.625rem 1.25rem;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 0.9375rem;
   font-weight: 500;
   cursor: pointer;

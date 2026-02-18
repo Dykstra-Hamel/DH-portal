@@ -39,6 +39,17 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  if (
+    user &&
+    (request.nextUrl.pathname === '/' ||
+      request.nextUrl.pathname.startsWith('/login'))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/tickets/dashboard';
+    url.search = '';
+    return NextResponse.redirect(url);
+  }
+
   // Check if this is a public quote page (pattern: /{companySlug}/quote/{quoteId})
   const isQuotePage = /^\/[^\/]+\/quote\/[^\/]+$/.test(request.nextUrl.pathname);
 

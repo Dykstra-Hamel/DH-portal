@@ -1,8 +1,11 @@
 .pageContainer {
   padding: 0 16px;
-  max-width: 1240px;
   width: 100%;
-  margin: 0 auto;
+  max-width: 100%;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 100%;
 
   @media (min-width: 769px) {
     padding: 0;
@@ -36,7 +39,7 @@
   color: white;
   padding: 10px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 650;
   font-family: var(--font-satoshi);
@@ -79,7 +82,7 @@
   padding: 8px 16px;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 550;
   font-family: var(--font-satoshi);
@@ -115,42 +118,174 @@
   margin-bottom: 24px;
 }
 
-.viewTabs {
+// Tabs Row - wrapper for tabs and search (matching tickets/dashboard)
+.tabsRow {
   display: flex;
-  gap: 4px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 32px;
+  width: 100%;
+  max-width: 1309px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
-.viewTab {
+.tabsLeft {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex: 1;
+}
+
+.tabsRight {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.tabsSectionCompact {
+  width: auto;
+}
+
+// Tabs Section - tabs with border bottom (matching tickets/dashboard)
+.tabsSection {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+// Search Section - search with border bottom (matching tickets/dashboard)
+.searchSection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.filterControls {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.categorySelect {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--gray-300, #d1d5db);
+  padding-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.categorySelectInput {
+  min-width: 180px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  text-align: left;
+  cursor: pointer;
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+  }
+}
+
+.searchInput {
+  width: 182px;
+  padding: 0;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-300, #d1d5db);
+  background: transparent;
+  border: none;
+  outline: none;
+  transition: color 0.2s ease;
+  text-align: left;
+
+  &::placeholder {
+    color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus {
+    color: var(--gray-800, #252c37);
+
+    &::placeholder {
+      color: var(--gray-500, #6a7282);
+    }
+  }
+}
+
+.searchIcon {
+  color: var(--gray-300, #d1d5db);
+  flex-shrink: 0;
+}
+
+.searchSection:focus-within .searchIcon {
+  color: var(--gray-800, #252c37);
+}
+
+.searchSection:focus-within .searchInput {
+  color: var(--gray-800, #252c37);
+}
+
+// Category Tab (matching tickets/dashboard tabs)
+.categoryTab {
   position: relative;
   display: inline-flex;
   align-items: center;
-  padding: 10px 14px;
+  padding: 10px 0;
   gap: 8px;
+  white-space: nowrap;
+
+  &:first-child {
+    padding-left: 0;
+
+    &::after {
+      left: 0;
+    }
+  }
+
   border: none;
   background: transparent;
   box-shadow: none;
   cursor: pointer;
   transition: color 0.2s ease;
-  color: var(--gray-600);
-  font-family: var(--font-satoshi);
+  color: var(--gray-600, #525252);
+  font-family: var(--font-satoshi, inherit);
   font-size: 14px;
   font-style: normal;
   font-weight: 600;
   line-height: 18px;
 
-  svg {
-    flex-shrink: 0;
-  }
-
   &:hover {
-    color: var(--gray-800);
+    color: var(--gray-800, #262626);
   }
 
   &::after {
     content: '';
     position: absolute;
-    left: 12px;
-    right: 12px;
+    right: 0px;
     bottom: -1px;
     height: 3px;
     background: transparent;
@@ -165,21 +300,236 @@
     background: transparent;
     border: none;
     box-shadow: none;
-    color: var(--action-500);
-
-    svg {
-      color: var(--action-500);
-    }
+    color: var(--action-500, #0088cc);
 
     &::after {
-      background: var(--action-500);
+      background: var(--action-500, #0088cc);
       transform: scaleX(1);
     }
   }
 }
 
+.tabCount {
+  color: var(--action-600, #007ab3);
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+}
+
+// Legacy categoryTabs class for backwards compatibility
+.categoryTabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: 2px;
+}
+
+// View Tabs (Updated to match Figma)
+.viewTabs {
+  display: inline-flex;
+  width: fit-content;
+  gap: 4px;
+  border-radius: 8px;
+  border: 1px solid var(--UI-Gray-300, #d1d5db);
+  background: var(--White, #fff);
+  padding: 4px;
+}
+
+// View Controls Row
+.viewControls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32px;
+  gap: 16px;
+}
+
+// Kanban Group Toggle
+.kanbanGroupToggle {
+  display: flex;
+  gap: 4px;
+  background: #f3f4f6;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.groupToggleButton {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: var(--font-satoshi);
+
+  &:hover:not(.active) {
+    color: #252c37;
+  }
+
+  &.active {
+    background: white;
+    color: #0080f0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+}
+
+.viewTab {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-radius: var(--border-radius);
+
+  // Inactive state
+  color: var(--UI-Gray-400, #99a1af);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 14px;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  &:hover:not(.active) {
+    color: var(--UI-Gray-600);
+  }
+
+  &.active {
+    background: var(--UI-Gray-100, #f3f4f6);
+    color: var(--UI-Gray-950, #0c0e12);
+  }
+}
+
+// Status Filter Dropdown
+.statusFilter {
+  padding: 8px 12px;
+  border: 1px solid var(--UI-Gray-300, #d1d5db);
+  border-radius: var(--border-radius);
+  height: 40px;
+  background: var(--white, #ffffff);
+  color: var(--UI-Gray-950, #0c0e12);
+  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-size: 13px;
+  font-weight: 550;
+  line-height: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  min-width: 140px;
+
+  &:hover {
+    border-color: var(--UI-Gray-400, #9ca3af);
+  }
+
+  &:focus {
+    border-color: var(--action-500, #0080f0);
+    box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
+  }
+}
+
+// Responsive: Horizontal scroll for category tabs on mobile
+@media (max-width: 768px) {
+  .categoryTabs {
+    &::-webkit-scrollbar {
+      height: 4px;
+    }
+
+    &::-webkit-scrollbar-thumb {
+      background: var(--UI-Gray-300);
+      border-radius: 2px;
+    }
+  }
+}
+
+.categoryFilter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.filterLabel {
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--gray-700);
+  font-family: var(--font-satoshi);
+  white-space: nowrap;
+}
+
+.filterSelect {
+  flex: 1;
+  max-width: 300px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  background: white;
+  color: var(--gray-800);
+  font-size: 14px;
+  font-weight: 500;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover:not(:disabled) {
+    border-color: var(--action-400);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--action-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--gray-100);
+  }
+}
+
+.noCompanyMessage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  color: var(--gray-600);
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  text-align: center;
+}
+
 .viewContent {
-  min-height: 400px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-left: max(calc((100% - 1309px) / 2), 0px);
+  overflow-x: auto;
+}
+
+.constrainedViewMode {
+  padding-left: 0;
+  overflow-x: visible;
+}
+
+.constrainedViewPane {
+  width: 100%;
+  max-width: 1309px;
+  margin: 0 auto;
 }
 
 .loading {
@@ -194,6 +544,138 @@
     margin-top: 1rem;
     font-size: 0.9375rem;
     font-family: var(--font-satoshi);
+  }
+}
+
+.taskPageLayout {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.taskMainContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.taskViewTabsRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.taskSidebar {
+  width: 320px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 16px;
+}
+
+.personalTasksList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.personalTaskRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: var(--gray-50, #f9fafb);
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+  }
+}
+
+.taskToggle {
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-300, #d1d5db);
+  background: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--success-600, #04ae6a);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+
+  &:hover {
+    border-color: var(--success-500, #00c281);
+  }
+}
+
+.taskToggleDone {
+  background: var(--success-600, #04ae6a);
+  color: var(--white);
+  border-color: var(--success-600, #04ae6a);
+}
+
+.taskToggleBlocked {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: white !important;
+  cursor: not-allowed !important;
+
+  &:hover {
+    background-color: #dc2626 !important;
+    border-color: #dc2626 !important;
+  }
+}
+
+.taskContent {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.taskTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900, #111827);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskDueDate {
+  font-size: 12px;
+  color: var(--gray-500, #6b7280);
+
+  &.overdue {
+    color: var(--error-600, #e7000b);
+    font-weight: 600;
+  }
+}
+
+.emptyPersonalTasks {
+  font-size: 14px;
+  color: var(--gray-500, #6b7280);
+  text-align: center;
+  padding: 24px 16px;
+  margin: 0;
+}
+
+@media (max-width: 1024px) {
+  .taskPageLayout {
+    flex-direction: column;
+  }
+
+  .taskSidebar {
+    width: 100%;
+    position: static;
   }
 }
 

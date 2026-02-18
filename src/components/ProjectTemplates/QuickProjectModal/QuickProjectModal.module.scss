@@ -12,7 +12,7 @@
   padding: 12px 16px;
   background: var(--error-50);
   border: 1px solid var(--error-200);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   color: var(--error-700);
   font-size: 14px;
   font-weight: 550;
@@ -53,6 +53,39 @@
   gap: 8px;
 }
 
+.shortcodePreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-700);
+
+  label {
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+}
+
+.shortcodeValue {
+  background: var(--gray-50);
+  border: 1px dashed var(--gray-300);
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--gray-950);
+  font-family: var(--font-satoshi);
+
+  code {
+    font-family: var(--font-satoshi);
+  }
+}
+
+.shortcodeWarning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--error-600, #e7000b);
+}
+
 .formRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -87,7 +120,7 @@
 .select {
   padding: 10px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-family: var(--font-satoshi);
   color: var(--gray-800);
@@ -133,7 +166,7 @@
   color: white;
   padding: 8px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-satoshi);
@@ -157,7 +190,7 @@
   color: var(--gray-800);
   padding: 8px 16px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-satoshi);

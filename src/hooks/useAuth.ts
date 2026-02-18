@@ -58,7 +58,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${redirectOrigin}/auth/callback?next=/tickets/new`,
+        redirectTo: `${redirectOrigin}/auth/callback?next=/tickets/dashboard`,
       },
     });
     if (error) console.error('Error signing in:', error);
@@ -75,7 +75,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'facebook',
       options: {
-        redirectTo: `${redirectOrigin}/auth/callback?next=/tickets/new`,
+        redirectTo: `${redirectOrigin}/auth/callback?next=/tickets/dashboard`,
       },
     });
     if (error) console.error('Error signing in:', error);
@@ -95,7 +95,7 @@ export function useAuth() {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: `${redirectOrigin}/auth/callback?next=/tickets/new`,
+        emailRedirectTo: `${redirectOrigin}/auth/callback?next=/tickets/dashboard`,
       },
     });
 
@@ -146,7 +146,7 @@ export function useAuth() {
       setVerifyingOtp(false);
       // Reload the page to ensure CompanyContext initializes with the new session
       // This matches the OAuth flow behavior (which also causes a full page load)
-      window.location.href = '/tickets/new';
+      window.location.href = '/tickets/dashboard';
     }
   };
 
@@ -184,7 +184,7 @@ export function useAuth() {
     } else {
       // Reload the page to ensure CompanyContext initializes with the new session
       // This matches the OAuth flow behavior (which also causes a full page load)
-      window.location.href = '/tickets/new';
+      window.location.href = '/tickets/dashboard';
     }
   };
 

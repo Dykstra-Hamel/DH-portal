@@ -41,7 +41,7 @@
         padding: 8px 16px;
         border: none;
         background: transparent;
-        border-radius: 6px;
+        border-radius: var(--border-radius);
         font-size: 14px;
         font-weight: 500;
         cursor: pointer;

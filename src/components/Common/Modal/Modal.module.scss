@@ -159,7 +159,7 @@
 
 // Modal Middle Section
 .modalMiddle {
-  padding: 24px 24px 0;
+  padding: 24px 24px;
   width: 100%;
   flex: 1;
   background: #fff;
@@ -248,7 +248,7 @@
   color: white;
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -274,7 +274,7 @@
   color: var(--gray-800);
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -309,7 +309,7 @@
   color: var(--gray-800);
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -330,7 +330,7 @@
   color: var(--gray-800);
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
@@ -356,7 +356,7 @@
   color: #9ca3af;
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   cursor: not-allowed;

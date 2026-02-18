@@ -13,6 +13,7 @@ interface HeroSectionProps {
   hero: {
     title: string;
     subtitle: string;
+    subheading: string | null;
     description: string | null;
     buttonText: string;
     imageUrl: string | null; // Changed from imageUrls array to single image
@@ -51,39 +52,45 @@ export default function HeroSection({
     [customer, pricing, company, branding, serviceName]
   );
 
-  // Process text fields with variables
+  // Process text fields with variables and price styling
   const processHeroTextWithOriginalPriceStyling = useCallback(
     (text: string) => {
       if (!text) return '';
 
-      const styledText =
-        pricing.originalPrice && text.includes('{original_price}')
-          ? text.replace(
-              /\{original_price\}/g,
-              `<span class="${styles.strikethrough}">{original_price}</span>`
-            )
-          : text;
+      let styledText = text;
+
+      if (pricing.originalPrice && styledText.includes('{original_price}')) {
+        styledText = styledText.replace(
+          /\{original_price\}/g,
+          `<span class="${styles.strikethrough}">{original_price}</span>`
+        );
+      }
+
+      if (styledText.includes('{display_price}')) {
+        styledText = styledText.replace(
+          /\{display_price\}/g,
+          `<span class="${styles.priceHighlight}">{display_price}</span>`
+        );
+      }
 
       return processTextWithVariables(styledText, variableContext);
     },
     [pricing.originalPrice, variableContext]
   );
 
-  // Decode HTML entities for rendering as JSX
-  const decodeHtmlEntities = (text: string): string => {
-    const textarea = document.createElement('textarea');
-    textarea.innerHTML = text;
-    return textarea.value;
-  };
-
   const processedTitle = useMemo(
-    () => decodeHtmlEntities(processTextWithVariables(hero.title, variableContext)),
-    [hero.title, variableContext]
+    () => processHeroTextWithOriginalPriceStyling(hero.title),
+    [hero.title, processHeroTextWithOriginalPriceStyling]
   );
 
   const processedSubtitle = useMemo(
     () => processHeroTextWithOriginalPriceStyling(hero.subtitle),
     [hero.subtitle, processHeroTextWithOriginalPriceStyling]
+  );
+
+  const processedSubheading = useMemo(
+    () => hero.subheading ? processHeroTextWithOriginalPriceStyling(hero.subheading) : null,
+    [hero.subheading, processHeroTextWithOriginalPriceStyling]
   );
 
   const processedDescription = useMemo(
@@ -93,61 +100,6 @@ export default function HeroSection({
         : null,
     [hero.description, processHeroTextWithOriginalPriceStyling]
   );
-
-  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-  const renderPriceParts = (text: string, keyPrefix: string | number) => {
-    // Split by <br> tags first to handle line breaks
-    const lines = text.split('<br>');
-
-    return lines.flatMap((line, lineIndex) => {
-      const parts = line.split('$').map((part, index) => {
-        if (index === 0) return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>{part}</span>;
-
-        // Extract price pattern like "44/mo"
-        const pricePattern = part.match(/^(\d+)(\/mo)/);
-        if (pricePattern) {
-          return (
-            <span key={`${keyPrefix}-line${lineIndex}-${index}`}>
-              <span className={styles.priceHighlight}>
-                <sup>$</sup>
-                {pricePattern[1]}
-                <span className={styles.priceUnit}>{pricePattern[2]}</span>
-              </span>
-              {part.substring(pricePattern[0].length)}
-            </span>
-          );
-        }
-        return <span key={`${keyPrefix}-line${lineIndex}-${index}`}>${part}</span>;
-      });
-
-      // Add line break between lines (but not after the last line)
-      if (lineIndex < lines.length - 1) {
-        return [...parts, <br key={`${keyPrefix}-br${lineIndex}`} />];
-      }
-      return parts;
-    });
-  };
-
-  const renderTitleWithStyles = () => {
-    const originalPrice = pricing.originalPrice?.trim();
-    const titleSegments =
-      originalPrice && processedTitle
-        ? processedTitle.split(new RegExp(`(${escapeRegExp(originalPrice)})`, 'g')).filter(Boolean)
-        : [processedTitle];
-
-    return titleSegments.map((segment, idx) => {
-      if (originalPrice && segment === originalPrice) {
-        return (
-          <span key={`orig-${idx}`} className={styles.strikethrough}>
-            {segment}
-          </span>
-        );
-      }
-
-      return renderPriceParts(segment, `seg-${idx}`);
-    });
-  };
 
   return (
     <section id="hero-section" className={styles.heroSection}>
@@ -159,7 +111,17 @@ export default function HeroSection({
             dangerouslySetInnerHTML={{ __html: processedSubtitle }}
           />
 
-          <h1 className={styles.heroTitle}>{renderTitleWithStyles()}</h1>
+          <h1
+            className={styles.heroTitle}
+            dangerouslySetInnerHTML={{ __html: processedTitle }}
+          />
+
+          {processedSubheading && (
+            <h2
+              className={styles.heroSubheading}
+              dangerouslySetInnerHTML={{ __html: processedSubheading }}
+            />
+          )}
 
           {processedDescription && (
             <p
@@ -176,8 +138,8 @@ export default function HeroSection({
               <Image
                 src={hero.buttonIconUrl}
                 alt="Badge"
-                width={80}
-                height={80}
+                width={270}
+                height={270}
                 className={styles.heroButtonIcon}
               />
             )}

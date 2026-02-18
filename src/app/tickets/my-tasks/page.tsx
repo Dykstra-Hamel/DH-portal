@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { Search } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { DataTable } from '@/components/Common/DataTable';
@@ -31,6 +32,7 @@ import {
   subscribeToTaskUpdates,
   TaskUpdatePayload,
 } from '@/lib/realtime/task-channel';
+import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 export default function MyTasksPage() {
   const router = useRouter();
@@ -40,6 +42,8 @@ export default function MyTasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<TaskFormData | null>(null);
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
   const { user } = useUser();
   const { selectedCompany } = useCompany();
 
@@ -51,6 +55,41 @@ export default function MyTasksPage() {
     companyId: selectedCompany?.id,
     departmentType: 'all',
   });
+
+  // Get tabs configuration
+  const tabs = useMemo(() => getTaskTabs(true), []);
+
+  // Handle tab change
+  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(newTab);
+  }, []);
+
+  // Handle search change
+  const handleSearchChange = useCallback((newQuery: string) => {
+    setSearchQuery(newQuery);
+  }, []);
+
+  // Filter data based on active tab
+  const filteredByTab = useMemo(() => {
+    if (!tabs || tabs.length === 0) return tasks;
+    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
+    if (!activeTabConfig) return tasks;
+    return activeTabConfig.filter(tasks);
+  }, [tasks, activeTab, tabs]);
+
+  // Apply search filter
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByTab;
+
+    const query = searchQuery.toLowerCase();
+    return filteredByTab.filter(task => {
+      if (task.title?.toLowerCase().includes(query)) return true;
+      if (task.description?.toLowerCase().includes(query)) return true;
+      if (task.status?.toLowerCase().includes(query)) return true;
+      if (task.priority?.toLowerCase().includes(query)) return true;
+      return false;
+    });
+  }, [filteredByTab, searchQuery]);
 
   // Calculate task metrics from current tasks array
   const calculateTaskMetrics = () => {
@@ -413,15 +452,47 @@ export default function MyTasksPage() {
         </ModalBottom>
       </Modal>
 
+      {/* Tabs and Search Row */}
+      {tabs && tabs.length > 0 && (
+        <div className={styles.tabsRow}>
+          <div className={styles.tabsSection}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
+                onClick={() => handleTabChange(tab.key)}
+              >
+                {tab.label}
+                {tab.getCount && (
+                  <span className={styles.tabCount}>
+                    {tab.getCount(tasks)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className={styles.searchSection}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+            />
+            <Search size={18} className={styles.searchIcon} />
+          </div>
+        </div>
+      )}
+
       <DataTable<Task>
-        data={tasks}
+        data={filteredData}
         title="My Tasks"
         columns={getTaskColumns(false, true)}
-        tabs={getTaskTabs(true)}
         loading={loading}
         emptyStateMessage="No tasks assigned to you yet."
         onItemAction={handleTaskAction}
         customColumnWidths="minmax(340px, 2fr) 1fr 1fr 1.1fr 1.4fr"
+        searchEnabled={false}
       />
     </div>
   );

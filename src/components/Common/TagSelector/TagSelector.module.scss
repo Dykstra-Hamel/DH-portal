@@ -24,7 +24,7 @@
   padding: 8px 12px;
   background: white;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 13px;
   font-weight: 550;
   font-family: var(--font-satoshi);

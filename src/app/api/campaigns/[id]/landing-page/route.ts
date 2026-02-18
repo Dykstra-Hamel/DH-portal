@@ -18,14 +18,18 @@ export async function GET(
     const { id: campaignId } = await params;
     const { searchParams } = new URL(request.url);
     const customerId = searchParams.get('customerId');
+    const preview = searchParams.get('preview'); // Check for preview mode
 
     // Check if this is an authenticated admin request (for editing) or public request (for viewing)
     const authSupabase = await createClient();
     const { data: { user } } = await authSupabase.auth.getUser();
-    const isAdminRequest = !!user && (!customerId || customerId === 'preview');
 
-    // For public requests, customerId is required
-    if (!isAdminRequest && !customerId) {
+    // Preview mode: can be accessed by anyone (authenticated or not) when preview=true
+    const isPreviewMode = customerId === 'preview' || preview === 'true';
+    const isAdminRequest = !!user && (!customerId || isPreviewMode);
+
+    // For public requests (non-preview, non-admin), customerId is required
+    if (!isAdminRequest && !customerId && !isPreviewMode) {
       return NextResponse.json(
         { success: false, error: 'Customer ID is required' },
         { status: 400 }
@@ -98,12 +102,12 @@ export async function GET(
       );
     }
 
-    // Fetch customer with service address (or use mock data for admin requests)
+    // Fetch customer with service address (or use mock data for preview/admin mode)
     let customer;
-    if (isAdminRequest) {
-      // For admin requests, provide mock customer data for preview purposes
+    if (isPreviewMode || (isAdminRequest && !customerId)) {
+      // For preview or admin requests without a customer, provide mock customer data
       customer = {
-        id: 'admin-preview',
+        id: 'preview',
         first_name: 'John',
         last_name: 'Doe',
         email: 'customer@example.com',
@@ -179,7 +183,7 @@ export async function GET(
     // Fetch company branding (optional)
     const { data: brandData } = await supabase
       .from('brands')
-      .select('logo_url, primary_color_hex, secondary_color_hex, font_primary_name, font_primary_url')
+      .select('logo_url, primary_color_hex, secondary_color_hex, font_color_hex, font_primary_name, font_primary_url')
       .eq('company_id', campaign.company_id)
       .maybeSingle();
 
@@ -275,22 +279,34 @@ export async function GET(
       ? campaign.company_discounts[0]
       : campaign.company_discounts;
 
-    // For admin requests, skip customer authorization and provide mock redemption data
+    // For admin or preview requests, skip customer authorization and provide mock redemption data
     let redemption;
-    if (isAdminRequest) {
+    if (isAdminRequest || isPreviewMode) {
       // For authenticated admin users, verify they have access to this campaign's company
-      const { data: userCompany } = await authSupabase
-        .from('user_companies')
-        .select('id')
-        .eq('user_id', user!.id)
-        .eq('company_id', campaign.company_id)
-        .maybeSingle();
+      if (isAdminRequest && user) {
+        const { data: getProfile } = await authSupabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        const isGetGlobalAdmin = getProfile?.role === 'admin';
 
-      if (!userCompany) {
-        return NextResponse.json(
-          { success: false, error: 'You do not have access to this campaign' },
-          { status: 403 }
-        );
+        // Skip company check for global admins
+        if (!isGetGlobalAdmin) {
+          const { data: userCompany } = await authSupabase
+            .from('user_companies')
+            .select('id')
+            .eq('user_id', user.id)
+            .eq('company_id', campaign.company_id)
+            .maybeSingle();
+
+          if (!userCompany) {
+            return NextResponse.json(
+              { success: false, error: 'You do not have access to this campaign' },
+              { status: 403 }
+            );
+          }
+        }
       }
 
       // Mock redemption data for preview
@@ -399,6 +415,7 @@ export async function GET(
       accentColorPreference: landingPageData?.accent_color_preference || 'primary',
       fontPrimaryName: brandData?.font_primary_name || null,
       fontPrimaryUrl: brandData?.font_primary_url || null,
+      fontColor: brandData?.font_color_hex || null,
     };
 
     // Parse additional services config (supports legacy array or new object structure)
@@ -409,24 +426,67 @@ export async function GET(
         ? additionalServicesConfig
         : [];
 
-    const storedSelectedAddonIds =
+    // Check if addon selection has been explicitly stored (even if empty)
+    const hasStoredSelection =
       additionalServicesConfig &&
       typeof additionalServicesConfig === 'object' &&
-      Array.isArray((additionalServicesConfig as any).selectedAddonIds)
-        ? (additionalServicesConfig as any).selectedAddonIds
-        : null;
+      Array.isArray((additionalServicesConfig as any).selectedAddonIds);
 
-    const selectedAddonIdsSet = storedSelectedAddonIds
-      ? new Set(storedSelectedAddonIds)
+    const storedSelectedAddonIds = hasStoredSelection
+      ? (additionalServicesConfig as any).selectedAddonIds
       : null;
+    const hasStoredServicePlanSelection =
+      additionalServicesConfig &&
+      typeof additionalServicesConfig === 'object' &&
+      Array.isArray((additionalServicesConfig as any).selectedServicePlanIds);
+    const storedSelectedServicePlanIds: string[] = hasStoredServicePlanSelection
+      ? (additionalServicesConfig as any).selectedServicePlanIds
+      : [];
 
-    let selectedAddons = selectedAddonIdsSet
-      ? eligibleAddOns.filter((addon) => selectedAddonIdsSet.has(addon.id))
-      : eligibleAddOns;
+    let selectedAddons: typeof eligibleAddOns;
 
-    // If the stored selection is now invalid (e.g., plan changed), fall back to all eligible add-ons
-    if (selectedAddonIdsSet && selectedAddons.length === 0) {
+    if (hasStoredSelection) {
+      // Explicit selection exists — respect it (even if empty means "none selected")
+      const selectedAddonIdsSet = new Set(storedSelectedAddonIds);
+      selectedAddons = eligibleAddOns.filter((addon) => selectedAddonIdsSet.has(addon.id));
+    } else {
+      // No selection ever stored (legacy/new record) — default to all eligible
       selectedAddons = eligibleAddOns;
+    }
+    let selectedServicePlans: Array<{
+      id: string;
+      name: string;
+      description: string | null;
+      price: number | null;
+    }> = [];
+
+    if (storedSelectedServicePlanIds.length > 0) {
+      const { data: selectedPlansData } = await supabase
+        .from('service_plans')
+        .select('id, plan_name, plan_description, recurring_price')
+        .in('id', storedSelectedServicePlanIds)
+        .eq('company_id', campaign.company_id);
+
+      if (selectedPlansData && selectedPlansData.length > 0) {
+        const planMap = new Map(
+          selectedPlansData.map((plan) => [
+            plan.id,
+            {
+              id: plan.id,
+              name: plan.plan_name,
+              description: plan.plan_description,
+              price: plan.recurring_price,
+            },
+          ])
+        );
+
+        selectedServicePlans = storedSelectedServicePlanIds
+          .map((planId) => planMap.get(planId))
+          .filter(
+            (plan): plan is { id: string; name: string; description: string | null; price: number | null } =>
+              !!plan
+          );
+      }
     }
 
     // Build landing page object with defaults
@@ -434,6 +494,7 @@ export async function GET(
       hero: {
         title: landingPageData?.hero_title || 'Quarterly Pest Control starting at only $44/mo',
         subtitle: landingPageData?.hero_subtitle || 'Special Offer',
+        subheading: landingPageData?.hero_subheading || null,
         description: landingPageData?.hero_description || null,
         buttonText: landingPageData?.hero_button_text || 'Upgrade Today!',
         // Use single hero image (hero_image_url) or fall back to first image from old array format
@@ -470,6 +531,11 @@ export async function GET(
         faqs: addon.addon_faqs || [],
         price: addon.recurring_price,
       })),
+      servicePlans: selectedServicePlans,
+      preFooter: {
+        show: landingPageData?.show_pre_footer ?? true,
+        content: landingPageData?.pre_footer_content || null,
+      },
       faq: {
         show: landingPageData?.show_faq ?? true,
         heading: landingPageData?.faq_heading || 'Frequently Asked Questions',
@@ -503,7 +569,7 @@ export async function GET(
         greeting: landingPageData?.thankyou_greeting || 'Thanks {first_name}!',
         content: landingPageData?.thankyou_content || null,
         showExpect: landingPageData?.thankyou_show_expect ?? true,
-        expectHeading: landingPageData?.thankyou_expect_heading || 'What To Expect',
+        expectHeading: landingPageData?.thankyou_expect_heading ?? 'What To Expect',
         expectColumns: [
           {
             imageUrl: landingPageData?.thankyou_expect_col1_image || null,
@@ -526,6 +592,7 @@ export async function GET(
       },
       branding,
       selectedAddonIds: selectedAddons.map((addon) => addon.id),
+      selectedServicePlanIds: selectedServicePlans.map((plan) => plan.id),
     };
 
     // Return formatted data
@@ -635,19 +702,29 @@ export async function POST(
       );
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', campaign.company_id)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: postProfile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isPostGlobalAdmin = postProfile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have access to this campaign' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (skip for global admins)
+    if (!isPostGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', campaign.company_id)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this campaign' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse request body
@@ -684,6 +761,7 @@ export async function POST(
         // Hero section
         hero_title: body.hero_title,
         hero_subtitle: body.hero_subtitle || 'Special Offer',
+        hero_subheading: body.hero_subheading || null,
         hero_description: body.hero_description || null,
         hero_button_text: body.hero_button_text || 'Upgrade Today!',
         hero_image_url: body.hero_image_url || null,
@@ -711,8 +789,13 @@ export async function POST(
         additional_services: {
           items: body.additional_services || [],
           selectedAddonIds: body.selected_addon_ids || [],
+          selectedServicePlanIds: body.selected_service_plan_ids || [],
         },
         additional_services_image_url: body.additional_services_image_url || null,
+
+        // Pre-Footer
+        show_pre_footer: body.show_pre_footer ?? true,
+        pre_footer_content: body.pre_footer_content || null,
 
         // FAQ
         show_faq: body.show_faq ?? true,
@@ -745,7 +828,7 @@ export async function POST(
         thankyou_greeting: body.thankyou_greeting || 'Thanks {first_name}!',
         thankyou_content: body.thankyou_content || null,
         thankyou_show_expect: body.thankyou_show_expect ?? true,
-        thankyou_expect_heading: body.thankyou_expect_heading || 'What To Expect',
+        thankyou_expect_heading: body.thankyou_expect_heading ?? 'What To Expect',
         thankyou_expect_col1_image: body.thankyou_expect_col1_image || null,
         thankyou_expect_col1_heading: body.thankyou_expect_col1_heading || null,
         thankyou_expect_col1_content: body.thankyou_expect_col1_content || null,
@@ -773,7 +856,7 @@ export async function POST(
     if (body.service_plan_id !== undefined) {
       const { error: campaignUpdateError } = await supabase
         .from('campaigns')
-        .update({ service_plan_id: body.service_plan_id })
+        .update({ service_plan_id: body.service_plan_id || null })
         .eq('campaign_id', campaignId);
 
       if (campaignUpdateError) {
@@ -852,19 +935,29 @@ export async function PUT(
       );
     }
 
-    // Verify user has access to this company
-    const { data: userCompany, error: companyError } = await supabase
-      .from('user_companies')
-      .select('id')
-      .eq('user_id', user.id)
-      .eq('company_id', campaign.company_id)
-      .maybeSingle();
+    // Check if user is a global admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single();
+    const isGlobalAdmin = profile?.role === 'admin';
 
-    if (companyError || !userCompany) {
-      return NextResponse.json(
-        { success: false, error: 'You do not have access to this campaign' },
-        { status: 403 }
-      );
+    // Verify user has access to this company (skip for global admins)
+    if (!isGlobalAdmin) {
+      const { data: userCompany, error: companyError } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', campaign.company_id)
+        .maybeSingle();
+
+      if (companyError || !userCompany) {
+        return NextResponse.json(
+          { success: false, error: 'You do not have access to this campaign' },
+          { status: 403 }
+        );
+      }
     }
 
     // Parse request body
@@ -876,6 +969,7 @@ export async function PUT(
     // Hero section
     if (body.hero_title !== undefined) updateData.hero_title = body.hero_title;
     if (body.hero_subtitle !== undefined) updateData.hero_subtitle = body.hero_subtitle;
+    if (body.hero_subheading !== undefined) updateData.hero_subheading = body.hero_subheading;
     if (body.hero_description !== undefined) updateData.hero_description = body.hero_description;
     if (body.hero_button_text !== undefined) updateData.hero_button_text = body.hero_button_text;
     if (body.hero_image_url !== undefined) updateData.hero_image_url = body.hero_image_url;
@@ -900,13 +994,22 @@ export async function PUT(
     // Additional Services
     if (body.show_additional_services !== undefined) updateData.show_additional_services = body.show_additional_services;
     if (body.additional_services_heading !== undefined) updateData.additional_services_heading = body.additional_services_heading;
-    if (body.additional_services !== undefined || body.selected_addon_ids !== undefined) {
+    if (
+      body.additional_services !== undefined ||
+      body.selected_addon_ids !== undefined ||
+      body.selected_service_plan_ids !== undefined
+    ) {
       updateData.additional_services = {
         items: body.additional_services ?? [],
         selectedAddonIds: body.selected_addon_ids ?? [],
+        selectedServicePlanIds: body.selected_service_plan_ids ?? [],
       };
     }
     if (body.additional_services_image_url !== undefined) updateData.additional_services_image_url = body.additional_services_image_url;
+
+    // Pre-Footer
+    if (body.show_pre_footer !== undefined) updateData.show_pre_footer = body.show_pre_footer;
+    if (body.pre_footer_content !== undefined) updateData.pre_footer_content = body.pre_footer_content;
 
     // FAQ
     if (body.show_faq !== undefined) updateData.show_faq = body.show_faq;
@@ -977,7 +1080,7 @@ export async function PUT(
     if (body.service_plan_id !== undefined) {
       const { error: campaignUpdateError } = await supabase
         .from('campaigns')
-        .update({ service_plan_id: body.service_plan_id })
+        .update({ service_plan_id: body.service_plan_id || null })
         .eq('campaign_id', campaignId);
 
       if (campaignUpdateError) {

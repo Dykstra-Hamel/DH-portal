@@ -191,12 +191,16 @@ export async function POST(request: NextRequest) {
     const urlOrigin = lookupUrl.startsWith('http') ? new URL(lookupUrl).origin : lookupUrl;
     const sourceDomain = urlOrigin.replace(/^https?:\/\//, '');
 
-    // Step 4: Extract campaign_id if present (supports multiple sources)
+    // Step 4: Extract campaign_id and gclid if present (supports multiple sources)
     // Priority: URL query param > form field > top-level payload
     const queryParams = request.nextUrl.searchParams;
     const campaignId = queryParams.get('campaign_id') || queryParams.get('campaignId') ||
                        formData.campaignId || formData.campaign_id || formData['campaign-id'] ||
                        rawPayload.campaignId || rawPayload.campaign_id || rawPayload['campaign-id'] || null;
+
+    // Extract gclid separately (Google Click ID)
+    const gclid = queryParams.get('gclid') ||
+                  formData.gclid || rawPayload.gclid || null;
 
     // Step 5: Create initial form_submissions record (pending state)
     const userAgent = request.headers.get('user-agent') || null;
@@ -215,7 +219,8 @@ export async function POST(request: NextRequest) {
         processing_status: 'pending',
         ip_address: ipAddress,
         user_agent: userAgent,
-        campaign_id: campaignId,
+        campaign_id: null, // Will be set to campaign UUID after lookup
+        gclid: gclid,
       })
       .select('id')
       .single();
@@ -447,6 +452,12 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // Update form_submission with campaign UUID now that we have it
+      await supabase
+        .from('form_submissions')
+        .update({ campaign_id: campaign.id })
+        .eq('id', submissionId);
+
       const leadData: any = {
         company_id: companyId,
         customer_id: customerId,
@@ -459,6 +470,7 @@ export async function POST(request: NextRequest) {
         comments: geminiResult.ticket.description || 'Campaign form submission',
         priority: geminiResult.ticket.priority || 'medium',
         utm_campaign: campaignId, // Also store in UTM for tracking purposes
+        gclid: gclid || null,
         ip_address: ipAddress,
         user_agent: userAgent,
         referrer_url: lookupUrl,

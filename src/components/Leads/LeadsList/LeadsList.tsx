@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Lead } from '@/types/lead';
+import { Search } from 'lucide-react';
 import { DataTable, SortConfig } from '@/components/Common/DataTable';
 import { getLeadColumns, getLeadTabs } from './LeadsListConfig';
 import { TabDefinition } from '@/components/Common/DataTable';
 import { Toast } from '@/components/Common/Toast';
+import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 interface LeadsListProps {
   leads: Lead[];
@@ -36,12 +38,32 @@ function LeadsList({
   customTabs,
   defaultSort,
 }: LeadsListProps) {
+  // Tab and search state
+  const [activeTab, setActiveTab] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
   // Toast state for undo functionality
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
   const [showUndoOnToast, setShowUndoOnToast] = useState(false);
   const [previousLeadState, setPreviousLeadState] = useState<any>(null);
   const [isUndoing, setIsUndoing] = useState(false);
+
+  // Get tabs configuration
+  const tabs = useMemo(
+    () => (customTabs !== undefined ? customTabs || getLeadTabs() : getLeadTabs()),
+    [customTabs]
+  );
+
+  // Handle tab change
+  const handleTabChange = useCallback((newTab: string) => {
+    setActiveTab(newTab);
+  }, []);
+
+  // Handle search change
+  const handleSearchChange = useCallback((newQuery: string) => {
+    setSearchQuery(newQuery);
+  }, []);
 
   // Handle item actions (edit, archive, etc.)
   const handleItemAction = (action: string, lead: Lead) => {
@@ -244,6 +266,38 @@ function LeadsList({
     return [...unassigned, ...others];
   }, [leads, showArchived]);
 
+  // Filter data based on active tab
+  const filteredByTab = useMemo(() => {
+    if (!tabs || tabs.length === 0) return sortedLeads;
+    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
+    if (!activeTabConfig) return sortedLeads;
+    return activeTabConfig.filter(sortedLeads);
+  }, [sortedLeads, activeTab, tabs]);
+
+  // Apply search filter
+  const filteredData = useMemo(() => {
+    if (!searchQuery.trim()) return filteredByTab;
+
+    const query = searchQuery.toLowerCase();
+    return filteredByTab.filter(lead => {
+      // Search in customer name
+      const customerName =
+        `${lead.customer?.first_name || ''} ${lead.customer?.last_name || ''}`.toLowerCase();
+      if (customerName.includes(query)) return true;
+
+      // Search in phone
+      if (lead.customer?.phone?.toLowerCase().includes(query)) return true;
+
+      // Search in email
+      if (lead.customer?.email?.toLowerCase().includes(query)) return true;
+
+      // Search in status
+      if (lead.lead_status?.toLowerCase().includes(query)) return true;
+
+      return false;
+    });
+  }, [filteredByTab, searchQuery]);
+
   return (
     <>
       {/* Custom Toast with Undo */}
@@ -256,21 +310,51 @@ function LeadsList({
         undoLoading={isUndoing}
       />
 
+      {/* Tabs and Search Row */}
+      {tabs && tabs.length > 0 && (
+        <div className={styles.tabsRow}>
+          <div className={styles.tabsSection}>
+            {tabs.map(tab => (
+              <button
+                key={tab.key}
+                className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
+                onClick={() => handleTabChange(tab.key)}
+              >
+                {tab.label}
+                {tab.getCount && (
+                  <span className={styles.tabCount}>
+                    {tab.getCount(sortedLeads)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+          <div className={styles.searchSection}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search"
+              value={searchQuery}
+              onChange={e => handleSearchChange(e.target.value)}
+            />
+            <Search size={18} className={styles.searchIcon} />
+          </div>
+        </div>
+      )}
+
       {/* DataTable Component */}
       <DataTable
-        data={sortedLeads}
+        data={filteredData}
         loading={loading}
         title="Leads Overview"
         columns={getLeadColumns()}
-        tabs={
-          customTabs !== undefined ? customTabs || getLeadTabs() : getLeadTabs()
-        }
         tableType="leads"
         onItemAction={handleItemAction}
         onDataUpdated={onLeadUpdated}
         emptyStateMessage="No leads found for this category."
         onShowToast={handleShowToast}
         defaultSort={defaultSort}
+        searchEnabled={false}
       />
     </>
   );

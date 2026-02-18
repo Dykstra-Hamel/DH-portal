@@ -1,10 +1,97 @@
+// Project Category Types
+export type CategoryType = 'internal' | 'external';
+
+export interface ProjectCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_system_default: boolean;
+  is_hidden: boolean;
+  company_id: string | null; // NULL = internal/system category
+  created_at: string;
+  updated_at: string;
+}
+
+// Project Department Types
+export interface ProjectDepartment {
+  id: string;
+  name: string;
+  icon: string | null;
+  company_id: string | null;
+  sort_order: number;
+  is_system_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Project Type Subtypes (related to project types, not categories)
+export interface ProjectTypeSubtype {
+  id: string;
+  project_type: ProjectTypeCode; // WEB, SOC, EML, etc.
+  name: string;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectCategoryAssignment {
+  id: string;
+  project_id: string;
+  category_id: string;
+  category_type: CategoryType; // internal or external categorization
+  created_at: string;
+  category?: ProjectCategory;
+}
+
+// Project type codes for shortcode generation
+export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'ADS' | 'CAM' | 'SFT';
+
+// Project scope types
+export type ProjectScope = 'internal' | 'external' | 'both';
+
+// Project status types
+export type ProjectStatus = 'new' | 'in_progress' | 'on_hold' | 'internal_review' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
+
+export const PROJECT_TYPE_CODES: Record<ProjectTypeCode, { label: string; description: string }> = {
+  WEB: { label: 'Website', description: 'Landing Pages, Full Websites' },
+  SOC: { label: 'Social Media', description: 'Social media content and campaigns' },
+  EML: { label: 'Email Media', description: 'Email templates and campaigns' },
+  PRT: { label: 'Print Media', description: 'Print materials and designs' },
+  VEH: { label: 'Vehicle Design', description: 'Vehicle wraps and graphics' },
+  DIG: { label: 'Digital Designs', description: 'Digital ads for magazines, websites, etc.' },
+  ADS: { label: 'Paid Ad Designs', description: 'Google, Bing, Yelp, YouTube ads' },
+  CAM: { label: 'Campaigns', description: 'Campaign planning, execution, and assets' },
+  SFT: { label: 'Software', description: 'Software and engineering projects' },
+};
+
+export interface ProjectMember {
+  id: string;
+  project_id: string;
+  user_id: string;
+  added_via: 'manual' | 'task_assignment' | 'project_assignment';
+  added_by: string | null;
+  created_at: string;
+  updated_at: string;
+  user_profile?: {
+    id: string;
+    first_name: string;
+    last_name: string;
+    email: string;
+    avatar_url?: string | null;
+  };
+}
+
 export interface Project {
   id: string;
   name: string;
   description: string;
-  project_type: string;
-  project_subtype: string | null;
-  status: 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
+  project_type: string; // Existing broad category
+  project_subtype: string | null; // Existing specific subcategory
+  type_code?: ProjectTypeCode; // NEW: Type code for shortcode generation
+  shortcode?: string; // NEW: Auto-generated shortcode (read-only)
+  status: 'new' | 'in_progress' | 'on_hold' | 'internal_review' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
   priority: 'low' | 'medium' | 'high' | 'urgent';
   due_date: string;
   start_date: string | null;
@@ -17,26 +104,49 @@ export interface Project {
   tags: string[] | null;
   notes: string | null;
   primary_file_path: string | null;
+  scope?: ProjectScope; // internal = agency-only, external = client-only, both = mixed work
   created_at: string;
   updated_at: string;
+
+  // Progress tracking (auto-calculated by database trigger)
+  progress_percentage?: number;
+
+  // Optional fields for Kanban card display
+  comments_count?: number;
+  members_count?: number;
+  progress?: { completed: number; total: number };
+  has_unread_mentions?: boolean;
   requested_by_profile: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
   assigned_to_profile: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   } | null;
   company: {
     id: string;
     name: string;
+    branding?: {
+      icon_logo_url?: string;
+    } | {
+      icon_logo_url?: string;
+    }[] | null;
   };
   comments?: ProjectComment[];
   activity?: ProjectActivity[];
+  categories?: ProjectCategoryAssignment[]; // Many-to-many relationship
+  is_starred?: boolean; // Whether the current user has starred this project
+  members?: ProjectMember[]; // Project members
+  current_department_id: string | null;
+  current_department?: ProjectDepartment; // For joins
+  attachments?: ProjectAttachment[]; // Project attachments
 }
 
 export interface ProjectFormData {
@@ -44,6 +154,7 @@ export interface ProjectFormData {
   description: string;
   project_type: string;
   project_subtype: string;
+  type_code?: string; // Optional type code for shortcode generation
   requested_by: string;
   company_id: string;
   assigned_to: string;
@@ -56,6 +167,11 @@ export interface ProjectFormData {
   quoted_price: string;
   tags: string;
   notes: string;
+  scope?: ProjectScope; // internal, external, or both
+  category_ids: string[]; // Array of category IDs for many-to-many relationship
+  current_department_id?: string; // Optional department ID
+  tasks?: ProjectTaskDraft[]; // Optional tasks to create with the project
+  member_ids?: string[]; // Optional member user IDs to add to the project
 }
 
 export interface User {
@@ -66,12 +182,14 @@ export interface User {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
 export interface Company {
   id: string;
   name: string;
+  short_code?: string; // 3-4 character code for project shortcodes (e.g., "BZB")
 }
 
 export interface ProjectFilters {
@@ -81,17 +199,28 @@ export interface ProjectFilters {
 }
 
 export const statusOptions = [
-  { value: 'coming_up', label: 'Coming Up', color: '#f59e0b' },
-  { value: 'design', label: 'Design', color: '#8b5cf6' },
-  { value: 'development', label: 'Development', color: '#3b82f6' },
-  { value: 'out_to_client', label: 'Out To Client', color: '#06b6d4' },
-  { value: 'waiting_on_client', label: 'Waiting On Client', color: '#6b7280' },
-  { value: 'bill_client', label: 'Bill Client', color: '#10b981' },
+  { value: 'new', label: 'New', color: '#3b82f6' }, // Blue (was In Progress color)
+  { value: 'in_progress', label: 'In Progress', color: '#05B62E' }, // Custom green
+  { value: 'on_hold', label: 'On Hold', color: '#ef4444' }, // Red (was Blocked color)
+  { value: 'internal_review', label: 'Internal Review', color: '#eab308' }, // Yellow (was Pending Approval color)
+  { value: 'out_to_client', label: 'Out To Client', color: '#8b5cf6' },
+  { value: 'ready_to_print', label: 'Ready To Print', color: '#06b6d4', requiresCategory: 'Print' },
+  { value: 'printing', label: 'Printing', color: '#0891b2', requiresCategory: 'Print' },
+  { value: 'bill_client', label: 'Bill Client', color: '#059669', requiresBillable: true },
+  { value: 'complete', label: 'Complete', color: '#99a1af' }, // Gray (icon color from project cards)
 ];
 
 export const projectTypeOptions = [
-  { value: 'print', label: 'Print' },
-  { value: 'digital', label: 'Digital' },
+  { value: 'none', label: 'None (no shortcode)', code: null },
+  { value: 'website', label: 'Website', code: 'WEB' },
+  { value: 'social', label: 'Social Media', code: 'SOC' },
+  { value: 'email', label: 'Email Media', code: 'EML' },
+  { value: 'print', label: 'Print Media', code: 'PRT' },
+  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
+  { value: 'digital', label: 'Digital Designs', code: 'DIG' },
+  { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
+  { value: 'campaigns', label: 'Campaigns', code: 'CAM' },
+  { value: 'software', label: 'Software', code: 'SFT' },
 ];
 
 export const printSubtypes = [
@@ -124,7 +253,7 @@ export const priorityOptions = [
 // Project Task Types
 export interface ProjectTask {
   id: string;
-  project_id: string;
+  project_id: string | null; // Optional - tasks can exist without a project
   parent_task_id: string | null;
 
   // Basic Info
@@ -151,10 +280,11 @@ export interface ProjectTask {
   progress_percentage: number;
   actual_hours: number | null;
 
-  // Dependencies & Blockers
-  blocked_by: string[] | null;
-  blocking: string[] | null;
+  // Dependencies & Blockers (one-to-one relationships)
+  blocks_task_id: string | null; // The ONE task this task is blocking
+  blocked_by_task_id: string | null; // The ONE task blocking this task
   blocker_reason: string | null;
+  department_id: string | null; // Optional department assignment
 
   // Order & Display
   display_order: number;
@@ -171,21 +301,64 @@ export interface ProjectTask {
   updated_at: string;
 
   // Relationships (populated by API)
+  project?: {
+    id: string;
+    name: string;
+    shortcode?: string | null;
+  } | null;
+  monthly_service_id?: string | null;
+  monthly_service?: {
+    id: string;
+    service_name: string;
+    company?: {
+      id: string;
+      name: string;
+      branding?: {
+        icon_logo_url?: string;
+      } | {
+        icon_logo_url?: string;
+      }[] | null;
+    } | null;
+  } | null;
   assigned_to_profile?: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   } | null;
   created_by_profile?: {
     id: string;
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
   subtasks?: ProjectTask[];
   comments?: ProjectTaskComment[];
   activity?: ProjectTaskActivity[];
+  categories?: Array<{
+    id: string;
+    name: string;
+    category_type: CategoryType;
+  }>;
+  // Task dependencies (one-to-one, populated by joins)
+  blocking_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The ONE task this task is blocking
+  blocked_by_task?: {
+    id: string;
+    title: string;
+    is_completed: boolean;
+    assigned_to: string | null;
+    due_date: string | null;
+  } | null; // The ONE task blocking this task
+  hasUnreadComments?: boolean; // Whether there are comments newer than user's last view
+  hasUnreadMentions?: boolean; // Whether there are unread comments that mention the current user
 }
 
 export interface ProjectTaskFormData {
@@ -197,8 +370,13 @@ export interface ProjectTaskFormData {
   due_date: string;
   start_date: string;
   parent_task_id: string;
+  blocks_task_id?: string | null;
+  blocked_by_task_id?: string | null;
+  blocker_reason?: string | null;
+  department_id?: string | null;
   recurring_frequency: string;
   recurring_end_date: string;
+  category_ids?: string[];
 }
 
 export interface ProjectTaskComment {
@@ -213,7 +391,9 @@ export interface ProjectTaskComment {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
+  attachments?: ProjectCommentAttachment[];
 }
 
 export interface ProjectTaskActivity {
@@ -231,6 +411,7 @@ export interface ProjectTaskActivity {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -260,6 +441,26 @@ export const taskPriorityOptions = [
   { value: 'critical', label: 'Critical', color: '#ef4444' },
 ];
 
+export interface ProjectCommentAttachment {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  url: string;
+  created_at: string;
+}
+
+export interface ProjectAttachment {
+  id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by: string;
+  uploaded_at: string;
+}
+
 export interface ProjectComment {
   id: string;
   project_id: string;
@@ -272,7 +473,9 @@ export interface ProjectComment {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
+  attachments?: ProjectCommentAttachment[];
 }
 
 export interface ProjectActivity {
@@ -294,6 +497,7 @@ export interface ProjectActivity {
     first_name: string;
     last_name: string;
     email: string;
+    avatar_url?: string | null;
   };
 }
 
@@ -302,44 +506,86 @@ export interface ProjectTemplate {
   id: string;
   name: string;
   description: string | null;
+  notes: string | null;
   project_type: string;
   project_subtype: string | null;
   is_active: boolean;
   template_data: Record<string, any> | null;
+  default_assigned_to: string | null;
+  default_scope: ProjectScope;
+  default_due_date_offset_days: number;
+  default_is_billable?: boolean | null;
+  initial_department_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
   tasks?: ProjectTemplateTask[];
+  categories?: ProjectCategoryAssignment[];
+  default_members?: Array<{ id: string; user_id: string }>;
+  initial_department?: ProjectDepartment; // For joins
 }
 
 export interface ProjectTemplateTask {
   id: string;
   template_id: string;
+  parent_task_id?: string | null;
   title: string;
   description: string | null;
   priority: 'low' | 'medium' | 'high' | 'critical';
   due_date_offset_days: number;
   display_order: number;
   tags: string[] | null;
+  default_assigned_to: string | null;
+  blocks_task_id: string | null;
+  blocked_by_task_id: string | null;
+  department_id: string | null;
   created_at: string;
   updated_at: string;
+  categories?: Array<{
+    id: string;
+    category_id: string;
+    category?: ProjectCategory;
+  }>;
+}
+
+export interface ProjectTaskDraft {
+  temp_id?: string;
+  parent_temp_id?: string | null;
+  title: string;
+  description: string;
+  priority: string;
+  due_date_offset_days: string;
+  display_order: string;
+  tags: string;
+  default_assigned_to: string;
+  blocks_task_id?: string | null;
+  blocked_by_task_id?: string | null;
+  department_id?: string | null;
+  category_ids?: string[];
 }
 
 export interface ProjectTemplateFormData {
   name: string;
   description: string;
+  notes: string;
   project_type: string;
   project_subtype: string;
   is_active: string;
   template_data: string;
-  tasks: Array<{
-    title: string;
-    description: string;
-    priority: string;
-    due_date_offset_days: string;
-    display_order: string;
-    tags: string;
-  }>;
+  default_assigned_to: string;
+  default_scope: string;
+  default_due_date_offset_days: string;
+  default_is_billable?: string;
+  initial_department_id?: string;
+  category_ids?: string[];
+  default_member_ids?: string[];
+  tasks: ProjectTaskDraft[];
+}
+
+// Apply Template Options
+export interface ApplyTemplateOptions {
+  templateId: string;
+  mergeDescription: boolean; // true = append, false = replace
 }
 
 // Recurring Task Types

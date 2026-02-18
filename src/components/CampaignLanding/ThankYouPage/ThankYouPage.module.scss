@@ -4,7 +4,7 @@
 
 // Mixin for content section containers (matches landing page)
 @mixin contentSectionPadding {
-  padding: 0 276px;
+  padding: 0 147px;
 
   @media (max-width: 1400px) {
     padding: 0 60px;
@@ -22,8 +22,7 @@
   --accent-color: var(--brand-primary);
   --font-primary: 'Inter Tight', sans-serif;
 
-  // Fixed design system colors
-  --color-text: #2b2b2b;
+  // Fixed design system colors (--color-text is set via inline styles from brand font color, fallback #2b2b2b)
   --color-text-gray: #4e4e4e;
   --color-white: #ffffff;
   --color-bg-light: #f9fafb;
@@ -36,6 +35,37 @@
   color: var(--color-text);
   min-height: 100vh;
   max-width: 1626px;
+}
+
+// Success Banner
+.successBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0 20px 40px;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 768px) {
+    gap: 12px;
+    padding-bottom: 20px;
+
+    svg {
+      width: 30px;
+      height: 30px;
+    }
+  }
+}
+
+.successBannerText {
+  font-family: var(--font-primary);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.24px;
+  color: var(--accent-color);
 }
 
 .container {
@@ -65,7 +95,9 @@
   font-weight: 700;
   color: var(--Gray-Text, #4e4e4e);
   text-align: center;
-  margin: 0 0 24px 0;
+  margin: 0 auto 24px;
+  max-width: 800px;
+  width: 100%;
   line-height: 50px;
 
   @media (max-width: 768px) {
@@ -77,12 +109,13 @@
 
 .description {
   font-family: var(--font-primary);
-  font-size: 26px;
+  font-size: 20px;
   font-weight: 500;
   color: #484848;
   line-height: 30px;
   margin: 0 auto;
   max-width: 800px;
+  letter-spacing: -0.2px;
 
   p {
     margin: 12px 0;
@@ -101,15 +134,21 @@
 // 3-Column Info Section
 .infoSection {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: center;
-  gap: 109px; // 54px + 1px separator + 54px
-  margin-bottom: 80px;
+  gap: 109px;
+  margin: 0 auto;
+  max-width: 1076px;
+  width: 100%;
+  border-radius: 8px;
+  border: 1px solid var(--UI-Gray-300, #d1d5db);
+  padding: 23px 40px;
 
   @media (max-width: 1024px) {
     flex-direction: column;
     gap: 32px;
     margin-bottom: 60px;
+    padding: 23px 20px;
   }
 }
 
@@ -118,16 +157,16 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  flex: 0 0 auto;
+  flex: 1;
   position: relative;
 
   &:not(:last-child)::after {
     content: '';
     position: absolute;
     width: 1px;
-    height: 122px;
+    height: 100%;
     background: #bfbfbf;
-    right: -55px; // Half of gap (109px / 2) to center the separator
+    right: -55px;
     top: 0;
 
     @media (max-width: 1024px) {
@@ -143,14 +182,17 @@
 .infoHeading {
   font-family: var(--font-primary);
   font-size: 14px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--brand-secondary);
-  margin: 0 0 20px 0;
-  line-height: 1.3;
+  margin: 0 0 16px 0;
+  line-height: 1;
   text-align: center;
+  background: #fff;
+  padding: 0 12px;
+  margin-top: -30px;
 
-  @media (max-width: 768px) {
-    font-size: 14px;
+  @media (max-width: 1024px) {
+    margin-top: 0px;
   }
 }
 
@@ -161,6 +203,11 @@
   color: #2b2b2b;
   line-height: 28px;
   text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 
   p {
     margin: 0;
@@ -231,12 +278,15 @@
 }
 
 .expectImage {
+  position: relative;
   width: 100%;
+  aspect-ratio: 4 / 3;
   border-radius: 16px;
   overflow: hidden;
   background: #f9fafb;
 
   img {
+    display: block;
     width: 100%;
     height: 100%;
     object-fit: cover;
@@ -250,6 +300,8 @@
   color: #484848;
   margin: 0;
   line-height: 1.3;
+  letter-spacing: -0.3px;
+  text-align: center;
 
   @media (max-width: 768px) {
     font-size: 24px;
@@ -264,7 +316,7 @@
   line-height: 28px;
 
   p {
-    margin: 12px 0;
+    margin: 0;
   }
 
   strong {
@@ -282,7 +334,6 @@
   }
 
   @media (max-width: 768px) {
-    font-size: 15px;
     line-height: 24px;
   }
 }
@@ -305,7 +356,7 @@
   color: var(--color-white);
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   padding: 14px 20px;
   cursor: pointer;
   transition:
@@ -349,8 +400,10 @@
 // Office Hours Section
 .officeHoursSection {
   text-align: center;
-  margin: 60px 0;
+  margin: 30px 0 60px 0;
   padding: 0 20px;
+  font-size: 16px;
+  line-height: 1.6;
 
   @media (max-width: 768px) {
     margin: 40px 0;
@@ -358,41 +411,26 @@
 }
 
 .officeHoursHeading {
-  font-size: 24px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+}
+
+.officeHoursInline {
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: 16px;
-
-  @media (max-width: 768px) {
-    font-size: 20px;
-  }
 }
 
-.officeHoursList {
-  display: inline-block;
-  text-align: center;
-}
-
-.officeHourRow {
-  margin-bottom: 8px;
-  font-size: 18px;
-
-  @media (max-width: 768px) {
-    font-size: 16px;
-  }
-
-  &:last-child {
-    margin-bottom: 0;
-  }
+.officeHoursPipe {
+  color: var(--color-text-gray);
+  padding: 0 5px;
 }
 
 .officeHourDays {
   font-weight: 600;
   color: var(--color-text);
-  min-width: 120px;
-  margin-right: 5px;
 }
 
 .officeHourTime {
-  color: var(--color-text-gray);
+  font-weight: 600;
+  color: var(--color-text);
 }

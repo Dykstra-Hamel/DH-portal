@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { findCompanyByAgentId } from '@/lib/agent-utils';
 import { trackCallEnd } from '@/lib/campaigns/concurrency-manager';
+import {
+  createOrFindServiceAddress,
+  getCustomerPrimaryServiceAddress,
+  linkCustomerToServiceAddress,
+} from '@/lib/service-addresses';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -344,7 +349,7 @@ async function handleOutboundCallEnded(supabase: any, callData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('call_id', call_id)
-    .select('*, leads(id, customer_id, comments)')
+    .select('*, leads(id, customer_id, comments, company_id, service_address_id)')
     .single();
 
   let callRecord = existingRecord;
@@ -558,7 +563,7 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('call_id', call_id)
-    .select('*, leads(id, customer_id, comments)')
+    .select('*, leads(id, customer_id, comments, company_id, service_address_id)')
     .single();
 
   if (updateError) {
@@ -600,6 +605,82 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
       .from('leads')
       .update(updateData)
       .eq('id', callRecord.leads.id);
+  }
+
+  if (callRecord.leads?.customer_id && callRecord.leads?.company_id) {
+    const primaryServiceAddress = await getCustomerPrimaryServiceAddress(
+      callRecord.leads.customer_id
+    );
+
+    if (!primaryServiceAddress.serviceAddress) {
+      const isValidValue = (value: string | null | undefined): boolean => {
+        return !!(
+          value &&
+          value.trim() !== '' &&
+          value.toLowerCase() !== 'none'
+        );
+      };
+      let serviceAddressId = callRecord.leads.service_address_id || null;
+
+      if (!serviceAddressId) {
+        const streetAddress = isValidValue(extractedData.street_address)
+          ? extractedData.street_address!.trim()
+          : '';
+        const city = isValidValue(extractedData.customer_city)
+          ? extractedData.customer_city!.trim()
+          : '';
+        const state = isValidValue(extractedData.customer_state)
+          ? extractedData.customer_state!.trim()
+          : '';
+        const zip = isValidValue(extractedData.customer_zip)
+          ? extractedData.customer_zip!.trim()
+          : '';
+        const hasAddressData = [streetAddress, city, state, zip].some(
+          value => value !== ''
+        );
+
+        if (hasAddressData) {
+          const serviceAddressResult = await createOrFindServiceAddress(
+            callRecord.leads.company_id,
+            {
+              street_address: streetAddress || undefined,
+              city: city || undefined,
+              state: state || undefined,
+              zip_code: zip || undefined,
+            }
+          );
+
+          if (
+            serviceAddressResult.success &&
+            serviceAddressResult.serviceAddressId
+          ) {
+            serviceAddressId = serviceAddressResult.serviceAddressId;
+          }
+        }
+      }
+
+      if (serviceAddressId) {
+        const linkResult = await linkCustomerToServiceAddress(
+          callRecord.leads.customer_id,
+          serviceAddressId,
+          'owner',
+          true
+        );
+
+        if (!linkResult.success && linkResult.error) {
+          console.warn(
+            'Failed to link service address to customer:',
+            linkResult.error
+          );
+        }
+
+        await supabase
+          .from('leads')
+          .update({ service_address_id: serviceAddressId })
+          .eq('id', callRecord.leads.id)
+          .is('service_address_id', null);
+      }
+    }
   }
 
   return NextResponse.json({
@@ -763,6 +844,9 @@ function extractCallData(
     street_address: null as string | null,
     preferred_service_time: null as string | null,
     contacted_other_companies: false,
+    customer_city: null as string | null,
+    customer_state: null as string | null,
+    customer_zip: null as string | null,
     summary: '',
   };
 
@@ -777,6 +861,9 @@ function extractCallData(
       dynamicVariables.street_address ||
       dynamicVariables.customer_street_address ||
       null;
+    extractedData.customer_city = dynamicVariables.customer_city || null;
+    extractedData.customer_state = dynamicVariables.customer_state || null;
+    extractedData.customer_zip = dynamicVariables.customer_zip || null;
     extractedData.preferred_service_time =
       dynamicVariables.preferred_service_time || null;
     extractedData.contacted_other_companies =
@@ -815,6 +902,18 @@ function extractCallData(
       extractedData.street_address =
         extractedData.street_address ||
         callAnalysis.custom_analysis_data.street_address ||
+        null;
+      extractedData.customer_city =
+        extractedData.customer_city ||
+        callAnalysis.custom_analysis_data.customer_city ||
+        null;
+      extractedData.customer_state =
+        extractedData.customer_state ||
+        callAnalysis.custom_analysis_data.customer_state ||
+        null;
+      extractedData.customer_zip =
+        extractedData.customer_zip ||
+        callAnalysis.custom_analysis_data.customer_zip ||
         null;
       extractedData.preferred_service_time =
         extractedData.preferred_service_time ||

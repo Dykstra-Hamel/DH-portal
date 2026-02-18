@@ -1,112 +1,98 @@
-import React, { useState, useRef, useEffect, DragEvent } from 'react';
-import { Project } from '@/types/project';
-import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  DragEvent,
+} from 'react';
+import { Project, ProjectDepartment } from '@/types/project';
+import { ProjectCard } from '@/components/Common/ProjectCard/ProjectCard';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectKanbanView.module.scss';
-
-type ProjectStatus = 'coming_up' | 'design' | 'development' | 'out_to_client' | 'waiting_on_client' | 'bill_client';
 
 interface ProjectKanbanViewProps {
   projects: Project[];
+  departments: ProjectDepartment[];
+  taskStatsByProject?: Record<string, { completed: number; total: number }>;
+  userTaskStatsByProject?: Record<string, { completed: number; total: number }>;
   onProjectClick: (project: Project) => void;
   onUpdateProject: (project: Project) => void;
+  onToggleStar?: (projectId: string) => void;
 }
 
 interface Column {
-  id: ProjectStatus;
+  id: string;
   title: string;
-  color: string;
+  icon?: string | null;
 }
 
-const columns: Column[] = [
-  { id: 'coming_up', title: 'Coming Up', color: '#6b7280' },
-  { id: 'design', title: 'Design', color: '#8b5cf6' },
-  { id: 'development', title: 'Development', color: '#3b82f6' },
-  { id: 'out_to_client', title: 'Out To Client', color: '#f59e0b' },
-  { id: 'waiting_on_client', title: 'Waiting On Client', color: '#ef4444' },
-  { id: 'bill_client', title: 'Bill Client', color: '#10b981' },
-];
+export function ProjectKanbanView({
+  projects,
+  departments,
+  taskStatsByProject,
+  userTaskStatsByProject,
+  onProjectClick,
+  onUpdateProject,
+  onToggleStar,
+}: ProjectKanbanViewProps) {
+  // Simple drag state
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [draggedFromColumn, setDraggedFromColumn] = useState<string | null>(
+    null
+  );
+  const [dropToColumn, setDropToColumn] = useState<string | null>(null);
 
-export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }: ProjectKanbanViewProps) {
-  const [draggedProject, setDraggedProject] = useState<Project | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<ProjectStatus | null>(null);
-  const [columnScrollStates, setColumnScrollStates] = useState<Record<ProjectStatus, boolean>>({
-    'coming_up': false,
-    'design': false,
-    'development': false,
-    'out_to_client': false,
-    'waiting_on_client': false,
-    'bill_client': false,
-  });
+  // Auto-scroll state
+  const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  // Click-and-drag scroll state
+  const [isMouseDown, setIsMouseDown] = useState(false);
+  const [startX, setStartX] = useState(0);
+  const [scrollLeft, setScrollLeft] = useState(0);
+
+  // Build columns from departments
+  const columns: Column[] = useMemo(() => [
+    ...departments.map(dept => ({
+      id: dept.id,
+      title: dept.name,
+      icon: dept.icon,
+    })),
+  ], [departments]);
+
+  // Scroll state
+  const [columnScrollStates, setColumnScrollStates] = useState<
+    Record<string, boolean>
+  >({});
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const columnRefs = useRef<Record<ProjectStatus, HTMLDivElement | null>>({
-    'coming_up': null,
-    'design': null,
-    'development': null,
-    'out_to_client': null,
-    'waiting_on_client': null,
-    'bill_client': null,
-  });
-  const scrollAnimationRef = useRef<number | null>(null);
-  const scrollSpeedRef = useRef<number>(0);
-  const isDraggingRef = useRef<boolean>(false);
+  const viewContentRef = useRef<HTMLDivElement | null>(null);
+  const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const getProjectsByStatus = (status: ProjectStatus): Project[] => {
-    return projects.filter(project => project.status === status);
+  const getProjectsByDepartment = (columnId: string): Project[] => {
+    // Projects assigned to this department
+    const departmentProjects = projects.filter(p => p.current_department_id === columnId);
+
+    // Sort by closest due date at top
+    return [...departmentProjects].sort((a, b) => {
+      // Projects without due dates go to the bottom
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+
+      // Sort by due date (earliest first)
+      const dateA = parseDateString(a.due_date)?.getTime() ?? Infinity;
+      const dateB = parseDateString(b.due_date)?.getTime() ?? Infinity;
+      return dateA - dateB;
+    });
   };
 
-  const handleDragStart = (e: DragEvent<HTMLDivElement>, project: Project) => {
-    setDraggedProject(project);
-    e.dataTransfer.effectAllowed = 'move';
-    isDraggingRef.current = true;
-    scrollSpeedRef.current = 0;
-  };
-
-  const handleDragEnd = () => {
-    setDraggedProject(null);
-    setDragOverColumn(null);
-    isDraggingRef.current = false;
-    scrollSpeedRef.current = 0;
-  };
-
-  const handleDrag = (e: DragEvent<HTMLDivElement>) => {
-    if (!containerRef.current || e.clientX === 0) return;
-
-    const container = containerRef.current;
-    const containerRect = container.getBoundingClientRect();
-    const scrollEdgeSize = 180; // Larger trigger zone (was 100)
-    const maxScrollSpeed = 30; // Faster scroll (was 22)
-
-    // Calculate distance from edges
-    const distanceFromLeft = e.clientX - containerRect.left;
-    const distanceFromRight = containerRect.right - e.clientX;
-
-    // Determine scroll direction and speed with easing
-    let scrollSpeed = 0;
-
-    if (distanceFromLeft < scrollEdgeSize && distanceFromLeft > 0) {
-      // Near left edge - scroll left with ease-out-cubic
-      const ratio = distanceFromLeft / scrollEdgeSize;
-      const easedRatio = 1 - Math.pow(ratio, 3);
-      scrollSpeed = -maxScrollSpeed * easedRatio;
-    } else if (distanceFromRight < scrollEdgeSize && distanceFromRight > 0) {
-      // Near right edge - scroll right with ease-out-cubic
-      const ratio = distanceFromRight / scrollEdgeSize;
-      const easedRatio = 1 - Math.pow(ratio, 3);
-      scrollSpeed = maxScrollSpeed * easedRatio;
-    }
-
-    // Update scroll speed ref (will be read by animation loop)
-    scrollSpeedRef.current = scrollSpeed;
-  };
-
-  const checkColumnScroll = (columnId: ProjectStatus) => {
+  const checkColumnScroll = (columnId: string) => {
     const columnContent = columnRefs.current[columnId];
     if (!columnContent) return;
-
     const { scrollTop, scrollHeight, clientHeight } = columnContent;
-    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10; // 10px threshold
-
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 10;
     setColumnScrollStates(prev => ({
       ...prev,
       [columnId]: !isAtBottom && scrollHeight > clientHeight,
@@ -114,163 +100,278 @@ export function ProjectKanbanView({ projects, onProjectClick, onUpdateProject }:
   };
 
   useEffect(() => {
-    // Check scroll state for all columns on mount and when projects change
-    columns.forEach(column => {
-      checkColumnScroll(column.id);
-    });
-  }, [projects]);
+    columns.forEach(column => checkColumnScroll(column.id));
+  }, [projects, columns]);
 
+  // Find and store reference to parent .viewContent container
   useEffect(() => {
-    // Continuous scroll animation loop
-    const scrollLoop = () => {
-      if (isDraggingRef.current && containerRef.current) {
-        const speed = scrollSpeedRef.current;
-        if (speed !== 0) {
-          containerRef.current.scrollLeft += speed;
-        }
+    if (containerRef.current) {
+      // Find parent with class containing "viewContent"
+      const viewContentElement = containerRef.current.closest('[class*="viewContent"]') as HTMLDivElement;
+      viewContentRef.current = viewContentElement;
+    }
+  }, []);
+
+  // Auto-scroll when dragging near edges
+  const handleDragOverContainer = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      if (!isDragging) return;
+
+      const container = containerRef.current;
+      if (!container) return;
+
+      const containerRect = container.getBoundingClientRect();
+      const scrollZoneWidth = 100; // pixels from edge to trigger scroll
+      const scrollSpeed = 15; // pixels per interval
+
+      const mouseX = e.clientX - containerRect.left;
+
+      // Clear any existing interval
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+        autoScrollIntervalRef.current = null;
       }
-      scrollAnimationRef.current = requestAnimationFrame(scrollLoop);
-    };
 
-    // Start the loop
-    scrollAnimationRef.current = requestAnimationFrame(scrollLoop);
+      // Check if near left edge
+      if (mouseX < scrollZoneWidth && container.scrollLeft > 0) {
+        autoScrollIntervalRef.current = setInterval(() => {
+          if (container.scrollLeft > 0) {
+            container.scrollLeft -= scrollSpeed;
+          } else if (autoScrollIntervalRef.current) {
+            clearInterval(autoScrollIntervalRef.current);
+            autoScrollIntervalRef.current = null;
+          }
+        }, 50);
+      }
+      // Check if near right edge
+      else if (
+        mouseX > containerRect.width - scrollZoneWidth &&
+        container.scrollLeft + container.clientWidth < container.scrollWidth
+      ) {
+        autoScrollIntervalRef.current = setInterval(() => {
+          if (
+            container.scrollLeft + container.clientWidth <
+            container.scrollWidth
+          ) {
+            container.scrollLeft += scrollSpeed;
+          } else if (autoScrollIntervalRef.current) {
+            clearInterval(autoScrollIntervalRef.current);
+            autoScrollIntervalRef.current = null;
+          }
+        }, 50);
+      }
+    },
+    [isDragging]
+  );
 
-    // Cleanup on unmount
+  // Clean up auto-scroll interval
+  useEffect(() => {
     return () => {
-      if (scrollAnimationRef.current) {
-        cancelAnimationFrame(scrollAnimationRef.current);
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+        autoScrollIntervalRef.current = null;
       }
     };
   }, []);
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+  // Click-and-drag scroll handlers
+  const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only start drag if clicking on the container itself, not on cards
+    const target = e.target as HTMLElement;
+    if (
+      target.closest(`.${styles.projectCard}`) ||
+      target.closest(`.${styles.draggableProject}`)
+    ) {
+      return;
+    }
+
+    const viewContent = viewContentRef.current;
+    if (!viewContent) return;
+
+    setIsMouseDown(true);
+    setStartX(e.clientX); // Use clientX for more accurate positioning
+    setScrollLeft(viewContent.scrollLeft);
+  };
+
+  const handleMouseLeave = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseUp = () => {
+    setIsMouseDown(false);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!isMouseDown) return;
+    e.preventDefault();
+
+    const viewContent = viewContentRef.current;
+    if (!viewContent) return;
+
+    const x = e.clientX;
+    const distance = startX - x; // Calculate how far we've moved
+    viewContent.scrollLeft = scrollLeft + distance;
+  };
+
+  // Drag handlers
+  const handleDragStart = (
+    e: DragEvent<HTMLDivElement>,
+    projectId: string,
+    columnId: string
+  ) => {
+    setDraggedId(projectId);
+    setDraggedFromColumn(columnId);
+    setIsDragging(true);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragEnd = () => {
+    // Clear auto-scroll interval
+    if (autoScrollIntervalRef.current) {
+      clearInterval(autoScrollIntervalRef.current);
+      autoScrollIntervalRef.current = null;
+    }
+
+    // Handle department change when dragging between columns
+    if (
+      draggedId &&
+      dropToColumn &&
+      draggedFromColumn !== dropToColumn
+    ) {
+      const draggedProject = projects.find(p => p.id === draggedId);
+      if (draggedProject && onUpdateProject) {
+        onUpdateProject({
+          ...draggedProject,
+          current_department_id: dropToColumn,
+        });
+      }
+    }
+
+    // Reset all drag state
+    setDraggedId(null);
+    setDraggedFromColumn(null);
+    setDropToColumn(null);
+    setIsDragging(false);
+  };
+
+  const handleColumnDragOver = (
+    e: DragEvent<HTMLDivElement>,
+    columnId: string
+  ) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    setDropToColumn(columnId);
   };
 
-  const handleDragEnter = (status: ProjectStatus) => {
-    setDragOverColumn(status);
-  };
-
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
-    if (e.currentTarget === e.target) {
-      setDragOverColumn(null);
-    }
-  };
-
-  const handleDrop = (e: DragEvent<HTMLDivElement>, newStatus: ProjectStatus) => {
+  const handleColumnDrop = (e: DragEvent<HTMLDivElement>, columnId: string) => {
     e.preventDefault();
-
-    if (draggedProject && draggedProject.status !== newStatus) {
-      const updatedProject: Project = {
-        ...draggedProject,
-        status: newStatus,
-        updated_at: new Date().toISOString(),
-      };
-
-      onUpdateProject(updatedProject);
-    }
-
-    setDraggedProject(null);
-    setDragOverColumn(null);
-  };
-
-  const formatDate = (dateString: string): string => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const getStatusColor = (status: string) => {
-    const statusColors: { [key: string]: string } = {
-      planning: '#6b7280',
-      active: '#3b82f6',
-      'on-hold': '#f59e0b',
-      completed: '#10b981',
-      archived: '#9ca3af',
-    };
-    return statusColors[status] || '#6b7280';
+    setDropToColumn(columnId);
+    // The actual department change happens in handleDragEnd
   };
 
   return (
-    <div ref={containerRef} className={styles.kanbanContainer}>
-      <div className={styles.kanbanBoard}>
-        {columns.map((column) => {
-          const columnProjects = getProjectsByStatus(column.id);
-          const isDragOver = dragOverColumn === column.id;
+    <div className={styles.kanbanWrapper}>
+      <div
+        ref={containerRef}
+        className={`${styles.kanbanContainer} ${styles.departmentView}`}
+        onDragOver={handleDragOverContainer}
+        onMouseDown={handleMouseDown}
+        onMouseLeave={handleMouseLeave}
+        onMouseUp={handleMouseUp}
+        onMouseMove={handleMouseMove}
+      >
+        <div className={`${styles.kanbanBoard} ${styles.departmentView}`}>
+          {columns.map(column => {
+            const columnProjects = getProjectsByDepartment(column.id);
+            const hasUnreadMentions = columnProjects.some(project => project.has_unread_mentions);
+            const isColumnDropTarget =
+              isDragging &&
+              dropToColumn === column.id &&
+              draggedFromColumn !== column.id;
 
-          return (
-            <div
-              key={column.id}
-              className={`${styles.kanbanColumn} ${isDragOver ? styles.dragOver : ''}`}
-              onDragOver={handleDragOver}
-              onDragEnter={() => handleDragEnter(column.id)}
-              onDragLeave={handleDragLeave}
-              onDrop={(e) => handleDrop(e, column.id)}
-            >
-              <div className={styles.columnHeader}>
-                <div className={styles.columnTitle} style={{ color: column.color }}>
-                  {column.title}
-                </div>
-                <div className={styles.columnCount}>{columnProjects.length}</div>
-              </div>
-
+            return (
               <div
-                ref={(el) => { columnRefs.current[column.id] = el; }}
-                className={styles.columnContent}
-                onScroll={() => checkColumnScroll(column.id)}
+                key={column.id}
+                className={`${styles.kanbanColumnWrapper} ${styles.departmentView}`}
               >
-                {columnProjects.map((project) => {
-                  return (
-                    <div
-                      key={project.id}
-                      className={styles.draggableProject}
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, project)}
-                      onDragEnd={handleDragEnd}
-                      onDrag={handleDrag}
-                      onClick={() => onProjectClick(project)}
-                    >
-                      <div className={styles.projectCard}>
-                        <div className={styles.projectHeader}>
-                          <h3 className={styles.projectName}>{project.name}</h3>
-                          <ProjectBadge
-                            projectName={project.name}
-                            projectType={project.project_type as any}
-                            size="small"
+                <div className={styles.columnHeader}>
+                  <div className={styles.columnHeaderRow}>
+                    <span className={styles.columnTitle}>
+                      {column.icon && <span className={styles.columnIcon}>{column.icon}</span>}
+                      {column.title}
+                    </span>
+                    <span className={styles.columnCount}>
+                      ({columnProjects.length})
+                    </span>
+                  </div>
+                  <span
+                    className={`${styles.columnNewComments} ${!hasUnreadMentions ? styles.columnNewCommentsPlaceholder : ''}`}
+                    aria-hidden={!hasUnreadMentions}
+                  >
+                    Unread Comments
+                  </span>
+                </div>
+
+                <div
+                  className={`${styles.kanbanColumn} ${styles.departmentColumn} ${isColumnDropTarget ? styles.columnDropTarget : ''}`}
+                  onDragOver={e => handleColumnDragOver(e, column.id)}
+                  onDrop={e => handleColumnDrop(e, column.id)}
+                >
+                  <div
+                    ref={el => {
+                      columnRefs.current[column.id] = el;
+                    }}
+                    className={styles.columnContent}
+                    onScroll={() => checkColumnScroll(column.id)}
+                  >
+                    {columnProjects.map(project => {
+                      const isDraggedProject = draggedId === project.id;
+
+                      return (
+                        <div
+                          key={project.id}
+                          className={`
+                          ${styles.draggableProject}
+                          ${styles.draggable}
+                          ${isDraggedProject ? styles.dragging : ''}
+                        `}
+                          draggable={true}
+                          onDragStart={e => handleDragStart(e, project.id, column.id)}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <ProjectCard
+                            project={project}
+                            taskStats={taskStatsByProject?.[project.id]}
+                            userTaskStats={userTaskStatsByProject?.[project.id]}
+                            onToggleStar={onToggleStar}
+                            onProjectClick={onProjectClick}
+                            onStatusChange={(proj, newStatus) => {
+                              onUpdateProject({
+                                ...proj,
+                                status: newStatus as Project['status'],
+                              });
+                            }}
                           />
                         </div>
+                      );
+                    })}
 
-                        <div className={styles.projectClient}>
-                          {project.company.name}
-                        </div>
-
-                        <div className={styles.projectFooter}>
-                          <div className={styles.projectPriority}>
-                            <span className={styles.priorityText}>
-                              {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
-                            </span>
-                          </div>
-                          <div className={styles.projectDeadline}>
-                            Due: {formatDate(project.due_date)}
-                          </div>
-                        </div>
+                    {columnProjects.length === 0 && (
+                      <div className={styles.emptyColumn}>
+                        No projects in this department
                       </div>
-                    </div>
-                  );
-                })}
-
-                {columnProjects.length === 0 && (
-                  <div className={styles.emptyColumn}>
-                    No projects in this phase
+                    )}
                   </div>
-                )}
+
+                  {columnScrollStates[column.id] && (
+                    <div className={styles.scrollGradient} />
+                  )}
+                </div>
+
               </div>
-              {columnScrollStates[column.id] && (
-                <div className={styles.scrollGradient} />
-              )}
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

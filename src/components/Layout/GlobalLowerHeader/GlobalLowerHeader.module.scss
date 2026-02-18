@@ -3,13 +3,20 @@
   padding: 16px 0;
   border-bottom: 1px solid #e5e5e5;
   background-color: var(--white);
+  position: relative;
+  z-index: 50;
+  transition: box-shadow 0.2s ease;
+}
+
+.globalLowerHeaderScrolled {
+  box-shadow: 0 4px 6px color-mix(in srgb, var(--gray-200) 60%, transparent);
 }
 
 .headerContent {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  max-width: 1240px;
+  max-width: 1309px;
   margin: 0 auto;
   gap: 24px;
 }
@@ -23,7 +30,8 @@
 .controlsSection {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 24px;
+  margin-left: auto;
 }
 
 .controlGroup {
@@ -46,14 +54,21 @@
   white-space: nowrap;
 }
 
+.iconOnlyLabel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .controlDropdown {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: 40px;
   padding: 6px 12px;
   background: var(--white);
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
   font-family:
@@ -83,6 +98,30 @@
   text-align: left;
 }
 
+.companyControlDropdown {
+  min-width: max-content;
+}
+
+.companyControlValue {
+  white-space: nowrap;
+}
+
+.categoryControlDropdown {
+  min-width: max-content;
+}
+
+.categoryControlValue {
+  white-space: nowrap;
+}
+
+.usersControlDropdown {
+  min-width: max-content;
+}
+
+.usersControlValue {
+  white-space: nowrap;
+}
+
 .assignedToContent {
   display: flex;
   align-items: center;
@@ -107,7 +146,7 @@
   right: 0;
   background: var(--white);
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -115,6 +154,55 @@
   overflow: hidden;
   max-height: 300px;
   overflow-y: auto;
+}
+
+.companyDropdownMenu {
+  width: min-content;
+  min-width: 100%;
+}
+
+.categoryDropdownMenu {
+  width: min-content;
+  min-width: 100%;
+}
+
+.usersDropdownMenu {
+  width: min-content;
+  min-width: 100%;
+}
+
+.searchContainer {
+  padding: 8px;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--white);
+  sticky: top;
+  top: 0;
+  z-index: 1;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-family:
+    'Satoshi Variable',
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  font-size: 14px;
+  color: var(--gray-700);
+  outline: none;
+  transition: border-color 0.2s ease;
+
+  &:focus {
+    border-color: var(--action-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
 }
 
 .dropdownOption {
@@ -148,6 +236,18 @@
     outline: none;
     background-color: var(--gray-100);
   }
+}
+
+.companyDropdownOption {
+  white-space: nowrap;
+}
+
+.categoryDropdownOption {
+  white-space: nowrap;
+}
+
+.usersDropdownOption {
+  white-space: nowrap;
 }
 
 .optionContent {
@@ -222,6 +322,53 @@
   margin: 0;
 }
 
+.backButton {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius);
+  border: 1px solid var(--gray-200);
+  background: var(--gray-200);
+  color: var(--gray-700);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-500);
+    border-color: var(--gray-500);
+    color: var(--white);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.leftSectionWithLeading {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 16px;
+}
+
+.titleLeading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.titleStack {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .description {
   font-family:
     'Satoshi Variable',
@@ -239,12 +386,21 @@
   span {
     color: var(--gray-900);
   }
+
+  .updatedText {
+    color: var(--gray-500);
+  }
+}
+
+.updatedText {
+  color: var(--gray-500);
 }
 
 .rightSection {
   display: flex;
   align-items: center;
   gap: 17px;
+  flex-shrink: 0;
 }
 
 // Filter styles
@@ -260,7 +416,7 @@
   min-width: 225px;
   background: var(--gray-100);
   border: 1px solid var(--gray-100);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   cursor: pointer;
   transition: all 0.2s ease;
 
@@ -309,7 +465,7 @@
   min-width: 160px;
   background: var(--white);
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   box-shadow:
     0 10px 15px -3px rgba(0, 0, 0, 0.1),
     0 4px 6px -2px rgba(0, 0, 0, 0.05);
@@ -357,7 +513,7 @@
   padding: 9px 16px 9px 12px;
   align-items: center;
   gap: 4px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: var(--action-600);
   color: var(--white);
   border: none;
@@ -386,6 +542,26 @@
     font-size: 14px;
     font-weight: 600;
   }
+}
+
+.deleteButton {
+  background: #dc2626;
+
+  &:hover:not(:disabled) {
+    background: #b91c1c;
+  }
+
+  &:focus:not(:disabled) {
+    box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.3);
+  }
+}
+
+.iconOnlyButton {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  justify-content: center;
+  border-radius: var(--border-radius);
 }
 
 // Responsive design

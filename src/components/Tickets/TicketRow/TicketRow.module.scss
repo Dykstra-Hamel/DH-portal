@@ -2,7 +2,7 @@
   display: flex;
   padding: 20px 16px;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: var(--white);
   box-shadow: var(--box-shadow-card);
   margin-bottom: 8px;
@@ -147,7 +147,7 @@
   font-size: 14px;
   font-weight: 700;
   line-height: 14px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: var(--UX-Colors-Primary-Colors-Primary---100, #e0f2fe);
   padding: 9px 16px;
   border: none;

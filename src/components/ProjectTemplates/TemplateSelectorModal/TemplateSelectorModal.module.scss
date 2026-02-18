@@ -18,7 +18,7 @@
 .typeFilter {
   padding: 10px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-family: var(--font-satoshi);
   color: var(--gray-800);
@@ -89,7 +89,7 @@
   background: white;
   color: var(--gray-800);
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 550;
   font-family: var(--font-satoshi);
@@ -203,7 +203,7 @@
   background: var(--action-500);
   color: white;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 13px;
   font-weight: 700;
   font-family: var(--font-satoshi);
@@ -229,7 +229,7 @@
   color: var(--gray-800);
   padding: 8px 16px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-satoshi);

@@ -15,34 +15,40 @@ export type TaskRelatedEntityType =
 export interface Task {
   id: string;
   company_id: string;
-  
+
   // Core task fields
   title: string;
   description?: string;
   notes?: string;
-  
+
   // Task workflow and status
   status: TaskStatus;
   priority: TaskPriority;
-  
+
   // Assignment and tracking
   assigned_to?: string;
   created_by?: string;
-  
+
   // Timing and scheduling
   due_date?: string; // ISO date string
   due_time?: string; // HH:MM format
   estimated_hours?: number;
   actual_hours?: number;
-  
+
   // Polymorphic relationship to any entity
   related_entity_type?: TaskRelatedEntityType;
   related_entity_id?: string;
-  
+
+  // Cadence automation link (if this task is from a cadence step)
+  cadence_step_id?: string;
+
+  // Monthly service link (if this task is generated from a monthly service)
+  monthly_service_id?: string;
+
   // Task completion tracking
   completed_at?: string;
   started_at?: string;
-  
+
   // Standard fields
   archived: boolean;
   created_at: string;
@@ -65,7 +71,7 @@ export interface Task {
     id: string;
     name: string;
   };
-  
+
   // Related entity data (populated based on related_entity_type)
   related_entity?: {
     id: string;
@@ -74,6 +80,12 @@ export interface Task {
     summary?: string;
     status?: string;
     type?: string;
+  };
+
+  // Monthly service data (if task is from a monthly service)
+  monthly_service?: {
+    id: string;
+    service_name: string;
   };
 }
 

@@ -1,5 +1,8 @@
 .wideModal {
   max-width: 1000px !important;
+  form {
+    width: 100%;
+  }
 }
 
 .modalContent {
@@ -49,7 +52,7 @@
 .textarea {
   padding: 10px 12px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-family: var(--font-satoshi);
   color: var(--gray-800);
@@ -77,6 +80,26 @@
   cursor: pointer;
 }
 
+.checkboxWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 0;
+
+  input[type='checkbox'] {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: var(--action-500);
+  }
+}
+
+.checkboxLabel {
+  font-size: 14px;
+  color: var(--gray-700);
+  cursor: pointer;
+}
+
 .textarea {
   resize: vertical;
   min-height: 80px;
@@ -94,7 +117,7 @@
   background: white;
   color: #6b7280;
   border: 1.5px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 12px;
   font-weight: 550;
   font-family: var(--font-satoshi);
@@ -143,7 +166,7 @@
   color: white;
   padding: 8px 16px;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-satoshi);
@@ -166,7 +189,7 @@
   color: var(--gray-800);
   padding: 8px 16px;
   border: 1px solid #d1d5db;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-satoshi);
@@ -190,7 +213,7 @@
   color: var(--error-500);
   padding: 8px 16px;
   border: 1px solid var(--error-500);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
   font-weight: 700;
   font-family: var(--font-satoshi);

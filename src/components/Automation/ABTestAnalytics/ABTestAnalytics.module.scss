@@ -61,7 +61,7 @@
       select {
         padding: 0.5rem 0.75rem;
         border: 1px solid #d1d5db;
-        border-radius: 6px;
+        border-radius: var(--border-radius);
         background: white;
         font-size: 0.875rem;
 

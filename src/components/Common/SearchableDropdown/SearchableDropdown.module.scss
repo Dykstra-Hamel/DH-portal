@@ -12,7 +12,7 @@
   width: 100%;
   padding: 8px 40px 8px 12px;
   border: 1px solid var(--gray-300);
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   background: white;
   font-size: 14px;
   font-weight: 450;
@@ -89,7 +89,7 @@
   background: white;
   border: 1px solid var(--gray-300);
   border-top: none;
-  border-radius: 0 0 6px 6px;
+  border-radius: 0 0 var(--border-radius) var(--border-radius);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   max-height: 200px;
   overflow-y: auto;
@@ -110,11 +110,11 @@
 
   &:last-child {
     border-bottom: none;
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
   }
 
   &:first-child:last-child {
-    border-radius: 0 0 6px 6px;
+    border-radius: 0 0 var(--border-radius) var(--border-radius);
   }
 }
 

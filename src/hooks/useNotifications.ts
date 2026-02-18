@@ -102,13 +102,13 @@ export function useNotifications() {
         .on('broadcast', { event: 'notification_update' }, (payload: any) => {
           const { action, notification, company_id } = payload.payload;
 
-          // Verify this is for our company
-          if (company_id !== companyId) {
+          // Only process notifications for the current user
+          if (notification.user_id !== userId) {
             return;
           }
 
-          // Only process notifications for the current user
-          if (notification.user_id !== userId) {
+          // Verify this is for our company OR it's a mention notification (global)
+          if (company_id !== companyId && notification.type !== 'mention') {
             return;
           }
 
@@ -284,7 +284,7 @@ export function useNotifications() {
 
   // Navigate to notification reference
   const navigateToReference = useCallback(
-    (notification: Notification) => {
+    async (notification: Notification) => {
       if (!notification.reference_id || !notification.reference_type) {
         return;
       }
@@ -312,6 +312,50 @@ export function useNotifications() {
           break;
         case 'customer':
           router.push(`/customers/${notification.reference_id}`);
+          break;
+        case 'project_comment':
+          try {
+            const response = await fetch(
+              `/api/admin/notifications/comment-reference?type=project_comment&commentId=${notification.reference_id}`
+            );
+            if (!response.ok) {
+              throw new Error('Failed to resolve project comment');
+            }
+            const data = await response.json();
+            if (data.projectId) {
+              router.push(
+                `/admin/project-management/${data.projectId}?commentId=${notification.reference_id}`
+              );
+            } else {
+              router.push('/admin/project-management');
+            }
+          } catch (error) {
+            console.error('Error resolving project comment notification:', error);
+            router.push('/admin/project-management');
+          }
+          break;
+        case 'task_comment':
+          try {
+            const response = await fetch(
+              `/api/admin/notifications/comment-reference?type=task_comment&commentId=${notification.reference_id}`
+            );
+            if (!response.ok) {
+              throw new Error('Failed to resolve task comment');
+            }
+            const data = await response.json();
+            if (data.projectId && data.taskId) {
+              router.push(
+                `/admin/project-management/${data.projectId}?taskId=${data.taskId}&commentId=${notification.reference_id}`
+              );
+            } else if (data.projectId) {
+              router.push(`/admin/project-management/${data.projectId}`);
+            } else {
+              router.push('/admin/project-management');
+            }
+          } catch (error) {
+            console.error('Error resolving task comment notification:', error);
+            router.push('/admin/project-management');
+          }
           break;
         default:
           console.warn('Unknown reference type:', notification.reference_type);

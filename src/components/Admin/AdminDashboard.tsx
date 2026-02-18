@@ -19,6 +19,8 @@ import FormAnalytics from './FormAnalytics';
 import TemplateLibraryManager from './TemplateLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
+import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
+import InternalDepartmentSettings from '../ProjectManagement/DepartmentSettings/InternalDepartmentSettings';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -45,7 +47,8 @@ type SystemSubsection =
   | 'widgets'
   | 'pest-management'
   | 'calling'
-  | 'sms-testing';
+  | 'sms-testing'
+  | 'project-settings';
 
 type AdminSubsection =
   | UserSubsection
@@ -169,6 +172,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'widgets', label: 'Widget Config', legacySection: 'widgets' },
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
       { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
+      { id: 'project-settings', label: 'Project Management' },
     ],
   },
 ];
@@ -264,6 +268,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               </Link>{' '}
               to view the cross-company pest pressure dashboard.
             </p>
+          </div>
+        );
+      case 'project-settings':
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+            <InternalDepartmentSettings />
+            <InternalCategorySettings />
           </div>
         );
       default:

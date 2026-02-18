@@ -71,7 +71,7 @@ export function generateCallSummaryEmailTemplate(
         <div style="padding: 32px;">
 
           <!-- Call Overview -->
-          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
             <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
               📊 Call Overview
             </h3>
@@ -112,7 +112,7 @@ export function generateCallSummaryEmailTemplate(
 
           ${customerName || customerEmail || streetAddress ? `
             <!-- Customer Information -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
               <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
                 👤 Customer Information
               </h3>
@@ -144,7 +144,7 @@ export function generateCallSummaryEmailTemplate(
 
           ${pestIssue || homeSize || yardSize || decisionMaker || preferredServiceTime ? `
             <!-- Service Details -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
               <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
                 🏠 Service Information
               </h3>
@@ -197,7 +197,7 @@ export function generateCallSummaryEmailTemplate(
 
           ${callSummary ? `
             <!-- Call Summary -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 20px; margin-bottom: 24px;">
+            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
               <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
                 📝 Call Summary
               </h3>
@@ -208,7 +208,7 @@ export function generateCallSummaryEmailTemplate(
 
           ${recordingUrl ? `
             <!-- Recording Access -->
-            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: 6px; padding: 16px; text-align: center; margin-bottom: 24px;">
+            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: var(--border-radius); padding: 16px; text-align: center; margin-bottom: 24px;">
               <p style="margin: 0 0 12px 0; font-size: 14px; color: #92400e;">
                 🎵 <strong>Call Recording Available</strong>
               </p>
@@ -219,7 +219,7 @@ export function generateCallSummaryEmailTemplate(
           ` : ''}
 
           <!-- Metadata -->
-          <div style="background-color: #f8fafc; border-radius: 6px; padding: 16px;">
+          <div style="background-color: #f8fafc; border-radius: var(--border-radius); padding: 16px;">
             <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center;">
               <strong>Call Details:</strong> ${formattedDate} • Duration: ${durationText}
               ${leadId ? ` • Lead ID: ${leadId}` : ''}

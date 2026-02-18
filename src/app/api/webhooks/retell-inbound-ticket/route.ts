@@ -8,6 +8,11 @@ import {
 } from '@/lib/agent-utils';
 import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
 import { CallSummaryEmailData } from '@/lib/email/types';
+import {
+  createOrFindServiceAddress,
+  getCustomerPrimaryServiceAddress,
+  linkCustomerToServiceAddress,
+} from '@/lib/service-addresses';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -346,34 +351,6 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     }
   }
 
-  // Create ticket for inbound calls with 'live' status
-  const { data: newTicket, error: ticketError } = await supabase
-    .from('tickets')
-    .insert({
-      company_id: companyId,
-      customer_id: customerId,
-      source: 'cold_call',
-      type: 'phone_call',
-      call_direction: 'inbound', // Set direction for filtering
-      status: 'live', // Set as 'live' for active calls
-      priority: 'medium',
-      description: `📞 Inbound call started at ${new Date().toISOString()}`,
-      created_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
-
-  if (ticketError) {
-    console.error(
-      `❌ [${requestId}] Ticket creation failed:`,
-      ticketError.message
-    );
-    return NextResponse.json(
-      { error: 'Failed to create ticket' },
-      { status: 500 }
-    );
-  }
-
   // Extract data (will be mostly empty until call_analyzed event)
   const extractedData = extractCallData(
     undefined,
@@ -385,7 +362,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     .from('call_records')
     .insert({
       call_id,
-      ticket_id: newTicket.id, // Link call record to ticket
+      company_id: companyId, // Store company_id for use in call_analyzed
       customer_id: customerId,
       phone_number: customerPhone, // Use normalized phone for consistency
       from_number: rawCustomerPhone, // Keep original format from Retell
@@ -419,27 +396,10 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     );
   }
 
-  // Create bidirectional relationship by updating the ticket with call_record_id
-  const { error: ticketUpdateError } = await supabase
-    .from('tickets')
-    .update({
-      call_record_id: callRecord.id,
-    })
-    .eq('id', newTicket.id);
-
-  if (ticketUpdateError) {
-    console.error(
-      `⚠️ [${requestId}] Failed to create bidirectional link between ticket and call record:`,
-      ticketUpdateError.message
-    );
-    // Don't fail the request - the ticket and call record exist, just not fully linked
-  }
-
   return NextResponse.json({
     success: true,
     call_record_id: callRecord.id,
-    ticket_id: newTicket.id,
-    action: 'inbound_ticket_created',
+    action: 'inbound_call_started',
   });
 }
 
@@ -486,7 +446,7 @@ async function handleInboundCallEnded(supabase: any, callData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('call_id', call_id)
-    .select('*, tickets!call_records_ticket_id_fkey(id, description)')
+    .select('*, tickets!call_records_ticket_id_fkey(id, description, service_address_id)')
     .single();
 
   if (updateError) {
@@ -605,7 +565,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       updated_at: new Date().toISOString(),
     })
     .eq('call_id', call_id)
-    .select('*, tickets!call_records_ticket_id_fkey(id, description)')
+    .select('*, tickets!call_records_ticket_id_fkey(id, description, service_address_id)')
     .single();
 
   if (updateError) {
@@ -619,58 +579,56 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     );
   }
 
-  // Update ticket with analysis and qualification info
-  if (callRecord.tickets) {
-    // Get is_qualified from call analysis (Post-Call Analysis)
-    const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
+  // Only create a ticket if action is required
+  let ticketId: string | null = null;
 
-    const updateData: any = {
-      description: callRecord.tickets.description || '',
-      updated_at: new Date().toISOString(),
-    };
-
-    // Add analysis summary if available
+  if (extractedData.action_required === 'true') {
+    // Build description from analysis
+    let description = `📞 Inbound call - Action Required`;
     if (extractedData.summary) {
-      updateData.description =
-        `${updateData.description}\n\n📊 Call Analysis: ${extractedData.summary}`.trim();
+      description += `\n\n📊 Call Analysis: ${extractedData.summary}`;
     }
 
-    // Update ticket status and category based on AI qualification decision
+    // Determine service_type and add qualification context
+    const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
+    let serviceType = 'Customer Service';
     if (isQualified === 'true' || isQualified === true) {
-      // AI determined this is qualified for sales - set category to sales
-      updateData.type = 'phone_call'; // Keep as phone_call type
-      updateData.service_type = 'Sales'; // Set category to Sales
-      updateData.status = 'new'; // Set to 'new' as requested
-      updateData.description =
-        `${updateData.description}\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`.trim();
+      serviceType = 'Sales';
+      description += `\n\n✅ AI Qualification: QUALIFIED - Category set to Sales`;
     } else if (isQualified === 'false' || isQualified === false) {
-      // AI determined this is not qualified for sales - set as customer service
-      updateData.service_type = 'Customer Service';
-      updateData.status = 'new'; // Set to 'new' as requested
-      updateData.description =
-        `${updateData.description}\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`.trim();
-    } else {
-      // No qualification decision provided - set as new for follow-up
-      updateData.status = 'new'; // Set to 'new' as requested
+      description += `\n\n❌ AI Qualification: UNQUALIFIED - Category set to Customer Service`;
     }
+    description += `\n\n🔄 Action Required: TRUE - Follow-up needed`;
 
-    // Check action_required and override status if needed
-    if (extractedData.action_required === 'false') {
-      updateData.status = 'closed';
-      updateData.description =
-        `${updateData.description}\n\n🔒 Action Required: FALSE - Ticket closed automatically`.trim();
-    } else if (extractedData.action_required === 'true') {
-      updateData.description =
-        `${updateData.description}\n\n🔄 Action Required: TRUE - Follow-up needed`.trim();
-    }
-
-    // Add pest_type from extracted data
-    updateData.pest_type = extractedData.pest_issue;
-
-    await supabase
+    const { data: newTicket, error: ticketError } = await supabase
       .from('tickets')
-      .update(updateData)
-      .eq('id', callRecord.tickets.id);
+      .insert({
+        company_id: callRecord.company_id,
+        customer_id: callRecord.customer_id,
+        source: 'cold_call',
+        type: 'phone_call',
+        call_direction: 'inbound',
+        call_record_id: callRecord.id,
+        status: 'new',
+        priority: 'medium',
+        service_type: serviceType,
+        pest_type: extractedData.pest_issue,
+        description: description.trim(),
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (!ticketError && newTicket) {
+      ticketId = newTicket.id;
+      // Link call_record back to the new ticket
+      await supabase
+        .from('call_records')
+        .update({ ticket_id: ticketId })
+        .eq('id', callRecord.id);
+    } else {
+      console.error(`❌ Failed to create inbound ticket:`, ticketError?.message);
+    }
   }
 
   // Update customer data conditionally - only update if customer doesn't have existing data
@@ -678,7 +636,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     // Get existing customer data first
     const { data: existingCustomer, error: customerFetchError } = await supabase
       .from('customers')
-      .select('id, first_name, last_name, address, city, state, zip_code')
+      .select('id, first_name, last_name, address, city, state, zip_code, company_id')
       .eq('id', callRecord.customer_id)
       .single();
 
@@ -774,6 +732,74 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
           console.error('Customer update failed:', customerUpdateError.message);
         }
       }
+
+      const primaryServiceAddress = await getCustomerPrimaryServiceAddress(
+        existingCustomer.id
+      );
+      if (!primaryServiceAddress.serviceAddress && existingCustomer.company_id) {
+        let serviceAddressId: string | null = null;
+
+        if (!serviceAddressId) {
+          const streetAddress = isValidValue(customerStreetAddress)
+            ? customerStreetAddress.trim()
+            : existingCustomer.address?.trim() || '';
+          const city = isValidValue(customerCity)
+            ? customerCity.trim()
+            : existingCustomer.city?.trim() || '';
+          const state = isValidValue(customerState)
+            ? customerState.trim()
+            : existingCustomer.state?.trim() || '';
+          const zip = isValidValue(customerZip)
+            ? customerZip.trim()
+            : existingCustomer.zip_code?.trim() || '';
+          const hasAddressData = [streetAddress, city, state, zip].some(
+            value => value !== ''
+          );
+
+          if (hasAddressData) {
+            const serviceAddressResult = await createOrFindServiceAddress(
+              existingCustomer.company_id,
+              {
+                street_address: streetAddress || undefined,
+                city: city || undefined,
+                state: state || undefined,
+                zip_code: zip || undefined,
+              }
+            );
+
+            if (
+              serviceAddressResult.success &&
+              serviceAddressResult.serviceAddressId
+            ) {
+              serviceAddressId = serviceAddressResult.serviceAddressId;
+            }
+          }
+        }
+
+        if (serviceAddressId) {
+          const linkResult = await linkCustomerToServiceAddress(
+            existingCustomer.id,
+            serviceAddressId,
+            'owner',
+            true
+          );
+
+          if (!linkResult.success && linkResult.error) {
+            console.warn(
+              'Failed to link service address to customer:',
+              linkResult.error
+            );
+          }
+
+          if (ticketId) {
+            await supabase
+              .from('tickets')
+              .update({ service_address_id: serviceAddressId })
+              .eq('id', ticketId)
+              .is('service_address_id', null);
+          }
+        }
+      }
     }
   }
 
@@ -784,7 +810,8 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         supabase,
         callRecord,
         callData,
-        extractedData
+        extractedData,
+        ticketId
       );
       console.log(
         `[Ticket Notification Emails] Sending email for call ${callData.call_id} - action_required: true`
@@ -903,9 +930,10 @@ function extractCallData(
     extractedData.customer_last_name =
       callAnalysis.custom_analysis_data.customer_last_name || null;
 
-    // Extract action_required field
+    // Extract action_required field (normalize to string to handle boolean true from Retell)
+    const rawActionRequired = callAnalysis.custom_analysis_data.action_required;
     extractedData.action_required =
-      callAnalysis.custom_analysis_data.action_required || null;
+      rawActionRequired != null ? String(rawActionRequired) : null;
   }
 
   // Extract sentiment and summary from call analysis (highest priority)
@@ -969,7 +997,9 @@ function extractCallData(
         retellVariables.customer_last_name || null;
     }
     if (!extractedData.action_required) {
-      extractedData.action_required = retellVariables.action_required || null;
+      const rawRetellActionRequired = retellVariables.action_required;
+      extractedData.action_required =
+        rawRetellActionRequired != null ? String(rawRetellActionRequired) : null;
     }
   }
 
@@ -993,7 +1023,8 @@ async function sendTicketNotificationEmailsIfEnabled(
   supabase: any,
   callRecord: any,
   callData: any,
-  extractedData: any
+  extractedData: any,
+  ticketId: string | null = null
 ) {
   const callId = callData.call_id;
 
@@ -1135,9 +1166,7 @@ async function sendTicketNotificationEmailsIfEnabled(
         '',
 
       // Optional fields for tickets
-      leadId: callRecord.tickets?.id
-        ? String(callRecord.tickets.id)
-        : undefined,
+      leadId: ticketId ? String(ticketId) : undefined,
       recordingUrl:
         callData.recording_url || callRecord.recording_url || undefined,
     };

@@ -1,0 +1,56 @@
+.modalContent {
+  padding-bottom: 24px;
+}
+
+.emptyState {
+  color: var(--gray-500, #6a7282);
+  font-size: 14px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.announcementsList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.announcementItem {
+  padding: 16px;
+  background: var(--gray-50, #f9fafb);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 8px;
+}
+
+.announcementHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.announcementTitle {
+  color: var(--gray-900, #161a22);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  margin: 0;
+}
+
+.announcementDate {
+  color: var(--gray-400, #99a1af);
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.announcementContent {
+  color: var(--gray-600, #4a5565);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  margin: 0;
+}

@@ -651,7 +651,7 @@ export async function POST(
       if (ticket.converted_to_support_case_id) {
         // Update the existing support case instead of creating a new one
         const updateData: any = {
-          status: customStatus || (assignedTo ? 'in_progress' : 'new'),
+          status: customStatus || (assignedTo ? 'in_progress' : 'unassigned'),
           priority: ticket.priority || 'medium',
           updated_at: new Date().toISOString(),
         };
@@ -736,7 +736,7 @@ export async function POST(
         description: ticket.description,
         status:
           customStatus ||
-          (assignedTo || ticket.assigned_to ? 'in_progress' : 'new'),
+          (assignedTo || ticket.assigned_to ? 'in_progress' : 'unassigned'),
         priority: ticket.priority || 'medium',
         assigned_to: assignedTo || ticket.assigned_to || null,
         archived: false,

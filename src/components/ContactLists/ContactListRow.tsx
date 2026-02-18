@@ -78,7 +78,7 @@ export default function ContactListRow({ item, onAction }: ContactListRowProps) 
               background: 'var(--gray-50)',
               color: 'var(--gray-900)',
               border: '1px solid var(--gray-300)',
-              borderRadius: '6px',
+              borderRadius: 'var(--border-radius)',
               cursor: 'pointer',
               transition: 'background-color 0.2s ease',
             }}
@@ -101,7 +101,7 @@ export default function ContactListRow({ item, onAction }: ContactListRowProps) 
               background: 'var(--gray-50)',
               color: 'var(--gray-900)',
               border: '1px solid var(--gray-300)',
-              borderRadius: '6px',
+              borderRadius: 'var(--border-radius)',
               cursor: 'pointer',
               transition: 'background-color 0.2s ease',
             }}
@@ -125,7 +125,7 @@ export default function ContactListRow({ item, onAction }: ContactListRowProps) 
                 background: 'var(--gray-50)',
                 color: 'var(--gray-900)',
                 border: '1px solid var(--gray-300)',
-                borderRadius: '6px',
+                borderRadius: 'var(--border-radius)',
                 cursor: 'pointer',
                 transition: 'background-color 0.2s ease',
               }}
@@ -149,7 +149,7 @@ export default function ContactListRow({ item, onAction }: ContactListRowProps) 
                 background: 'var(--gray-50)',
                 color: 'var(--gray-900)',
                 border: '1px solid var(--gray-300)',
-                borderRadius: '6px',
+                borderRadius: 'var(--border-radius)',
                 cursor: 'pointer',
                 transition: 'background-color 0.2s ease',
               }}

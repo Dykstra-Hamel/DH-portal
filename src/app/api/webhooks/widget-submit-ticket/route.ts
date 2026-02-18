@@ -8,6 +8,12 @@ import {
   createCorsErrorResponse,
   validateOrigin,
 } from '@/lib/cors';
+import {
+  createOrFindServiceAddress,
+  extractAddressData,
+  getCustomerPrimaryServiceAddress,
+  linkCustomerToServiceAddress,
+} from '@/lib/service-addresses';
 
 
 export async function OPTIONS(request: NextRequest) {
@@ -238,6 +244,80 @@ export async function POST(request: NextRequest) {
       customerId = newCustomer.id;
     }
 
+    let serviceAddressId: string | null = null;
+    const primaryServiceAddress = await getCustomerPrimaryServiceAddress(
+      customerId
+    );
+
+    if (primaryServiceAddress.serviceAddress?.id) {
+      serviceAddressId = primaryServiceAddress.serviceAddress.id;
+    } else {
+      if (partialLead?.service_address_id) {
+        serviceAddressId = partialLead.service_address_id;
+      } else {
+        const parsedAddressData = extractAddressData(
+          submission.addressDetails,
+          submission.address,
+          submission.coordinates
+            ? {
+                latitude: submission.coordinates.latitude,
+                longitude: submission.coordinates.longitude,
+              }
+            : undefined
+        );
+        const fallbackAddressData = {
+          street_address: submission.addressDetails?.street || submission.address || undefined,
+          city: submission.addressDetails?.city || undefined,
+          state: submission.addressDetails?.state || undefined,
+          zip_code: submission.addressDetails?.zip || undefined,
+          latitude: submission.coordinates?.latitude,
+          longitude: submission.coordinates?.longitude,
+        };
+        const serviceAddressData = parsedAddressData || fallbackAddressData;
+        const hasAddressData = [
+          serviceAddressData.street_address,
+          serviceAddressData.city,
+          serviceAddressData.state,
+          serviceAddressData.zip_code,
+        ].some(value => typeof value === 'string' && value.trim() !== '');
+
+        if (hasAddressData) {
+          const serviceAddressResult = await createOrFindServiceAddress(
+            submission.companyId,
+            serviceAddressData
+          );
+
+          if (
+            serviceAddressResult.success &&
+            serviceAddressResult.serviceAddressId
+          ) {
+            serviceAddressId = serviceAddressResult.serviceAddressId;
+          } else if (serviceAddressResult.error) {
+            console.warn(
+              'Failed to create service address for widget ticket:',
+              serviceAddressResult.error
+            );
+          }
+        }
+      }
+
+      if (serviceAddressId) {
+        const linkResult = await linkCustomerToServiceAddress(
+          customerId,
+          serviceAddressId,
+          'owner',
+          true
+        );
+
+        if (!linkResult.success && linkResult.error) {
+          console.warn(
+            'Failed to link service address to customer:',
+            linkResult.error
+          );
+        }
+      }
+    }
+
     // Set priority to medium for all tickets
     const priority = 'medium';
 
@@ -297,6 +377,7 @@ export async function POST(request: NextRequest) {
           // Service information
           service_type: 'Sales', // Pre-Qualified field for widget submissions
           pest_type: submission.pestType || null,
+          service_address_id: serviceAddressId,
           // Attribution tracking
           partial_lead_id: partialLead?.id || null,
           gclid: submission.gclid || partialLead?.gclid || null,

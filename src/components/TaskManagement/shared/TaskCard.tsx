@@ -3,6 +3,7 @@ import { Task, getUserById, getClientById, getProjectById } from '@/types/taskMa
 import { PriorityBadge } from './PriorityBadge';
 import { ProjectBadge } from './ProjectBadge';
 import { UserAvatar } from './UserAvatar';
+import { parseDateString } from '@/lib/date-utils';
 import styles from './TaskCard.module.scss';
 
 interface TaskCardProps {
@@ -27,7 +28,8 @@ export function TaskCard({
   const project = task.project_id ? getProjectById(task.project_id) : undefined;
 
   const formatDueDate = (dateString: string): string => {
-    const date = new Date(dateString);
+    const date = parseDateString(dateString);
+    if (!date) return 'Not Set';
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
@@ -50,7 +52,8 @@ export function TaskCard({
     if (task.status === 'completed') return false;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const dueDate = new Date(task.due_date);
+    const dueDate = parseDateString(task.due_date);
+    if (!dueDate) return false;
     dueDate.setHours(0, 0, 0, 0);
     return dueDate < today;
   };

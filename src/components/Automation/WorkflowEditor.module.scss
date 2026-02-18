@@ -47,7 +47,7 @@
       border: none;
       background: none;
       color: #64748b;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       cursor: pointer;
       transition: all 0.2s ease;
 
@@ -78,7 +78,7 @@
       border: 1px solid #d1d5db;
       background: white;
       color: #374151;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
@@ -98,7 +98,7 @@
       background: #10b981;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
@@ -122,7 +122,7 @@
       background: #3b82f6;
       color: white;
       border: none;
-      border-radius: 6px;
+      border-radius: var(--border-radius);
       font-size: 14px;
       font-weight: 500;
       cursor: pointer;
@@ -146,7 +146,7 @@
   gap: 8px;
   padding: 12px 16px;
   margin-bottom: 20px;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   font-size: 14px;
 
   &.success {
@@ -206,7 +206,7 @@
     margin-top: 8px;
     padding: 12px;
     background: #f8fafc;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     border: 1px solid #e2e8f0;
 
     .checkbox {
@@ -230,7 +230,7 @@
     width: 100%;
     padding: 8px 12px;
     border: 1px solid #d1d5db;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 14px;
     transition: border-color 0.2s ease;
 
@@ -274,7 +274,7 @@
     background: #f1f5f9;
     color: #475569;
     border: 1px solid #cbd5e1;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     font-size: 13px;
     font-weight: 500;
     cursor: pointer;
@@ -336,7 +336,7 @@
         width: 32px;
         height: 32px;
         background: #f1f5f9;
-        border-radius: 6px;
+        border-radius: var(--border-radius);
         color: #475569;
       }
 
@@ -450,7 +450,7 @@
     align-items: center;
     background: white;
     padding: 8px 12px;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     border: 1px solid #e2e8f0;
 
     .statLabel {
@@ -478,7 +478,7 @@
   padding: 10px 12px;
   background: white;
   border: 1px solid #e2e8f0;
-  border-radius: 6px;
+  border-radius: var(--border-radius);
   margin-bottom: 8px;
 
   .stepNumber {
@@ -527,7 +527,7 @@
   .emailPreview {
     background: white;
     border: 1px solid #e2e8f0;
-    border-radius: 6px;
+    border-radius: var(--border-radius);
     padding: 12px;
     margin-bottom: 8px;
 
