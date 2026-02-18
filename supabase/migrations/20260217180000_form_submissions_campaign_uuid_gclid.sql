@@ -2,7 +2,7 @@
 -- and add a dedicated gclid column for Google Click IDs.
 
 -- Step 1: Add gclid column
-ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS gclid VARCHAR(255);
+ALTER TABLE form_submissions ADD COLUMN IF NOT EXISTS gclid TEXT;
 
 -- Step 2: Migrate non-UUID values from campaign_id to gclid
 -- (These are gclid values that were previously stored in campaign_id)

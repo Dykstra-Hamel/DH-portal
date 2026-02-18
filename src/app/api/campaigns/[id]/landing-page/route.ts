@@ -828,7 +828,7 @@ export async function POST(
         thankyou_greeting: body.thankyou_greeting || 'Thanks {first_name}!',
         thankyou_content: body.thankyou_content || null,
         thankyou_show_expect: body.thankyou_show_expect ?? true,
-        thankyou_expect_heading: body.thankyou_expect_heading || 'What To Expect',
+        thankyou_expect_heading: body.thankyou_expect_heading ?? 'What To Expect',
         thankyou_expect_col1_image: body.thankyou_expect_col1_image || null,
         thankyou_expect_col1_heading: body.thankyou_expect_col1_heading || null,
         thankyou_expect_col1_content: body.thankyou_expect_col1_content || null,

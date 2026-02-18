@@ -9,6 +9,7 @@
 import { useState, useMemo } from 'react';
 import styles from './InlineRedemptionCard.module.scss';
 import { processTextWithVariables, processRedemptionHeading, type VariableContext } from '@/lib/campaign-text-processing';
+import LoadingSpinner from '@/components/CampaignLanding/LoadingSpinner/LoadingSpinner';
 
 interface InlineRedemptionCardProps {
   customer: {
@@ -156,6 +157,8 @@ export default function InlineRedemptionCard({
   };
 
   return (
+    <>
+    {isRedeeming && <LoadingSpinner />}
     <div className={styles.redemptionCard}>
       <div
         className={styles.heading}
@@ -352,5 +355,6 @@ export default function InlineRedemptionCard({
         dangerouslySetInnerHTML={{ __html: processedDisclaimer }}
       />
     </div>
+    </>
   );
 }
