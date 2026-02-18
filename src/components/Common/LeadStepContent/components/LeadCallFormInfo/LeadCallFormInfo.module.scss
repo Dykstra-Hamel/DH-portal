@@ -4,6 +4,9 @@
 }
 
 .callInsightsSection {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--gray-300);
   margin-bottom: 16px;
@@ -122,6 +125,91 @@
   padding: 32px;
   text-align: center;
   color: var(--gray-500);
+}
+
+// Attribution editing styles
+.editButton {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--action-600);
+  padding: 4px 8px;
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--action-50);
+  }
+}
+
+.editForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  input,
+  select {
+    padding: 8px 10px;
+    border: 1px solid var(--gray-300);
+    border-radius: 6px;
+    font-size: 14px;
+    color: var(--gray-900);
+    background: var(--white);
+
+    &:focus {
+      outline: none;
+      border-color: var(--action-500);
+    }
+  }
+}
+
+.editActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cancelButton {
+  padding: 7px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
+.saveButton {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 6px;
+  background: var(--action-600);
+  color: var(--white);
+  font-size: 14px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--action-700);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
 }
 
 @media (max-width: 768px) {

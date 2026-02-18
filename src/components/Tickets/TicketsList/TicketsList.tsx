@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Ticket } from '@/types/ticket';
 import { Search } from 'lucide-react';
-import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import { getTicketColumns, getTicketTabs } from './TicketsListConfig';
@@ -18,7 +17,6 @@ import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 interface TicketsListProps {
   tickets: Ticket[];
-  liveTickets: Ticket[]; // Live tickets for LiveCallBar
   callRecords?: any[]; // For hang-up calls filtering
   loading?: boolean;
   onTicketUpdated?: () => void;
@@ -45,7 +43,6 @@ interface TicketsListProps {
 
 function TicketsList({
   tickets,
-  liveTickets,
   callRecords = [],
   loading = false,
   onTicketUpdated,
@@ -437,9 +434,6 @@ function TicketsList({
           <Search size={18} className={styles.searchIcon} />
         </div>
       </div>
-
-      {/* Live Call Bar */}
-      <LiveCallBar liveTickets={liveTickets} />
 
       {/* DataTable Component */}
       <DataTable

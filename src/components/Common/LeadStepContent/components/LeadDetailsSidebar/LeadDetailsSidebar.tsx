@@ -19,6 +19,7 @@ import {
   NotebookPen,
   Phone,
   TextCursorInput,
+  ClipboardList,
 } from 'lucide-react';
 import { Lead } from '@/types/lead';
 import {
@@ -505,11 +506,15 @@ export function LeadDetailsSidebar({
             title={
               lead.lead_type === 'web_form'
                 ? 'Form Details'
+                : lead.lead_type === 'other' || lead.lead_source === 'campaign'
+                ? 'Attribution Details'
                 : 'Call Information'
             }
             icon={
               lead.lead_type === 'web_form' ? (
                 <TextCursorInput size={20} />
+              ) : lead.lead_type === 'other' || lead.lead_source === 'campaign' ? (
+                <ClipboardList size={20} />
               ) : (
                 <Phone size={20} />
               )
