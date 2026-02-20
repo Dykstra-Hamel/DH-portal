@@ -194,9 +194,15 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                 </h4>
               </div>
               <div className={styles.transcriptContent}>
-                <span className={cardStyles.transcriptText}>
-                  {lead.comments}
-                </span>
+                {lead.lead_source === 'campaign' ? (
+                  <div className={cardStyles.transcriptText}>
+                    {lead.comments.split('\n').map((line, i) =>
+                      line === '' ? <br key={i} /> : <p key={i} className={styles.commentLine}>{line}</p>
+                    )}
+                  </div>
+                ) : (
+                  <span className={cardStyles.transcriptText}>{lead.comments}</span>
+                )}
               </div>
             </div>
           )}

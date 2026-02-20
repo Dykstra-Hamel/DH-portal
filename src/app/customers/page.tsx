@@ -8,7 +8,7 @@ import CustomersList from '@/components/Customers/CustomersList/CustomersList';
 import SearchByLetter from '@/components/Customers/SearchByLetter/SearchByLetter';
 import { AddCustomerModal } from '@/components/Customers/AddCustomerModal/AddCustomerModal';
 import { adminAPI } from '@/lib/api-client';
-import { Customer, CustomerStatus } from '@/types/customer';
+import { Customer } from '@/types/customer';
 import { SortDirection } from '@/types/common';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -31,6 +31,8 @@ export default function CustomersPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('all');
   const [sortKey, setSortKey] = useState('created_at');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [selectedLetter, setSelectedLetter] = useState<string | null>(null);
@@ -88,6 +90,12 @@ export default function CustomersPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
+  // Debounce search query to avoid firing on every keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchCustomers = useCallback(async (page: number = 1, isLoadMore: boolean = false) => {
     if (!selectedCompany && !isAdmin) return;
 
@@ -98,15 +106,21 @@ export default function CustomersPage() {
         setCustomersLoading(true);
       }
 
+      const PAGE_SIZE = 50;
+      const currentOffset = (page - 1) * PAGE_SIZE;
+
       const filters = {
         companyId: selectedCompany?.id,
-        search: searchQuery,
+        search: debouncedSearch,
         sortBy: sortKey,
         sortOrder: sortDirection,
         startsWith: selectedLetter,
+        status: activeTab !== 'all' ? activeTab : undefined,
+        limit: PAGE_SIZE,
+        offset: currentOffset,
       };
 
-      let response: { customers: Customer[]; counts: { all: number; active: number; inactive: number; archived: number } };
+      let response: { customers: Customer[]; counts: { all: number; active: number; inactive: number; archived: number }; total: number };
       if (isAdmin) {
         // Admin users use admin API
         response = await adminAPI.getCustomers(filters);
@@ -117,29 +131,24 @@ export default function CustomersPage() {
           companyId: selectedCompany.id,
         });
       } else {
-        response = { customers: [], counts: { all: 0, active: 0, inactive: 0, archived: 0 } };
+        response = { customers: [], counts: { all: 0, active: 0, inactive: 0, archived: 0 }, total: 0 };
       }
 
-      const allCustomers = response.customers || [];
+      const pageCustomers = response.customers || [];
       const counts = response.counts || { all: 0, active: 0, inactive: 0, archived: 0 };
+      const total = response.total || 0;
 
       // Update tab counts
       setTabCounts(counts);
 
-      // Client-side pagination for infinite scroll
-      const limit = 20;
-      const startIndex = (page - 1) * limit;
-      const endIndex = startIndex + limit;
-      const paginatedCustomers = allCustomers.slice(startIndex, endIndex);
-
       if (isLoadMore) {
-        setCustomers(prev => [...prev, ...paginatedCustomers]);
+        setCustomers(prev => [...prev, ...pageCustomers]);
       } else {
-        setCustomers(paginatedCustomers);
+        setCustomers(pageCustomers);
       }
 
-      // Check if there are more customers to load
-      setHasMore(endIndex < allCustomers.length);
+      // Check if there are more customers to load using server total
+      setHasMore(currentOffset + pageCustomers.length < total);
       setCurrentPage(page);
     } catch (error) {
       console.error('Error fetching customers:', error);
@@ -150,45 +159,29 @@ export default function CustomersPage() {
       setCustomersLoading(false);
       setLoadingMore(false);
     }
-  }, [selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, selectedLetter]);
+  }, [selectedCompany, isAdmin, debouncedSearch, activeTab, sortKey, sortDirection, selectedLetter]);
 
-  // Fetch letter counts for the alphabet filter
+  // Fetch letter counts for the alphabet filter using lightweight server-side mode
   const fetchLetterCounts = useCallback(async () => {
     if (!selectedCompany && !isAdmin) return;
 
     try {
-      const filters = {
-        companyId: selectedCompany?.id,
-      };
-
-      let response: { customers: Customer[]; counts: { all: number; active: number; inactive: number; archived: number } };
+      let response: { letterCounts?: Record<string, number> };
       if (isAdmin) {
-        response = await adminAPI.getCustomers(filters);
+        response = await adminAPI.getCustomers({
+          companyId: selectedCompany?.id,
+          mode: 'letterCounts',
+        });
       } else if (selectedCompany) {
         response = await adminAPI.getUserCustomers({
-          ...filters,
           companyId: selectedCompany.id,
+          mode: 'letterCounts',
         });
       } else {
-        response = { customers: [], counts: { all: 0, active: 0, inactive: 0, archived: 0 } };
+        return;
       }
 
-      const allCustomers = response.customers || [];
-
-      // Count customers by first letter of last name
-      const counts: Record<string, number> = {};
-      'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(letter => {
-        counts[letter] = 0;
-      });
-
-      allCustomers.forEach(customer => {
-        const firstLetter = customer.last_name?.charAt(0).toUpperCase();
-        if (firstLetter && counts[firstLetter] !== undefined) {
-          counts[firstLetter]++;
-        }
-      });
-
-      setLetterCounts(counts);
+      setLetterCounts(response.letterCounts || {});
     } catch (error) {
       console.error('Error fetching letter counts:', error);
     }
@@ -221,7 +214,7 @@ export default function CustomersPage() {
       setHasMore(true);
       fetchCustomers(1);
     }
-  }, [contextLoading, selectedCompany, isAdmin, searchQuery, sortKey, sortDirection, selectedLetter, fetchCustomers]);
+  }, [contextLoading, selectedCompany, isAdmin, debouncedSearch, activeTab, sortKey, sortDirection, selectedLetter, fetchCustomers]);
 
   // Infinite scroll handler
   const handleLoadMore = () => {
@@ -286,6 +279,10 @@ export default function CustomersPage() {
           onCustomerClick={handleCustomerClick}
           showCompanyColumn={isAdmin && !selectedCompany}
           tabCounts={tabCounts}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
       )}
 
@@ -305,6 +302,10 @@ export default function CustomersPage() {
           onCustomerClick={handleCustomerClick}
           showCompanyColumn={true}
           tabCounts={tabCounts}
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeTab={activeTab}
+          onTabChange={setActiveTab}
         />
       )}
 

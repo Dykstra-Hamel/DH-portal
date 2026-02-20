@@ -718,14 +718,16 @@ function TicketsDashboardContent() {
           .select('id', { count: 'exact', head: true })
           .eq('company_id', companyId)
           .is('assigned_to', null)
-          .in('lead_status', ['new', 'in_process', 'quoted']),
+          .in('lead_status', ['new', 'in_process', 'quoted'])
+          .or('archived.is.null,archived.eq.false'),
         // Unassigned scheduling (leads with scheduling status)
         supabase
           .from('leads')
           .select('id', { count: 'exact', head: true })
           .eq('company_id', companyId)
           .is('assigned_to', null)
-          .eq('lead_status', 'scheduling'),
+          .eq('lead_status', 'scheduling')
+          .or('archived.is.null,archived.eq.false'),
         // Unassigned support cases
         supabase
           .from('support_cases')
@@ -741,6 +743,7 @@ function TicketsDashboardContent() {
               .eq('company_id', companyId)
               .eq('assigned_to', userId)
               .in('lead_status', ['in_process', 'quoted', 'scheduling'])
+              .or('archived.is.null,archived.eq.false')
           : Promise.resolve({ count: 0 }),
         // My support cases (assigned to user)
         userId

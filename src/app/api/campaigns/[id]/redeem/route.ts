@@ -304,41 +304,53 @@ export async function POST(
       );
     }
 
-    // Build lead comments
-    let leadComments = body.signature_data
-      ? `Campaign: ${campaign.name}\nRedeemed with signature on ${new Date().toLocaleDateString()}`
-      : `Campaign: ${campaign.name}\nRedeemed via inline form on ${new Date().toLocaleDateString()}`;
+    // Pre-fetch display names for comments
+    const [campaignPlanResult, selectedPlanResult, addonResults] = await Promise.all([
+      campaign.service_plan_id
+        ? supabase.from('service_plans').select('plan_name').eq('id', campaign.service_plan_id).single()
+        : Promise.resolve({ data: null }),
+      body.selected_service_plan_id
+        ? supabase.from('service_plans').select('plan_name').eq('id', body.selected_service_plan_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+      body.selected_addon_ids?.length
+        ? supabase.from('add_on_services').select('addon_name').in('id', body.selected_addon_ids).eq('company_id', campaign.company_id)
+        : Promise.resolve({ data: [] }),
+    ]);
 
-    // Add pest targeting info if applicable
-    if (targetPestName) {
-      leadComments += `\n\nTarget Pest: ${targetPestName}`;
+    const campaignServicePlanName: string | null = campaignPlanResult.data?.plan_name || null;
+    const selectedServicePlanName: string | null = selectedPlanResult.data?.plan_name || null;
+    const selectedAddonNames: string[] = ((addonResults.data as { addon_name: string }[]) || []).map((a) => a.addon_name);
+
+    // Build structured lead comments for campaign redemption
+    const commentLines: string[] = ['Lead has redeemed the landing page form.'];
+
+    if (campaignServicePlanName) {
+      commentLines.push(`Service Plan: ${campaignServicePlanName}`);
     }
 
-    // Add note if no service address provided
-    if (!addressData) {
-      leadComments += `\n\nNote: Customer did not have a service address on file. Please collect service address when scheduling.`;
+    const additionalInterests = [selectedServicePlanName, ...selectedAddonNames].filter(Boolean);
+    if (additionalInterests.length > 0) {
+      commentLines.push(`Additional Interests: ${additionalInterests.join(', ')}`);
     }
 
-    // Add phone number if provided
-    if (body.phone_number) {
-      leadComments += `\n\nContact Phone: ${body.phone_number}`;
+    if (body.requested_date) {
+      commentLines.push(`Preferred Service Date: ${new Date(body.requested_date).toLocaleDateString()}`);
     }
 
-    if (body.requested_date || body.requested_time) {
-      leadComments += `\n\nCustomer preferred schedule:`;
-      if (body.requested_date) {
-        leadComments += `\nDate: ${new Date(body.requested_date).toLocaleDateString()}`;
-      }
-      if (body.requested_time) {
-        const timeLabels: Record<string, string> = {
-          morning: 'Morning (8am - 12pm)',
-          afternoon: 'Afternoon (12pm - 4pm)',
-          evening: 'Evening (4pm - 8pm)',
-          anytime: 'Anytime',
-        };
-        leadComments += `\nTime: ${timeLabels[body.requested_time] || body.requested_time}`;
-      }
+    if (body.requested_time) {
+      const timeLabels: Record<string, string> = {
+        morning: 'Morning (8am - 12pm)',
+        afternoon: 'Afternoon (12pm - 4pm)',
+        evening: 'Evening (4pm - 8pm)',
+        anytime: 'Anytime',
+      };
+      commentLines.push(`Preferred Service Time: ${timeLabels[body.requested_time] || body.requested_time}`);
     }
+
+    commentLines.push('');
+    commentLines.push('This lead has been pre-filled with data based off the Campaign details and the Customer\'s input.');
+
+    const leadComments = commentLines.join('\n');
 
     // Check for existing lead first (may have been created from email click)
     // Check for an existing lead tied to this member (only if it belongs to this campaign)
@@ -375,7 +387,6 @@ export async function POST(
     }
 
     let lead;
-    const signedAt = new Date().toLocaleDateString();
     const hasDropdownSelection =
       (body.selected_addon_ids?.length || 0) > 0 ||
       !!body.selected_service_plan_id;
@@ -383,10 +394,7 @@ export async function POST(
 
     if (existingLead) {
       // Update existing lead to 'ready_to_schedule' stage
-      const acceptanceMethod = body.signature_data ? 'Signature captured' : 'Offer accepted via inline form';
-      const updatedComments = existingLead.comments
-        ? `${existingLead.comments}\n\nCampaign offer accepted. ${acceptanceMethod} on ${signedAt}. Requested: ${body.requested_date || 'ASAP'} ${body.requested_time || ''}`
-        : `Campaign: ${campaign.name}. ${acceptanceMethod} on ${signedAt}. Requested: ${body.requested_date || 'ASAP'} ${body.requested_time || ''}`;
+      const updatedComments = leadComments;
 
       const { data: updatedLead, error: updateError } = await supabase
         .from('leads')

@@ -205,6 +205,9 @@ export const adminAPI = {
       dateFrom?: string;
       dateTo?: string;
       startsWith?: string | null;
+      limit?: number;
+      offset?: number;
+      mode?: string;
     } = {}
   ) {
     const queryParams = new URLSearchParams();
@@ -217,6 +220,9 @@ export const adminAPI = {
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
     if (filters.startsWith)
       queryParams.append('startsWith', filters.startsWith);
+    if (filters.limit !== undefined) queryParams.append('limit', filters.limit.toString());
+    if (filters.offset !== undefined) queryParams.append('offset', filters.offset.toString());
+    if (filters.mode) queryParams.append('mode', filters.mode);
 
     const url = `/api/admin/customers${queryParams.toString() ? `?${queryParams}` : ''}`;
     return authenticatedFetch(url);
@@ -442,6 +448,9 @@ export const adminAPI = {
     dateFrom?: string;
     dateTo?: string;
     startsWith?: string | null;
+    limit?: number;
+    offset?: number;
+    mode?: string;
   }) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', filters.companyId);
@@ -453,6 +462,9 @@ export const adminAPI = {
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
     if (filters.startsWith)
       queryParams.append('startsWith', filters.startsWith);
+    if (filters.limit !== undefined) queryParams.append('limit', filters.limit.toString());
+    if (filters.offset !== undefined) queryParams.append('offset', filters.offset.toString());
+    if (filters.mode) queryParams.append('mode', filters.mode);
 
     const url = `/api/customers?${queryParams.toString()}`;
     return authenticatedFetch(url);

@@ -266,6 +266,7 @@
   border: none;
   transition: background 0.2s ease;
   margin-bottom: 12px;
+  box-shadow: none;
 
   &::before {
     content: '';

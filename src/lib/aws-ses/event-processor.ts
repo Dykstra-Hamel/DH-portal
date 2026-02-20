@@ -388,13 +388,7 @@ async function handleLeadCreationFromClick(
   const serviceAddressId = customer?.customer_service_addresses?.[0]?.service_address?.id || null;
 
   // Build lead comments
-  let leadComments = `Lead created from email click engagement. Link: ${click.link}`;
-  if (targetPestName) {
-    leadComments += `\nTarget Pest: ${targetPestName}`;
-  }
-  if (campaign.service_plan_id) {
-    leadComments += `\nCampaign Service Plan: ${campaign.name}`;
-  }
+  const leadComments = 'Lead has viewed the campaign landing page but did not submit the form yet.';
 
   // Create lead in 'quoted' stage
   const { data: newLead, error: leadError } = await supabase

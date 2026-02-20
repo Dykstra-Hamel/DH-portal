@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeFileName } from '@/lib/storage-utils';
-import { ArrowLeft, Check, ChevronDown, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, Copy, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
@@ -24,6 +24,7 @@ import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
 import ProjectTaskDetail from '../ProjectTaskDetail/ProjectTaskDetail';
 import ApplyTemplateModal from '../ApplyTemplateModal/ApplyTemplateModal';
+import DuplicateProjectModal from '../DuplicateProjectModal/DuplicateProjectModal';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ProjectDetailWithTasks.module.scss';
@@ -127,6 +128,10 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [isTasksCollapsed, setIsTasksCollapsed] = useState(false);
   const [isCommentsCollapsed, setIsCommentsCollapsed] = useState(false);
   const [isEditingProjectDescription, setIsEditingProjectDescription] = useState(false);
+  const [blockedTaskHoverRef, setBlockedTaskHoverRef] = useState<{
+    id: string | null;
+    title: string | null;
+  }>({ id: null, title: null });
 
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -142,6 +147,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
   const highlightTimeoutRef = React.useRef<number | null>(null);
   const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [projectAttachments, setProjectAttachments] = useState<ProjectAttachment[]>(project?.attachments || []);
   const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
   const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
@@ -505,6 +511,27 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       alert('Failed to delete project. Please try again.');
     }
   }, [project?.id, project?.name, router, project]);
+
+  const handleDuplicateProject = useCallback(async (name: string, companyId: string) => {
+    if (!project) return;
+
+    const response = await fetch(`/api/admin/projects/${project.id}/duplicate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, companyId }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const errorMessage = data.details
+        ? `${data.error || 'Failed to duplicate project'}: ${data.details}`
+        : (data.error || 'Failed to duplicate project');
+      throw new Error(errorMessage);
+    }
+
+    const { projectId } = await response.json();
+    router.push(`/admin/project-management/${projectId}`);
+  }, [project, router]);
 
   const handleBackToProjects = useCallback(() => {
     router.push('/admin/project-management');
@@ -915,6 +942,14 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
             </button>
           )}
           <button
+            className={`${headerStyles.addLeadButton} ${headerStyles.iconOnlyButton}`}
+            onClick={() => setIsDuplicateModalOpen(true)}
+            type="button"
+            aria-label="Duplicate project"
+          >
+            <Copy size={18} />
+          </button>
+          <button
             className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton} ${headerStyles.iconOnlyButton}`}
             onClick={handleDeleteProject}
             type="button"
@@ -930,6 +965,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     projectLoading,
     handleBackToProjects,
     handleDeleteProject,
+    handleDuplicateProject,
+    setIsDuplicateModalOpen,
     availableStatusOptions,
     handleHeaderStatusChange,
     handleHeaderDepartmentChange,
@@ -2240,6 +2277,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                     isLoading={isLoading}
                     showHeader={false}
                     onAddTask={handleCreateTask}
+                    blockedTaskHoverRef={blockedTaskHoverRef}
+                    onBlockedTaskHoverChange={setBlockedTaskHoverRef}
                   />
                 ) : (
                   taskSections.map((section, index) => (
@@ -2261,6 +2300,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                         onAddTask={
                           index === taskSections.length - 1 ? handleCreateTask : undefined
                         }
+                        blockedTaskHoverRef={blockedTaskHoverRef}
+                        onBlockedTaskHoverChange={setBlockedTaskHoverRef}
                       />
                     </div>
                   ))
@@ -2630,6 +2671,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         availableTasks={tasks}
         departments={departments}
         currentUserId={user.id}
+      />
+
+      {/* Duplicate Project Modal */}
+      <DuplicateProjectModal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        onDuplicate={handleDuplicateProject}
+        defaultName={`${project.name} (Copy)`}
+        defaultCompanyId={project.company.id}
       />
 
       {/* Apply Template Modal */}

@@ -49,6 +49,9 @@ export async function GET(request: NextRequest) {
     const startsWith = searchParams.get('startsWith');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const mode = searchParams.get('mode');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50', 10), 200);
+    const offset = parseInt(searchParams.get('offset') || '0', 10);
 
     if (!companyId) {
       return NextResponse.json(
@@ -83,6 +86,23 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // letterCounts mode — lightweight query returning only first-letter counts
+    if (mode === 'letterCounts') {
+      const { data: lastNames } = await supabase
+        .from('customers')
+        .select('last_name')
+        .eq('company_id', companyId)
+        .range(0, 99999);
+
+      const counts: Record<string, number> = {};
+      'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(l => { counts[l] = 0; });
+      (lastNames || []).forEach((c: { last_name: string | null }) => {
+        const letter = c.last_name?.charAt(0)?.toUpperCase();
+        if (letter && counts[letter] !== undefined) counts[letter]++;
+      });
+      return NextResponse.json({ letterCounts: counts });
+    }
+
     // Build query with company join and lead data
     let query = supabase
       .from('customers')
@@ -105,7 +125,8 @@ export async function GET(request: NextRequest) {
         support_cases:support_cases!support_cases_customer_id_fkey(
           id
         )
-      `
+      `,
+        { count: 'exact' }
       )
       .eq('company_id', companyId);
 
@@ -133,8 +154,9 @@ export async function GET(request: NextRequest) {
     const safeSortBy = validSortFields.includes(sortBy) ? sortBy : 'created_at';
     const ascending = sortOrder === 'asc';
     query = query.order(safeSortBy, { ascending });
+    query = query.range(offset, offset + limit - 1);
 
-    const { data: customers, error } = await query;
+    const { data: customers, count: total, error } = await query;
 
     if (error) {
       console.error('Error fetching customers with details:', {
@@ -157,7 +179,8 @@ export async function GET(request: NextRequest) {
     if (!customers || customers.length === 0) {
       return NextResponse.json({
         customers: [],
-        counts
+        counts,
+        total: 0,
       });
     }
 
@@ -247,7 +270,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       customers: enhancedCustomers,
-      counts
+      counts,
+      total: total || 0,
     });
   } catch (error) {
     console.error('Error in customers API:', error);
