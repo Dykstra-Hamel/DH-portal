@@ -32,6 +32,8 @@ interface MentionItem {
   senderLastName: string | null;
   senderEmail: string | null;
   senderAvatarUrl: string | null;
+  companyName: string | null;
+  companyIconUrl: string | null;
   hasAttachments: boolean;
 }
 
@@ -50,6 +52,14 @@ const stripHtml = (value?: string | null): string => {
     .replace(/&quot;/gi, '"')
     .replace(/\s+/g, ' ')
     .trim();
+};
+
+const getCompanyIconUrl = (branding: any): string | null => {
+  if (Array.isArray(branding)) {
+    return branding[0]?.icon_logo_url || null;
+  }
+
+  return branding?.icon_logo_url || null;
 };
 
 export async function GET(request: NextRequest) {
@@ -245,7 +255,19 @@ export async function GET(request: NextRequest) {
       projectIds.size > 0
         ? supabase
             .from('projects')
-            .select('id, name, shortcode, status')
+            .select(`
+              id,
+              name,
+              shortcode,
+              status,
+              company:companies(
+                id,
+                name,
+                branding:brands!company_id(
+                  icon_logo_url
+                )
+              )
+            `)
             .in('id', Array.from(projectIds))
             .neq('status', 'complete')
         : Promise.resolve({ data: [], error: null }),
@@ -311,6 +333,8 @@ export async function GET(request: NextRequest) {
       let monthlyServiceName: string | null = null;
       let commentText = '';
       let senderUserId: string | null = null;
+      let companyName: string | null = null;
+      let companyIconUrl: string | null = null;
       let hasAttachments = false;
 
       if (referenceType === 'project_comment' && referenceId) {
@@ -320,6 +344,10 @@ export async function GET(request: NextRequest) {
         const project = projectId ? projectById.get(projectId) : null;
         projectName = project?.name || null;
         projectShortcode = project?.shortcode || null;
+        const companyRaw = project?.company;
+        const company = Array.isArray(companyRaw) ? companyRaw[0] ?? null : companyRaw ?? null;
+        companyName = company?.name || null;
+        companyIconUrl = getCompanyIconUrl(company?.branding);
         commentText = stripHtml(comment?.comment || '');
         hasAttachments = projectCommentsWithAttachments.has(referenceId);
       }
@@ -334,6 +362,10 @@ export async function GET(request: NextRequest) {
         const project = projectId ? projectById.get(projectId) : null;
         projectName = project?.name || null;
         projectShortcode = project?.shortcode || null;
+        const companyRaw = project?.company;
+        const company = Array.isArray(companyRaw) ? companyRaw[0] ?? null : companyRaw ?? null;
+        companyName = company?.name || null;
+        companyIconUrl = getCompanyIconUrl(company?.branding);
         commentText = stripHtml(comment?.comment || '');
         hasAttachments = taskCommentsWithAttachments.has(referenceId);
       }
@@ -371,6 +403,8 @@ export async function GET(request: NextRequest) {
         senderLastName: senderProfile?.last_name || null,
         senderEmail: senderProfile?.email || null,
         senderAvatarUrl: senderProfile?.avatar_url || null,
+        companyName,
+        companyIconUrl,
         hasAttachments,
       };
     });

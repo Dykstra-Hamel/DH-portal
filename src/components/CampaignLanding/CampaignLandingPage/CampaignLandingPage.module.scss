@@ -137,7 +137,6 @@
   transition:
     border-color 0.2s ease,
     color 0.2s ease;
-  box-shadow: var(--shadow-button);
   white-space: nowrap;
 
   &::before {
@@ -172,6 +171,7 @@
   --btn-bg: var(--color-bg-light);
   color: var(--accent-color);
   border: none;
+  box-shadow: var(--shadow-button);
 
   &:hover {
     &::before {
@@ -425,7 +425,6 @@
   transition:
     border-color 0.2s ease,
     background 0.2s ease;
-  box-shadow: var(--shadow-button);
   width: fit-content;
 
   &::before {
@@ -766,7 +765,6 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease;
-  box-shadow: var(--shadow-button);
   width: 100%;
 
   &::before {
@@ -892,7 +890,7 @@
 
 .featuresActions {
   display: flex;
-  gap: 16px;
+  gap: 22px;
   align-items: center;
   @media (max-width: 768px) {
     flex-direction: column;
@@ -912,7 +910,6 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease;
-  box-shadow: var(--shadow-button);
 
   &::before {
     content: '';
@@ -1088,7 +1085,7 @@
 
 .additionalServicesActions {
   display: flex;
-  gap: 16px;
+  gap: 22px;
   align-items: center;
 
   @media (max-width: 768px) {
@@ -1109,7 +1106,6 @@
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s ease;
-  box-shadow: var(--shadow-button);
 
   &::before {
     content: '';

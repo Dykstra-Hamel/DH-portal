@@ -34,6 +34,14 @@ interface ProjectTaskListProps {
   isLoading?: boolean;
   showHeader?: boolean;
   onAddTask?: () => void;
+  blockedTaskHoverRef?: {
+    id: string | null;
+    title: string | null;
+  };
+  onBlockedTaskHoverChange?: (value: {
+    id: string | null;
+    title: string | null;
+  }) => void;
 }
 
 export default function ProjectTaskList({
@@ -48,6 +56,8 @@ export default function ProjectTaskList({
   isLoading = false,
   showHeader = true,
   onAddTask,
+  blockedTaskHoverRef,
+  onBlockedTaskHoverChange,
 }: ProjectTaskListProps) {
   const [collapsedTasks, setCollapsedTasks] = useState<Record<string, boolean>>(
     {}
@@ -66,6 +76,15 @@ export default function ProjectTaskList({
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(
     null
   );
+  const [localHoveredBlockingTaskRef, setLocalHoveredBlockingTaskRef] =
+    useState<{
+      id: string | null;
+      title: string | null;
+    }>({ id: null, title: null });
+  const hoveredBlockingTaskRef =
+    blockedTaskHoverRef || localHoveredBlockingTaskRef;
+  const setHoveredBlockingTaskRef =
+    onBlockedTaskHoverChange || setLocalHoveredBlockingTaskRef;
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -137,6 +156,9 @@ export default function ProjectTaskList({
 
   const handleToggleComplete = (event: React.MouseEvent, task: ProjectTask) => {
     event.stopPropagation();
+    if (task.blocked_by_task && !task.blocked_by_task.is_completed) {
+      return;
+    }
     onToggleComplete(task.id, !task.is_completed);
   };
 
@@ -414,6 +436,17 @@ export default function ProjectTaskList({
     const dueDateLabel = task.due_date ? formatDateShort(task.due_date) : null;
     const isOverdue =
       !!task.due_date && !task.is_completed && isPastDue(task.due_date);
+    const hoveredBlockingTitle = hoveredBlockingTaskRef.title
+      ?.trim()
+      .toLowerCase();
+    const taskTitle = task.title?.trim().toLowerCase();
+    const matchesById =
+      !!hoveredBlockingTaskRef.id && hoveredBlockingTaskRef.id === task.id;
+    const matchesByTitle =
+      !!hoveredBlockingTitle &&
+      !!taskTitle &&
+      hoveredBlockingTitle === taskTitle;
+    const isBlockingHighlight = matchesById || (!matchesById && matchesByTitle);
 
     return (
       <div
@@ -430,7 +463,7 @@ export default function ProjectTaskList({
         onDragOver={!isSubtask ? e => handleDragOver(e, task.id) : undefined}
       >
         <div
-          className={`${styles.taskRow} ${isSubtask ? styles.subtaskRow : ''} ${task.is_completed ? styles.completed : ''} ${isLastRow ? styles.taskRowLast : ''}`}
+          className={`${styles.taskRow} ${isSubtask ? styles.subtaskRow : ''} ${task.is_completed ? styles.completed : ''} ${isLastRow ? styles.taskRowLast : ''} ${isBlockingHighlight ? styles.taskRowBlockingHighlight : ''}`}
           onClick={() => !isEditing && onTaskClick(task)}
         >
           {/* Drag handle - only for top-level tasks */}
@@ -448,12 +481,32 @@ export default function ProjectTaskList({
             aria-label={
               task.is_completed ? 'Mark task incomplete' : 'Mark task complete'
             }
-            disabled={
+            aria-disabled={
               !!(task.blocked_by_task && !task.blocked_by_task.is_completed)
             }
           >
             {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
-              <span className={styles.blockedTooltipWrapper}>
+              <span
+                className={styles.blockedTooltipWrapper}
+                onMouseEnter={() =>
+                  setHoveredBlockingTaskRef({
+                    id: task.blocked_by_task?.id || null,
+                    title: task.blocked_by_task?.title || null,
+                  })
+                }
+                onMouseLeave={() =>
+                  setHoveredBlockingTaskRef({ id: null, title: null })
+                }
+                onFocus={() =>
+                  setHoveredBlockingTaskRef({
+                    id: task.blocked_by_task?.id || null,
+                    title: task.blocked_by_task?.title || null,
+                  })
+                }
+                onBlur={() =>
+                  setHoveredBlockingTaskRef({ id: null, title: null })
+                }
+              >
                 <Lock size={14} />
                 <span className={styles.blockedTooltip}>
                   Blocked by: {task.blocked_by_task.title}

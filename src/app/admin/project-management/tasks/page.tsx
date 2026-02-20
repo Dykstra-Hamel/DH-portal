@@ -43,6 +43,8 @@ interface MentionListItem {
   senderLastName: string | null;
   senderEmail: string | null;
   senderAvatarUrl: string | null;
+  companyName: string | null;
+  companyIconUrl: string | null;
   hasAttachments: boolean;
 }
 
@@ -73,6 +75,8 @@ export default function AdminTasksPage() {
   const [mentions, setMentions] = useState<MentionListItem[]>([]);
   const [mentionsHasMore, setMentionsHasMore] = useState(false);
   const [mentionsLoading, setMentionsLoading] = useState(false);
+  const [showAllMentions, setShowAllMentions] = useState(false);
+  const [hasAnyMentions, setHasAnyMentions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   // Helper function to get authentication headers
@@ -227,15 +231,41 @@ export default function AdminTasksPage() {
     }
   }, []);
 
-  const fetchMentions = useCallback(async (options?: { reset?: boolean; offset?: number }) => {
+  const checkHasAnyMentions = useCallback(async (): Promise<boolean> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(
+        '/api/admin/notifications/mentions?unreadOnly=false&limit=1&offset=0',
+        { headers }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const mentionItems: MentionListItem[] = Array.isArray(data.mentions)
+          ? data.mentions
+          : [];
+        return mentionItems.length > 0;
+      }
+    } catch (error) {
+      console.error('Error checking mention availability:', error);
+    }
+    return false;
+  }, []);
+
+  const fetchMentions = useCallback(async (options?: {
+    reset?: boolean;
+    offset?: number;
+    unreadOnly?: boolean;
+  }) => {
     const reset = options?.reset ?? false;
     const offset = options?.offset ?? 0;
+    const unreadOnly = options?.unreadOnly ?? true;
 
     try {
       setMentionsLoading(true);
       const headers = await getAuthHeaders();
       const response = await fetch(
-        `/api/admin/notifications/mentions?unreadOnly=true&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
+        `/api/admin/notifications/mentions?unreadOnly=${unreadOnly}&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
         { headers }
       );
 
@@ -251,6 +281,14 @@ export default function AdminTasksPage() {
           ]);
         }
         setMentionsHasMore(Boolean(data.hasMore));
+        if (nextMentions.length > 0) {
+          setHasAnyMentions(true);
+        } else if (!unreadOnly) {
+          setHasAnyMentions(false);
+        } else if (reset) {
+          const hasAny = await checkHasAnyMentions();
+          setHasAnyMentions(hasAny);
+        }
       } else {
         console.error('Error fetching mentions:', await response.text());
         if (reset) {
@@ -267,7 +305,7 @@ export default function AdminTasksPage() {
     } finally {
       setMentionsLoading(false);
     }
-  }, []);
+  }, [checkHasAnyMentions]);
 
   // Open task detail sidebar
   const openTaskDetailById = useCallback(async (taskId: string, projectId?: string | null) => {
@@ -292,7 +330,12 @@ export default function AdminTasksPage() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchTasks(), fetchProjects(), fetchUsers(), fetchMentions({ reset: true, offset: 0 })]);
+      await Promise.all([
+        fetchTasks(),
+        fetchProjects(),
+        fetchUsers(),
+        fetchMentions({ reset: true, offset: 0, unreadOnly: true }),
+      ]);
       setIsLoading(false);
     };
 
@@ -417,10 +460,20 @@ export default function AdminTasksPage() {
           headers,
         });
 
-        // Remove the mention from the list since it's now read
-        setMentions((prev) =>
-          prev.filter((item) => item.notificationId !== mention.notificationId)
-        );
+        if (showAllMentions) {
+          setMentions((prev) =>
+            prev.map((item) =>
+              item.notificationId === mention.notificationId
+                ? { ...item, read: true }
+                : item
+            )
+          );
+        } else {
+          // Remove the mention from the list since it's now read
+          setMentions((prev) =>
+            prev.filter((item) => item.notificationId !== mention.notificationId)
+          );
+        }
       }
     } catch (error) {
       console.error('Error marking mention as read:', error);
@@ -434,7 +487,65 @@ export default function AdminTasksPage() {
       window.location.href = `/admin/monthly-services/${mention.monthlyServiceId}?commentId=${mention.referenceId}`;
     }
 
-  }, [openTaskDetailById]);
+  }, [openTaskDetailById, showAllMentions]);
+
+  const handleShowAllMentions = useCallback(async () => {
+    await fetchMentions({ reset: true, offset: 0, unreadOnly: false });
+    setShowAllMentions(true);
+  }, [fetchMentions]);
+
+  const handleHideReadMentions = useCallback(async () => {
+    await fetchMentions({ reset: true, offset: 0, unreadOnly: true });
+    setShowAllMentions(false);
+  }, [fetchMentions]);
+
+  const loadAllPastMentions = useCallback(async (): Promise<MentionListItem[]> => {
+    try {
+      setMentionsLoading(true);
+      const headers = await getAuthHeaders();
+      const limit = 50;
+      let offset = 0;
+      let hasMore = true;
+      const allMentions: MentionListItem[] = [];
+      const seenIds = new Set<string>();
+
+      while (hasMore) {
+        const response = await fetch(
+          `/api/admin/notifications/mentions?unreadOnly=false&limit=${limit}&offset=${offset}`,
+          { headers }
+        );
+
+        if (!response.ok) {
+          console.error('Error fetching all past mentions:', await response.text());
+          break;
+        }
+
+        const data = await response.json();
+        const batch: MentionListItem[] = Array.isArray(data.mentions)
+          ? data.mentions
+          : [];
+
+        batch.forEach((mention) => {
+          if (seenIds.has(mention.notificationId)) return;
+          seenIds.add(mention.notificationId);
+          allMentions.push(mention);
+        });
+
+        hasMore = Boolean(data.hasMore) && batch.length > 0;
+        offset += batch.length;
+      }
+
+      setMentions(allMentions);
+      setMentionsHasMore(false);
+      setHasAnyMentions(allMentions.length > 0);
+      return allMentions;
+    } catch (error) {
+      console.error('Error loading all past mentions:', error);
+      return mentions;
+    } finally {
+      setMentionsLoading(false);
+    }
+  }, [mentions]);
 
   // Task detail sidebar handlers
   const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
@@ -709,8 +820,19 @@ export default function AdminTasksPage() {
                   mentions={mentions}
                   hasMoreMentions={mentionsHasMore}
                   mentionsLoading={mentionsLoading}
+                  showAllMentions={showAllMentions}
+                  hasAnyMentions={hasAnyMentions}
                   onMentionClick={handleMentionClick}
-                  onLoadMoreMentions={() => fetchMentions({ reset: false, offset: mentions.length })}
+                  onLoadMoreMentions={() =>
+                    fetchMentions({
+                      reset: false,
+                      offset: mentions.length,
+                      unreadOnly: !showAllMentions,
+                    })
+                  }
+                  onLoadAllMentions={loadAllPastMentions}
+                  onShowAllMentions={handleShowAllMentions}
+                  onHideReadMentions={handleHideReadMentions}
                 />
               )}
               {currentView === 'calendar' && (
@@ -740,8 +862,19 @@ export default function AdminTasksPage() {
                   mentions={mentions}
                   hasMoreMentions={mentionsHasMore}
                   mentionsLoading={mentionsLoading}
+                  showAllMentions={showAllMentions}
+                  hasAnyMentions={hasAnyMentions}
                   onMentionClick={handleMentionClick}
-                  onLoadMoreMentions={() => fetchMentions({ reset: false, offset: mentions.length })}
+                  onLoadMoreMentions={() =>
+                    fetchMentions({
+                      reset: false,
+                      offset: mentions.length,
+                      unreadOnly: !showAllMentions,
+                    })
+                  }
+                  onLoadAllMentions={loadAllPastMentions}
+                  onShowAllMentions={handleShowAllMentions}
+                  onHideReadMentions={handleHideReadMentions}
                   archiveMode
                 />
               )}
