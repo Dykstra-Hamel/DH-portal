@@ -369,6 +369,18 @@
   gap: 4px;
 }
 
+.titleWithLogoWrapper {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 12px;
+}
+
+.titleLogoCol {
+  display: flex;
+  align-items: flex-start;
+}
+
 .description {
   font-family:
     'Satoshi Variable',

@@ -369,6 +369,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             return {
               title: pageHeader.title,
               titleLeading: pageHeader.titleLeading,
+              titleLogo: pageHeader.titleLogo,
               description: pageHeader.description,
               showAddButton: false,
               customActions: pageHeader.customActions,
@@ -501,6 +502,11 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               titleLeading={
                 'titleLeading' in pageConfig
                   ? pageConfig.titleLeading
+                  : undefined
+              }
+              titleLogo={
+                'titleLogo' in pageConfig
+                  ? pageConfig.titleLogo
                   : undefined
               }
               description={pageConfig.description}

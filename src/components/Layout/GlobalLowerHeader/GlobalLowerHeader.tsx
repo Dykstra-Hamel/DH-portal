@@ -72,6 +72,7 @@ interface GlobalLowerHeaderProps {
   title: ReactNode;
   description: string;
   titleLeading?: ReactNode;
+  titleLogo?: ReactNode;
   showAddButton?: boolean;
   addButtonText?: string;
   onAddClick?: () => void;
@@ -124,6 +125,7 @@ export function GlobalLowerHeader({
   projectFilterControls,
   customActions,
   titleLeading,
+  titleLogo,
 }: GlobalLowerHeaderProps) {
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
@@ -434,13 +436,26 @@ export function GlobalLowerHeader({
       <div className={styles.headerContent}>
         <div className={`${styles.leftSection} ${titleLeading ? styles.leftSectionWithLeading : ''}`}>
           {titleLeading && <div className={styles.titleLeading}>{titleLeading}</div>}
-          <div className={styles.titleStack}>
-            <h1 className={styles.title}>{title}</h1>
-            <p
-              className={styles.description}
-              dangerouslySetInnerHTML={{ __html: description }}
-            />
-          </div>
+          {titleLogo ? (
+            <div className={styles.titleWithLogoWrapper}>
+              <div className={styles.titleLogoCol}>{titleLogo}</div>
+              <div className={styles.titleStack}>
+                <h1 className={styles.title}>{title}</h1>
+                <p
+                  className={styles.description}
+                  dangerouslySetInnerHTML={{ __html: description }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className={styles.titleStack}>
+              <h1 className={styles.title}>{title}</h1>
+              <p
+                className={styles.description}
+                dangerouslySetInnerHTML={{ __html: description }}
+              />
+            </div>
+          )}
         </div>
 
         {leadAssignmentControls && (
