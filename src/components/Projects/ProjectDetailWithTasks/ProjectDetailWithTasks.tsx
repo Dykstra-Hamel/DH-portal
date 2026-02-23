@@ -851,14 +851,25 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
     const companyName = project.company?.name;
     const projectName = project.name || 'Project Details';
-    const headerTitle = companyName ? `${companyName} - ${projectName}` : projectName;
+    const brandingRaw = project.company?.branding;
+    const branding = Array.isArray(brandingRaw) ? brandingRaw[0] : brandingRaw;
+    const logoUrl = branding?.icon_logo_url;
 
     const isOverdue = isDueDateOverdue(project.due_date);
     const daysText = getDaysUntilDue(project.due_date);
     const dueDateColor = isOverdue ? '#ef4444' : '#111827';
 
     setPageHeader({
-      title: headerTitle,
+      title: projectName,
+      titleLogo: logoUrl ? (
+        <Image
+          src={logoUrl}
+          alt={companyName || ''}
+          width={36}
+          height={36}
+          className={styles.headerCompanyLogo}
+        />
+      ) : undefined,
       titleLeading: (
         <button
           type="button"

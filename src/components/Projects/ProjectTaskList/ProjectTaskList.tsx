@@ -8,6 +8,7 @@ import {
   Pencil,
   Calendar,
   MessageSquare,
+  Paperclip,
   Trash2,
   GripVertical,
   ChevronLeft,
@@ -18,6 +19,24 @@ import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectTaskList.module.scss';
+
+const CommentIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="13"
+    height="13"
+    viewBox="0 0 15 14"
+    fill="none"
+  >
+    <path
+      d="M7.33317 5.99996H7.33984M9.99984 5.99996H10.0065M4.6665 5.99996H4.67317M13.9998 9.99996C13.9998 10.3536 13.8594 10.6927 13.6093 10.9428C13.3593 11.1928 13.0201 11.3333 12.6665 11.3333H3.88517C3.53158 11.3334 3.19249 11.4739 2.9425 11.724L1.4745 13.192C1.40831 13.2581 1.32397 13.3032 1.23216 13.3215C1.14035 13.3397 1.04519 13.3304 0.958709 13.2945C0.872226 13.2587 0.798306 13.1981 0.746294 13.1202C0.694283 13.0424 0.666516 12.9509 0.666504 12.8573V1.99996C0.666504 1.64634 0.80698 1.3072 1.05703 1.05715C1.30708 0.807102 1.64622 0.666626 1.99984 0.666626H12.6665C13.0201 0.666626 13.3593 0.807102 13.6093 1.05715C13.8594 1.3072 13.9998 1.64634 13.9998 1.99996V9.99996Z"
+      stroke="currentColor"
+      strokeWidth="1.33333"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
 
 interface ProjectTaskListProps {
   tasks: ProjectTask[];
@@ -548,18 +567,30 @@ export default function ProjectTaskList({
                 <span className={styles.taskName}>
                   {task.title || 'Untitled task'}
                 </span>
-                {task.comments && task.comments.length === 1 && (
+                {(() => {
+                  const count =
+                    task.comment_count ??
+                    task.comments?.length ??
+                    0;
+                  return count > 0 ? (
+                    <span
+                      className={`${styles.taskCommentBadge} ${task.hasUnreadMentions ? styles.taskCommentBadgeMention : task.hasUnreadComments ? styles.taskCommentBadgeUnread : ''}`}
+                      title={`${count} comment${count !== 1 ? 's' : ''}`}
+                    >
+                      <CommentIcon />
+                      <span>{count}</span>
+                    </span>
+                  ) : null;
+                })()}
+                {(task.has_attachments ||
+                  task.comments?.some(
+                    c => (c.attachments ?? []).length > 0
+                  )) && (
                   <span
-                    className={`${styles.taskCommentBadge} ${task.hasUnreadMentions ? styles.taskCommentBadgeMention : task.hasUnreadComments ? styles.taskCommentBadgeUnread : ''}`}
+                    className={styles.taskAttachmentBadge}
+                    title="Has attachments"
                   >
-                    - {task.comments.length} Comment
-                  </span>
-                )}
-                {task.comments && task.comments.length > 1 && (
-                  <span
-                    className={`${styles.taskCommentBadge} ${task.hasUnreadMentions ? styles.taskCommentBadgeMention : task.hasUnreadComments ? styles.taskCommentBadgeUnread : ''}`}
-                  >
-                    - {task.comments.length} Comments
+                    <Paperclip size={12} />
                   </span>
                 )}
               </div>

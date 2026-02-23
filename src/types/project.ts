@@ -359,6 +359,8 @@ export interface ProjectTask {
   } | null; // The ONE task blocking this task
   hasUnreadComments?: boolean; // Whether there are comments newer than user's last view
   hasUnreadMentions?: boolean; // Whether there are unread comments that mention the current user
+  comment_count?: number; // Total number of comments (from list API)
+  has_attachments?: boolean; // Whether any comment has attachments (from list API)
 }
 
 export interface ProjectTaskFormData {

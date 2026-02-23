@@ -69,6 +69,7 @@ interface PageHeaderConfig {
   title: ReactNode;
   description: string;
   titleLeading?: ReactNode;
+  titleLogo?: ReactNode;
   leadAssignmentControls?: LeadAssignmentControls;
   supportCaseAssignmentControls?: SupportCaseAssignmentControls;
   projectFilterControls?: ProjectFilterControls;
