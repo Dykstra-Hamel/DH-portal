@@ -37,7 +37,7 @@ export async function GET(
       .from('project_type_subtypes')
       .select('*')
       .eq('project_type', projectType.toUpperCase())
-      .order('sort_order', { ascending: true });
+      .order('name', { ascending: true });
 
     if (error) {
       console.error('Error fetching subtypes:', error);

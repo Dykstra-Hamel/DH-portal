@@ -86,19 +86,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // letterCounts mode — lightweight query returning only first-letter counts
+    // letterCounts mode — use DB-side COUNT aggregate to avoid PostgREST max-rows limit
     if (mode === 'letterCounts') {
-      const { data: lastNames } = await supabase
-        .from('customers')
-        .select('last_name')
-        .eq('company_id', companyId)
-        .range(0, 99999);
+      const { data: rows } = await supabase
+        .rpc('get_customer_letter_counts', { p_company_id: companyId });
 
       const counts: Record<string, number> = {};
       'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').forEach(l => { counts[l] = 0; });
-      (lastNames || []).forEach((c: { last_name: string | null }) => {
-        const letter = c.last_name?.charAt(0)?.toUpperCase();
-        if (letter && counts[letter] !== undefined) counts[letter]++;
+      (rows || []).forEach((row: { letter: string; count: number }) => {
+        if (row.letter && counts[row.letter] !== undefined) {
+          counts[row.letter] = Number(row.count);
+        }
       });
       return NextResponse.json({ letterCounts: counts });
     }

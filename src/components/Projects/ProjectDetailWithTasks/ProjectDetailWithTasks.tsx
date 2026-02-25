@@ -90,6 +90,18 @@ const isCompletionOnlyUpdate = (updates: Partial<ProjectTask>) => {
   return keys.every((key) => key === 'is_completed' || key === 'completed_at');
 };
 
+type UploadProgressState = {
+  active: boolean;
+  completed: number;
+  total: number;
+};
+
+const EMPTY_UPLOAD_PROGRESS: UploadProgressState = {
+  active: false,
+  completed: 0,
+  total: 0,
+};
+
 export default function ProjectDetailWithTasks({ project, projectLoading = false, user, onProjectUpdate }: ProjectDetailWithTasksProps) {
   const { isStarred, toggleStar } = useStarredItems();
   const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
@@ -115,6 +127,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [commentAvatarError, setCommentAvatarError] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [projectCommentUploadProgress, setProjectCommentUploadProgress] =
+    useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
   const commentComposerDragCounterRef = React.useRef(0);
   const [toastMessage, setToastMessage] = useState('');
@@ -150,6 +164,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
   const [projectAttachments, setProjectAttachments] = useState<ProjectAttachment[]>(project?.attachments || []);
   const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
+  const [projectUploadProgress, setProjectUploadProgress] =
+    useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
   const projectDragCounterRef = React.useRef(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
@@ -1318,38 +1334,78 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       // If there are attachments, upload them directly to storage
       if (pendingAttachments.length > 0) {
         const supabase = createClient();
-        const fileMetadata = [];
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        setProjectCommentUploadProgress({
+          active: true,
+          completed: 0,
+          total: pendingAttachments.length,
+        });
 
-        for (const file of pendingAttachments) {
-          // Validate file size (50MB)
-          const MAX_FILE_SIZE = 50 * 1024 * 1024;
-          if (file.size > MAX_FILE_SIZE) {
-            throw new Error(`File "${file.name}" exceeds 50MB limit`);
+        const uploadResults = await Promise.allSettled(
+          pendingAttachments.map(async (file) => {
+            if (file.size > MAX_FILE_SIZE) {
+              throw new Error(`File "${file.name}" exceeds 50MB limit`);
+            }
+
+            const timestamp = Date.now();
+            const sanitizedName = sanitizeFileName(file.name);
+            const filePath = `comment-attachments/${project.id}/${comment.id}/${timestamp}-${sanitizedName}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from('brand-assets')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (uploadError) {
+              throw new Error(
+                `Failed to upload "${file.name}": ${uploadError.message}`
+              );
+            }
+
+            setProjectCommentUploadProgress((prev) => ({
+              ...prev,
+              completed: Math.min(prev.total, prev.completed + 1),
+            }));
+
+            return {
+              file_path: filePath,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+            };
+          })
+        );
+
+        const fileMetadata = uploadResults
+          .filter(
+            (
+              result
+            ): result is PromiseFulfilledResult<{
+              file_path: string;
+              file_name: string;
+              file_size: number;
+              mime_type: string;
+            }> => result.status === 'fulfilled'
+          )
+          .map((result) => result.value);
+
+        const firstFailedUpload = uploadResults.find(
+          (result) => result.status === 'rejected'
+        );
+
+        if (firstFailedUpload) {
+          if (fileMetadata.length > 0) {
+            await supabase.storage
+              .from('brand-assets')
+              .remove(fileMetadata.map((file) => file.file_path));
           }
 
-          // Upload directly to Supabase Storage
-          const timestamp = Date.now();
-          const sanitizedName = sanitizeFileName(file.name);
-          const filePath = `comment-attachments/${project.id}/${comment.id}/${timestamp}-${sanitizedName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('brand-assets')
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              upsert: false,
-            });
-
-          if (uploadError) {
-            console.error('Storage upload error:', uploadError);
-            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
-          }
-
-          fileMetadata.push({
-            file_path: filePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
-          });
+          const reason = (firstFailedUpload as PromiseRejectedResult).reason;
+          throw reason instanceof Error
+            ? reason
+            : new Error('Failed to upload one or more attachments');
         }
 
         // Save metadata via API
@@ -1387,6 +1443,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setShowToast(true);
     } finally {
       setIsSubmittingComment(false);
+      setProjectCommentUploadProgress(EMPTY_UPLOAD_PROGRESS);
     }
   };
 
@@ -1633,74 +1690,136 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     );
   }, [user, project]);
 
-
-  const handleProjectFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!project?.id) return;
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  const uploadProjectFiles = useCallback(async (files: File[]) => {
+    if (!project?.id || files.length === 0) return;
 
     setUploadingProjectAttachment(true);
+    setProjectUploadProgress({
+      active: true,
+      completed: 0,
+      total: files.length,
+    });
+
     try {
       const supabase = createClient();
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
-      for (const file of files) {
-        // Validate file size (50MB)
-        const MAX_FILE_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_FILE_SIZE) {
-          throw new Error(`File "${file.name}" exceeds 50MB limit`);
+      const uploadResults = await Promise.allSettled(
+        files.map(async (file) => {
+          if (file.size > MAX_FILE_SIZE) {
+            throw new Error(`File "${file.name}" exceeds 50MB limit`);
+          }
+
+          const sanitizedName = sanitizeFileName(file.name);
+          const timestamp = Date.now();
+          const storagePath = `${project.id}/${timestamp}-${sanitizedName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('project-files')
+            .upload(storagePath, file, {
+              contentType: file.type,
+              upsert: false,
+            });
+
+          if (uploadError) {
+            throw new Error(
+              `Failed to upload "${file.name}": ${uploadError.message}`
+            );
+          }
+
+          setProjectUploadProgress((prev) => ({
+            ...prev,
+            completed: Math.min(prev.total, prev.completed + 1),
+          }));
+
+          return {
+            file_path: storagePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          };
+        })
+      );
+
+      const successfulUploads = uploadResults
+        .filter(
+          (
+            result
+          ): result is PromiseFulfilledResult<{
+            file_path: string;
+            file_name: string;
+            file_size: number;
+            mime_type: string;
+          }> => result.status === 'fulfilled'
+        )
+        .map((result) => result.value);
+
+      const firstFailedUpload = uploadResults.find(
+        (result) => result.status === 'rejected'
+      );
+
+      if (firstFailedUpload) {
+        if (successfulUploads.length > 0) {
+          await supabase.storage
+            .from('project-files')
+            .remove(successfulUploads.map((file) => file.file_path));
         }
 
-        // Upload directly to Supabase Storage
-        const sanitizedName = sanitizeFileName(file.name);
-        const timestamp = Date.now();
-        const storagePath = `${project.id}/${timestamp}-${sanitizedName}`;
+        const reason = (firstFailedUpload as PromiseRejectedResult).reason;
+        throw reason instanceof Error
+          ? reason
+          : new Error('Failed to upload one or more files');
+      }
 
-        const { error: uploadError } = await supabase.storage
-          .from('project-files')
-          .upload(storagePath, file, {
-            contentType: file.type,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError);
-          throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
-        }
-
-        // Save metadata via API
-        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
+      const metadataResponse = await fetch(
+        `/api/admin/projects/${project.id}/attachments`,
+        {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            file_path: storagePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
+            files: successfulUploads,
           }),
-        });
-
-        if (!response.ok) {
-          // Clean up uploaded file if metadata save fails
-          await supabase.storage.from('project-files').remove([storagePath]);
-
-          let errorMessage = 'Failed to save attachment metadata';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
         }
+      );
+
+      if (!metadataResponse.ok) {
+        if (successfulUploads.length > 0) {
+          await supabase.storage
+            .from('project-files')
+            .remove(successfulUploads.map((file) => file.file_path));
+        }
+
+        let errorMessage = 'Failed to save attachment metadata';
+        try {
+          const errorData = await metadataResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = metadataResponse.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Fetch fresh attachments from server
-      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
-      if (attachmentsResponse.ok) {
-        const { attachments } = await attachmentsResponse.json();
-        setProjectAttachments(attachments);
+      const metadataPayload = await metadataResponse
+        .json()
+        .catch(() => null);
+      const createdAttachments = Array.isArray(metadataPayload?.attachments)
+        ? metadataPayload.attachments
+        : metadataPayload?.attachment
+        ? [metadataPayload.attachment]
+        : [];
+
+      if (createdAttachments.length > 0) {
+        setProjectAttachments((prev) => [...prev, ...createdAttachments]);
+      } else {
+        const attachmentsResponse = await fetch(
+          `/api/admin/projects/${project.id}/attachments`
+        );
+        if (attachmentsResponse.ok) {
+          const { attachments } = await attachmentsResponse.json();
+          setProjectAttachments(attachments);
+        }
       }
 
       setToastMessage(`${files.length} file(s) uploaded successfully.`);
@@ -1709,15 +1828,24 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       onProjectUpdate?.();
     } catch (error) {
       console.error('Error uploading attachment:', error);
-      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
+      setToastMessage(
+        error instanceof Error ? error.message : 'Failed to upload file(s).'
+      );
       setToastType('error');
       setShowToast(true);
     } finally {
       setUploadingProjectAttachment(false);
-      // Reset file input
-      e.target.value = '';
+      setProjectUploadProgress(EMPTY_UPLOAD_PROGRESS);
     }
-  }, [project?.id, onProjectUpdate, project]);
+  }, [onProjectUpdate, project?.id]);
+
+  const handleProjectFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      await uploadProjectFiles(files);
+    }
+    e.target.value = '';
+  }, [uploadProjectFiles]);
 
   const handleDeleteProjectAttachment = useCallback((attachmentId: string) => {
     setAttachmentToDelete(attachmentId);
@@ -1780,57 +1908,14 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const handleProjectDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!project?.id) return;
     projectDragCounterRef.current = 0;
     setIsDraggingProjectFile(false);
 
     const files = Array.from(e.dataTransfer.files || []);
     if (files.length === 0) return;
 
-    setUploadingProjectAttachment(true);
-    try {
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          let errorMessage = 'Failed to upload attachment';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            // If response is not JSON, use status text
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-      }
-
-      // Fetch fresh attachments from server
-      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
-      if (attachmentsResponse.ok) {
-        const { attachments } = await attachmentsResponse.json();
-        setProjectAttachments(attachments);
-      }
-
-      setToastMessage(`${files.length} file(s) uploaded successfully.`);
-      setToastType('success');
-      setShowToast(true);
-      onProjectUpdate?.();
-    } catch (error) {
-      console.error('Error uploading attachment:', error);
-      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
-      setToastType('error');
-      setShowToast(true);
-    } finally {
-      setUploadingProjectAttachment(false);
-    }
-  }, [project?.id, onProjectUpdate, project]);
+    await uploadProjectFiles(files);
+  }, [uploadProjectFiles]);
 
   // Lightbox handlers
   const imageAttachments = useMemo(
@@ -1876,6 +1961,21 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setLightboxOpen(true);
     }
   }, []);
+
+  const projectUploadPercent =
+    projectUploadProgress.total > 0
+      ? Math.round(
+          (projectUploadProgress.completed / projectUploadProgress.total) * 100
+        )
+      : 0;
+  const projectCommentUploadPercent =
+    projectCommentUploadProgress.total > 0
+      ? Math.round(
+          (projectCommentUploadProgress.completed /
+            projectCommentUploadProgress.total) *
+            100
+        )
+      : 0;
 
   // Internal component for loading skeleton
   const ProjectDetailSkeleton = () => {
@@ -2242,7 +2342,21 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                     >
                       <div className={styles.addNewContent}>
                         {uploadingProjectAttachment ? (
-                          <span className={styles.addNewText}>Uploading...</span>
+                          <>
+                            <span className={styles.addNewText}>
+                              Uploading {projectUploadProgress.completed}/
+                              {projectUploadProgress.total}
+                            </span>
+                            <div className={styles.uploadProgressBarCompact}>
+                              <div
+                                className={styles.uploadProgressFill}
+                                style={{ width: `${projectUploadPercent}%` }}
+                              />
+                            </div>
+                            <span className={styles.uploadProgressCompactLabel}>
+                              {projectUploadPercent}%
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span className={styles.addNewPlus}>+</span>
@@ -2288,6 +2402,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                     isLoading={isLoading}
                     showHeader={false}
                     onAddTask={handleCreateTask}
+                    projectDueDate={project.due_date}
                     blockedTaskHoverRef={blockedTaskHoverRef}
                     onBlockedTaskHoverChange={setBlockedTaskHoverRef}
                   />
@@ -2311,6 +2426,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                         onAddTask={
                           index === taskSections.length - 1 ? handleCreateTask : undefined
                         }
+                        projectDueDate={project.due_date}
                         blockedTaskHoverRef={blockedTaskHoverRef}
                         onBlockedTaskHoverChange={setBlockedTaskHoverRef}
                       />
@@ -2573,6 +2689,24 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                           ))}
                         </div>
                       )}
+                      {projectCommentUploadProgress.active && (
+                        <div className={styles.uploadProgressContainer}>
+                          <div className={styles.uploadProgressLabel}>
+                            Uploading attachments{' '}
+                            {projectCommentUploadProgress.completed}/
+                            {projectCommentUploadProgress.total} (
+                            {projectCommentUploadPercent}%)
+                          </div>
+                          <div className={styles.uploadProgressBar}>
+                            <div
+                              className={styles.uploadProgressFill}
+                              style={{
+                                width: `${projectCommentUploadPercent}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <input
                       ref={commentFileInputRef}
@@ -2603,7 +2737,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                       className={styles.commentSubmit}
                       disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
                     >
-                      {isSubmittingComment ? 'Posting...' : 'Post'}
+                      {isSubmittingComment
+                        ? projectCommentUploadProgress.active
+                          ? `Uploading ${projectCommentUploadPercent}%`
+                          : 'Posting...'
+                        : 'Post'}
                     </button>
                   </form>
                 </>
@@ -2635,6 +2773,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         editingTask={editingTask}
         users={users}
         projectId={project.id}
+        projectDueDate={project.due_date}
         parentTasks={parentTasks}
         projectMembers={project.members}
         projectAssignedTo={project.assigned_to_profile?.id}
@@ -2651,18 +2790,25 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         }}
         onUpdate={async (taskId, updates) => {
           if (!project?.id) return;
+          const hasUpdates = Object.keys(updates).length > 0;
           const completionOnly = isCompletionOnlyUpdate(updates);
           const isCompletingTask = updates.is_completed === true;
-          const assignedTo = updates.assigned_to || null;
-          const memberAdded = await ensureProjectMember(assignedTo);
-          await updateTask(project.id, taskId, updates);
+          let memberAdded = false;
+
+          if (hasUpdates) {
+            const assignedTo = updates.assigned_to || null;
+            memberAdded = await ensureProjectMember(assignedTo);
+            await updateTask(project.id, taskId, updates);
+          }
+
           // Refresh the task details to show updated data
           const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`);
           const updatedTask = await response.json();
           setSelectedTask(updatedTask);
+
           // Always refresh project when completing a task (department may have changed)
           // or when it's not a completion-only update, or when a member was added
-          if (isCompletingTask || !completionOnly || memberAdded) {
+          if (hasUpdates && (isCompletingTask || !completionOnly || memberAdded)) {
             onProjectUpdate?.();
           }
         }}

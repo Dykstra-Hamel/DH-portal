@@ -210,7 +210,7 @@ const TemplateForm: React.FC<TemplateFormProps> = ({
 
         if (response.ok) {
           const data = await response.json();
-          setAvailableSubtypes(data);
+          setAvailableSubtypes([...data].sort((a, b) => a.name.localeCompare(b.name)));
         } else {
           console.error('Failed to fetch subtypes. Status:', response.status);
           setAvailableSubtypes([]);

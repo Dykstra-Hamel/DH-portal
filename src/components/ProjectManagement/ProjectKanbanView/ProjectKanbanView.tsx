@@ -60,15 +60,30 @@ export function ProjectKanbanView({
   const [expandedColumnId, setExpandedColumnId] = useState<string | null>(
     () => getCookie(EXPANDED_COLUMN_COOKIE)
   );
+  const [isClosingExpanded, setIsClosingExpanded] = useState(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const CLOSE_ANIMATION_MS = 200;
 
   const handleExpandColumn = (columnId: string) => {
+    // If already closing, cancel and switch columns immediately
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setIsClosingExpanded(false);
     setExpandedColumnId(columnId);
     setCookie(EXPANDED_COLUMN_COOKIE, columnId);
   };
 
   const handleCloseExpanded = () => {
-    setExpandedColumnId(null);
-    deleteCookie(EXPANDED_COLUMN_COOKIE);
+    setIsClosingExpanded(true);
+    closeTimeoutRef.current = setTimeout(() => {
+      setExpandedColumnId(null);
+      setIsClosingExpanded(false);
+      deleteCookie(EXPANDED_COLUMN_COOKIE);
+      closeTimeoutRef.current = null;
+    }, CLOSE_ANIMATION_MS);
   };
 
   // Simple drag state
@@ -106,6 +121,13 @@ export function ProjectKanbanView({
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const expandedViewRef = useRef<HTMLDivElement | null>(null);
 
+  // Clean up close timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
   // Close expanded view when clicking outside it, but only within the viewContent section
   useEffect(() => {
     if (!expandedColumnId) return;
@@ -119,20 +141,23 @@ export function ProjectKanbanView({
         '[class*="viewContent"]'
       ) as HTMLElement | null;
       if (!viewContent?.contains(target)) return;
-      setExpandedColumnId(null);
-      deleteCookie(EXPANDED_COLUMN_COOKIE);
+      handleCloseExpanded();
     };
 
     document.addEventListener('mousedown', handleMouseDown);
     return () => document.removeEventListener('mousedown', handleMouseDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expandedColumnId]);
 
   const getProjectsByDepartment = (columnId: string): Project[] => {
     // Projects assigned to this department
     const departmentProjects = projects.filter(p => p.current_department_id === columnId);
 
-    // Sort by closest due date at top
+    // Sort starred projects first, then by closest due date
     return [...departmentProjects].sort((a, b) => {
+      // Starred projects float to the top
+      if (a.is_starred !== b.is_starred) return a.is_starred ? -1 : 1;
+
       // Projects without due dates go to the bottom
       if (!a.due_date && !b.due_date) return 0;
       if (!a.due_date) return 1;
@@ -336,7 +361,10 @@ export function ProjectKanbanView({
   return (
     <div className={styles.kanbanWrapper}>
       {expandedColumn && (
-        <div ref={expandedViewRef} className={styles.expandedView}>
+        <div
+          ref={expandedViewRef}
+          className={`${styles.expandedView} ${isClosingExpanded ? styles.expandedViewClosing : ''}`}
+        >
           <div className={styles.expandedHeader}>
             <div className={styles.expandedTitleRow}>
               {expandedColumn.icon && (

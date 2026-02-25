@@ -14,12 +14,39 @@ const getTaskReference = (task: ProjectTask) => ({
   due_date: task.due_date,
 });
 
+const mergeTaskForList = (
+  existingTask: ProjectTask,
+  incomingTask: ProjectTask
+): ProjectTask => {
+  const mergedComments = incomingTask.comments ?? existingTask.comments;
+  const derivedCommentCount =
+    incomingTask.comment_count ??
+    (Array.isArray(mergedComments) ? mergedComments.length : existingTask.comment_count);
+  const derivedHasAttachments =
+    incomingTask.has_attachments ??
+    (Array.isArray(mergedComments)
+      ? mergedComments.some((comment) => (comment.attachments ?? []).length > 0)
+      : existingTask.has_attachments);
+
+  return {
+    ...existingTask,
+    ...incomingTask,
+    comments: mergedComments,
+    comment_count: derivedCommentCount,
+    has_attachments: derivedHasAttachments,
+    hasUnreadComments:
+      incomingTask.hasUnreadComments ?? existingTask.hasUnreadComments,
+    hasUnreadMentions:
+      incomingTask.hasUnreadMentions ?? existingTask.hasUnreadMentions,
+  };
+};
+
 const applyTaskUpdate = (tasks: ProjectTask[], updatedTask: ProjectTask) => {
   const updatedRef = getTaskReference(updatedTask);
 
   return tasks.map((task) => {
     if (task.id === updatedTask.id) {
-      return updatedTask;
+      return mergeTaskForList(task, updatedTask);
     }
 
     let changed = false;

@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const paginate = searchParams.get('paginate') === 'true';
+    const page = Math.max(
+      1,
+      parseInt(searchParams.get('page') || '1', 10) || 1
+    );
+    const requestedLimit = parseInt(searchParams.get('limit') || '100', 10) || 100;
+    const limit = Math.min(Math.max(1, requestedLimit), 500);
 
     if (!companyId) {
       return NextResponse.json(
@@ -67,6 +74,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build query - specify only needed columns to reduce data transfer
+    const selectOptions = paginate ? ({ count: 'exact' as const }) : undefined;
     let query = supabase
       .from('leads')
       .select(
@@ -101,7 +109,8 @@ export async function GET(request: NextRequest) {
           email,
           phone
         )
-      `
+      `,
+        selectOptions
       )
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
@@ -147,7 +156,13 @@ export async function GET(request: NextRequest) {
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    const { data: leads, error } = await query;
+    if (paginate) {
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      query = query.range(from, to);
+    }
+
+    const { data: leads, error, count } = await query;
 
     if (error) {
       console.error('Error fetching leads:', error);
@@ -158,6 +173,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (!leads || leads.length === 0) {
+      if (paginate) {
+        return NextResponse.json({
+          leads: [],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit),
+            hasMore: false,
+          },
+        });
+      }
       return NextResponse.json([]);
     }
 
@@ -259,6 +286,21 @@ export async function GET(request: NextRequest) {
           : null,
       };
     });
+
+    if (paginate) {
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limit);
+      return NextResponse.json({
+        leads: enhancedLeads,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasMore: page < totalPages,
+        },
+      });
+    }
 
     return NextResponse.json(enhancedLeads);
   } catch (error) {

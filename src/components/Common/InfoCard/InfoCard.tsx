@@ -6,6 +6,7 @@ interface InfoCardProps {
   children: ReactNode;
   className?: string;
   icon?: ReactNode;
+  headerRight?: ReactNode;
   isCollapsible?: boolean;
   startExpanded?: boolean;
   onExpand?: () => void;
@@ -21,6 +22,7 @@ export function InfoCard({
   children,
   className = '',
   icon,
+  headerRight,
   isCollapsible = true,
   startExpanded = false,
   onExpand,
@@ -74,33 +76,43 @@ export function InfoCard({
           <h3>{title}</h3>
           <p className={styles.compactTitle}>{title}</p>
         </div>
-        {isCollapsible && (
-          <button
-            className={styles.toggleButton}
-            onClick={e => {
-              e.stopPropagation(); // Prevent double-trigger from header click
-              toggleExpanded();
-            }}
-            type="button"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="21"
-              viewBox="0 0 20 21"
-              fill="none"
-              className={!isExpanded ? styles.rotated : ''}
+        <div className={styles.headerRight}>
+          {headerRight && (
+            <div
+              className={styles.headerRightContent}
+              onClick={e => e.stopPropagation()}
             >
-              <path
-                d="M6 12.2539L10 7.80946L14 12.2539"
-                stroke="#99A1AF"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          </button>
-        )}
+              {headerRight}
+            </div>
+          )}
+          {isCollapsible && (
+            <button
+              className={styles.toggleButton}
+              onClick={e => {
+                e.stopPropagation(); // Prevent double-trigger from header click
+                toggleExpanded();
+              }}
+              type="button"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="21"
+                viewBox="0 0 20 21"
+                fill="none"
+                className={!isExpanded ? styles.rotated : ''}
+              >
+                <path
+                  d="M6 12.2539L10 7.80946L14 12.2539"
+                  stroke="#99A1AF"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
       {isExpanded && <div className={styles.body}>{children}</div>}
     </div>

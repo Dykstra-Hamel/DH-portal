@@ -212,15 +212,15 @@ export const statusOptions = [
 
 export const projectTypeOptions = [
   { value: 'none', label: 'None (no shortcode)', code: null },
-  { value: 'website', label: 'Website', code: 'WEB' },
-  { value: 'social', label: 'Social Media', code: 'SOC' },
-  { value: 'email', label: 'Email Media', code: 'EML' },
-  { value: 'print', label: 'Print Media', code: 'PRT' },
-  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
-  { value: 'digital', label: 'Digital Designs', code: 'DIG' },
-  { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
   { value: 'campaigns', label: 'Campaigns', code: 'CAM' },
+  { value: 'digital', label: 'Digital Designs', code: 'DIG' },
+  { value: 'email', label: 'Email Media', code: 'EML' },
+  { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
+  { value: 'print', label: 'Print Media', code: 'PRT' },
+  { value: 'social', label: 'Social Media', code: 'SOC' },
   { value: 'software', label: 'Software', code: 'SFT' },
+  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
+  { value: 'website', label: 'Website', code: 'WEB' },
 ];
 
 export const printSubtypes = [

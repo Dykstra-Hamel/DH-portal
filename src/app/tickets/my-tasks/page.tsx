@@ -57,7 +57,25 @@ export default function MyTasksPage() {
   });
 
   // Get tabs configuration
-  const tabs = useMemo(() => getTaskTabs(true), []);
+  const tabs = useMemo(() => {
+    const baseTabs = getTaskTabs(true);
+
+    return baseTabs.map(tab => {
+      if (tab.key !== 'all') return tab;
+
+      return {
+        ...tab,
+        filter: (tasks: Task[]) =>
+          tasks.filter(
+            task => !task.archived && task.status !== 'completed'
+          ),
+        getCount: (tasks: Task[]) =>
+          tasks.filter(
+            task => !task.archived && task.status !== 'completed'
+          ).length,
+      };
+    });
+  }, []);
 
   // Handle tab change
   const handleTabChange = useCallback((newTab: string) => {

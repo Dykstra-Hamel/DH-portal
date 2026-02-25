@@ -321,7 +321,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         const response = await fetch(`/api/admin/project-types/${typeCode}/subtypes`);
         if (response.ok) {
           const data = await response.json();
-          setAvailableSubtypes(data);
+          setAvailableSubtypes([...data].sort((a, b) => a.name.localeCompare(b.name)));
         } else {
           setAvailableSubtypes([]);
         }

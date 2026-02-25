@@ -11,6 +11,7 @@ import {
   PageActionsProvider,
   usePageActions,
 } from '@/contexts/PageActionsContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
 import { ProjectActionMenu } from '../GlobalLowerHeader/ProjectActionMenu';
 import BackToTopButton from '@/components/Common/BackToTopButton/BackToTopButton';
@@ -32,6 +33,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     pathname === '/login' ||
     pathname === '/sign-up' ||
     pathname === '/unsubscribe' ||
+    pathname === '/recording' ||
     pathname.match(/^\/login\/[^\/]+$/);
   const isHomePage = pathname === '/';
   const isQuotePage = pathname.match(/^\/[^\/]+\/quote\/[^\/]+$/);
@@ -554,9 +556,11 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
     <NavigationProvider>
       <CompanyProvider>
-        <PageActionsProvider>
-          <LayoutContent>{children}</LayoutContent>
-        </PageActionsProvider>
+        <NotificationProvider>
+          <PageActionsProvider>
+            <LayoutContent>{children}</LayoutContent>
+          </PageActionsProvider>
+        </NotificationProvider>
       </CompanyProvider>
     </NavigationProvider>
   );

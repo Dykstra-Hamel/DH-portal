@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
@@ -49,9 +50,31 @@ interface MentionListItem {
 }
 
 const MENTIONS_PAGE_SIZE = 5;
+const PROJECTS_CARD_EXPANDED_COOKIE = 'admin_tasks_projects_expanded';
+
+const getBooleanCookie = (name: string, fallback = false): boolean => {
+  if (typeof document === 'undefined') return fallback;
+  const cookieEntry = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`));
+
+  if (!cookieEntry) return fallback;
+
+  const value = decodeURIComponent(cookieEntry.slice(name.length + 1));
+  return value === '1' || value === 'true';
+};
+
+const setBooleanCookie = (name: string, value: boolean, days = 365) => {
+  if (typeof document === 'undefined') return;
+  const expires = new Date(
+    Date.now() + days * 24 * 60 * 60 * 1000
+  ).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value ? '1' : '0')}; expires=${expires}; path=/; SameSite=Lax`;
+};
 
 export default function AdminTasksPage() {
   const { registerPageAction } = usePageActions();
+  const { markAsRead } = useNotificationContext();
   const { user } = useUser();
   const { isStarred, toggleStar, refetch: refetchStarredItems } = useStarredItems();
   const [currentView, setCurrentView] = useState<ViewType>(() => {
@@ -78,6 +101,10 @@ export default function AdminTasksPage() {
   const [showAllMentions, setShowAllMentions] = useState(false);
   const [hasAnyMentions, setHasAnyMentions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [projectsCardExpandPreference, setProjectsCardExpandPreference] =
+    useState(false);
+  const [projectsCardPreferenceLoaded, setProjectsCardPreferenceLoaded] =
+    useState(false);
 
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
@@ -454,11 +481,8 @@ export default function AdminTasksPage() {
   const handleMentionClick = useCallback(async (mention: MentionListItem) => {
     try {
       if (!mention.read) {
-        const headers = await getAuthHeaders();
-        await fetch(`/api/notifications/${mention.notificationId}/read`, {
-          method: 'POST',
-          headers,
-        });
+        // Use shared context markAsRead so bell badge updates immediately
+        await markAsRead(mention.notificationId);
 
         if (showAllMentions) {
           setMentions((prev) =>
@@ -469,7 +493,6 @@ export default function AdminTasksPage() {
             )
           );
         } else {
-          // Remove the mention from the list since it's now read
           setMentions((prev) =>
             prev.filter((item) => item.notificationId !== mention.notificationId)
           );
@@ -486,8 +509,7 @@ export default function AdminTasksPage() {
     } else if (mention.referenceType === 'monthly_service_comment' && mention.monthlyServiceId) {
       window.location.href = `/admin/monthly-services/${mention.monthlyServiceId}?commentId=${mention.referenceId}`;
     }
-
-  }, [openTaskDetailById, showAllMentions]);
+  }, [markAsRead, openTaskDetailById, showAllMentions]);
 
   const handleShowAllMentions = useCallback(async () => {
     await fetchMentions({ reset: true, offset: 0, unreadOnly: false });
@@ -701,6 +723,21 @@ export default function AdminTasksPage() {
     }
   }, [currentView]);
 
+  useEffect(() => {
+    setProjectsCardExpandPreference(
+      getBooleanCookie(PROJECTS_CARD_EXPANDED_COOKIE, false)
+    );
+    setProjectsCardPreferenceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!projectsCardPreferenceLoaded) return;
+    setBooleanCookie(
+      PROJECTS_CARD_EXPANDED_COOKIE,
+      projectsCardExpandPreference
+    );
+  }, [projectsCardExpandPreference, projectsCardPreferenceLoaded]);
+
   const viewTabs = (
     <div className={styles.viewTabs}>
       <button
@@ -833,6 +870,10 @@ export default function AdminTasksPage() {
                   onLoadAllMentions={loadAllPastMentions}
                   onShowAllMentions={handleShowAllMentions}
                   onHideReadMentions={handleHideReadMentions}
+                  projectsCardExpandPreference={projectsCardExpandPreference}
+                  onProjectsCardExpandPreferenceChange={
+                    setProjectsCardExpandPreference
+                  }
                 />
               )}
               {currentView === 'calendar' && (
@@ -875,6 +916,10 @@ export default function AdminTasksPage() {
                   onLoadAllMentions={loadAllPastMentions}
                   onShowAllMentions={handleShowAllMentions}
                   onHideReadMentions={handleHideReadMentions}
+                  projectsCardExpandPreference={projectsCardExpandPreference}
+                  onProjectsCardExpandPreferenceChange={
+                    setProjectsCardExpandPreference
+                  }
                   archiveMode
                 />
               )}

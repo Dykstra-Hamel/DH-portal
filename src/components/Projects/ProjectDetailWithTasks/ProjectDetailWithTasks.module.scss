@@ -417,6 +417,20 @@
   font-weight: 500;
 }
 
+.uploadProgressBarCompact {
+  width: 110px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gray-200, #e5e7eb);
+  overflow: hidden;
+}
+
+.uploadProgressCompactLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-700, #374151);
+}
+
 .deleteImageButton {
   position: absolute;
   top: 8px;
@@ -1006,6 +1020,33 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.uploadProgressContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.uploadProgressLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-600, #4b5563);
+}
+
+.uploadProgressBar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gray-200, #e5e7eb);
+  overflow: hidden;
+}
+
+.uploadProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--action-500, #0ea5e9);
+  transition: width 0.2s ease;
 }
 
 .pendingAttachment {
