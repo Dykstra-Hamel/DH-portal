@@ -509,6 +509,15 @@
       background: var(--action-700, #0369a1);
     }
   }
+
+  &.disabledDay {
+    color: var(--gray-300, #d1d5db);
+    cursor: not-allowed;
+
+    &:hover {
+      background: transparent;
+    }
+  }
 }
 
 .clearDateButton {

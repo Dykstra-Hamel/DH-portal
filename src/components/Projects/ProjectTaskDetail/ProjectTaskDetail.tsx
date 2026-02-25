@@ -73,6 +73,18 @@ interface ProjectTaskDetailProps {
   currentUserId?: string; // Current user's ID for checking comment ownership
 }
 
+type UploadProgressState = {
+  active: boolean;
+  completed: number;
+  total: number;
+};
+
+const EMPTY_UPLOAD_PROGRESS: UploadProgressState = {
+  active: false,
+  completed: 0,
+  total: 0,
+};
+
 export default function ProjectTaskDetail({
   task,
   onClose,
@@ -100,6 +112,8 @@ export default function ProjectTaskDetail({
   const [isUpdatingComment, setIsUpdatingComment] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [commentUploadProgress, setCommentUploadProgress] =
+    useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
   const commentComposerDragCounterRef = useRef(0);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
@@ -570,6 +584,13 @@ export default function ProjectTaskDetail({
 
   if (!task) return null;
 
+  const commentUploadPercent =
+    commentUploadProgress.total > 0
+      ? Math.round(
+          (commentUploadProgress.completed / commentUploadProgress.total) * 100
+        )
+      : 0;
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRichTextEmpty(newComment) && pendingAttachments.length === 0) return;
@@ -586,32 +607,77 @@ export default function ProjectTaskDetail({
       // Upload attachments if any
       if (pendingAttachments.length > 0) {
         const supabase = createClient();
-        const fileMetadata = [];
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        setCommentUploadProgress({
+          active: true,
+          completed: 0,
+          total: pendingAttachments.length,
+        });
 
-        // Upload each file to storage using the createdComment.id
-        for (const file of pendingAttachments) {
-          const timestamp = Date.now();
-          const sanitizedName = sanitizeFileName(file.name);
-          const filePath = `comment-attachments/tasks/${task.id}/${createdComment.id}/${timestamp}-${sanitizedName}`;
+        const uploadResults = await Promise.allSettled(
+          pendingAttachments.map(async (file) => {
+            if (file.size > MAX_FILE_SIZE) {
+              throw new Error(`File "${file.name}" exceeds 50MB limit`);
+            }
 
-          const { error: uploadError } = await supabase.storage
-            .from('brand-assets')
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              upsert: false,
-            });
+            const timestamp = Date.now();
+            const sanitizedName = sanitizeFileName(file.name);
+            const filePath = `comment-attachments/tasks/${task.id}/${createdComment.id}/${timestamp}-${sanitizedName}`;
 
-          if (uploadError) {
-            console.error('Storage upload error:', uploadError);
-            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+            const { error: uploadError } = await supabase.storage
+              .from('brand-assets')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (uploadError) {
+              throw new Error(
+                `Failed to upload "${file.name}": ${uploadError.message}`
+              );
+            }
+
+            setCommentUploadProgress((prev) => ({
+              ...prev,
+              completed: Math.min(prev.total, prev.completed + 1),
+            }));
+
+            return {
+              file_path: filePath,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+            };
+          })
+        );
+
+        const fileMetadata = uploadResults
+          .filter(
+            (
+              result
+            ): result is PromiseFulfilledResult<{
+              file_path: string;
+              file_name: string;
+              file_size: number;
+              mime_type: string;
+            }> => result.status === 'fulfilled'
+          )
+          .map((result) => result.value);
+
+        const firstFailedUpload = uploadResults.find(
+          (result) => result.status === 'rejected'
+        );
+
+        if (firstFailedUpload) {
+          if (fileMetadata.length > 0) {
+            await supabase.storage
+              .from('brand-assets')
+              .remove(fileMetadata.map((file) => file.file_path));
           }
-
-          fileMetadata.push({
-            file_path: filePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
-          });
+          const reason = (firstFailedUpload as PromiseRejectedResult).reason;
+          throw reason instanceof Error
+            ? reason
+            : new Error('Failed to upload one or more attachments');
         }
 
         // Save metadata via API
@@ -642,6 +708,7 @@ export default function ProjectTaskDetail({
       alert('Failed to post comment. Please try again.');
     } finally {
       setIsSubmittingComment(false);
+      setCommentUploadProgress(EMPTY_UPLOAD_PROGRESS);
     }
   };
 
@@ -1465,6 +1532,20 @@ export default function ProjectTaskDetail({
                     ))}
                   </div>
                 )}
+                {commentUploadProgress.active && (
+                  <div className={styles.uploadProgressContainer}>
+                    <div className={styles.uploadProgressLabel}>
+                      Uploading attachments {commentUploadProgress.completed}/
+                      {commentUploadProgress.total} ({commentUploadPercent}%)
+                    </div>
+                    <div className={styles.uploadProgressBar}>
+                      <div
+                        className={styles.uploadProgressFill}
+                        style={{ width: `${commentUploadPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <input
                 ref={commentFileInputRef}
@@ -1495,7 +1576,11 @@ export default function ProjectTaskDetail({
                 disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
                 className={styles.commentSubmitButton}
               >
-                {isSubmittingComment ? 'Posting...' : 'Post Comment'}
+                {isSubmittingComment
+                  ? commentUploadProgress.active
+                    ? `Uploading ${commentUploadPercent}%`
+                    : 'Posting...'
+                  : 'Post Comment'}
               </button>
             </form>
 

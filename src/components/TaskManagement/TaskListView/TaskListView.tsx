@@ -116,6 +116,8 @@ interface TaskListViewProps {
   onLoadAllMentions?: () => Promise<MentionItem[]>;
   onShowAllMentions?: () => void | Promise<void>;
   onHideReadMentions?: () => void | Promise<void>;
+  projectsCardExpandPreference?: boolean;
+  onProjectsCardExpandPreferenceChange?: (expanded: boolean) => void;
   archiveMode?: boolean;
 }
 
@@ -146,6 +148,8 @@ export function TaskListView({
   onLoadAllMentions,
   onShowAllMentions,
   onHideReadMentions,
+  projectsCardExpandPreference,
+  onProjectsCardExpandPreferenceChange,
   archiveMode = false,
 }: TaskListViewProps) {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
@@ -821,6 +825,45 @@ export function TaskListView({
     getTaskCompletionSortValue,
   ]);
 
+  const projectGroupIdsWithTasks = useMemo(
+    () =>
+      groupedTasks.projectGroups
+        .filter(projectGroup => projectGroup.project?.id && projectGroup.tasks.length > 0)
+        .map(projectGroup => projectGroup.project!.id),
+    [groupedTasks.projectGroups]
+  );
+
+  const areAllProjectGroupsExpanded = useMemo(() => {
+    if (projectGroupIdsWithTasks.length === 0) return false;
+    return projectGroupIdsWithTasks.every(
+      projectId => !!expandedProjectsSectionProjects[projectId]
+    );
+  }, [projectGroupIdsWithTasks, expandedProjectsSectionProjects]);
+
+  useEffect(() => {
+    if (!groupTasksByProject) return;
+    if (typeof projectsCardExpandPreference !== 'boolean') return;
+    if (projectGroupIdsWithTasks.length === 0) return;
+
+    setExpandedProjectsSectionProjects(prev => {
+      const next = { ...prev };
+      let changed = false;
+
+      projectGroupIdsWithTasks.forEach(projectId => {
+        if (next[projectId] !== projectsCardExpandPreference) {
+          next[projectId] = projectsCardExpandPreference;
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [
+    groupTasksByProject,
+    projectGroupIdsWithTasks,
+    projectsCardExpandPreference,
+  ]);
+
   const getInitialCalendarMonth = (task?: Task) => {
     if (task?.due_date) {
       const parsed = parseDateString(task.due_date);
@@ -999,6 +1042,23 @@ export function TaskListView({
       [projectId]: !prev[projectId],
     }));
   }, []);
+
+  const setAllProjectsSectionExpanded = useCallback(
+    (nextExpanded: boolean) => {
+      if (projectGroupIdsWithTasks.length === 0) return;
+
+      setExpandedProjectsSectionProjects(prev => {
+        const next = { ...prev };
+        projectGroupIdsWithTasks.forEach(projectId => {
+          next[projectId] = nextExpanded;
+        });
+        return next;
+      });
+
+      onProjectsCardExpandPreferenceChange?.(nextExpanded);
+    },
+    [projectGroupIdsWithTasks, onProjectsCardExpandPreferenceChange]
+  );
 
   // Project-level handlers
   const handleProjectCalendarClick = (
@@ -2514,6 +2574,25 @@ export function TaskListView({
               title="Projects"
               isCollapsible={true}
               startExpanded={true}
+              headerRight={
+                <div className={styles.projectsCardHeaderToggleRow}>
+                  <label className={styles.projectsCardToggle}>
+                    <input
+                      type="checkbox"
+                      checked={areAllProjectGroupsExpanded}
+                      onChange={event =>
+                        setAllProjectsSectionExpanded(event.target.checked)
+                      }
+                      aria-label="Expand all projects"
+                      disabled={projectGroupIdsWithTasks.length === 0}
+                    />
+                    <span className={styles.projectsCardToggleSlider}></span>
+                  </label>
+                  <span className={styles.projectsCardToggleText}>
+                    {areAllProjectGroupsExpanded ? 'Collapse' : 'Expand'}
+                  </span>
+                </div>
+              }
             >
               <div className={styles.groupedTasks}>
                 {groupedTasks.projectGroups.length === 0 ? (

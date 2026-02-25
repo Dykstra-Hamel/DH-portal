@@ -301,7 +301,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
         const response = await fetch(`/api/admin/project-types/${formData.type_code}/subtypes`);
         if (response.ok) {
           const data = await response.json();
-          setAvailableSubtypes(data);
+          setAvailableSubtypes([...data].sort((a, b) => a.name.localeCompare(b.name)));
         } else {
           setAvailableSubtypes([]);
         }

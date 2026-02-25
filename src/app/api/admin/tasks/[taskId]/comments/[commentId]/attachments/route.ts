@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
-import { STORAGE_CONFIG, sanitizeFileName } from '@/lib/storage-utils';
+import { STORAGE_CONFIG } from '@/lib/storage-utils';
 
 // GET /api/admin/tasks/[taskId]/comments/[commentId]/attachments - List attachments
 export async function GET(
@@ -109,7 +109,6 @@ export async function POST(
       );
     }
 
-    const uploadedAttachments = [];
     const allowedTypes = STORAGE_CONFIG.ATTACHMENT_ALLOWED_TYPES as readonly string[];
 
     for (const file of files) {
@@ -138,39 +137,40 @@ export async function POST(
       }
 
       // File verification skipped - client already uploaded successfully
+    }
 
-      // Create attachment record
-      const { data: attachment, error: insertError } = await supabase
-        .from('comment_attachments')
-        .insert({
-          task_comment_id: commentId,
-          file_path: file.file_path,
-          file_name: file.file_name,
-          file_size: file.file_size,
-          mime_type: file.mime_type,
-          uploaded_by: user.id,
-        })
-        .select()
-        .single();
+    const recordsToInsert = files.map((file) => ({
+      task_comment_id: commentId,
+      file_path: file.file_path,
+      file_name: file.file_name,
+      file_size: file.file_size,
+      mime_type: file.mime_type,
+      uploaded_by: user.id,
+    }));
 
-      if (insertError) {
-        console.error('Error creating attachment record:', insertError);
-        return NextResponse.json(
-          { error: 'Failed to create attachment record' },
-          { status: 500 }
-        );
-      }
+    const { data: attachments, error: insertError } = await supabase
+      .from('comment_attachments')
+      .insert(recordsToInsert)
+      .select();
 
-      // Get public URL
+    if (insertError) {
+      console.error('Error creating attachment records:', insertError);
+      return NextResponse.json(
+        { error: 'Failed to create attachment records' },
+        { status: 500 }
+      );
+    }
+
+    const uploadedAttachments = (attachments || []).map((attachment) => {
       const { data: urlData } = supabase.storage
         .from(STORAGE_CONFIG.BUCKET_NAME)
-        .getPublicUrl(file.file_path);
+        .getPublicUrl(attachment.file_path);
 
-      uploadedAttachments.push({
+      return {
         ...attachment,
         url: urlData.publicUrl,
-      });
-    }
+      };
+    });
 
     return NextResponse.json(uploadedAttachments, { status: 201 });
   } catch (error) {

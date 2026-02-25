@@ -196,6 +196,67 @@ export function useNotifications() {
 
     const channel = setupChannel();
 
+    // Also subscribe to the user's personal channel so cross-company mention
+    // notifications are received regardless of which company is currently selected
+    const userChannelName = `user:${userId}:notifications`;
+    const supabaseForUserChannel = createClient();
+    const userChannel = supabaseForUserChannel
+      .channel(userChannelName, {
+        config: {
+          broadcast: { self: true, ack: true },
+        },
+      })
+      .on('broadcast', { event: 'notification_update' }, (payload: any) => {
+        const { action, notification } = payload.payload;
+
+        // Only process notifications for the current user
+        if (notification.user_id !== userId) {
+          return;
+        }
+
+        // Only process mention notifications on this channel (company channel handles the rest)
+        if (notification.type !== 'mention') {
+          return;
+        }
+
+        // Skip if this notification belongs to the current company (already handled by company channel)
+        if (notification.company_id === companyId) {
+          return;
+        }
+
+        try {
+          if (action === 'INSERT') {
+            const newNotification = notification as Notification;
+            setNotifications(prev => [newNotification, ...prev]);
+            setUnreadCount(prev => prev + 1);
+          } else if (action === 'UPDATE') {
+            const updatedNotification = notification as Notification;
+            setNotifications(prev =>
+              prev.map(notif =>
+                notif.id === updatedNotification.id ? updatedNotification : notif
+              )
+            );
+            setNotifications(currentNotifications => {
+              const unreadCount = currentNotifications.filter(n => !n.read).length;
+              setUnreadCount(unreadCount);
+              return currentNotifications;
+            });
+          } else if (action === 'DELETE') {
+            const deletedId = notification.id;
+            const wasUnread = notification.read === false;
+            setNotifications(prev => prev.filter(notif => notif.id !== deletedId));
+            if (wasUnread) {
+              setUnreadCount(prev => Math.max(0, prev - 1));
+            }
+          }
+        } catch (error) {
+          if (isDevelopment) {
+            console.error(`Error processing user-channel notification ${action}:`, error);
+          }
+        }
+      })
+      .subscribe();
+
     // Initial fetch - call directly instead of using from dependency
     fetchNotifications();
 
@@ -209,6 +270,7 @@ export function useNotifications() {
         const supabase = createClient();
         supabase.removeChannel(channel);
       }
+      supabaseForUserChannel.removeChannel(userChannel);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, companyId, companyLoading]); // Removed fetchNotifications to prevent cascade
@@ -227,7 +289,13 @@ export function useNotifications() {
         throw new Error('Failed to mark notification as read');
       }
 
-      // Real-time subscription will handle the state update automatically
+      // Optimistically update local state immediately
+      setNotifications(prev =>
+        prev.map(notif =>
+          notif.id === notificationId ? { ...notif, read: true } : notif
+        )
+      );
+      setUnreadCount(prev => Math.max(0, prev - 1));
     } catch (err) {
       console.error('Error marking notification as read:', err);
       setError(
@@ -355,6 +423,23 @@ export function useNotifications() {
           } catch (error) {
             console.error('Error resolving task comment notification:', error);
             router.push('/admin/project-management');
+          }
+          break;
+        case 'monthly_service_comment':
+          try {
+            const response = await fetch(
+              `/api/admin/notifications/comment-reference?type=monthly_service_comment&commentId=${notification.reference_id}`
+            );
+            if (!response.ok) throw new Error('Failed to resolve monthly service comment');
+            const data = await response.json();
+            if (data.serviceId) {
+              router.push(`/admin/monthly-services/${data.serviceId}`);
+            } else {
+              router.push('/admin/monthly-services');
+            }
+          } catch (error) {
+            console.error('Error resolving monthly service comment notification:', error);
+            router.push('/admin/monthly-services');
           }
           break;
         default:

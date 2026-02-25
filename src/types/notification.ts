@@ -23,7 +23,8 @@ export interface Notification {
     | 'customer'
     | 'support_case'
     | 'project_comment'
-    | 'task_comment';
+    | 'task_comment'
+    | 'monthly_service_comment';
   assigned_to?: string;
   read: boolean;
   created_at: string;

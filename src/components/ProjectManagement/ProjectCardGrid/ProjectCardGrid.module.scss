@@ -1,9 +1,30 @@
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
   margin: 10px 0;
   max-width: 1309px;
+
+  & > * {
+    animation: cardFadeIn 0.2s ease-out both;
+
+    @for $i from 1 through 24 {
+      &:nth-child(#{$i}) {
+        animation-delay: #{($i - 1) * 35}ms;
+      }
+    }
+  }
 }
 
 @media (max-width: 1200px) {

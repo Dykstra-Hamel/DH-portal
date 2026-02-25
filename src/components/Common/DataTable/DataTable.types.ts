@@ -42,6 +42,7 @@ export interface DataTableProps<T> {
 
   // Infinite scroll
   infiniteScrollEnabled?: boolean;
+  visibleCount?: number; // Optional client-side visible row limit applied after sorting
   hasMore?: boolean;
   onLoadMore?: () => void;
   loadingMore?: boolean;

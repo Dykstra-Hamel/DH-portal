@@ -53,6 +53,7 @@ interface ProjectTaskListProps {
   isLoading?: boolean;
   showHeader?: boolean;
   onAddTask?: () => void;
+  projectDueDate?: string | null;
   blockedTaskHoverRef?: {
     id: string | null;
     title: string | null;
@@ -75,6 +76,7 @@ export default function ProjectTaskList({
   isLoading = false,
   showHeader = true,
   onAddTask,
+  projectDueDate,
   blockedTaskHoverRef,
   onBlockedTaskHoverChange,
 }: ProjectTaskListProps) {
@@ -235,6 +237,7 @@ export default function ProjectTaskList({
   };
 
   const handleDateSelect = async (taskId: string, date: string) => {
+    if (date && projectDueDate && date > projectDueDate) return;
     if (onUpdateTask) {
       await onUpdateTask(taskId, { due_date: date });
     }
@@ -355,11 +358,15 @@ export default function ProjectTaskList({
       const lastDay = new Date(year, month + 1, 0);
       const startPadding = firstDay.getDay();
 
+      const toISODate = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
       const days: {
         date: Date;
         isCurrentMonth: boolean;
         isToday: boolean;
         isSelected: boolean;
+        isDisabled: boolean;
       }[] = [];
 
       // Previous month padding
@@ -370,6 +377,7 @@ export default function ProjectTaskList({
           isCurrentMonth: false,
           isToday: false,
           isSelected: false,
+          isDisabled: !!(projectDueDate && toISODate(date) > projectDueDate),
         });
       }
 
@@ -383,6 +391,7 @@ export default function ProjectTaskList({
           isSelected: selectedDate
             ? date.toDateString() === selectedDate.toDateString()
             : false,
+          isDisabled: !!(projectDueDate && toISODate(date) > projectDueDate),
         });
       }
 
@@ -395,6 +404,7 @@ export default function ProjectTaskList({
           isCurrentMonth: false,
           isToday: false,
           isSelected: false,
+          isDisabled: !!(projectDueDate && toISODate(date) > projectDueDate),
         });
       }
 
@@ -711,7 +721,9 @@ export default function ProjectTaskList({
                               ${!day.isCurrentMonth ? styles.otherMonth : ''}
                               ${day.isToday ? styles.today : ''}
                               ${day.isSelected ? styles.selected : ''}
+                              ${day.isDisabled ? styles.disabledDay : ''}
                             `}
+                            disabled={day.isDisabled}
                             onClick={() =>
                               handleDateSelect(
                                 task.id,
