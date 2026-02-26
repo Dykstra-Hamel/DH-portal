@@ -64,20 +64,22 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             pageHeader?.description ||
             'Manage your projects across all phases.',
           showAddButton: false,
-          projectFilterControls: pageHeader?.projectFilterControls,
           customActions: (
-            <ProjectActionMenu
-              onNewProjectFromScratch={
-                getPageAction('add-project') || (() => {})
-              }
-              onNewProjectFromTemplate={
-                getPageAction('create-from-template') || (() => {})
-              }
-              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
-              onNewTaskFromTemplate={
-                getPageAction('add-task-from-template') || (() => {})
-              }
-            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              {pageHeader?.customActions}
+              <ProjectActionMenu
+                onNewProjectFromScratch={
+                  getPageAction('add-project') || (() => {})
+                }
+                onNewProjectFromTemplate={
+                  getPageAction('create-from-template') || (() => {})
+                }
+                onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+                onNewTaskFromTemplate={
+                  getPageAction('add-task-from-template') || (() => {})
+                }
+              />
+            </div>
           ),
         };
       case '/project-management/tasks':
@@ -188,20 +190,22 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description:
             pageHeader?.description || 'Internal Project and Task Management',
           showAddButton: false,
-          projectFilterControls: pageHeader?.projectFilterControls,
           customActions: (
-            <ProjectActionMenu
-              onNewProjectFromScratch={
-                getPageAction('add-project') || (() => {})
-              }
-              onNewProjectFromTemplate={
-                getPageAction('create-from-template') || (() => {})
-              }
-              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
-              onNewTaskFromTemplate={
-                getPageAction('add-task-from-template') || (() => {})
-              }
-            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              {pageHeader?.customActions}
+              <ProjectActionMenu
+                onNewProjectFromScratch={
+                  getPageAction('add-project') || (() => {})
+                }
+                onNewProjectFromTemplate={
+                  getPageAction('create-from-template') || (() => {})
+                }
+                onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+                onNewTaskFromTemplate={
+                  getPageAction('add-task-from-template') || (() => {})
+                }
+              />
+            </div>
           ),
         };
       case '/admin/project-management/templates':
@@ -525,7 +529,6 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               supportCaseAssignmentControls={
                 pageConfig.supportCaseAssignmentControls
               }
-              projectFilterControls={pageConfig.projectFilterControls}
               customActions={pageConfig.customActions}
             />
           )}
