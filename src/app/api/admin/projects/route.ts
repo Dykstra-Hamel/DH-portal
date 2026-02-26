@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
     const scope = searchParams.get('scope') || 'internal'; // internal, client, all
     const categoryId = searchParams.get('categoryId');
     const assignedTo = searchParams.get('assignedTo');
+    const memberId = searchParams.get('memberId'); // filter by project membership
     const scopeFilter = searchParams.get('scopeFilter'); // NEW: e.g., 'internal,both' or 'external,both'
     const isBillable = searchParams.get('isBillable'); // NEW: filter by is_billable
 
@@ -104,6 +105,28 @@ export async function GET(request: NextRequest) {
     // Apply category filter if provided
     if (categoryId) {
       query = query.eq('categories.category_id', categoryId);
+    }
+
+    // Apply member filter if provided (filter to projects where user is a member)
+    if (memberId) {
+      const { data: memberProjects, error: memberProjectsError } = await supabase
+        .from('project_members')
+        .select('project_id')
+        .eq('user_id', memberId);
+
+      if (memberProjectsError) {
+        console.error('Error fetching member projects:', memberProjectsError);
+        return NextResponse.json(
+          { error: 'Failed to filter by project member' },
+          { status: 500 }
+        );
+      }
+
+      const memberProjectIds = (memberProjects || []).map(mp => mp.project_id);
+      if (memberProjectIds.length === 0) {
+        return NextResponse.json([]);
+      }
+      query = query.in('id', memberProjectIds);
     }
 
     const { data: projects, error } = await query;

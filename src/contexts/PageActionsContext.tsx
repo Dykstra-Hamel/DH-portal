@@ -50,21 +50,6 @@ interface SupportCaseAssignmentControls {
   onStatusChange: (status: string) => void;
 }
 
-interface ProjectFilterControls {
-  selectedCompanyId?: string | null;
-  selectedAssignedTo?: string | null | undefined;
-  selectedStatus?: string | null;
-  selectedCategoryId?: string | null;
-  companies: Array<{ id: string; name: string }>;
-  categories?: Array<{ id: string; name: string; count?: number }>;
-  assignableUsers: AssignableUser[];
-  currentUser: { id: string; name: string; email: string; avatar?: string };
-  onCompanyChange: (companyId: string | null) => void;
-  onAssignedToChange: (userId: string | null) => void;
-  onStatusChange?: (status: string | null) => void;
-  onCategoryChange?: (categoryId: string | null) => void;
-}
-
 interface PageHeaderConfig {
   title: ReactNode;
   description: string;
@@ -72,7 +57,6 @@ interface PageHeaderConfig {
   titleLogo?: ReactNode;
   leadAssignmentControls?: LeadAssignmentControls;
   supportCaseAssignmentControls?: SupportCaseAssignmentControls;
-  projectFilterControls?: ProjectFilterControls;
   customActions?: ReactNode;
 }
 
