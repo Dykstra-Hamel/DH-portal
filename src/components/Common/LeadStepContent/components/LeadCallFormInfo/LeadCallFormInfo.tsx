@@ -37,19 +37,25 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
 
   const getLeadSourceDisplay = (source: string): string => {
     const sourceMap: Record<string, string> = {
-      organic: 'Organic',
-      referral: 'Referral',
-      google_cpc: 'Google CPC',
+      // New taxonomy values
+      google_ads: 'Google Ads',
+      google_organic: 'Google Organic',
       facebook_ads: 'Facebook Ads',
+      referral: 'Referral',
+      direct: 'Direct',
+      campaign: 'Campaign',
+      widget: 'Widget',
+      other: 'Other',
+      // Legacy values
+      organic: 'Google Organic',
+      google_cpc: 'Google Ads',
       linkedin: 'LinkedIn',
       email_campaign: 'Email Campaign',
       cold_call: 'Cold Call',
       trade_show: 'Trade Show',
       webinar: 'Webinar',
       content_marketing: 'Content Marketing',
-      campaign: 'Campaign',
-      widget_submission: 'Widget Submission',
-      other: 'Other',
+      widget_submission: 'Widget',
     };
     return sourceMap[source] || capitalizeFirst(source);
   };
@@ -102,10 +108,10 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
 
   return (
     <>
-      {lead.lead_type === 'web_form' || lead.lead_source === 'campaign' ? (
+      {lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' || lead.lead_source === 'campaign' ? (
         <>
           {/* Widget Details Section - only for widget submissions */}
-          {lead.lead_source === 'widget_submission' && (
+          {(lead.lead_source === 'widget' || lead.lead_source === 'widget_submission') && (
             <div className={styles.cardContent}>
               <div className={styles.callInsightsSection}>
                 <h4 className={cardStyles.defaultText}>Widget Details:</h4>
@@ -207,7 +213,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             </div>
           )}
         </>
-      ) : lead.lead_type === 'other' ? (
+      ) : lead.lead_type === 'manual' || lead.lead_type === 'other' ? (
         <div className={styles.cardContent}>
           <div className={styles.callInsightsSection}>
             <h4 className={cardStyles.defaultText}>Attribution Details:</h4>

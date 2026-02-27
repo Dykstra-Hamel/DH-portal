@@ -8,6 +8,7 @@ import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import Image from 'next/image';
 import { Users, ChevronDown } from 'lucide-react';
+import { leadFormatOptions, leadSourceOptions, leadTypesByFormat } from '@/types/lead';
 import styles from './AddLeadModal.module.scss';
 
 interface AddLeadModalProps {
@@ -48,6 +49,11 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     departmentType: 'sales',
     enabled: isOpen,
   });
+
+  // Single lead taxonomy state
+  const [leadFormat, setLeadFormat] = useState<string>('call');
+  const [leadSource, setLeadSource] = useState<string>('direct');
+  const [leadType, setLeadType] = useState<string>('inbound_call');
 
   // Single lead form state
   const [singleLeadData, setSingleLeadData] = useState({
@@ -140,6 +146,9 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     setCustomers([]);
     setSelectedAssignee('');
     setIsAssignmentDropdownOpen(false);
+    setLeadFormat('call');
+    setLeadSource('direct');
+    setLeadType('inbound_call');
     setSingleLeadData({
       firstName: '',
       lastName: '',
@@ -206,6 +215,9 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
           customerId,
           assignedTo: isTeamAssignment() ? undefined : (selectedAssignee || undefined),
           status: selectedAssignee ? 'assigned' : 'unassigned',
+          leadFormat,
+          leadSource,
+          leadType,
         }),
       });
 
@@ -543,6 +555,51 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Lead Taxonomy: Format, Source, Type */}
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label>Format *</label>
+                <select
+                  required
+                  value={leadFormat}
+                  onChange={(e) => {
+                    const fmt = e.target.value;
+                    setLeadFormat(fmt);
+                    const firstType = leadTypesByFormat[fmt]?.[0]?.value || 'manual';
+                    setLeadType(firstType);
+                  }}
+                >
+                  {leadFormatOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Source *</label>
+                <select
+                  required
+                  value={leadSource}
+                  onChange={(e) => setLeadSource(e.target.value)}
+                >
+                  {leadSourceOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className={styles.formGroup}>
+              <label>Type *</label>
+              <select
+                required
+                value={leadType}
+                onChange={(e) => setLeadType(e.target.value)}
+              >
+                {(leadTypesByFormat[leadFormat] || leadTypesByFormat['call']).map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             </div>
 
             {/* Assignment Dropdown */}

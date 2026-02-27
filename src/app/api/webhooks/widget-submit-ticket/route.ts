@@ -14,6 +14,7 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { deriveSource } from '@/lib/taxonomy/derive-source';
 
 
 export async function OPTIONS(request: NextRequest) {
@@ -356,8 +357,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Set ticket source as widget for widget chat submissions
-    const ticketSource = 'widget';
+    // Derive ticket source from attribution signals
+    const ticketSource = deriveSource({
+      gclid: submission.gclid || null,
+      fbclid: submission.fbclid || null,
+      utm_source: submission.utm_source || null,
+      isWidget: true,
+    });
 
     // Create ticket with enhanced attribution data
     const { data: ticket, error: ticketError } = await supabase
@@ -367,7 +373,8 @@ export async function POST(request: NextRequest) {
           company_id: submission.companyId,
           customer_id: customerId,
           source: ticketSource,
-          type: 'web_form',
+          type: 'widget_form',
+          format: 'form',
           status: status,
           priority,
           description: notes,

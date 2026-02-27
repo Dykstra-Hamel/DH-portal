@@ -1,3 +1,15 @@
+export type SupportCaseFormat = 'call' | 'form' | 'email' | 'text';
+
+export type SupportCaseSource =
+  | 'google_ads'
+  | 'google_organic'
+  | 'facebook_ads'
+  | 'referral'
+  | 'direct'
+  | 'campaign'
+  | 'widget'
+  | 'other';
+
 export type SupportCaseIssueType =
   | 'billing'
   | 'scheduling'
@@ -22,29 +34,33 @@ export interface SupportCase {
   company_id: string;
   customer_id?: string;
   ticket_id?: string;
-  
+
+  // Attribution fields
+  format?: SupportCaseFormat;
+  source?: SupportCaseSource;
+
   // Support case specific fields
   issue_type: SupportCaseIssueType;
   summary: string;
   description?: string;
   resolution_action?: string;
   notes?: string;
-  
+
   // Workflow and assignment
   status: SupportCaseStatus;
   assigned_to?: string;
-  
+
   // Priority and tracking
   priority: SupportCasePriority;
   first_response_at?: string;
   resolved_at?: string;
   closed_at?: string;
-  
+
   // Customer satisfaction
   satisfaction_rating?: number; // 1-5
   satisfaction_feedback?: string;
   satisfaction_collected_at?: string;
-  
+
   // Standard fields
   archived: boolean;
   created_at: string;
@@ -101,6 +117,8 @@ export interface SupportCase {
 export interface SupportCaseFormData {
   customer_id?: string;
   ticket_id?: string;
+  format?: SupportCaseFormat;
+  source?: SupportCaseSource;
   issue_type: SupportCaseIssueType;
   summary: string;
   description?: string;
@@ -112,6 +130,24 @@ export interface SupportCaseFormData {
   satisfaction_rating?: number;
   satisfaction_feedback?: string;
 }
+
+export const supportCaseFormatOptions = [
+  { value: 'call', label: 'Call' },
+  { value: 'form', label: 'Form' },
+  { value: 'email', label: 'Email' },
+  { value: 'text', label: 'Text' },
+] as const;
+
+export const supportCaseSourceOptions = [
+  { value: 'google_ads', label: 'Google Ads' },
+  { value: 'google_organic', label: 'Google Organic' },
+  { value: 'facebook_ads', label: 'Facebook Ads' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'direct', label: 'Direct' },
+  { value: 'campaign', label: 'Campaign' },
+  { value: 'widget', label: 'Widget' },
+  { value: 'other', label: 'Other' },
+] as const;
 
 export const supportCaseIssueTypeOptions = [
   { value: 'billing', label: 'Billing' },
