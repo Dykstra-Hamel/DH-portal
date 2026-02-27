@@ -236,8 +236,8 @@ export default function TicketReviewModal({
   };
 
   const fetchCallRecord = useCallback(async () => {
-    // Only fetch call records for phone calls
-    if (ticket.type !== 'phone_call') {
+    // Only fetch call records for call-format tickets
+    if (ticket.format !== 'call' && ticket.type !== 'phone_call') {
       return;
     }
 
@@ -255,8 +255,8 @@ export default function TicketReviewModal({
   }, [ticket.id, ticket.type]);
 
   const fetchFormSubmission = useCallback(async () => {
-    // Only fetch form submissions for web forms
-    if (ticket.type !== 'web_form') {
+    // Only fetch form submissions for form-format tickets
+    if (ticket.format !== 'form' && ticket.type !== 'web_form') {
       return;
     }
 
@@ -1206,7 +1206,7 @@ export default function TicketReviewModal({
                     onClick={() => setActiveTab('details')}
                   >
                     <ReceiptText size={20} />
-                    {localTicket.type === 'web_form' ? 'Form Details' : 'Call Details'}
+                    {(localTicket.format === 'form' || (!localTicket.format && localTicket.type === 'web_form')) ? 'Form Details' : 'Call Details'}
                     <ChevronRight size={20} />
                   </button>
                   <button
@@ -1228,7 +1228,7 @@ export default function TicketReviewModal({
                         strokeLinejoin="round"
                       />
                     </svg>
-                    {localTicket.type === 'web_form' ? 'Form Insights' : 'Call Insights'}
+                    {(localTicket.format === 'form' || (!localTicket.format && localTicket.type === 'web_form')) ? 'Form Insights' : 'Call Insights'}
                     <ChevronRight size={20} />
                   </button>
 

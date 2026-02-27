@@ -375,8 +375,9 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     .insert({
       company_id: companyId,
       customer_id: customerId,
-      lead_source: 'cold_call',
-      lead_type: 'phone_call',
+      lead_source: 'direct',
+      lead_type: 'inbound_call',
+      format: 'call',
       lead_status: 'new', // Will be updated based on AI qualification later
       priority: 'medium',
       comments: `📞 Inbound call started at ${new Date().toISOString()}`,

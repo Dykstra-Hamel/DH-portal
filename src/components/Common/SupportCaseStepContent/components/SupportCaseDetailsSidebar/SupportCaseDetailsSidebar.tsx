@@ -14,6 +14,9 @@ import {
   NotebookPen,
   Phone,
   TextCursorInput,
+  Mail,
+  MessageSquare,
+  Info,
 } from 'lucide-react';
 import { SupportCase } from '@/types/support-case';
 import styles from './SupportCaseDetailsSidebar.module.scss';
@@ -133,19 +136,27 @@ export function SupportCaseDetailsSidebar({
 
       <InfoCard
         title={
-          supportCase.ticket?.source === 'phone_call'
-            ? 'Call Information'
-            : supportCase.ticket?.source === 'web_form'
-              ? 'Form Details'
-              : 'Source Information'
+          supportCase.format === 'form' || (!supportCase.format && supportCase.ticket?.source === 'web_form')
+            ? 'Form Details'
+            : supportCase.format === 'call' || (!supportCase.format && supportCase.ticket?.source === 'phone_call')
+              ? 'Call Information'
+              : supportCase.format === 'email'
+                ? 'Email Details'
+                : supportCase.format === 'text'
+                  ? 'Text Details'
+                  : 'Source Information'
         }
         icon={
-          supportCase.ticket?.source === 'phone_call' ? (
-            <Phone size={20} />
-          ) : supportCase.ticket?.source === 'web_form' ? (
+          supportCase.format === 'form' || (!supportCase.format && supportCase.ticket?.source === 'web_form') ? (
             <TextCursorInput size={20} />
-          ) : (
+          ) : supportCase.format === 'call' || (!supportCase.format && supportCase.ticket?.source === 'phone_call') ? (
             <Phone size={20} />
+          ) : supportCase.format === 'email' ? (
+            <Mail size={20} />
+          ) : supportCase.format === 'text' ? (
+            <MessageSquare size={20} />
+          ) : (
+            <Info size={20} />
           )
         }
         startExpanded={false}
@@ -155,48 +166,55 @@ export function SupportCaseDetailsSidebar({
         inSidebar={true}
       >
         <div className={styles.cardContent}>
-          {supportCase.ticket ? (
+          {supportCase.source || supportCase.ticket ? (
             <>
-              <div className={styles.detailItem}>
-                <div className={styles.label}>Source</div>
-                <div className={styles.value}>
-                  {supportCase.ticket.source === 'phone_call'
-                    ? 'Phone Call'
-                    : supportCase.ticket.source === 'web_form'
-                      ? 'Web Form'
-                      : supportCase.ticket.source
-                          .split('_')
-                          .map(
-                            word => word.charAt(0).toUpperCase() + word.slice(1)
-                          )
-                          .join(' ')}
+              {supportCase.source && (
+                <div className={styles.detailItem}>
+                  <div className={styles.label}>Source</div>
+                  <div className={styles.value}>
+                    {({
+                      google_ads: 'Google Ads',
+                      google_organic: 'Google Organic',
+                      facebook_ads: 'Facebook Ads',
+                      referral: 'Referral',
+                      direct: 'Direct',
+                      campaign: 'Campaign',
+                      widget: 'Widget',
+                      other: 'Other',
+                    } as Record<string, string>)[supportCase.source] ||
+                      supportCase.source.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                  </div>
                 </div>
-              </div>
-              <div className={styles.detailItem}>
-                <div className={styles.label}>Type</div>
-                <div className={styles.value}>
-                  {supportCase.ticket.type
-                    .split('_')
-                    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                    .join(' ')}
-                </div>
-              </div>
-              <div className={styles.detailItem}>
-                <div className={styles.label}>Created</div>
-                <div className={styles.value}>
-                  {new Date(supportCase.ticket.created_at).toLocaleString(
-                    'en-US',
-                    {
-                      month: 'numeric',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    }
-                  )}
-                </div>
-              </div>
+              )}
+              {supportCase.ticket && (
+                <>
+                  <div className={styles.detailItem}>
+                    <div className={styles.label}>Type</div>
+                    <div className={styles.value}>
+                      {supportCase.ticket.type
+                        .split('_')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ')}
+                    </div>
+                  </div>
+                  <div className={styles.detailItem}>
+                    <div className={styles.label}>Created</div>
+                    <div className={styles.value}>
+                      {new Date(supportCase.ticket.created_at).toLocaleString(
+                        'en-US',
+                        {
+                          month: 'numeric',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true,
+                        }
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
             </>
           ) : (
             <div className={styles.noData}>No source information available</div>

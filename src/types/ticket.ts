@@ -1,8 +1,18 @@
+export type TicketFormat = 'call' | 'form' | 'email' | 'text';
+
+// New taxonomy values (use these for all new records)
 export type TicketSource =
-  | 'organic'
-  | 'referral'
-  | 'google_cpc'
+  | 'google_ads'
+  | 'google_organic'
   | 'facebook_ads'
+  | 'referral'
+  | 'direct'
+  | 'campaign'
+  | 'widget'
+  | 'other'
+  // Legacy values (existing records only — do not use for new records)
+  | 'organic'
+  | 'google_cpc'
   | 'linkedin'
   | 'email_campaign'
   | 'cold_call'
@@ -10,13 +20,22 @@ export type TicketSource =
   | 'webinar'
   | 'content_marketing'
   | 'internal'
-  | 'other'
   | 'inbound'
   | 'outbound'
-  | 'widget'
   | 'website';
 
+// New taxonomy values (use these for all new records)
 export type TicketType =
+  | 'inbound_call'
+  | 'outbound_call'
+  | 'website_form'
+  | 'widget_form'
+  | 'campaign_call'
+  | 'campaign_email'
+  | 'campaign_text'
+  | 'manual'
+  | 'email_inbound'
+  // Legacy values (existing records only — do not use for new records)
   | 'phone_call'
   | 'web_form'
   | 'email'
@@ -25,8 +44,7 @@ export type TicketType =
   | 'in_person'
   | 'internal_task'
   | 'bug_report'
-  | 'feature_request'
-  | 'other';
+  | 'feature_request';
 
 export type TicketStatus =
   | 'live'
@@ -49,6 +67,7 @@ export interface Ticket {
   customer_id?: string;
   service_address_id?: string; // Reference to service address for location-based tickets
   call_record_id?: string; // Direct reference to call record for phone_call tickets
+  format?: TicketFormat;
   source: TicketSource;
   type: TicketType;
   call_direction?: 'inbound' | 'outbound' | null; // Direction for phone calls, null for non-calls
@@ -165,6 +184,7 @@ export interface Ticket {
 export interface TicketFormData {
   customer_id?: string;
   service_address_id?: string;
+  format?: TicketFormat;
   source: TicketSource;
   type: TicketType;
   service_type?: string;
@@ -192,33 +212,58 @@ export interface TicketConversionData {
   };
 }
 
+export const ticketFormatOptions = [
+  { value: 'call', label: 'Call' },
+  { value: 'form', label: 'Form' },
+  { value: 'email', label: 'Email' },
+  { value: 'text', label: 'Text' },
+] as const;
+
 export const ticketSourceOptions = [
-  { value: 'organic', label: 'Google Organic' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'google_cpc', label: 'Google Ads' },
+  { value: 'google_ads', label: 'Google Ads' },
+  { value: 'google_organic', label: 'Google Organic' },
   { value: 'facebook_ads', label: 'Facebook Ads' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'email_campaign', label: 'Email Campaign' },
-  { value: 'cold_call', label: 'Cold Call' },
-  { value: 'trade_show', label: 'Trade Show' },
-  { value: 'webinar', label: 'Webinar' },
-  { value: 'content_marketing', label: 'Content Marketing' },
-  { value: 'internal', label: 'Internal' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'direct', label: 'Direct' },
+  { value: 'campaign', label: 'Campaign' },
+  { value: 'widget', label: 'Widget' },
   { value: 'other', label: 'Other' },
 ] as const;
 
 export const ticketTypeOptions = [
-  { value: 'phone_call', label: 'Call' },
-  { value: 'web_form', label: 'Form' },
-  { value: 'email', label: 'Email' },
-  { value: 'chat', label: 'Chat' },
-  { value: 'social_media', label: 'Social Media' },
-  { value: 'in_person', label: 'In Person' },
-  { value: 'internal_task', label: 'Internal Task' },
-  { value: 'bug_report', label: 'Bug Report' },
-  { value: 'feature_request', label: 'Feature Request' },
-  { value: 'other', label: 'Other' },
+  { value: 'inbound_call', label: 'Inbound Call' },
+  { value: 'outbound_call', label: 'Outbound Call' },
+  { value: 'website_form', label: 'Website Form' },
+  { value: 'widget_form', label: 'Widget Form' },
+  { value: 'campaign_call', label: 'Campaign Call' },
+  { value: 'campaign_email', label: 'Campaign Email' },
+  { value: 'campaign_text', label: 'Campaign Text' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'email_inbound', label: 'Email Inbound' },
 ] as const;
+
+// Type options filtered by format
+export const ticketTypesByFormat: Record<string, { value: string; label: string }[]> = {
+  call: [
+    { value: 'inbound_call', label: 'Inbound Call' },
+    { value: 'outbound_call', label: 'Outbound Call' },
+    { value: 'campaign_call', label: 'Campaign Call' },
+  ],
+  form: [
+    { value: 'website_form', label: 'Website Form' },
+    { value: 'widget_form', label: 'Widget Form' },
+    { value: 'manual', label: 'Manual' },
+  ],
+  email: [
+    { value: 'campaign_email', label: 'Campaign Email' },
+    { value: 'email_inbound', label: 'Email Inbound' },
+    { value: 'manual', label: 'Manual' },
+  ],
+  text: [
+    { value: 'campaign_text', label: 'Campaign Text' },
+    { value: 'manual', label: 'Manual' },
+  ],
+};
 
 export const ticketStatusOptions = [
   { value: 'live', label: 'Live Call' },

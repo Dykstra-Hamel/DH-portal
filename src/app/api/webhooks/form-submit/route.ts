@@ -25,6 +25,7 @@ import {
   createOrFindServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { deriveSource } from '@/lib/taxonomy/derive-source';
 
 /**
  * Check for recent duplicate form submissions
@@ -198,9 +199,14 @@ export async function POST(request: NextRequest) {
                        formData.campaignId || formData.campaign_id || formData['campaign-id'] ||
                        rawPayload.campaignId || rawPayload.campaign_id || rawPayload['campaign-id'] || null;
 
-    // Extract gclid separately (Google Click ID)
-    const gclid = queryParams.get('gclid') ||
-                  formData.gclid || rawPayload.gclid || null;
+    // Extract all UTM and tracking params (URL params take priority over form body)
+    const gclid = queryParams.get('gclid') || formData.gclid || rawPayload.gclid || null;
+    const fbclid = queryParams.get('fbclid') || formData.fbclid || rawPayload.fbclid || null;
+    const utmSource = queryParams.get('utm_source') || formData.utm_source || rawPayload.utm_source || null;
+    const utmMedium = queryParams.get('utm_medium') || formData.utm_medium || rawPayload.utm_medium || null;
+    const utmCampaign = queryParams.get('utm_campaign') || formData.utm_campaign || rawPayload.utm_campaign || null;
+    const utmContent = queryParams.get('utm_content') || formData.utm_content || rawPayload.utm_content || null;
+    const utmTerm = queryParams.get('utm_term') || formData.utm_term || rawPayload.utm_term || null;
 
     // Step 5: Create initial form_submissions record (pending state)
     const userAgent = request.headers.get('user-agent') || null;
@@ -462,15 +468,20 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
-        campaign_id: campaign.id, // Store campaign UUID for proper FK relationship
+        campaign_id: campaign.id,
         lead_source: 'campaign',
-        lead_type: 'web_form',
+        lead_type: 'campaign_form',
+        format: 'form',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
         lead_status: 'new',
         comments: geminiResult.ticket.description || 'Campaign form submission',
         priority: geminiResult.ticket.priority || 'medium',
-        utm_campaign: campaignId, // Also store in UTM for tracking purposes
         gclid: gclid || null,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+        utm_content: utmContent,
+        utm_term: utmTerm,
         ip_address: ipAddress,
         user_agent: userAgent,
         referrer_url: lookupUrl,
@@ -506,14 +517,23 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
-        type: 'web_form',
-        source: 'website',
+        type: 'website_form',
+        source: deriveSource({ gclid, fbclid, utm_source: utmSource }),
+        format: 'form',
         description: geminiResult.ticket.description || 'Form submission',
         priority: geminiResult.ticket.priority || 'medium',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
         status: 'new',
         pest_type: geminiResult.ticket.pest_type || 'General Pest Control',
         form_submission_id: submissionId,
+        gclid: gclid,
+        fbclid: fbclid,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+        utm_content: utmContent,
+        utm_term: utmTerm,
+        referrer_url: lookupUrl,
       };
 
       const { data: ticket, error: ticketError } = await supabase

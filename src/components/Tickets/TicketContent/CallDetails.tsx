@@ -13,7 +13,7 @@ interface CallDetailsProps {
 }
 
 export default function CallDetails({ ticket, callRecord, formSubmission }: CallDetailsProps) {
-  const isFormSubmission = ticket.type === 'web_form';
+  const isFormSubmission = ticket.format === 'form' || (!ticket.format && ticket.type === 'web_form');
 
   const formatDuration = (seconds?: number) => {
     if (!seconds) return '0:00';
