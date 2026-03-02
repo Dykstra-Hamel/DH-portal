@@ -1847,6 +1847,22 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     e.target.value = '';
   }, [uploadProjectFiles]);
 
+  const handleDownloadProjectAttachment = useCallback(async (attachmentId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/admin/projects/${project?.id}/attachments/${attachmentId}/url`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // fallback: open in new tab
+      window.open(`/api/admin/projects/${project?.id}/attachments/${attachmentId}/url`, '_blank');
+    }
+  }, [project?.id]);
+
   const handleDeleteProjectAttachment = useCallback((attachmentId: string) => {
     setAttachmentToDelete(attachmentId);
     setShowDeleteAttachmentModal(true);
@@ -2292,6 +2308,16 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                               alt={attachment.file_name}
                               loading="lazy"
                             />
+                            <button
+                              className={styles.downloadImageButton}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadProjectAttachment(attachment.id, attachment.file_name);
+                              }}
+                              aria-label="Download attachment"
+                            >
+                              <Download size={14} />
+                            </button>
                             {canEditProject && (
                               <button
                                 className={styles.deleteImageButton}
@@ -2315,6 +2341,17 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                             <div className={styles.documentIcon}>
                               <FileText size={48} />
                             </div>
+                            <button
+                              className={styles.downloadImageButton}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDownloadProjectAttachment(attachment.id, attachment.file_name);
+                              }}
+                              aria-label="Download attachment"
+                            >
+                              <Download size={14} />
+                            </button>
                             {canEditProject && (
                               <button
                                 className={styles.deleteImageButton}

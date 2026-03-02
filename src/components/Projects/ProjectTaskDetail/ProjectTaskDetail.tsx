@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import {
   X,
   Trash2,
+  Download,
   User as UserIcon,
   Calendar,
   MessageSquare,
@@ -527,6 +528,21 @@ export default function ProjectTaskDetail({
   }, []);
 
   // Image lightbox handlers
+  const handleDownloadCommentAttachment = useCallback(async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  }, []);
+
   const handleCommentImageClick = useCallback((commentImages: Array<{ id: string; url: string; name: string }>, imageId: string) => {
     const index = commentImages.findIndex(img => img.id === imageId);
     if (index !== -1) {
@@ -1723,6 +1739,16 @@ export default function ProjectTaskDetail({
                                           alt={attachment.file_name}
                                           loading="lazy"
                                         />
+                                        <button
+                                          className={styles.commentImageDownload}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDownloadCommentAttachment(attachment.url, attachment.file_name);
+                                          }}
+                                          aria-label="Download image"
+                                        >
+                                          <Download size={13} />
+                                        </button>
                                       </div>
                                     ))}
                                   </div>
@@ -1754,6 +1780,17 @@ export default function ProjectTaskDetail({
                                           />
                                         </svg>
                                         <span>{attachment.file_name}</span>
+                                        <button
+                                          className={styles.commentFileDownload}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleDownloadCommentAttachment(attachment.url, attachment.file_name);
+                                          }}
+                                          aria-label="Download file"
+                                        >
+                                          <Download size={13} />
+                                        </button>
                                       </a>
                                     ))}
                                   </div>
