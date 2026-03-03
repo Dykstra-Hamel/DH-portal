@@ -255,6 +255,28 @@ export function LeadStepContent({
   }, [lead.requested_date, lead.requested_time]);
   // Removed preferredDate and preferredTime from dependencies to prevent re-run loops
 
+  const handlePreferredDateChange = useCallback(async (date: string) => {
+    setPreferredDate(date);
+    try {
+      await adminAPI.updateLead(lead.id, { requested_date: date });
+      onShowToast?.('Preferred date saved', 'success');
+    } catch (error) {
+      console.error('Error saving preferred date:', error);
+      onShowToast?.('Failed to save preferred date', 'error');
+    }
+  }, [lead.id, onShowToast]);
+
+  const handlePreferredTimeChange = useCallback(async (time: string) => {
+    setPreferredTime(time);
+    try {
+      await adminAPI.updateLead(lead.id, { requested_time: time });
+      onShowToast?.('Preferred time saved', 'success');
+    } catch (error) {
+      console.error('Error saving preferred time:', error);
+      onShowToast?.('Failed to save preferred time', 'error');
+    }
+  }, [lead.id, onShowToast]);
+
 
   const currentUser = user
     ? {
@@ -551,8 +573,8 @@ export function LeadStepContent({
             setLinearFeet={setLinearFeet}
             setSelectedHomeSizeOption={setSelectedHomeSizeOption}
             setSelectedYardSizeOption={setSelectedYardSizeOption}
-            onPreferredDateChange={setPreferredDate}
-            onPreferredTimeChange={setPreferredTime}
+            onPreferredDateChange={handlePreferredDateChange}
+            onPreferredTimeChange={handlePreferredTimeChange}
             onNotInterested={onNotInterested || (() => {})}
             onReadyToSchedule={onReadyToSchedule || (() => {})}
             isSidebarExpanded={isSidebarExpanded}

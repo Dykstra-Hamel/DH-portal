@@ -19,6 +19,8 @@ import { useStarredItems } from '@/hooks/useStarredItems';
 import { adminAPI } from '@/lib/api-client';
 import { parseDateString } from '@/lib/date-utils';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
+import { scheduleScrollToElementById } from '@/lib/scroll-utils';
 import ProjectDetail from '../ProjectDetail/ProjectDetail';
 import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
@@ -175,6 +177,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const searchParams = useSearchParams();
   const processedCommentRef = React.useRef<string | null>(null);
   const { setPageHeader } = usePageActions();
+  const { refreshNotifications } = useNotificationContext();
   const { getAvatarUrl, getDisplayName, getInitials } = useUser();
   const getCommentHtml = React.useCallback(
     (html: string) => {
@@ -500,6 +503,32 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   React.useEffect(() => {
     fetchComments();
   }, [fetchComments]);
+
+  // Realtime subscription — re-fetch comments when another user adds/edits/deletes
+  useEffect(() => {
+    if (!project?.id) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`project-comments:${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_comments',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => {
+          fetchComments();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [project?.id, fetchComments]);
 
   const handleCreateTask = useCallback(() => {
     setEditingTask(null);
@@ -1026,6 +1055,33 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     openTaskDetailById(task.id);
   };
 
+  const markMentionReferenceAsRead = useCallback(
+    async (referenceType: 'project_comment', referenceId: string) => {
+      try {
+        const response = await fetch('/api/notifications/mentions/read-by-reference', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ referenceType, referenceId }),
+        });
+
+        if (!response.ok) {
+          console.error(
+            'Error marking mention as read by reference:',
+            await response.text()
+          );
+          return;
+        }
+
+        await refreshNotifications();
+      } catch (error) {
+        console.error('Error marking mention as read by reference:', error);
+      }
+    },
+    [refreshNotifications]
+  );
+
   React.useEffect(() => {
     const commentId = searchParams.get('commentId');
     const taskId = searchParams.get('taskId');
@@ -1044,17 +1100,21 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } else {
       setIsCommentsCollapsed(false);
       setHighlightedProjectCommentId(commentId);
+      void markMentionReferenceAsRead('project_comment', commentId);
     }
 
     processedCommentRef.current = key;
-  }, [openTaskDetailById, searchParams, selectedTask]);
+  }, [markMentionReferenceAsRead, openTaskDetailById, searchParams, selectedTask]);
 
   React.useEffect(() => {
     if (!highlightedProjectCommentId) return;
-    const element = document.getElementById(`project-comment-${highlightedProjectCommentId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+
+    return scheduleScrollToElementById(
+      `project-comment-${highlightedProjectCommentId}`,
+      {
+        topOffset: 120,
+      }
+    );
   }, [highlightedProjectCommentId, comments.length]);
 
   React.useEffect(() => {

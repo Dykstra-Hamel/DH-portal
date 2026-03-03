@@ -215,7 +215,7 @@ export async function POST(
         contextType: 'task',
         contextName: task.title,
         commentText: body.comment,
-        deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}`,
+        deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?taskId=${taskId}&commentId=${comment.id}`,
       }).catch(() => {});
     }
 

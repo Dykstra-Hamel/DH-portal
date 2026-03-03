@@ -241,13 +241,18 @@ export async function POST(
     }
 
     if (mentionedUserIds.length > 0) {
+      const commentMonth = comment.comment_month || body.month;
+      const deepLinkUrl = commentMonth
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/admin/monthly-services/${monthlyServiceId}?month=${encodeURIComponent(commentMonth)}&commentId=${comment.id}`
+        : `${process.env.NEXT_PUBLIC_SITE_URL}/admin/monthly-services/${monthlyServiceId}?commentId=${comment.id}`;
+
       sendMentionSlackNotifications({
         mentionedUserIds,
         commenterName,
         contextType: 'monthly_service',
         contextName: monthlyService.service_name,
         commentText: body.comment,
-        deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/monthly-services/${monthlyServiceId}`,
+        deepLinkUrl,
       }).catch(() => {});
     }
 
