@@ -521,6 +521,31 @@ export default function AdminTasksPage() {
     setShowAllMentions(false);
   }, [fetchMentions]);
 
+  const handleTaskCommentMentionsRead = useCallback(
+    (commentIds: string[]) => {
+      if (commentIds.length === 0) return;
+
+      const commentIdSet = new Set(commentIds);
+      setMentions((prev) =>
+        showAllMentions
+          ? prev.map((item) =>
+              item.referenceType === 'task_comment' &&
+              commentIdSet.has(item.referenceId)
+                ? { ...item, read: true }
+                : item
+            )
+          : prev.filter(
+              (item) =>
+                !(
+                  item.referenceType === 'task_comment' &&
+                  commentIdSet.has(item.referenceId)
+                )
+            )
+      );
+    },
+    [showAllMentions]
+  );
+
   const loadAllPastMentions = useCallback(async (): Promise<MentionListItem[]> => {
     try {
       setMentionsLoading(true);
@@ -632,6 +657,9 @@ export default function AdminTasksPage() {
         if (selectedTaskDetail?.id === updatedTask.id) {
           setSelectedTaskDetail(updatedTask);
         }
+        if (isCompleted && isStarred('task', taskId)) {
+          await toggleStar('task', taskId);
+        }
         await fetchTasks();
       } else {
         console.error('Error updating task completion:', await response.text());
@@ -639,7 +667,7 @@ export default function AdminTasksPage() {
     } catch (error) {
       console.error('Error updating task completion:', error);
     }
-  }, [fetchTasks, selectedTaskDetail]);
+  }, [fetchTasks, selectedTaskDetail, isStarred, toggleStar]);
 
   const handleDeleteTaskFromDetail = useCallback(async () => {
     if (!selectedTaskDetail?.id) return;
@@ -960,6 +988,7 @@ export default function AdminTasksPage() {
         users={users}
         mentionUsers={users}
         currentUserId={user?.id}
+        onTaskCommentMentionsRead={handleTaskCommentMentionsRead}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
       />

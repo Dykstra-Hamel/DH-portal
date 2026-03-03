@@ -25,6 +25,17 @@ function buildContextLine(commenterName: string, contextType: MentionNotificatio
   }
 }
 
+function buildEditContextLine(commenterName: string, contextType: MentionNotificationData['contextType'], contextName: string): string {
+  switch (contextType) {
+    case 'project':
+      return `*${commenterName}* edited a comment you were tagged in on project *${contextName}*`;
+    case 'task':
+      return `*${commenterName}* edited a comment you were tagged in on task *${contextName}*`;
+    case 'monthly_service':
+      return `*${commenterName}* edited a comment you were tagged in on service *${contextName}*`;
+  }
+}
+
 export async function sendMentionSlackNotifications(data: MentionNotificationData): Promise<void> {
   if (data.mentionedUserIds.length === 0) return;
   if (!process.env.SLACK_BOT_TOKEN) return;
@@ -74,6 +85,62 @@ export async function sendMentionSlackNotifications(data: MentionNotificationDat
     await client.chat.postMessage({
       channel: slackUserId,
       text: `${data.commenterName} tagged you in a comment on ${data.contextName}`,
+      blocks,
+    });
+  });
+
+  await Promise.allSettled(promises);
+}
+
+export async function sendEditedCommentSlackNotifications(data: MentionNotificationData): Promise<void> {
+  if (data.mentionedUserIds.length === 0) return;
+  if (!process.env.SLACK_BOT_TOKEN) return;
+
+  const client = new WebClient(process.env.SLACK_BOT_TOKEN);
+  const contextLine = buildEditContextLine(data.commenterName, data.contextType, data.contextName);
+  const plainText = stripHtml(data.commentText).slice(0, 500);
+
+  const blocks: any[] = [
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: contextLine,
+      },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'plain_text',
+        text: plainText,
+      },
+    },
+  ];
+
+  if (data.deepLinkUrl) {
+    blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: {
+            type: 'plain_text',
+            text: 'View',
+          },
+          url: data.deepLinkUrl,
+          action_id: 'view_edited_mention',
+        },
+      ],
+    });
+  }
+
+  const promises = data.mentionedUserIds.map(async (userId) => {
+    const slackUserId = await getSlackUserIdByDatabaseUserId(userId);
+    if (!slackUserId) return;
+
+    await client.chat.postMessage({
+      channel: slackUserId,
+      text: `${data.commenterName} edited a comment you were tagged in on ${data.contextName}`,
       blocks,
     });
   });

@@ -33,6 +33,8 @@ import {
 } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
+import { useNotificationContext } from '@/contexts/NotificationContext';
+import { scheduleScrollToElementById } from '@/lib/scroll-utils';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import styles from './ProjectTaskDetail.module.scss';
 
@@ -72,6 +74,7 @@ interface ProjectTaskDetailProps {
   departments?: ProjectDepartment[];
   mentionUsers?: MentionUser[]; // Users available for @mentions
   currentUserId?: string; // Current user's ID for checking comment ownership
+  onTaskCommentMentionsRead?: (commentIds: string[]) => void;
 }
 
 type UploadProgressState = {
@@ -105,6 +108,7 @@ export default function ProjectTaskDetail({
   departments = [],
   mentionUsers,
   currentUserId,
+  onTaskCommentMentionsRead,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -155,6 +159,8 @@ export default function ProjectTaskDetail({
     task?.parent_task_id || ''
   );
   const priorityRef = useRef<HTMLDivElement>(null);
+  const processedVisibleTaskMentionsRef = useRef<string | null>(null);
+  const { refreshNotifications } = useNotificationContext();
 
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -365,13 +371,76 @@ export default function ProjectTaskDetail({
 
   useEffect(() => {
     if (!highlightedCommentId) return;
-    const element = document.getElementById(
-      `task-comment-${highlightedCommentId}`
-    );
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+
+    return scheduleScrollToElementById(`task-comment-${highlightedCommentId}`, {
+      topOffset: 24,
+    });
   }, [highlightedCommentId, task?.id, task?.comments?.length]);
+
+  const markVisibleTaskMentionsAsRead = useCallback(
+    async (commentIds: string[]) => {
+      if (commentIds.length === 0) return;
+
+      try {
+        const response = await fetch(
+          '/api/notifications/mentions/read-by-reference',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              referenceType: 'task_comment',
+              referenceIds: commentIds,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            'Error marking task mentions as read:',
+            await response.text()
+          );
+          return;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (data?.markedCount > 0) {
+          onTaskCommentMentionsRead?.(commentIds);
+          await refreshNotifications();
+        }
+      } catch (error) {
+        console.error('Error marking task mentions as read:', error);
+      }
+    },
+    [onTaskCommentMentionsRead, refreshNotifications]
+  );
+
+  useEffect(() => {
+    if (!task?.id || !Array.isArray(task.comments) || task.comments.length === 0) {
+      return;
+    }
+
+    const commentIds = task.comments
+      .map((comment) => comment.id)
+      .filter((id): id is string => Boolean(id));
+
+    if (commentIds.length === 0) {
+      return;
+    }
+
+    const commentSignature = task.comments
+      .map((comment) => `${comment.id}:${comment.updated_at}`)
+      .join('|');
+    const nextKey = `${task.id}:${commentSignature}`;
+
+    if (processedVisibleTaskMentionsRef.current === nextKey) {
+      return;
+    }
+
+    processedVisibleTaskMentionsRef.current = nextKey;
+    void markVisibleTaskMentionsAsRead(commentIds);
+  }, [markVisibleTaskMentionsAsRead, task?.comments, task?.id]);
 
   // Helper function for validating rich text content
   const isRichTextEmpty = (html: string): boolean => {
