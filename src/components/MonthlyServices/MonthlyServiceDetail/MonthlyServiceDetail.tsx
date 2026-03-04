@@ -275,6 +275,7 @@ export function MonthlyServiceDetail({
   const [newTaskDepartment, setNewTaskDepartment] = useState<string>('');
   const [addToTemplate, setAddToTemplate] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
   const dragCounterRef = useRef(0);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
   const processedCommentRef = useRef<string | null>(null);
@@ -1201,6 +1202,9 @@ export function MonthlyServiceDetail({
     0
   );
 
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const isFutureMonth = selectedMonth > currentMonth;
+
   const handlePreviousMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const newDate = new Date(year, month - 2, 1); // month - 2 because month is 1-indexed
@@ -1213,6 +1217,36 @@ export function MonthlyServiceDetail({
     const newDate = new Date(year, month, 1); // month is already correct for next month
     const newMonth = newDate.toISOString().slice(0, 7);
     setSelectedMonth(newMonth);
+  };
+
+  const handleGenerateTasks = async () => {
+    setIsGeneratingTasks(true);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(
+        `/api/admin/monthly-services/${service.id}/generate-tasks`,
+        { method: 'POST', headers, body: JSON.stringify({ month: selectedMonth }) }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to generate tasks');
+      setToastMessage(`Generated ${data.tasksCreated} tasks for ${formatMonth(selectedMonth)}`);
+      setToastType('success');
+      setShowToast(true);
+      const refreshResponse = await fetch(
+        `/api/admin/monthly-services/${service.id}?month=${selectedMonth}`,
+        { headers }
+      );
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setServiceData(refreshData.service);
+      }
+    } catch {
+      setToastMessage('Failed to generate tasks');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsGeneratingTasks(false);
+    }
   };
 
   // Budget handlers
@@ -1444,9 +1478,21 @@ export function MonthlyServiceDetail({
 
       {/* Tasks by Week */}
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>
-          Tasks for {formatMonth(selectedMonth)}
-        </h2>
+        <div className={styles.taskSectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            Tasks for {formatMonth(selectedMonth)}
+          </h2>
+          {isFutureMonth && totalTasks === 0 && (
+            <button
+              className={styles.generateTasksButton}
+              onClick={handleGenerateTasks}
+              disabled={isGeneratingTasks}
+              type="button"
+            >
+              {isGeneratingTasks ? 'Generating...' : 'Generate Tasks'}
+            </button>
+          )}
+        </div>
         {loading ? (
           <div className={styles.loading}>Loading tasks...</div>
         ) : (

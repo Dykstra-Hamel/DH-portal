@@ -25,11 +25,13 @@ export function GlobalHeader({
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
     pathname.startsWith('/admin/project-management/') ||
-    pathname.startsWith('/admin/monthly-services');
+    pathname.startsWith('/admin/monthly-services') ||
+    pathname.startsWith('/admin/content-pieces/');
   const hideBreadcrumbs =
     pathname === '/admin/project-management' ||
     pathname.startsWith('/admin/project-management/') ||
-    pathname.startsWith('/admin/monthly-services');
+    pathname.startsWith('/admin/monthly-services') ||
+    pathname.startsWith('/admin/content-pieces/');
 
   return (
     <header className={styles.globalHeader}>

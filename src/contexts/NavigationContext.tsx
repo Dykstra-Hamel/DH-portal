@@ -51,7 +51,9 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     } else if (
       pathname.startsWith('/project-management') ||
       pathname.startsWith('/admin/project-management') ||
-      pathname.startsWith('/admin/monthly-services')
+      pathname.startsWith('/admin/monthly-services') ||
+      pathname.startsWith('/admin/content-calendar') ||
+      pathname.startsWith('/admin/content-pieces')
     ) {
       setActivePrimaryNav('project-management');
     } else if (pathname.startsWith('/dashboard')) {

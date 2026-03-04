@@ -150,6 +150,9 @@ export default function ProjectTaskDetail({
   const [monthlyServiceDepartmentId, setMonthlyServiceDepartmentId] =
     useState<string>('');
   const [isUpdatingDepartment, setIsUpdatingDepartment] = useState(false);
+  const [contentPieceId, setContentPieceId] = useState<string | null>(null);
+  const [contentType, setContentType] = useState<string>('');
+  const [isUpdatingContentType, setIsUpdatingContentType] = useState(false);
   const [departmentDraft, setDepartmentDraft] = useState(
     task?.department_id || ''
   );
@@ -313,8 +316,11 @@ export default function ProjectTaskDetail({
     // Fetch monthly service department assignment if this is a monthly service task
     if ((task as any).monthly_service_id) {
       fetchMonthlyServiceDepartment(task.id);
+      fetchContentPiece(task.id, (task as any).monthly_service_id);
     } else {
       setMonthlyServiceDepartmentId('');
+      setContentPieceId(null);
+      setContentType('');
     }
     setParentTaskDraft(task.parent_task_id || '');
     setIsActivityCollapsed(true);
@@ -335,6 +341,68 @@ export default function ProjectTaskDetail({
       }
     } catch (error) {
       console.error('Error fetching monthly service department:', error);
+    }
+  };
+
+  const fetchContentPiece = async (taskId: string, monthlyServiceId: string) => {
+    try {
+      const response = await fetch(
+        `/api/admin/monthly-services/${monthlyServiceId}/content?task_id=${taskId}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const piece = data.contentPieces?.[0] || null;
+        setContentPieceId(piece?.id || null);
+        setContentType(piece?.content_type || '');
+      }
+    } catch (error) {
+      console.error('Error fetching content piece:', error);
+    }
+  };
+
+  const handleContentTypeChange = async (newType: string) => {
+    if (!task) return;
+    const monthlyServiceId = (task as any).monthly_service_id;
+    if (!monthlyServiceId) return;
+
+    const previousType = contentType;
+    setContentType(newType);
+    setIsUpdatingContentType(true);
+
+    try {
+      if (contentPieceId) {
+        // Update existing content piece
+        const response = await fetch(
+          `/api/admin/monthly-services/${monthlyServiceId}/content/${contentPieceId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content_type: newType || null }),
+          }
+        );
+        if (!response.ok) throw new Error('Failed to update content type');
+      } else {
+        // Create new content piece linked to this task
+        const response = await fetch(
+          `/api/admin/monthly-services/${monthlyServiceId}/content`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              task_id: task.id,
+              content_type: newType || null,
+            }),
+          }
+        );
+        if (!response.ok) throw new Error('Failed to create content piece');
+        const data = await response.json();
+        setContentPieceId(data.contentPiece?.id || null);
+      }
+    } catch (error) {
+      console.error('Error updating content type:', error);
+      setContentType(previousType);
+    } finally {
+      setIsUpdatingContentType(false);
     }
   };
 
@@ -1343,6 +1411,34 @@ export default function ProjectTaskDetail({
                           {dept.name}
                         </option>
                       ))}
+                    </select>
+                  </div>
+                )}
+
+              {/* Content Type - only show when MS Department is Content */}
+              {(task as any)?.monthly_service_id &&
+                monthlyServiceDepartments.find(
+                  d => d.id === monthlyServiceDepartmentId && d.name === 'Content'
+                ) && (
+                  <div className={styles.detailItem}>
+                    <div className={styles.detailLabel}>
+                      <Layers size={14} />
+                      Content Type
+                    </div>
+                    <select
+                      className={styles.editSelect}
+                      value={contentType}
+                      onChange={e => handleContentTypeChange(e.target.value)}
+                      disabled={isUpdatingContentType}
+                    >
+                      <option value="">Select type...</option>
+                      <option value="blog">Blog</option>
+                      <option value="evergreen">Evergreen</option>
+                      <option value="location">Location</option>
+                      <option value="pillar">Pillar</option>
+                      <option value="cluster">Cluster</option>
+                      <option value="pest_id">Pest ID</option>
+                      <option value="other">Other</option>
                     </select>
                   </div>
                 )}

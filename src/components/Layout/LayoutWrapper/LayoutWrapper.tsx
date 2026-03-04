@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
+import { NavigationGuardProvider } from '@/contexts/NavigationGuardContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import {
   PageActionsProvider,
@@ -229,6 +230,14 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           onAddClick: getPageAction('add-monthly-service') || (() => {}),
           customActions: pageHeader?.customActions,
         };
+      case '/admin/content-calendar':
+        return {
+          title: pageHeader?.title || 'Content Calendar',
+          description:
+            pageHeader?.description ||
+            'Year-wide view of planned content across all active monthly services',
+          showAddButton: false,
+        };
       case '/tickets/leads':
         return {
           title: 'Leads',
@@ -411,6 +420,20 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return null;
         }
 
+        // Show lower header for content piece detail pages
+        if (pathname.match(/^\/admin\/content-pieces\/[^\/]+$/)) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
         // Show lower header for task detail pages
         if (pathname.match(/^\/tickets\/tasks\/[^\/]+$/)) {
           // Use dynamic page header if set, otherwise hide header
@@ -511,9 +534,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
                   : undefined
               }
               titleLogo={
-                'titleLogo' in pageConfig
-                  ? pageConfig.titleLogo
-                  : undefined
+                'titleLogo' in pageConfig ? pageConfig.titleLogo : undefined
               }
               description={pageConfig.description}
               showAddButton={pageConfig.showAddButton}
@@ -557,14 +578,16 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
 export function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
-    <NavigationProvider>
-      <CompanyProvider>
-        <NotificationProvider>
-          <PageActionsProvider>
-            <LayoutContent>{children}</LayoutContent>
-          </PageActionsProvider>
-        </NotificationProvider>
-      </CompanyProvider>
-    </NavigationProvider>
+    <NavigationGuardProvider>
+      <NavigationProvider>
+        <CompanyProvider>
+          <NotificationProvider>
+            <PageActionsProvider>
+              <LayoutContent>{children}</LayoutContent>
+            </PageActionsProvider>
+          </NotificationProvider>
+        </CompanyProvider>
+      </NavigationProvider>
+    </NavigationGuardProvider>
   );
 }

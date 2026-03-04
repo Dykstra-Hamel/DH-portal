@@ -8,6 +8,7 @@ interface TaskTemplate {
   due_day_of_week: number | null;
   default_assigned_to: string | null;
   department_id: string | null;
+  content_type: string | null;
   display_order: number;
 }
 
@@ -161,20 +162,93 @@ export async function generateTasksForMonth(
     return [];
   }
 
-  // Create department assignments for tasks that have a department
+  // Create department assignments and content pieces for tasks that have a department
   if (createdTasks && createdTasks.length > 0) {
-    const departmentAssignments = createdTasks
-      .map((task, index) => {
-        const template = templates[index];
-        if (template.department_id) {
-          return {
-            task_id: task.id,
-            department_id: template.department_id,
-          };
+    // Resolve the Content department ID once
+    const { data: contentDept } = await supabase
+      .from('monthly_services_departments')
+      .select('id')
+      .eq('name', 'Content')
+      .single();
+    const contentDeptId = contentDept?.id || null;
+
+    // Query existing unlinked content pieces for this service+month (created via the calendar UI)
+    const { data: existingUnlinkedPieces } = await supabase
+      .from('monthly_service_content_pieces')
+      .select('id, content_type')
+      .eq('monthly_service_id', serviceId)
+      .eq('service_month', targetMonth)
+      .is('task_id', null);
+
+    // Build a typed queue (for Pass 1) and a full ID list (for Pass 2 fallback)
+    const unlinkedByType = new Map<string, string[]>();
+    const allUnlinkedIds: string[] = [];
+    const claimedIds = new Set<string>();
+
+    for (const piece of existingUnlinkedPieces || []) {
+      allUnlinkedIds.push(piece.id);
+      if (piece.content_type) {
+        const arr = unlinkedByType.get(piece.content_type) || [];
+        arr.push(piece.id);
+        unlinkedByType.set(piece.content_type, arr);
+      }
+    }
+
+    const departmentAssignments: { task_id: string; department_id: string }[] = [];
+    const pieceLinksToUpdate: { id: string; task_id: string }[] = [];
+    const newContentPieces: { monthly_service_id: string; task_id: string; content_type: string | null; service_month: string }[] = [];
+    const unmatchedContentTasks: { task: { id: string }; template: TaskTemplate }[] = [];
+
+    // Build department assignments; Pass 1: typed matches for Content-dept tasks
+    createdTasks.forEach((task, index) => {
+      const template = templates[index];
+      if (template.department_id) {
+        departmentAssignments.push({
+          task_id: task.id,
+          department_id: template.department_id,
+        });
+
+        // For Content-department tasks, link an existing unlinked piece or create a new one
+        if (contentDeptId && template.department_id === contentDeptId) {
+          const contentType = template.content_type || null;
+          let matched = false;
+
+          if (contentType) {
+            const available = unlinkedByType.get(contentType) || [];
+            while (available.length > 0) {
+              const id = available.shift()!;
+              if (!claimedIds.has(id)) {
+                pieceLinksToUpdate.push({ id, task_id: task.id });
+                claimedIds.add(id);
+                matched = true;
+                break;
+              }
+            }
+          }
+
+          if (!matched) {
+            unmatchedContentTasks.push({ task, template });
+          }
         }
-        return null;
-      })
-      .filter((assignment): assignment is { task_id: string; department_id: string } => assignment !== null);
+      }
+    });
+
+    // Pass 2: generic fallback — assign unmatched tasks to any remaining unlinked pieces
+    const remainingPool = allUnlinkedIds.filter(id => !claimedIds.has(id));
+    for (const { task, template } of unmatchedContentTasks) {
+      if (remainingPool.length > 0) {
+        const id = remainingPool.shift()!;
+        pieceLinksToUpdate.push({ id, task_id: task.id });
+      } else {
+        // Pass 3: no unlinked piece available — create a new one
+        newContentPieces.push({
+          monthly_service_id: serviceId,
+          task_id: task.id,
+          content_type: template.content_type || null,
+          service_month: targetMonth,
+        });
+      }
+    }
 
     if (departmentAssignments.length > 0) {
       const { error: deptError } = await supabase
@@ -184,6 +258,87 @@ export async function generateTasksForMonth(
       if (deptError) {
         console.error(`[generateTasksForMonth] Error creating department assignments:`, deptError);
         // Don't fail the whole operation, just log the error
+      }
+    }
+
+    // Link existing unlinked pieces to their matched tasks
+    if (pieceLinksToUpdate.length > 0) {
+      await Promise.all(
+        pieceLinksToUpdate.map(({ id, task_id }) =>
+          supabase
+            .from('monthly_service_content_pieces')
+            .update({ task_id })
+            .eq('id', id)
+        )
+      );
+    }
+
+    // Insert new pieces only for templates that had no matching unlinked piece
+    let insertedNewPieces: { id: string; task_id: string }[] | null = null;
+    if (newContentPieces.length > 0) {
+      const { data: insertedData, error: contentError } = await supabase
+        .from('monthly_service_content_pieces')
+        .insert(newContentPieces)
+        .select('id, task_id');
+
+      if (contentError) {
+        console.error(`[generateTasksForMonth] Error creating content pieces:`, contentError);
+        // Don't fail the whole operation, just log the error
+      } else {
+        insertedNewPieces = insertedData as { id: string; task_id: string }[];
+      }
+    }
+
+    // Pass 4: Link social media tasks to content pieces by matching week_of_month
+    const { data: socialMediaDept } = await supabase
+      .from('monthly_services_departments')
+      .select('id')
+      .ilike('name', '%social%')
+      .single();
+    const socialMediaDeptId = socialMediaDept?.id || null;
+
+    if (socialMediaDeptId) {
+      const weekToSocialTaskId = new Map<number, string>();
+      const contentTaskIdToWeek = new Map<string, number>();
+
+      createdTasks.forEach((task, index) => {
+        const template = templates[index];
+        if (template.week_of_month === null) return;
+        if (template.department_id === socialMediaDeptId) {
+          weekToSocialTaskId.set(template.week_of_month, task.id);
+        }
+        if (template.department_id === contentDeptId) {
+          contentTaskIdToWeek.set(task.id, template.week_of_month);
+        }
+      });
+
+      const socialUpdates: { id: string; social_media_task_id: string }[] = [];
+
+      for (const { id, task_id } of pieceLinksToUpdate) {
+        const week = contentTaskIdToWeek.get(task_id);
+        if (week !== undefined) {
+          const socialTaskId = weekToSocialTaskId.get(week);
+          if (socialTaskId) socialUpdates.push({ id, social_media_task_id: socialTaskId });
+        }
+      }
+
+      for (const piece of insertedNewPieces || []) {
+        const week = contentTaskIdToWeek.get(piece.task_id);
+        if (week !== undefined) {
+          const socialTaskId = weekToSocialTaskId.get(week);
+          if (socialTaskId) socialUpdates.push({ id: piece.id, social_media_task_id: socialTaskId });
+        }
+      }
+
+      if (socialUpdates.length > 0) {
+        await Promise.all(
+          socialUpdates.map(({ id, social_media_task_id }) =>
+            supabase
+              .from('monthly_service_content_pieces')
+              .update({ social_media_task_id })
+              .eq('id', id)
+          )
+        );
       }
     }
   }
