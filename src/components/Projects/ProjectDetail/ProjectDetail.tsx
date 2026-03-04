@@ -321,7 +321,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         const response = await fetch(`/api/admin/project-types/${typeCode}/subtypes`);
         if (response.ok) {
           const data = await response.json();
-          setAvailableSubtypes(data);
+          setAvailableSubtypes([...data].sort((a, b) => a.name.localeCompare(b.name)));
         } else {
           setAvailableSubtypes([]);
         }
@@ -708,6 +708,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
   };
 
+  const handleCardCollapse = (cardId: string) => {
+    if (expandedCardId === cardId) {
+      setExpandedCardId(null);
+      setIsSidebarExpanded(false);
+    }
+  };
+
   React.useEffect(() => {
     if (isSidebarExpanded && pendingExpandCard) {
       const timer = setTimeout(() => {
@@ -741,6 +748,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<LayoutGrid size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('overview')}
+        onCollapse={() => handleCardCollapse('overview')}
         forceCollapse={shouldForceCollapse('overview')}
         forceExpand={shouldForceExpand('overview')}
         isCompact={!isSidebarExpanded}
@@ -962,6 +970,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<FileText size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('notes')}
+        onCollapse={() => handleCardCollapse('notes')}
         forceCollapse={shouldForceCollapse('notes')}
         forceExpand={shouldForceExpand('notes')}
         isCompact={!isSidebarExpanded}
@@ -993,6 +1002,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<Calendar size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('timeline')}
+        onCollapse={() => handleCardCollapse('timeline')}
         forceCollapse={shouldForceCollapse('timeline')}
         forceExpand={shouldForceExpand('timeline')}
         isCompact={!isSidebarExpanded}
@@ -1056,6 +1066,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<Users size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('people')}
+        onCollapse={() => handleCardCollapse('people')}
         forceCollapse={shouldForceCollapse('people')}
         forceExpand={shouldForceExpand('people')}
         isCompact={!isSidebarExpanded}
@@ -1231,6 +1242,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         icon={<ActivityIcon size={20} />}
         startExpanded={false}
         onExpand={() => handleCardExpand('activity')}
+        onCollapse={() => handleCardCollapse('activity')}
         forceCollapse={shouldForceCollapse('activity')}
         forceExpand={shouldForceExpand('activity')}
         isCompact={!isSidebarExpanded}

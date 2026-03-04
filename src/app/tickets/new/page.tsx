@@ -6,7 +6,6 @@ import {
   useCallback,
   useRef,
   Suspense,
-  useMemo,
 } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { adminAPI } from '@/lib/api-client';
@@ -57,6 +56,10 @@ const TicketsListSkeleton = () => (
   </div>
 );
 
+const INITIAL_TICKETS_PAGE_SIZE = 25;
+const FULL_TICKETS_FETCH_BATCH_SIZE = 100;
+const MAX_TICKET_FETCH_PAGES = 200;
+
 function TicketsPageContent() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [callRecords, setCallRecords] = useState<CallRecord[]>([]);
@@ -79,6 +82,7 @@ function TicketsPageContent() {
   const sortByRef = useRef('created_at');
   const sortOrderRef = useRef<'asc' | 'desc'>('asc');
   const searchQueryRef = useRef('');
+  const shouldFetchAllPagesRef = useRef(false);
 
   // Modal state for URL parameter handling
   const [showTicketModal, setShowTicketModal] = useState(false);
@@ -177,8 +181,19 @@ function TicketsPageContent() {
   }, []);
 
   const fetchTickets = useCallback(
-    async (companyId: string, page: number = 1, append: boolean = false) => {
+    async (
+      companyId: string,
+      options?: {
+        page?: number;
+        append?: boolean;
+        fetchAllPages?: boolean;
+      }
+    ) => {
       if (!companyId) return;
+
+      const page = options?.page ?? 1;
+      const append = options?.append ?? false;
+      const fetchAllPages = options?.fetchAllPages ?? shouldFetchAllPagesRef.current;
 
       isFetchingRef.current = true;
 
@@ -189,46 +204,85 @@ function TicketsPageContent() {
       }
 
       try {
-        // Build query parameters using current ref values
-        const params = new URLSearchParams({
-          companyId,
-          includeArchived: 'false',
-          page: page.toString(),
-          limit: '25',
-          sortBy: sortByRef.current,
-          sortOrder: sortOrderRef.current,
-          tab: currentTabRef.current,
-        });
+        const fetchTicketPage = async (targetPage: number, targetLimit: number) => {
+          const params = new URLSearchParams({
+            companyId,
+            includeArchived: 'false',
+            page: targetPage.toString(),
+            limit: targetLimit.toString(),
+            sortBy: sortByRef.current,
+            sortOrder: sortOrderRef.current,
+            tab: currentTabRef.current,
+          });
 
-        if (searchQueryRef.current) {
-          params.append('search', searchQueryRef.current);
+          if (searchQueryRef.current) {
+            params.append('search', searchQueryRef.current);
+          }
+
+          const response = await fetch(`/api/tickets?${params}`);
+          if (!response.ok) {
+            throw new Error('Failed to fetch tickets');
+          }
+
+          return response.json();
+        };
+
+        if (fetchAllPages) {
+          const allTickets: Ticket[] = [];
+          let fetchPage = 1;
+          let hasMorePages = true;
+          let lastPayload: any = null;
+
+          while (hasMorePages && fetchPage <= MAX_TICKET_FETCH_PAGES) {
+            const payload = await fetchTicketPage(
+              fetchPage,
+              FULL_TICKETS_FETCH_BATCH_SIZE
+            );
+            const pageTickets = Array.isArray(payload?.tickets) ? payload.tickets : [];
+            allTickets.push(...pageTickets);
+            lastPayload = payload;
+            hasMorePages =
+              Boolean(payload?.pagination?.hasMore) && pageTickets.length > 0;
+            fetchPage += 1;
+          }
+
+          if (hasMorePages) {
+            console.warn(
+              '[TicketsNew] Reached ticket page fetch safety cap while loading sorted data.'
+            );
+          }
+
+          const dedupedTickets = Array.from(
+            new Map(allTickets.map(ticket => [ticket.id, ticket])).values()
+          );
+
+          setTickets(dedupedTickets);
+          setHasMore(false);
+          setCurrentPage(Math.max(1, fetchPage - 1));
+          setTotalCount(lastPayload?.pagination?.total || dedupedTickets.length);
+          setTabCounts(
+            lastPayload?.counts || { all: 0, incoming: 0, outbound: 0, forms: 0 }
+          );
+        } else {
+          const data = await fetchTicketPage(page, INITIAL_TICKETS_PAGE_SIZE);
+
+          if (append) {
+            setTickets(prev => [...prev, ...(data.tickets || [])]);
+          } else {
+            setTickets(data.tickets || []);
+          }
+
+          setHasMore(data.pagination?.hasMore || false);
+          setTotalCount(data.pagination?.total || 0);
+          setTabCounts(
+            data.counts || { all: 0, incoming: 0, outbound: 0, forms: 0 }
+          );
+          setCurrentPage(page);
         }
-
-        // Fetch paginated tickets
-        const response = await fetch(`/api/tickets?${params}`);
-        if (!response.ok) {
-          throw new Error('Failed to fetch tickets');
-        }
-
-        const data = await response.json();
 
         // Fetch call records for hang-up filtering
         const callsData = await adminAPI.getUserCalls({ companyId });
-
-        if (append) {
-          setTickets(prev => [...prev, ...(data.tickets || [])]);
-        } else {
-          setTickets(data.tickets || []);
-        }
-
         setCallRecords(callsData);
-        const newHasMore = data.pagination?.hasMore || false;
-        setHasMore(newHasMore);
-        setTotalCount(data.pagination?.total || 0);
-        setTabCounts(
-          data.counts || { all: 0, incoming: 0, outbound: 0, forms: 0 }
-        );
-        setCurrentPage(page);
       } catch (error) {
         console.error('Error fetching tickets:', error);
       } finally {
@@ -243,7 +297,7 @@ function TicketsPageContent() {
   // Load more tickets for infinite scroll
   const handleLoadMore = () => {
     if (!selectedCompany?.id || loadingMore || !hasMore) return;
-    fetchTickets(selectedCompany.id, currentPage + 1, true);
+    fetchTickets(selectedCompany.id, { page: currentPage + 1, append: true });
   };
 
   // Handle filter changes - update refs and fetch new data
@@ -252,7 +306,11 @@ function TicketsPageContent() {
       if (!selectedCompany?.id) return;
       currentTabRef.current = tab;
       setCurrentPage(1);
-      fetchTickets(selectedCompany.id, 1, false);
+      fetchTickets(selectedCompany.id, {
+        page: 1,
+        append: false,
+        fetchAllPages: shouldFetchAllPagesRef.current,
+      });
     },
     [selectedCompany?.id, fetchTickets]
   );
@@ -262,8 +320,13 @@ function TicketsPageContent() {
       if (!selectedCompany?.id) return;
       sortByRef.current = field;
       sortOrderRef.current = order;
+      shouldFetchAllPagesRef.current = true;
       setCurrentPage(1);
-      fetchTickets(selectedCompany.id, 1, false);
+      fetchTickets(selectedCompany.id, {
+        page: 1,
+        append: false,
+        fetchAllPages: true,
+      });
     },
     [selectedCompany?.id, fetchTickets]
   );
@@ -273,7 +336,11 @@ function TicketsPageContent() {
       if (!selectedCompany?.id) return;
       searchQueryRef.current = query;
       setCurrentPage(1);
-      fetchTickets(selectedCompany.id, 1, false);
+      fetchTickets(selectedCompany.id, {
+        page: 1,
+        append: false,
+        fetchAllPages: shouldFetchAllPagesRef.current,
+      });
     },
     [selectedCompany?.id, fetchTickets]
   );
@@ -689,7 +756,12 @@ function TicketsPageContent() {
   // Fetch tickets when company changes (initial load only)
   useEffect(() => {
     if (selectedCompany?.id) {
-      fetchTickets(selectedCompany.id, 1, false);
+      shouldFetchAllPagesRef.current = false;
+      fetchTickets(selectedCompany.id, {
+        page: 1,
+        append: false,
+        fetchAllPages: false,
+      });
     }
   }, [selectedCompany?.id, fetchTickets]);
 
@@ -950,23 +1022,19 @@ function TicketsPageContent() {
     return () => unregisterPageAction('add');
   }, [registerPageAction, unregisterPageAction]);
 
-  // Filter live tickets for LiveCallBar component
-  const liveTickets = useMemo(
-    () => tickets.filter(ticket => ticket.status === 'live'),
-    [tickets]
-  );
-
   return (
     <div style={{ width: '100%' }}>
       {selectedCompany && (
         <Suspense fallback={<TicketsListSkeleton />}>
           <TicketsList
             tickets={tickets}
-            liveTickets={liveTickets}
             callRecords={callRecords}
             loading={loading}
             onTicketUpdated={() => {
-              fetchTickets(selectedCompany.id, 1, false);
+              fetchTickets(selectedCompany.id, {
+                page: 1,
+                append: false,
+              });
             }}
             // Infinite scroll props
             infiniteScrollEnabled={true}

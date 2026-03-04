@@ -122,16 +122,27 @@
     }
   }
 
-  // Clip native browser date picker icons (Firefox, mobile) off the right edge
+  // Clip native browser date picker icons (Firefox, desktop) off the right edge
   &:has(input[type='date']) {
     overflow: hidden;
+
+    // iOS doesn't show a persistent calendar icon — reset overflow so the
+    // date text isn't clipped or shifted on mobile.
+    @media (max-width: 768px) {
+      overflow: visible;
+    }
   }
 
   input[type='date'] {
     // Make input wider than container so native icon is clipped off-screen
+    // (desktop only — iOS uses a fullscreen wheel picker and needs no such trick)
     width: calc(100% + 40px);
 
-    // Chrome/Safari: make the native indicator a full-area transparent overlay
+    @media (max-width: 768px) {
+      width: 100%;
+    }
+
+    // Chrome/Safari desktop: make the native indicator a full-area transparent overlay
     &::-webkit-calendar-picker-indicator {
       position: absolute;
       top: 0;
@@ -142,6 +153,11 @@
       height: 100%;
       opacity: 0;
       cursor: pointer;
+    }
+
+    // Ensure the date value text is left-aligned on iOS Safari
+    &::-webkit-date-and-time-value {
+      text-align: left;
     }
   }
 }
@@ -250,6 +266,7 @@
   border: none;
   transition: background 0.2s ease;
   margin-bottom: 12px;
+  box-shadow: none;
 
   &::before {
     content: '';

@@ -20,6 +20,7 @@ interface ProjectTaskFormProps {
   editingTask: ProjectTask | null;
   users: User[];
   projectId: string;
+  projectDueDate?: string | null;
   parentTasks?: ProjectTask[]; // For creating subtasks
   projectMembers?: Array<{ user_id: string }>; // Project members
   projectAssignedTo?: string | null; // Project's assigned_to user
@@ -33,6 +34,7 @@ export default function ProjectTaskForm({
   onSubmit,
   editingTask,
   users,
+  projectDueDate,
   parentTasks = [],
   availableCategories = [],
   departments = [],
@@ -424,6 +426,7 @@ export default function ProjectTaskForm({
                     name="due_date"
                     value={formData.due_date}
                     onChange={handleChange}
+                    max={projectDueDate || undefined}
                     className={styles.input}
                   />
                 </div>

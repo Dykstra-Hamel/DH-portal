@@ -4,6 +4,11 @@ export function generateCallSummaryEmailTemplate(
   recipientName: string,
   callData: CallSummaryEmailData
 ): string {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://localhost:3000';
+
   const {
     companyName,
     customerName,
@@ -42,201 +47,319 @@ export function generateCallSummaryEmailTemplate(
   };
 
   const sentimentColor = sentiment ? sentimentColors[sentiment] : '#6b7280';
-  const statusColor = statusColors[callStatus as keyof typeof statusColors] || '#6b7280';
-  const formattedDate = new Date(callDate).toLocaleString();
-  const durationText = callDuration ? `${Math.floor(callDuration / 60)}:${(callDuration % 60).toString().padStart(2, '0')}` : 'N/A';
+  const statusColor =
+    statusColors[callStatus as keyof typeof statusColors] || '#6b7280';
+  const formattedDate = new Date(callDate).toLocaleString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const durationText = callDuration
+    ? `${Math.floor(callDuration / 60)}:${(callDuration % 60).toString().padStart(2, '0')}`
+    : 'N/A';
+
+  const hasCustomerInfo = customerName || customerEmail || streetAddress;
+  const hasServiceInfo =
+    pestIssue ||
+    homeSize ||
+    yardSize ||
+    decisionMaker ||
+    preferredServiceTime ||
+    contactedOtherCompanies !== undefined;
 
   return `
     <!DOCTYPE html>
     <html>
-    <head>
-      <meta charset="utf-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <title>Call Summary Report</title>
-    </head>
-    <body style="margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8fafc; color: #334155;">
-      <div style="max-width: 700px; margin: 0 auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
-        
-        <!-- Header -->
-        <div style="background: linear-gradient(135deg, #1e40af 0%, #1e3a8a 100%); padding: 24px; text-align: center;">
-          <h1 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: 600;">
-            📞 Call Summary Report
-          </h1>
-          <p style="margin: 8px 0 0 0; color: #e2e8f0; font-size: 16px;">
-            ${companyName}
-          </p>
-        </div>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Call Summary Report</title>
+        <style>
+          @media only screen and (max-width: 768px) {
+            .section-outer {
+              padding: 0 14px 14px 14px !important;
+            }
+            .section-inner {
+              padding: 18px !important;
+            }
+            .section-table {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .greeting-section {
+              padding: 30px 14px 20px 14px !important;
+            }
+            .footer-section {
+              padding: 18px !important;
+            }
+          }
+        </style>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif;">
+        <!-- Email Container -->
+        <table role="presentation" style="width: 100%;">
+          <tr>
+            <td align="center" style="padding: 0;">
+              <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
 
-        <!-- Main Content -->
-        <div style="padding: 32px;">
+                <!-- Header -->
+                <tr>
+                  <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center; border-radius: var(--border-radius);">
+                    <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">Call Summary Report</h1>
+                    <img src="${baseUrl}/images/email/header-logo.png" alt="PMP CENTRAL" style="width: 110px; height: auto; opacity: 0.56;" />
+                  </td>
+                </tr>
 
-          <!-- Call Overview -->
-          <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
-            <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-              📊 Call Overview
-            </h3>
-            
-            <div style="display: grid; gap: 12px;">
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Customer Phone:</span>
-                <a href="tel:${customerPhone}" style="color: #1e40af; text-decoration: none;">${customerPhone}</a>
-              </div>
-              
-              ${fromNumber ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">From Number:</span>
-                  <span style="color: #1e293b;">${fromNumber}</span>
-                </div>
-              ` : ''}
-              
-              <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                <span style="font-weight: 500; color: #64748b;">Call Status:</span>
-                <span style="color: ${statusColor}; font-weight: 600;">${callStatus.toUpperCase()}</span>
-              </div>
-              
-              ${sentiment ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">Sentiment:</span>
-                  <span style="color: ${sentimentColor}; font-weight: 600;">${sentiment.toUpperCase()}</span>
-                </div>
-              ` : ''}
-              
-              ${disconnectReason ? `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                  <span style="font-weight: 500; color: #64748b;">Disconnect Reason:</span>
-                  <span style="color: #1e293b;">${disconnectReason}</span>
-                </div>
-              ` : ''}
-            </div>
-          </div>
+                <!-- Greeting -->
+                <tr>
+                  <td class="greeting-section" style="padding: 30px 30px 20px 30px;">
+                    <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">Hi ${recipientName},</p>
+                  </td>
+                </tr>
 
-          ${customerName || customerEmail || streetAddress ? `
-            <!-- Customer Information -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
-              <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-                👤 Customer Information
-              </h3>
-              
-              <div style="display: grid; gap: 12px;">
-                ${customerName ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Name:</span>
-                    <span style="color: #1e293b;">${customerName}</span>
-                  </div>
-                ` : ''}
-                
-                ${customerEmail ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Email:</span>
-                    <a href="mailto:${customerEmail}" style="color: #1e40af; text-decoration: none;">${customerEmail}</a>
-                  </div>
-                ` : ''}
-                
-                ${streetAddress ? `
-                  <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Address:</span>
-                    <span style="color: #1e293b; text-align: right; max-width: 300px;">${streetAddress}</span>
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          ` : ''}
+                <!-- Intro -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                      An inbound call just completed and requires your attention. Review the details below and follow up with the caller as needed.
+                    </p>
+                  </td>
+                </tr>
 
-          ${pestIssue || homeSize || yardSize || decisionMaker || preferredServiceTime ? `
-            <!-- Service Details -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
-              <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-                🏠 Service Information
-              </h3>
-              
-              <div style="display: grid; gap: 12px;">
-                ${pestIssue ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Pest Issue:</span>
-                    <span style="color: #1e293b;">${pestIssue}</span>
-                  </div>
-                ` : ''}
-                
-                ${homeSize ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Home Size:</span>
-                    <span style="color: #1e293b;">${homeSize} sq ft</span>
-                  </div>
-                ` : ''}
-                
-                ${yardSize ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Yard Size:</span>
-                    <span style="color: #1e293b;">${yardSize} sq ft</span>
-                  </div>
-                ` : ''}
-                
-                ${decisionMaker ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Decision Maker:</span>
-                    <span style="color: #1e293b;">${decisionMaker}</span>
-                  </div>
-                ` : ''}
-                
-                ${preferredServiceTime ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Preferred Time:</span>
-                    <span style="color: #1e293b;">${preferredServiceTime}</span>
-                  </div>
-                ` : ''}
-                
-                ${contactedOtherCompanies !== undefined ? `
-                  <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; gap: 5px;">
-                    <span style="font-weight: 500; color: #64748b;">Contacted Others:</span>
-                    <span style="color: #1e293b;">${contactedOtherCompanies ? 'Yes' : 'No'}</span>
-                  </div>
-                ` : ''}
-              </div>
-            </div>
-          ` : ''}
+                <!-- Call Overview Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
+                            <tr>
+                              <td style="width: 26px; vertical-align: middle; padding: 0 10px 0 0;">
+                                <img src="${baseUrl}/images/email/phone-icon.png" alt="Call" style="width: 26px; height: auto; display: block;" />
+                              </td>
+                              <td style="vertical-align: middle; padding: 0;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Call Overview</h3>
+                              </td>
+                            </tr>
+                          </table>
+                          <table role="presentation" style="width: 100%;">
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Caller Phone:</strong> <a href="tel:${customerPhone}" style="color: #020618; text-decoration: underline;">${customerPhone}</a></p>
+                              </td>
+                            </tr>
+                            ${fromNumber ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">From Number:</strong> <span style="color: #020618;">${fromNumber}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Call Status:</strong> <span style="color: ${statusColor}; font-weight: 700;">${callStatus.toUpperCase()}</span></p>
+                              </td>
+                            </tr>
+                            ${sentiment ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Sentiment:</strong> <span style="color: ${sentimentColor}; font-weight: 700;">${sentiment.toUpperCase()}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${disconnectReason ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Disconnect Reason:</strong> <span style="color: #020618;">${disconnectReason}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Date:</strong> <span style="color: #020618;">${formattedDate}</span></p>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Duration:</strong> <span style="color: #020618;">${durationText}</span></p>
+                              </td>
+                            </tr>
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
 
-          ${callSummary ? `
-            <!-- Call Summary -->
-            <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--border-radius); padding: 20px; margin-bottom: 24px;">
-              <h3 style="margin: 0 0 16px 0; font-size: 16px; color: #1e293b; border-bottom: 1px solid #e2e8f0; padding-bottom: 8px;">
-                📝 Call Summary
-              </h3>
-              <p style="margin: 0; color: #1e293b; line-height: 1.6;">${callSummary}</p>
-            </div>
-          ` : ''}
+                ${hasCustomerInfo ? `
+                <!-- Customer Information Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
+                            <tr>
+                              <td style="width: 15px; vertical-align: middle; padding: 0 10px 0 0;">
+                                <img src="${baseUrl}/images/email/customer-icon.png" alt="Customer" style="width: 15px; height: auto; display: block;" />
+                              </td>
+                              <td style="vertical-align: middle; padding: 0;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Customer Information</h3>
+                              </td>
+                            </tr>
+                          </table>
+                          <table role="presentation" style="width: 100%;">
+                            ${customerName ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Name:</strong> <span style="color: #020618;">${customerName}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${customerEmail ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Email:</strong> <a href="mailto:${customerEmail}" style="color: #020618; text-decoration: underline;">${customerEmail}</a></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${streetAddress ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Address:</strong> <span style="color: #020618;">${streetAddress}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                ` : ''}
 
+                ${hasServiceInfo ? `
+                <!-- Service Information Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
+                            <tr>
+                              <td style="width: 19px; vertical-align: middle; padding: 0 10px 0 0;">
+                                <img src="${baseUrl}/images/email/service-request-icon.png" alt="Service" style="width: 19px; height: auto; display: block;" />
+                              </td>
+                              <td style="vertical-align: middle; padding: 0;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Service Information</h3>
+                              </td>
+                            </tr>
+                          </table>
+                          <table role="presentation" style="width: 100%;">
+                            ${pestIssue ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Pest Issue:</strong> <span style="color: #020618;">${pestIssue}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${homeSize ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Home Size:</strong> <span style="color: #020618;">${homeSize} sq ft</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${yardSize ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Yard Size:</strong> <span style="color: #020618;">${yardSize} sq ft</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${decisionMaker ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Decision Maker:</strong> <span style="color: #020618;">${decisionMaker}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${preferredServiceTime ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Preferred Time:</strong> <span style="color: #020618;">${preferredServiceTime}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${contactedOtherCompanies !== undefined ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Contacted Others:</strong> <span style="color: #020618;">${contactedOtherCompanies ? 'Yes' : 'No'}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                ` : ''}
 
-          ${recordingUrl ? `
-            <!-- Recording Access -->
-            <div style="background-color: #fef3c7; border: 1px solid #fbbf24; border-radius: var(--border-radius); padding: 16px; text-align: center; margin-bottom: 24px;">
-              <p style="margin: 0 0 12px 0; font-size: 14px; color: #92400e;">
-                🎵 <strong>Call Recording Available</strong>
-              </p>
-              <a href="${recordingUrl}" style="display: inline-block; background-color: #1e40af; color: #ffffff; padding: 8px 16px; border-radius: 4px; text-decoration: none; font-size: 14px; font-weight: 500;">
-                Listen to Recording
-              </a>
-            </div>
-          ` : ''}
+                ${callSummary ? `
+                <!-- Call Summary Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <h3 style="margin: 0 0 15px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000; border-bottom: 1px solid #D1D5DB; padding-bottom: 10px;">Call Summary</h3>
+                          <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 24px; color: #020618;">${callSummary}</p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                ` : ''}
 
-          <!-- Metadata -->
-          <div style="background-color: #f8fafc; border-radius: var(--border-radius); padding: 16px;">
-            <p style="margin: 0; font-size: 14px; color: #64748b; text-align: center;">
-              <strong>Call Details:</strong> ${formattedDate} • Duration: ${durationText}
-              ${leadId ? ` • Lead ID: ${leadId}` : ''}
-            </p>
-          </div>
-        </div>
+                ${recordingUrl ? `
+                <!-- Recording CTA -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 6px;">
+                      <tr>
+                        <td class="section-inner" style="text-align: center; padding: 20px;">
+                          <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Call Recording Available</h2>
+                          <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                            A recording of this call is available. Click below to listen.
+                          </p>
+                          <a href="${baseUrl}/recording?url=${encodeURIComponent(recordingUrl)}" target="_blank" rel="noopener noreferrer" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Listen to Recording</a>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+                ` : ''}
 
-        <!-- Footer -->
-        <div style="background-color: #f1f5f9; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0;">
-          <p style="margin: 0; font-size: 12px; color: #64748b;">
-            This call summary was generated automatically by your phone system.
-            <br>
-            ${companyName} • Call Management System
-          </p>
-        </div>
-      </div>
-    </body>
+                <!-- Footer -->
+                <tr>
+                  <td class="footer-section" style="padding: 30px; text-align: center;">
+                    <img src="${baseUrl}/images/email/footer-logo.png" alt="PMP CENTRAL" style="width: 179px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" />
+                    <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                      This notification was generated automatically by PMPCENTRAL - A Dykstra | Hamel Company
+                      ${leadId ? `<br>Lead ID: ${leadId}` : ''}
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
     </html>
   `;
 }

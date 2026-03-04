@@ -22,6 +22,7 @@ export default function DataTable<T>({
   onItemAction,
   onDataUpdated,
   infiniteScrollEnabled = false,
+  visibleCount,
   hasMore = false,
   onLoadMore,
   loadingMore = false,
@@ -182,6 +183,18 @@ export default function DataTable<T>({
       return aStr.localeCompare(bStr) * modifier;
     });
   }, [searchedData, sortConfig, columns]);
+
+  const visibleSortedData = useMemo(() => {
+    if (
+      !infiniteScrollEnabled ||
+      typeof visibleCount !== 'number' ||
+      visibleCount < 0
+    ) {
+      return sortedData;
+    }
+
+    return sortedData.slice(0, visibleCount);
+  }, [infiniteScrollEnabled, sortedData, visibleCount]);
 
   // Infinite scroll intersection observer
   const handleLoadMore = useCallback(() => {
@@ -351,7 +364,7 @@ export default function DataTable<T>({
 
               {/* Data Rows */}
               <div className={styles.dataRows} ref={dataRowsRef}>
-                {sortedData.map((item, index) => {
+                {visibleSortedData.map((item, index) => {
                   // Use custom row component if provided, otherwise use default
                   if (customComponents?.itemRow) {
                     const ItemRowComponent = customComponents.itemRow;

@@ -62,6 +62,7 @@ interface CampaignData {
     hero: {
       title: string;
       subtitle: string;
+      subheading: string | null;
       description: string | null;
       buttonText: string;
       imageUrl: string | null;

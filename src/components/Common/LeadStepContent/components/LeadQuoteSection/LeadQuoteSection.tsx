@@ -700,14 +700,12 @@ export function LeadQuoteSection({
 
     if (planIds.length === 0) return;
 
-    // Check if we're missing discounts for any of these plans
+    // Check if we're missing discounts for any of these plans.
+    // Note: an empty array is a valid fetched result (meaning "no discounts").
     const missingDiscounts = planIds.filter(planId => {
-      // Either never fetched, or fetched but got empty results
-      return (
-        !discountsFetchedRef.current.has(planId) ||
-        !availableDiscounts[planId] ||
-        availableDiscounts[planId].length === 0
-      );
+      if (!discountsFetchedRef.current.has(planId)) return true;
+
+      return !Object.prototype.hasOwnProperty.call(availableDiscounts, planId);
     });
 
     if (missingDiscounts.length === 0) return;

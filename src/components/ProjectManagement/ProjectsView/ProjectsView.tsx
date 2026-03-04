@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Project, ProjectStatus, statusOptions } from '@/types/project';
 import { Task } from '@/types/taskManagement';
-import { ProjectBadge } from '@/components/TaskManagement/shared/ProjectBadge';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
+import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
 import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectsView.module.scss';
 
@@ -15,6 +15,14 @@ interface ProjectsViewProps {
   onProjectClick?: (project: Project) => void | Promise<void>;
 }
 
+type SortField =
+  | 'due_date'
+  | 'client'
+  | 'project_name'
+  | 'status'
+  | 'tasks'
+  | 'progress';
+
 export function ProjectsView({
   projects,
   tasks,
@@ -24,17 +32,60 @@ export function ProjectsView({
   onProjectClick,
 }: ProjectsViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState<{
+    key: SortField;
+    direction: 'asc' | 'desc';
+  }>({
+    key: 'due_date',
+    direction: 'asc',
+  });
 
-  // Calculate project task counts
+  const projectTaskStats = useMemo(() => {
+    const stats = new Map<string, { total: number; completed: number }>();
+
+    tasks.forEach(task => {
+      if (!task.project_id) return;
+
+      const current = stats.get(task.project_id) || { total: 0, completed: 0 };
+      current.total += 1;
+      if (task.status === 'completed') {
+        current.completed += 1;
+      }
+      stats.set(task.project_id, current);
+    });
+
+    return stats;
+  }, [tasks]);
+
   const getProjectTaskCount = (projectId: string) => {
-    const projectTasks = tasks.filter(t => t.project_id === projectId);
-    const completed = projectTasks.filter(t => t.status === 'completed').length;
-    return { total: projectTasks.length, completed };
+    return projectTaskStats.get(projectId) || { total: 0, completed: 0 };
+  };
+
+  const getProjectProgress = (projectId: string) => {
+    const stats = getProjectTaskCount(projectId);
+    if (stats.total === 0) return 0;
+    return Math.round((stats.completed / stats.total) * 100);
+  };
+
+  const handleSort = (field: SortField) => {
+    setSortConfig(prev => {
+      if (prev.key === field) {
+        return {
+          key: field,
+          direction: prev.direction === 'asc' ? 'desc' : 'asc',
+        };
+      }
+
+      return {
+        key: field,
+        direction: 'asc',
+      };
+    });
   };
 
   // Filter and sort projects
   const filteredProjects = useMemo(() => {
-    return projects
+    const filtered = projects
       .filter(project => {
         // Search filter
         if (searchQuery.trim()) {
@@ -46,13 +97,57 @@ export function ProjectsView({
         }
 
         return true;
-      })
-      .sort(
-        (a, b) =>
-          (parseDateString(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY) -
-          (parseDateString(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY)
-      );
-  }, [projects, searchQuery]);
+      });
+
+    const statusOrder = statusOptions.reduce<Record<string, number>>(
+      (acc, option, index) => {
+        acc[option.value] = index;
+        return acc;
+      },
+      {}
+    );
+
+    const sorted = [...filtered].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortConfig.key) {
+        case 'due_date':
+          comparison =
+            (parseDateString(a.due_date)?.getTime() ?? Number.POSITIVE_INFINITY) -
+            (parseDateString(b.due_date)?.getTime() ?? Number.POSITIVE_INFINITY);
+          break;
+        case 'client':
+          comparison = a.company.name.localeCompare(b.company.name);
+          break;
+        case 'project_name':
+          comparison = a.name.localeCompare(b.name);
+          break;
+        case 'status':
+          comparison =
+            (statusOrder[a.status] ?? Number.MAX_SAFE_INTEGER) -
+            (statusOrder[b.status] ?? Number.MAX_SAFE_INTEGER);
+          break;
+        case 'tasks': {
+          const aStats = getProjectTaskCount(a.id);
+          const bStats = getProjectTaskCount(b.id);
+          comparison = aStats.total - bStats.total;
+          if (comparison === 0) {
+            comparison = aStats.completed - bStats.completed;
+          }
+          break;
+        }
+        case 'progress':
+          comparison = getProjectProgress(a.id) - getProjectProgress(b.id);
+          break;
+        default:
+          comparison = 0;
+      }
+
+      return sortConfig.direction === 'asc' ? comparison : -comparison;
+    });
+
+    return sorted;
+  }, [projects, searchQuery, sortConfig, projectTaskStats]);
 
   const formatDate = (dateString: string): string => {
     const date = parseDateString(dateString);
@@ -132,13 +227,48 @@ export function ProjectsView({
       {/* Projects Table */}
       <div className={styles.projectsTable}>
         <div className={styles.tableHeader}>
-          <div className={styles.headerCell}>Project Name</div>
-          <div className={styles.headerCell}>Client</div>
-          <div className={styles.headerCell}>Type</div>
-          <div className={styles.headerCell}>Status</div>
-          <div className={styles.headerCell}>Progress</div>
-          <div className={styles.headerCell}>Tasks</div>
-          <div className={styles.headerCell}>Deadline</div>
+          <SortableColumnHeader
+            title="Deadline"
+            sortKey="due_date"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Client"
+            sortKey="client"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Project Name"
+            sortKey="project_name"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Status"
+            sortKey="status"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Tasks"
+            sortKey="tasks"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
+          <SortableColumnHeader
+            title="Progress"
+            sortKey="progress"
+            currentSort={sortConfig}
+            onSort={(key) => handleSort(key as SortField)}
+            className={styles.headerCell}
+          />
           <div className={styles.headerCell}>Actions</div>
         </div>
 
@@ -161,7 +291,7 @@ export function ProjectsView({
           ) : (
             filteredProjects.map((project) => {
               const taskStats = getProjectTaskCount(project.id);
-              const progress = taskStats.total > 0 ? Math.round((taskStats.completed / taskStats.total) * 100) : 0;
+              const progress = getProjectProgress(project.id);
 
               return (
                 <div
@@ -179,16 +309,29 @@ export function ProjectsView({
                   }}
                 >
                   <div className={styles.cell}>
-                    <div className={styles.projectName}>{project.name}</div>
+                    <div
+                      className={`${styles.deadline} ${
+                        project.due_date && isPastDue(project.due_date)
+                          ? styles.deadlineOverdue
+                          : ''
+                      }`}
+                    >
+                      {formatDate(project.due_date)}
+                    </div>
                   </div>
                   <div className={styles.cell}>
                     <div className={styles.clientName}>{project.company.name}</div>
                   </div>
                   <div className={styles.cell}>
-                    <ProjectBadge projectName={project.project_type} projectType={project.project_type as any} size="medium" />
+                    <div className={styles.projectName}>{project.name}</div>
                   </div>
                   <div className={styles.cell}>
                     {getStatusBadge(project.status)}
+                  </div>
+                  <div className={styles.cell}>
+                    <div className={styles.taskCount}>
+                      {taskStats.completed}/{taskStats.total}
+                    </div>
                   </div>
                   <div className={styles.cell}>
                     <div className={styles.progressContainer}>
@@ -199,22 +342,6 @@ export function ProjectsView({
                         />
                       </div>
                       <span className={styles.progressText}>{progress}%</span>
-                    </div>
-                  </div>
-                  <div className={styles.cell}>
-                    <div className={styles.taskCount}>
-                      {taskStats.completed}/{taskStats.total}
-                    </div>
-                  </div>
-                  <div className={styles.cell}>
-                    <div
-                      className={`${styles.deadline} ${
-                        project.due_date && isPastDue(project.due_date)
-                          ? styles.deadlineOverdue
-                          : ''
-                      }`}
-                    >
-                      {formatDate(project.due_date)}
                     </div>
                   </div>
                   <div className={styles.cell}>

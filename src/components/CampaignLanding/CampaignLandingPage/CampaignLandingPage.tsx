@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import styles from './CampaignLandingPage.module.scss';
 import ThankYouPage from '../ThankYouPage/ThankYouPage';
 import InlineRedemptionCard from '../InlineRedemptionCard/InlineRedemptionCard';
+import LoadingSpinner from '../LoadingSpinner/LoadingSpinner';
 import HeaderSection from './sections/HeaderSection';
 import HeroSection from './sections/HeroSection';
 import LetterSection from './sections/LetterSection';
@@ -69,6 +70,7 @@ interface CampaignLandingPageProps {
     hero: {
       title: string;
       subtitle: string;
+      subheading: string | null;
       description: string | null;
       buttonText: string;
       imageUrl: string | null; // Changed from imageUrls array to single image
@@ -274,16 +276,16 @@ export default function CampaignLandingPage({
       const result = await response.json();
 
       if (result.success) {
-        // Reload page to show thank you screen
+        // Keep spinner visible — page reload will tear it down naturally
         window.location.reload();
       } else {
         console.error('Redemption error:', result.error);
         alert(`Error redeeming offer: ${result.error}`);
+        setIsRedeeming(false);
       }
     } catch (error) {
       console.error('Redemption error:', error);
       alert('An unexpected error occurred. Please try again.');
-    } finally {
       setIsRedeeming(false);
     }
   };
@@ -293,6 +295,8 @@ export default function CampaignLandingPage({
     : landingPage.header.secondaryButtonText || 'Call';
 
   return (
+    <>
+    {isRedeeming && <LoadingSpinner />}
     <div
       className={styles.landingPage}
       style={{
@@ -451,5 +455,6 @@ export default function CampaignLandingPage({
         serviceName={landingPage.faq.serviceName}
       />
     </div>
+    </>
   );
 }

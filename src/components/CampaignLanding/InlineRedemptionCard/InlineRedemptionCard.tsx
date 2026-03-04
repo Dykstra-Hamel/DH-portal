@@ -156,6 +156,7 @@ export default function InlineRedemptionCard({
   };
 
   return (
+    <>
     <div className={styles.redemptionCard}>
       <div
         className={styles.heading}
@@ -352,5 +353,7 @@ export default function InlineRedemptionCard({
         dangerouslySetInnerHTML={{ __html: processedDisclaimer }}
       />
     </div>
+    </>
   );
 }
+

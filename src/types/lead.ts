@@ -1,19 +1,39 @@
+export type LeadFormat = 'call' | 'form' | 'email' | 'text';
+
+// New taxonomy values (use these for all new records)
 export type LeadSource =
-  | 'organic'
-  | 'referral'
-  | 'google_cpc'
+  | 'google_ads'
+  | 'google_organic'
   | 'facebook_ads'
+  | 'referral'
+  | 'direct'
+  | 'campaign'
+  | 'widget'
+  | 'other'
+  // Legacy values (existing records only — do not use for new records)
+  | 'organic'
+  | 'google_cpc'
   | 'linkedin'
   | 'email_campaign'
   | 'cold_call'
   | 'trade_show'
   | 'webinar'
   | 'content_marketing'
-  | 'campaign'
-  | 'widget_submission'
-  | 'other';
+  | 'widget_submission';
 
+// New taxonomy values (use these for all new records)
 export type LeadType =
+  | 'inbound_call'
+  | 'outbound_call'
+  | 'website_form'
+  | 'widget_form'
+  | 'campaign_call'
+  | 'campaign_email'
+  | 'campaign_text'
+  | 'campaign_form'
+  | 'manual'
+  | 'email_inbound'
+  // Legacy values (existing records only — do not use for new records)
   | 'phone_call'
   | 'web_form'
   | 'bulk_add'
@@ -41,6 +61,7 @@ export interface Lead {
   campaign_id?: string; // Reference to campaign UUID
   lead_source: LeadSource;
   lead_type: LeadType;
+  format?: LeadFormat;
   service_type?: string;
   lead_status: LeadStatus;
   comments?: string;
@@ -128,6 +149,11 @@ export interface Lead {
     last_name?: string;
     avatar_url?: string | null;
   };
+  campaign?: {
+    id: string;
+    name: string;
+    campaign_id: string;
+  };
   company?: {
     id: string;
     name: string;
@@ -177,6 +203,7 @@ export interface LeadFormData {
   campaign_id?: string;
   lead_source: LeadSource;
   lead_type: LeadType;
+  format?: LeadFormat;
   service_type?: string;
   lead_status: LeadStatus;
   comments?: string;
@@ -193,32 +220,60 @@ export interface LeadFormData {
   utm_content?: string;
 }
 
+export const leadFormatOptions = [
+  { value: 'call', label: 'Call' },
+  { value: 'form', label: 'Form' },
+  { value: 'email', label: 'Email' },
+  { value: 'text', label: 'Text' },
+] as const;
+
 export const leadSourceOptions = [
-  { value: 'organic', label: 'Organic' },
-  { value: 'referral', label: 'Referral' },
-  { value: 'google_cpc', label: 'Google CPC' },
+  { value: 'google_ads', label: 'Google Ads' },
+  { value: 'google_organic', label: 'Google Organic' },
   { value: 'facebook_ads', label: 'Facebook Ads' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'email_campaign', label: 'Email Campaign' },
-  { value: 'cold_call', label: 'Cold Call' },
-  { value: 'trade_show', label: 'Trade Show' },
-  { value: 'webinar', label: 'Webinar' },
-  { value: 'content_marketing', label: 'Content Marketing' },
+  { value: 'referral', label: 'Referral' },
+  { value: 'direct', label: 'Direct' },
   { value: 'campaign', label: 'Campaign' },
-  { value: 'widget_submission', label: 'Widget Submission' },
+  { value: 'widget', label: 'Widget' },
   { value: 'other', label: 'Other' },
 ] as const;
 
 export const leadTypeOptions = [
-  { value: 'phone_call', label: 'Phone Call' },
-  { value: 'web_form', label: 'Web Form' },
-  { value: 'bulk_add', label: 'Bulk Add' },
-  { value: 'email', label: 'Email' },
-  { value: 'chat', label: 'Chat' },
-  { value: 'social_media', label: 'Social Media' },
-  { value: 'in_person', label: 'In Person' },
-  { value: 'other', label: 'Other' },
+  { value: 'inbound_call', label: 'Inbound Call' },
+  { value: 'outbound_call', label: 'Outbound Call' },
+  { value: 'website_form', label: 'Website Form' },
+  { value: 'widget_form', label: 'Widget Form' },
+  { value: 'campaign_call', label: 'Campaign Call' },
+  { value: 'campaign_email', label: 'Campaign Email' },
+  { value: 'campaign_text', label: 'Campaign Text' },
+  { value: 'campaign_form', label: 'Campaign Form' },
+  { value: 'manual', label: 'Manual' },
+  { value: 'email_inbound', label: 'Email Inbound' },
 ] as const;
+
+// Type options filtered by format
+export const leadTypesByFormat: Record<string, { value: string; label: string }[]> = {
+  call: [
+    { value: 'inbound_call', label: 'Inbound Call' },
+    { value: 'outbound_call', label: 'Outbound Call' },
+    { value: 'campaign_call', label: 'Campaign Call' },
+  ],
+  form: [
+    { value: 'website_form', label: 'Website Form' },
+    { value: 'widget_form', label: 'Widget Form' },
+    { value: 'campaign_form', label: 'Campaign Form' },
+    { value: 'manual', label: 'Manual' },
+  ],
+  email: [
+    { value: 'campaign_email', label: 'Campaign Email' },
+    { value: 'email_inbound', label: 'Email Inbound' },
+    { value: 'manual', label: 'Manual' },
+  ],
+  text: [
+    { value: 'campaign_text', label: 'Campaign Text' },
+    { value: 'manual', label: 'Manual' },
+  ],
+};
 
 export const leadStatusOptions = [
   { value: 'new', label: 'New' },

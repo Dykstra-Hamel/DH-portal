@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const paginate = searchParams.get('paginate') === 'true';
+    const page = Math.max(
+      1,
+      parseInt(searchParams.get('page') || '1', 10) || 1
+    );
+    const requestedLimit = parseInt(searchParams.get('limit') || '100', 10) || 100;
+    const limit = Math.min(Math.max(1, requestedLimit), 500);
 
     if (!companyId) {
       return NextResponse.json(
@@ -67,6 +74,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build query - specify only needed columns to reduce data transfer
+    const selectOptions = paginate ? ({ count: 'exact' as const }) : undefined;
     let query = supabase
       .from('leads')
       .select(
@@ -101,7 +109,8 @@ export async function GET(request: NextRequest) {
           email,
           phone
         )
-      `
+      `,
+        selectOptions
       )
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
@@ -147,7 +156,13 @@ export async function GET(request: NextRequest) {
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    const { data: leads, error } = await query;
+    if (paginate) {
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      query = query.range(from, to);
+    }
+
+    const { data: leads, error, count } = await query;
 
     if (error) {
       console.error('Error fetching leads:', error);
@@ -158,6 +173,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (!leads || leads.length === 0) {
+      if (paginate) {
+        return NextResponse.json({
+          leads: [],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit),
+            hasMore: false,
+          },
+        });
+      }
       return NextResponse.json([]);
     }
 
@@ -260,6 +287,21 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    if (paginate) {
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limit);
+      return NextResponse.json({
+        leads: enhancedLeads,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasMore: page < totalPages,
+        },
+      });
+    }
+
     return NextResponse.json(enhancedLeads);
   } catch (error) {
     console.error('Error in leads API:', error);
@@ -296,9 +338,12 @@ export async function POST(request: NextRequest) {
       pestType,
       comments,
       leadSource,
+      leadFormat,
+      leadType,
       priority,
       estimatedValue,
       serviceType,
+      assignedTo,
     } = body;
 
     // Validate required fields
@@ -450,14 +495,16 @@ export async function POST(request: NextRequest) {
           company_id: companyId,
           customer_id: customerId,
           service_address_id: serviceAddressId,
-          lead_type: 'web_form',
-          lead_source: leadSource || 'other',
-          lead_status: 'new',
+          format: leadFormat || undefined,
+          lead_type: leadType || 'manual',
+          lead_source: leadSource || 'direct',
+          lead_status: assignedTo ? 'in_process' : 'new',
           priority: priority || 'medium',
           pest_type: pestType,
           comments,
           service_type: serviceType,
           estimated_value: estimatedValue,
+          assigned_to: assignedTo || null,
           created_at: new Date().toISOString(),
         },
       ])
@@ -504,7 +551,7 @@ export async function POST(request: NextRequest) {
 
     // Send lead creation notification (non-blocking)
     notifyLeadCreated(newLead.id, companyId, {
-      assignedUserId: undefined, // Manual leads are unassigned
+      assignedUserId: assignedTo || undefined,
     }).catch(error => {
       console.error('Lead notification failed:', error);
     });

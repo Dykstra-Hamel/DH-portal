@@ -27,7 +27,7 @@ export async function GET(
     }
 
     // Validate project type
-    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'CAM', 'SFT'];
     if (!validTypes.includes(projectType.toUpperCase())) {
       return NextResponse.json({ error: 'Invalid project type' }, { status: 400 });
     }
@@ -37,7 +37,7 @@ export async function GET(
       .from('project_type_subtypes')
       .select('*')
       .eq('project_type', projectType.toUpperCase())
-      .order('sort_order', { ascending: true });
+      .order('name', { ascending: true });
 
     if (error) {
       console.error('Error fetching subtypes:', error);
@@ -79,7 +79,7 @@ export async function POST(
     }
 
     // Validate project type
-    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS'];
+    const validTypes = ['WEB', 'SOC', 'EML', 'PRT', 'VEH', 'DIG', 'ADS', 'CAM', 'SFT'];
     if (!validTypes.includes(projectType.toUpperCase())) {
       return NextResponse.json({ error: 'Invalid project type' }, { status: 400 });
     }

@@ -81,7 +81,25 @@
 .columnHeaderRow {
   display: flex;
   align-items: center;
+  width: 100%;
   gap: 6px;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background-color: var(--gray-100, #f3f4f6);
+  }
+}
+
+.expandIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gray-400, #9ca3af);
+  margin-left: auto;
+  margin-right: 3px;
 }
 
 .columnTitle {
@@ -708,6 +726,87 @@
   border-bottom-left-radius: 12px;
   border-bottom-right-radius: 12px;
   z-index: 1;
+}
+
+// Expanded column view
+@keyframes expandIn {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes expandOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.97) translateY(-10px);
+  }
+}
+
+@keyframes cardFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.expandedView {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 1309px;
+  animation: expandIn 0.22s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+
+.expandedViewClosing {
+  animation: expandOut 0.2s cubic-bezier(0.2, 0, 0.2, 1) forwards;
+}
+
+.expandedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+}
+
+.expandedTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.closeExpandButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: var(--border-radius);
+  background: var(--white);
+  color: var(--gray-500, #6b7280);
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+    color: var(--gray-800, #1f2937);
+  }
 }
 
 // Responsive

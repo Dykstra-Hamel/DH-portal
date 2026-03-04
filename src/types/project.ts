@@ -46,7 +46,7 @@ export interface ProjectCategoryAssignment {
 }
 
 // Project type codes for shortcode generation
-export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'ADS';
+export type ProjectTypeCode = 'WEB' | 'SOC' | 'EML' | 'PRT' | 'VEH' | 'DIG' | 'ADS' | 'CAM' | 'SFT';
 
 // Project scope types
 export type ProjectScope = 'internal' | 'external' | 'both';
@@ -62,6 +62,8 @@ export const PROJECT_TYPE_CODES: Record<ProjectTypeCode, { label: string; descri
   VEH: { label: 'Vehicle Design', description: 'Vehicle wraps and graphics' },
   DIG: { label: 'Digital Designs', description: 'Digital ads for magazines, websites, etc.' },
   ADS: { label: 'Paid Ad Designs', description: 'Google, Bing, Yelp, YouTube ads' },
+  CAM: { label: 'Campaigns', description: 'Campaign planning, execution, and assets' },
+  SFT: { label: 'Software', description: 'Software and engineering projects' },
 };
 
 export interface ProjectMember {
@@ -169,6 +171,7 @@ export interface ProjectFormData {
   category_ids: string[]; // Array of category IDs for many-to-many relationship
   current_department_id?: string; // Optional department ID
   tasks?: ProjectTaskDraft[]; // Optional tasks to create with the project
+  member_ids?: string[]; // Optional member user IDs to add to the project
 }
 
 export interface User {
@@ -209,14 +212,15 @@ export const statusOptions = [
 
 export const projectTypeOptions = [
   { value: 'none', label: 'None (no shortcode)', code: null },
-  { value: 'website', label: 'Website', code: 'WEB' },
-  { value: 'social', label: 'Social Media', code: 'SOC' },
-  { value: 'email', label: 'Email Media', code: 'EML' },
-  { value: 'print', label: 'Print Media', code: 'PRT' },
-  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
+  { value: 'campaigns', label: 'Campaigns', code: 'CAM' },
   { value: 'digital', label: 'Digital Designs', code: 'DIG' },
+  { value: 'email', label: 'Email Media', code: 'EML' },
   { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
+  { value: 'print', label: 'Print Media', code: 'PRT' },
+  { value: 'social', label: 'Social Media', code: 'SOC' },
   { value: 'software', label: 'Software', code: 'SFT' },
+  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
+  { value: 'website', label: 'Website', code: 'WEB' },
 ];
 
 export const printSubtypes = [
@@ -355,6 +359,8 @@ export interface ProjectTask {
   } | null; // The ONE task blocking this task
   hasUnreadComments?: boolean; // Whether there are comments newer than user's last view
   hasUnreadMentions?: boolean; // Whether there are unread comments that mention the current user
+  comment_count?: number; // Total number of comments (from list API)
+  has_attachments?: boolean; // Whether any comment has attachments (from list API)
 }
 
 export interface ProjectTaskFormData {

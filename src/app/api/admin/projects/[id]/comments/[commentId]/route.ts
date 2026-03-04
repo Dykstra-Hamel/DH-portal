@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { sendMentionSlackNotifications, sendEditedCommentSlackNotifications } from '@/lib/slack/mention-notifications';
+
+function extractMentionedUserIds(html: string): string[] {
+  const mentionRegex = /<span[^>]*data-type=["']mention["'][^>]*>/g;
+  const idRegex = /data-id=["']([^"']+)["']/;
+  const userIds: string[] = [];
+
+  const mentions = html.match(mentionRegex) || [];
+  for (const mention of mentions) {
+    const idMatch = mention.match(idRegex);
+    if (idMatch && idMatch[1] && !userIds.includes(idMatch[1])) {
+      userIds.push(idMatch[1]);
+    }
+  }
+
+  return userIds;
+}
 
 // PATCH /api/admin/projects/[id]/comments/[commentId] - Update a comment
 export async function PATCH(
@@ -32,6 +49,25 @@ export async function PATCH(
       );
     }
 
+    // Fetch original comment before update
+    const { data: originalComment } = await supabase
+      .from('project_comments')
+      .select('comment')
+      .eq('id', commentId)
+      .single();
+
+    const originalMentions = originalComment ? extractMentionedUserIds(originalComment.comment) : [];
+
+    // Fetch project and commenter profile in parallel
+    const [{ data: project }, { data: commenterProfile }] = await Promise.all([
+      supabase.from('projects').select('name, company_id').eq('id', projectId).single(),
+      supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
+    ]);
+
+    const commenterName = commenterProfile
+      ? `${commenterProfile.first_name || ''} ${commenterProfile.last_name || ''}`.trim() || 'Someone'
+      : 'Someone';
+
     const { data: updatedComment, error } = await supabase
       .from('project_comments')
       .update({ comment: body.comment })
@@ -52,6 +88,62 @@ export async function PATCH(
       }
       console.error('Error updating comment:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (project) {
+      const newMentions = extractMentionedUserIds(body.comment);
+      const deepLinkUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?commentId=${commentId}`;
+
+      const editTargets = originalMentions.filter(id => id !== user.id);
+      const newTagTargets = newMentions.filter(id => !originalMentions.includes(id) && id !== user.id);
+
+      if (editTargets.length > 0 && project.company_id) {
+        const editNotifications = editTargets.map(userId => ({
+          user_id: userId,
+          company_id: project.company_id,
+          type: 'mention',
+          title: `${commenterName} edited a comment you were tagged in`,
+          message: `${commenterName} edited a comment you were tagged in on project "${project.name}"`,
+          reference_id: commentId,
+          reference_type: 'project_comment',
+        }));
+        supabase.from('notifications').insert(editNotifications).then(({ error: notifError }) => {
+          if (notifError) console.error('Error creating edit notifications:', notifError);
+        });
+
+        sendEditedCommentSlackNotifications({
+          mentionedUserIds: editTargets,
+          commenterName,
+          contextType: 'project',
+          contextName: project.name,
+          commentText: body.comment,
+          deepLinkUrl,
+        }).catch(() => {});
+      }
+
+      if (newTagTargets.length > 0 && project.company_id) {
+        const newTagNotifications = newTagTargets.map(userId => ({
+          user_id: userId,
+          company_id: project.company_id,
+          type: 'mention',
+          title: `${commenterName} mentioned you`,
+          message: `${commenterName} mentioned you in a comment on project "${project.name}"`,
+          reference_id: commentId,
+          reference_type: 'project_comment',
+        }));
+        supabase.from('notifications').insert(newTagNotifications).then(({ error: notifError }) => {
+          if (notifError) console.error('Error creating mention notifications:', notifError);
+        });
+
+        sendMentionSlackNotifications({
+          mentionedUserIds: newTagTargets,
+          commenterName,
+          contextType: 'project',
+          contextName: project.name,
+          commentText: body.comment,
+          deepLinkUrl,
+        }).catch(() => {});
+      }
     }
 
     return NextResponse.json(updatedComment);

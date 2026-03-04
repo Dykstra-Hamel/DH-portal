@@ -109,6 +109,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       id: 'campaigns' as PrimaryNavItem,
       href: '/campaigns',
       disabled: false,
+      superAdminOnly: true,
       icon: <Mails size={24} />,
       text: 'Campaigns',
     },
@@ -191,6 +192,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       id: 'brand' as PrimaryNavItem,
       href: '/brand',
       disabled: false,
+      superAdminOnly: true,
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"

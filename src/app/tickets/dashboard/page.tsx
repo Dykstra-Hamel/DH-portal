@@ -6,14 +6,13 @@ import Image from 'next/image';
 import {
   Ticket,
   TicketFormData,
-  ticketPriorityOptions,
-  ticketStatusOptions,
+  ticketSourceOptions,
+  ticketTypeOptions,
 } from '@/types/ticket';
-import { Lead, leadStatusOptions } from '@/types/lead';
+import { Lead, leadSourceOptions, leadTypeOptions } from '@/types/lead';
 import {
   SupportCase,
-  supportCasePriorityOptions,
-  supportCaseStatusOptions,
+  supportCaseIssueTypeOptions,
 } from '@/types/support-case';
 import { Task } from '@/types/task';
 import { createClient } from '@/lib/supabase/client';
@@ -31,7 +30,6 @@ import {
   subscribeToTicketReviewUpdates,
   TicketReviewPayload,
 } from '@/lib/realtime/ticket-review-channel';
-import LiveCallBar from '@/components/Common/LiveCallBar/LiveCallBar';
 import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import {
@@ -64,8 +62,8 @@ interface Announcement {
 
 type DashboardSortLabels = {
   _typeSortLabel?: string;
-  _statusSortLabel?: string;
-  _prioritySortLabel?: string;
+  _formatSortLabel?: string;
+  _sourceSortLabel?: string;
 };
 
 type DashboardItem =
@@ -75,7 +73,13 @@ type DashboardItem =
 
 const DASHBOARD_OVERVIEW_COLUMN_WIDTHS =
   '120px 180px 140px 250px 120px 120px 120px 1fr';
-const TICKETS_PAGE_SIZE = 25;
+const DASHBOARD_INITIAL_PAGE_SIZE = 25;
+const TICKETS_FETCH_BATCH_SIZE = 100;
+const MAX_TICKET_FETCH_PAGES = 200;
+const LEADS_FETCH_BATCH_SIZE = 100;
+const MAX_LEAD_FETCH_PAGES = 200;
+const SUPPORT_CASES_FETCH_BATCH_SIZE = 100;
+const MAX_SUPPORT_CASE_FETCH_PAGES = 200;
 const INSPIRATIONAL_QUOTES = [
   { text: 'Focus on the customer, not the competition.', author: 'Jeff Bezos' },
   { text: 'Done is better than perfect.', author: 'Sheryl Sandberg' },
@@ -173,7 +177,7 @@ const getDashboardItemTypeLabel = (item: DashboardItem): string => {
   return 'New';
 };
 
-const NA_PRIORITY_LABEL = 'N/A';
+const NA_FIELD_LABEL = 'N/A';
 
 const getOptionLabel = (
   value: string | null | undefined,
@@ -183,26 +187,28 @@ const getOptionLabel = (
   return options.find(option => option.value === value)?.label || value;
 };
 
-const getDashboardItemStatusLabel = (item: DashboardItem): string => {
+const getDashboardItemFormatLabel = (item: DashboardItem): string => {
   if (item._type === 'lead') {
-    return getOptionLabel(item.lead_status, leadStatusOptions);
-  }
-  if (item._type === 'support_case') {
-    return getOptionLabel(item.status, supportCaseStatusOptions);
-  }
-  return getOptionLabel(item.status, ticketStatusOptions);
-};
-
-const getDashboardItemPriorityLabel = (item: DashboardItem): string => {
-  if (item._type === 'lead') {
-    return NA_PRIORITY_LABEL;
+    return getOptionLabel(item.lead_type, leadTypeOptions) || NA_FIELD_LABEL;
   }
   if (item._type === 'support_case') {
     return (
-      getOptionLabel(item.priority, supportCasePriorityOptions) || NA_PRIORITY_LABEL
+      getOptionLabel(item.ticket?.type, ticketTypeOptions) ||
+      getOptionLabel(item.issue_type, supportCaseIssueTypeOptions) ||
+      NA_FIELD_LABEL
     );
   }
-  return getOptionLabel(item.priority, ticketPriorityOptions) || NA_PRIORITY_LABEL;
+  return getOptionLabel(item.type, ticketTypeOptions) || NA_FIELD_LABEL;
+};
+
+const getDashboardItemSourceLabel = (item: DashboardItem): string => {
+  if (item._type === 'lead') {
+    return getOptionLabel(item.lead_source, leadSourceOptions) || NA_FIELD_LABEL;
+  }
+  if (item._type === 'support_case') {
+    return getOptionLabel(item.ticket?.source, ticketSourceOptions) || NA_FIELD_LABEL;
+  }
+  return getOptionLabel(item.source, ticketSourceOptions) || NA_FIELD_LABEL;
 };
 
 // Search filter helper - searches all string values in an object recursively
@@ -324,9 +330,6 @@ function TicketsDashboardContent() {
   // Search states
   const [tableSearch, setTableSearch] = useState('');
   const [tableVisibleCount, setTableVisibleCount] = useState(5);
-  const [ticketsHasMore, setTicketsHasMore] = useState(false);
-  const [loadingTicketsMore, setLoadingTicketsMore] = useState(false);
-  const ticketsPageRef = useRef(1);
 
   // Announcements modal state
   const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
@@ -355,6 +358,8 @@ function TicketsDashboardContent() {
   const subscriptionActiveRef = useRef(false);
   const currentChannelRef = useRef<ReturnType<typeof createTicketChannel> | null>(null);
   const isFetchingRef = useRef(false);
+  const queueFullFetchEnabledRef = useRef(false);
+  const pendingFullTicketFetchRef = useRef(false);
   const reviewChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Company ref for realtime updates
@@ -497,72 +502,120 @@ function TicketsDashboardContent() {
   // Fetch unassigned tickets AND live tickets (for LiveCallBar)
   const fetchTickets = useCallback(async (
     companyId: string,
-    options?: { showLoading?: boolean; page?: number; append?: boolean }
+    options?: { showLoading?: boolean; fetchAllPages?: boolean }
   ) => {
     if (!companyId) return;
-    if (isFetchingRef.current) return;
+    const fetchAllPages = options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
+    if (fetchAllPages) {
+      queueFullFetchEnabledRef.current = true;
+    }
+
+    if (isFetchingRef.current) {
+      if (fetchAllPages) {
+        pendingFullTicketFetchRef.current = true;
+      }
+      return;
+    }
 
     const showLoading = options?.showLoading ?? true;
-    const page = options?.page ?? 1;
-    const append = options?.append ?? false;
     isFetchingRef.current = true;
+    pendingFullTicketFetchRef.current = false;
     if (showLoading) {
       setLoading(true);
-    }
-    if (append) {
-      setLoadingTicketsMore(true);
     }
 
     try {
       const supabase = createClient();
 
-      // Fetch both regular tickets (via API) and live tickets (directly) in parallel
-      const [regularResponse, liveResult] = await Promise.all([
-        // Regular tickets for the list via API (oldest first)
-        fetch(`/api/tickets?${new URLSearchParams({
-          companyId,
-          includeArchived: 'false',
-          page: page.toString(),
-          limit: TICKETS_PAGE_SIZE.toString(),
-          sortBy: 'created_at',
-          sortOrder: 'asc',
-        })}`),
-        // Live tickets directly from Supabase (API excludes live status)
-        supabase
-          .from('tickets')
-          .select(`
-            *,
-            customer:customers!tickets_customer_id_fkey(
-              id, first_name, last_name, email, phone, address, city, state, zip_code
-            ),
-            service_address:service_addresses!left(
-              id, street_address, city, state, zip_code
-            ),
-            call_records:call_records!call_records_ticket_id_fkey(
-              id, call_id, call_status, start_timestamp, end_timestamp,
-              duration_seconds, phone_number, from_number
-            )
-          `)
-          .eq('company_id', companyId)
-          .eq('status', 'live')
-          .order('created_at', { ascending: true })
-          .limit(50),
+      // For initial load, use page 1 only. Once sorting is engaged, load
+      // all pages so client-side sorting works against the full queue.
+      const regularTicketsPromise = (async () => {
+        if (!fetchAllPages) {
+          const response = await fetch(
+            `/api/tickets?${new URLSearchParams({
+              companyId,
+              includeArchived: 'false',
+              page: '1',
+              limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+              sortBy: 'created_at',
+              sortOrder: 'asc',
+            })}`
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch tickets');
+          }
+
+          const data = await response.json();
+          return Array.isArray(data?.tickets) ? data.tickets : [];
+        }
+
+        const allRegularTickets: Ticket[] = [];
+        let page = 1;
+        let hasMore = true;
+
+        while (hasMore && page <= MAX_TICKET_FETCH_PAGES) {
+          const response = await fetch(
+            `/api/tickets?${new URLSearchParams({
+              companyId,
+              includeArchived: 'false',
+              page: page.toString(),
+              limit: TICKETS_FETCH_BATCH_SIZE.toString(),
+              sortBy: 'created_at',
+              sortOrder: 'asc',
+            })}`
+          );
+
+          if (!response.ok) {
+            throw new Error('Failed to fetch tickets');
+          }
+
+          const data = await response.json();
+          const pageTickets = Array.isArray(data?.tickets) ? data.tickets : [];
+          allRegularTickets.push(...pageTickets);
+
+          hasMore = Boolean(data?.pagination?.hasMore) && pageTickets.length > 0;
+          page += 1;
+        }
+
+        if (hasMore) {
+          console.warn(
+            '[TicketsDashboard] Reached ticket page fetch safety cap while loading queue.'
+          );
+        }
+
+        return allRegularTickets;
+      })();
+
+      // Live tickets directly from Supabase (API excludes live status)
+      const liveTicketsPromise = supabase
+        .from('tickets')
+        .select(`
+          *,
+          customer:customers!tickets_customer_id_fkey(
+            id, first_name, last_name, email, phone, address, city, state, zip_code
+          ),
+          service_address:service_addresses!left(
+            id, street_address, city, state, zip_code
+          ),
+          call_records:call_records!call_records_ticket_id_fkey(
+            id, call_id, call_status, start_timestamp, end_timestamp,
+            duration_seconds, phone_number, from_number
+          )
+        `)
+        .eq('company_id', companyId)
+        .eq('status', 'live')
+        .order('created_at', { ascending: true })
+        .limit(50);
+
+      const [regularTickets, liveResult] = await Promise.all([
+        regularTicketsPromise,
+        liveTicketsPromise,
       ]);
-
-      if (!regularResponse.ok) {
-        throw new Error('Failed to fetch tickets');
-      }
-
-      const regularData = await regularResponse.json();
-      const regularTickets = regularData.tickets || [];
       const liveTickets = !liveResult.error && liveResult.data ? liveResult.data : [];
 
-      setTickets(prev => {
-        const previousRegular = append
-          ? prev.filter(ticket => ticket.status !== 'live')
-          : [];
+      setTickets(() => {
         const mergedTickets = new Map<string, Ticket>();
-        previousRegular.forEach(ticket => mergedTickets.set(ticket.id, ticket));
         regularTickets.forEach((ticket: Ticket) =>
           mergedTickets.set(ticket.id, ticket)
         );
@@ -578,8 +631,6 @@ function TicketsDashboardContent() {
 
         return [...uniqueLiveTickets, ...mergedRegular];
       });
-      ticketsPageRef.current = page;
-      setTicketsHasMore(regularData.pagination?.hasMore ?? false);
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
@@ -587,24 +638,95 @@ function TicketsDashboardContent() {
       if (showLoading) {
         setLoading(false);
       }
-      if (append) {
-        setLoadingTicketsMore(false);
+
+      if (pendingFullTicketFetchRef.current) {
+        pendingFullTicketFetchRef.current = false;
+        void fetchTickets(companyId, { showLoading: false, fetchAllPages: true });
       }
     }
   }, []);
 
   // Fetch unassigned leads (sales + scheduling) - oldest first
-  const fetchLeads = useCallback(async (companyId: string) => {
+  const fetchLeads = useCallback(async (
+    companyId: string,
+    options?: { fetchAllPages?: boolean }
+  ) => {
     if (!companyId) return;
+    const fetchAllPages = options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
 
     setLoadingLeads(true);
     try {
-      const response = await fetch(
-        `/api/leads?companyId=${companyId}&unassigned=true&status=new,in_process,quoted,scheduling&limit=50&sortBy=created_at&sortOrder=asc`
+      if (!fetchAllPages) {
+        const response = await fetch(
+          `/api/leads?${new URLSearchParams({
+            companyId,
+            unassigned: 'true',
+            status: 'new,in_process,quoted,scheduling',
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+            paginate: 'true',
+            page: '1',
+            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+          })}`
+        );
+
+        if (!response.ok) throw new Error('Failed to fetch leads');
+        const payload = await response.json();
+
+        if (Array.isArray(payload)) {
+          setLeads(payload);
+          return;
+        }
+
+        setLeads(Array.isArray(payload?.leads) ? payload.leads : []);
+        return;
+      }
+
+      const allLeads: Lead[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore && page <= MAX_LEAD_FETCH_PAGES) {
+        const response = await fetch(
+          `/api/leads?${new URLSearchParams({
+            companyId,
+            unassigned: 'true',
+            status: 'new,in_process,quoted,scheduling',
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+            paginate: 'true',
+            page: page.toString(),
+            limit: LEADS_FETCH_BATCH_SIZE.toString(),
+          })}`
+        );
+
+        if (!response.ok) throw new Error('Failed to fetch leads');
+        const payload = await response.json();
+
+        if (Array.isArray(payload)) {
+          allLeads.push(...payload);
+          hasMore = false;
+          break;
+        }
+
+        const pageLeads = Array.isArray(payload?.leads) ? payload.leads : [];
+        allLeads.push(...pageLeads);
+
+        hasMore =
+          Boolean(payload?.pagination?.hasMore) && pageLeads.length > 0;
+        page += 1;
+      }
+
+      if (hasMore) {
+        console.warn(
+          '[TicketsDashboard] Reached lead page fetch safety cap while loading queue.'
+        );
+      }
+
+      const dedupedLeads = Array.from(
+        new Map(allLeads.map(lead => [lead.id, lead])).values()
       );
-      if (!response.ok) throw new Error('Failed to fetch leads');
-      const data = await response.json();
-      setLeads(Array.isArray(data) ? data : []);
+      setLeads(dedupedLeads);
     } catch (error) {
       console.error('Error fetching leads:', error);
     } finally {
@@ -613,17 +735,93 @@ function TicketsDashboardContent() {
   }, []);
 
   // Fetch unassigned support cases - oldest first
-  const fetchSupportCases = useCallback(async (companyId: string) => {
+  const fetchSupportCases = useCallback(async (
+    companyId: string,
+    options?: { fetchAllPages?: boolean }
+  ) => {
     if (!companyId) return;
+    const fetchAllPages = options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
 
     setLoadingSupportCases(true);
     try {
-      const response = await fetch(
-        `/api/support-cases?companyId=${companyId}&unassigned=true&includeArchived=false&sortBy=created_at&sortOrder=asc`
+      if (!fetchAllPages) {
+        const response = await fetch(
+          `/api/support-cases?${new URLSearchParams({
+            companyId,
+            unassigned: 'true',
+            includeArchived: 'false',
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+            paginate: 'true',
+            page: '1',
+            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+          })}`
+        );
+
+        if (!response.ok) throw new Error('Failed to fetch support cases');
+        const payload = await response.json();
+
+        if (Array.isArray(payload)) {
+          setSupportCases(payload);
+          return;
+        }
+
+        setSupportCases(
+          Array.isArray(payload?.supportCases) ? payload.supportCases : []
+        );
+        return;
+      }
+
+      const allSupportCases: SupportCase[] = [];
+      let page = 1;
+      let hasMore = true;
+
+      while (hasMore && page <= MAX_SUPPORT_CASE_FETCH_PAGES) {
+        const response = await fetch(
+          `/api/support-cases?${new URLSearchParams({
+            companyId,
+            unassigned: 'true',
+            includeArchived: 'false',
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+            paginate: 'true',
+            page: page.toString(),
+            limit: SUPPORT_CASES_FETCH_BATCH_SIZE.toString(),
+          })}`
+        );
+
+        if (!response.ok) throw new Error('Failed to fetch support cases');
+        const payload = await response.json();
+
+        if (Array.isArray(payload)) {
+          allSupportCases.push(...payload);
+          hasMore = false;
+          break;
+        }
+
+        const pageSupportCases = Array.isArray(payload?.supportCases)
+          ? payload.supportCases
+          : [];
+        allSupportCases.push(...pageSupportCases);
+
+        hasMore =
+          Boolean(payload?.pagination?.hasMore) &&
+          pageSupportCases.length > 0;
+        page += 1;
+      }
+
+      if (hasMore) {
+        console.warn(
+          '[TicketsDashboard] Reached support case page fetch safety cap while loading queue.'
+        );
+      }
+
+      const dedupedSupportCases = Array.from(
+        new Map(
+          allSupportCases.map(supportCase => [supportCase.id, supportCase])
+        ).values()
       );
-      if (!response.ok) throw new Error('Failed to fetch support cases');
-      const data = await response.json();
-      setSupportCases(Array.isArray(data) ? data : []);
+      setSupportCases(dedupedSupportCases);
     } catch (error) {
       console.error('Error fetching support cases:', error);
     } finally {
@@ -719,14 +917,16 @@ function TicketsDashboardContent() {
           .select('id', { count: 'exact', head: true })
           .eq('company_id', companyId)
           .is('assigned_to', null)
-          .in('lead_status', ['new', 'in_process', 'quoted']),
+          .in('lead_status', ['new', 'in_process', 'quoted'])
+          .or('archived.is.null,archived.eq.false'),
         // Unassigned scheduling (leads with scheduling status)
         supabase
           .from('leads')
           .select('id', { count: 'exact', head: true })
           .eq('company_id', companyId)
           .is('assigned_to', null)
-          .eq('lead_status', 'scheduling'),
+          .eq('lead_status', 'scheduling')
+          .or('archived.is.null,archived.eq.false'),
         // Unassigned support cases
         supabase
           .from('support_cases')
@@ -742,6 +942,7 @@ function TicketsDashboardContent() {
               .eq('company_id', companyId)
               .eq('assigned_to', userId)
               .in('lead_status', ['in_process', 'quoted', 'scheduling'])
+              .or('archived.is.null,archived.eq.false')
           : Promise.resolve({ count: 0 }),
         // My support cases (assigned to user)
         userId
@@ -790,9 +991,11 @@ function TicketsDashboardContent() {
   // Initial data fetch
   useEffect(() => {
     if (selectedCompany?.id) {
-      fetchTickets(selectedCompany.id);
-      fetchLeads(selectedCompany.id);
-      fetchSupportCases(selectedCompany.id);
+      queueFullFetchEnabledRef.current = false;
+      pendingFullTicketFetchRef.current = false;
+      fetchTickets(selectedCompany.id, { fetchAllPages: false });
+      fetchLeads(selectedCompany.id, { fetchAllPages: false });
+      fetchSupportCases(selectedCompany.id, { fetchAllPages: false });
       fetchAnnouncements(selectedCompany.id);
       fetchTotalCounts(selectedCompany.id, user?.id);
 
@@ -1017,12 +1220,6 @@ function TicketsDashboardContent() {
     };
   }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchTotalCounts]);
 
-  // Filter live tickets for LiveCallBar
-  const liveTickets = useMemo(
-    () => tickets.filter(ticket => ticket.status === 'live'),
-    [tickets]
-  );
-
   // Handle create ticket
   const handleCreateTicket = useCallback(
     async (ticketFormData: TicketFormData & { newCustomerData?: any }) => {
@@ -1243,29 +1440,29 @@ function TicketsDashboardContent() {
         ),
       },
       {
-        key: 'status',
-        title: 'Status',
+        key: 'format',
+        title: 'Format',
         width: '120px',
         sortable: true,
-        sortKey: '_statusSortLabel',
+        sortKey: '_formatSortLabel',
         render: (item: DashboardItem) => (
           <span className={tableStyles.formatCell}>
-            {getDashboardItemStatusLabel(item)}
+            {getDashboardItemFormatLabel(item)}
           </span>
         ),
       },
       {
-        key: 'priority',
-        title: 'Priority',
+        key: 'source',
+        title: 'Source',
         width: '120px',
         sortable: true,
-        sortKey: '_prioritySortLabel',
+        sortKey: '_sourceSortLabel',
         render: (item: DashboardItem) => {
-          const label = getDashboardItemPriorityLabel(item);
+          const label = getDashboardItemSourceLabel(item);
           return (
             <span
               className={`${tableStyles.formatCell} ${
-                label === NA_PRIORITY_LABEL ? tableStyles.mutedText : ''
+                label === NA_FIELD_LABEL ? tableStyles.mutedText : ''
               }`}
             >
               {label}
@@ -1275,7 +1472,7 @@ function TicketsDashboardContent() {
       },
       {
         key: 'type',
-        title: 'Type',
+        title: 'Ticket Type',
         width: '120px',
         sortable: true,
         sortKey: '_typeSortLabel',
@@ -1382,12 +1579,37 @@ function TicketsDashboardContent() {
     ]
   );
 
+  const handleDashboardSortChange = useCallback(
+    (_field: string, _order: 'asc' | 'desc') => {
+      if (dashboardTab !== 'new' || !selectedCompany?.id) {
+        return;
+      }
+
+      if (queueFullFetchEnabledRef.current) {
+        return;
+      }
+
+      queueFullFetchEnabledRef.current = true;
+      pendingFullTicketFetchRef.current = false;
+      fetchTickets(selectedCompany.id, { showLoading: false, fetchAllPages: true });
+      fetchLeads(selectedCompany.id, { fetchAllPages: true });
+      fetchSupportCases(selectedCompany.id, { fetchAllPages: true });
+    },
+    [
+      dashboardTab,
+      selectedCompany?.id,
+      fetchTickets,
+      fetchLeads,
+      fetchSupportCases,
+    ]
+  );
+
   // Get current data for dashboard table based on tab
   const getDashboardTableData = () => {
     switch (dashboardTab) {
       case 'new': {
         // Sort oldest to newest (ascending by created_at)
-        // Add _typeSortLabel for sortable Type column (alphabetically: New < Sales < Scheduling < Support)
+        // Add sortable labels for format/source/ticket type columns.
         const combinedData = [
           ...tickets
             .filter(ticket => ticket.status !== 'live')
@@ -1395,25 +1617,31 @@ function TicketsDashboardContent() {
               ...ticket,
               _type: 'ticket' as const,
               _typeSortLabel: 'New',
-              _statusSortLabel: getOptionLabel(ticket.status, ticketStatusOptions),
-              _prioritySortLabel:
-                getOptionLabel(ticket.priority, ticketPriorityOptions) || NA_PRIORITY_LABEL,
+              _formatSortLabel:
+                getOptionLabel(ticket.type, ticketTypeOptions) || NA_FIELD_LABEL,
+              _sourceSortLabel:
+                getOptionLabel(ticket.source, ticketSourceOptions) || NA_FIELD_LABEL,
             })),
           ...leads.map(lead => ({
             ...lead,
             _type: 'lead' as const,
             _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
-            _statusSortLabel: getOptionLabel(lead.lead_status, leadStatusOptions),
-            _prioritySortLabel: NA_PRIORITY_LABEL,
+            _formatSortLabel:
+              getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
+            _sourceSortLabel:
+              getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
           })),
           ...supportCases.map(supportCase => ({
             ...supportCase,
             _type: 'support_case' as const,
             _typeSortLabel: 'Support',
-            _statusSortLabel: getOptionLabel(supportCase.status, supportCaseStatusOptions),
-            _prioritySortLabel:
-              getOptionLabel(supportCase.priority, supportCasePriorityOptions) ||
-              NA_PRIORITY_LABEL,
+            _formatSortLabel:
+              getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
+              getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+              NA_FIELD_LABEL,
+            _sourceSortLabel:
+              getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
+              NA_FIELD_LABEL,
           })),
         ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
@@ -1427,23 +1655,28 @@ function TicketsDashboardContent() {
       }
       case 'my': {
         // Combine leads and support cases, sort oldest to newest
-        // Add _typeSortLabel for sortable Type column (alphabetically: New < Sales < Scheduling < Support)
+        // Add sortable labels for format/source/ticket type columns.
         const combinedData = [
           ...myLeads.map(lead => ({
             ...lead,
             _type: 'lead' as const,
             _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
-            _statusSortLabel: getOptionLabel(lead.lead_status, leadStatusOptions),
-            _prioritySortLabel: NA_PRIORITY_LABEL,
+            _formatSortLabel:
+              getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
+            _sourceSortLabel:
+              getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
           })),
           ...mySupportCases.map(supportCase => ({
             ...supportCase,
             _type: 'support_case' as const,
             _typeSortLabel: 'Support',
-            _statusSortLabel: getOptionLabel(supportCase.status, supportCaseStatusOptions),
-            _prioritySortLabel:
-              getOptionLabel(supportCase.priority, supportCasePriorityOptions) ||
-              NA_PRIORITY_LABEL,
+            _formatSortLabel:
+              getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
+              getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+              NA_FIELD_LABEL,
+            _sourceSortLabel:
+              getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
+              NA_FIELD_LABEL,
           })),
         ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         return {
@@ -1462,8 +1695,10 @@ function TicketsDashboardContent() {
               ...lead,
               _type: 'lead' as const,
               _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
-              _statusSortLabel: getOptionLabel(lead.lead_status, leadStatusOptions),
-              _prioritySortLabel: NA_PRIORITY_LABEL,
+              _formatSortLabel:
+                getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
+              _sourceSortLabel:
+                getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
             })),
           ...mySupportCases
             .filter(c => ['resolved', 'closed'].includes(c.status))
@@ -1471,13 +1706,13 @@ function TicketsDashboardContent() {
               ...supportCase,
               _type: 'support_case' as const,
               _typeSortLabel: 'Support',
-              _statusSortLabel: getOptionLabel(
-                supportCase.status,
-                supportCaseStatusOptions
-              ),
-              _prioritySortLabel:
-                getOptionLabel(supportCase.priority, supportCasePriorityOptions) ||
-                NA_PRIORITY_LABEL,
+              _formatSortLabel:
+                getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
+                getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+                NA_FIELD_LABEL,
+              _sourceSortLabel:
+                getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
+                NA_FIELD_LABEL,
             })),
         ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
         return {
@@ -1501,27 +1736,12 @@ function TicketsDashboardContent() {
 
   const tableContent = getDashboardTableData();
   const tableData = (tableContent.data || []) as any[];
-  const tableVisibleData =
-    dashboardTab === 'new' ? tableData.slice(0, tableVisibleCount) : tableData;
-  const canLoadMoreTickets = dashboardTab === 'new' && ticketsHasMore;
   const tableHasMore =
     dashboardTab === 'new' &&
-    (tableData.length > tableVisibleCount || canLoadMoreTickets);
+    tableData.length > tableVisibleCount;
   const handleTableLoadMore = () => {
     const nextVisibleCount = tableVisibleCount + 5;
     setTableVisibleCount(nextVisibleCount);
-
-    if (
-      canLoadMoreTickets &&
-      selectedCompany?.id &&
-      !loadingTicketsMore
-    ) {
-      fetchTickets(selectedCompany.id, {
-        showLoading: false,
-        page: ticketsPageRef.current + 1,
-        append: true,
-      });
-    }
   };
 
   const tableEmptyStateMessage =
@@ -1669,26 +1889,26 @@ function TicketsDashboardContent() {
           </div>
         </div>
 
-        {dashboardTab === 'new' && <LiveCallBar liveTickets={liveTickets} />}
-
         {/* Data Table */}
         {selectedCompany && (
           <Suspense fallback={<DashboardSkeleton />}>
             <DataTable
               key={`dashboard-${dashboardTab}`}
-              data={tableVisibleData as any[]}
+              data={tableData as any[]}
               loading={tableContent.loading}
               title="Tickets"
               columns={tableContent.columns as any}
               tabs={[]}
               onItemAction={handleDashboardItemAction as any}
               infiniteScrollEnabled={dashboardTab === 'new'}
+              visibleCount={dashboardTab === 'new' ? tableVisibleCount : undefined}
               hasMore={tableHasMore}
               onLoadMore={handleTableLoadMore}
-              loadingMore={loadingTicketsMore}
+              loadingMore={false}
               tableType={tableContent.tableType}
               customColumnWidths={tableContent.customColumnWidths}
               searchEnabled={false}
+              onSortChange={handleDashboardSortChange}
               emptyStateMessage={tableEmptyStateMessage}
             />
           </Suspense>

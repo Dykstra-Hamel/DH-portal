@@ -6,10 +6,30 @@ import React, {
   useMemo,
   DragEvent,
 } from 'react';
+import { Expand, X } from 'lucide-react';
 import { Project, ProjectDepartment } from '@/types/project';
 import { ProjectCard } from '@/components/Common/ProjectCard/ProjectCard';
+import { ProjectCardGrid } from '../ProjectCardGrid/ProjectCardGrid';
 import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectKanbanView.module.scss';
+
+const EXPANDED_COLUMN_COOKIE = 'kanban_expanded_column';
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(
+    new RegExp('(?:^|; )' + name + '=([^;]*)')
+  );
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+function setCookie(name: string, value: string) {
+  document.cookie = `${name}=${encodeURIComponent(value)}; path=/; max-age=${60 * 60 * 24 * 365}`;
+}
+
+function deleteCookie(name: string) {
+  document.cookie = `${name}=; path=/; max-age=0`;
+}
 
 interface ProjectKanbanViewProps {
   projects: Project[];
@@ -36,6 +56,36 @@ export function ProjectKanbanView({
   onUpdateProject,
   onToggleStar,
 }: ProjectKanbanViewProps) {
+  // Expanded column state — persisted via cookie
+  const [expandedColumnId, setExpandedColumnId] = useState<string | null>(
+    () => getCookie(EXPANDED_COLUMN_COOKIE)
+  );
+  const [isClosingExpanded, setIsClosingExpanded] = useState(false);
+  const closeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const CLOSE_ANIMATION_MS = 200;
+
+  const handleExpandColumn = (columnId: string) => {
+    // If already closing, cancel and switch columns immediately
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    setIsClosingExpanded(false);
+    setExpandedColumnId(columnId);
+    setCookie(EXPANDED_COLUMN_COOKIE, columnId);
+  };
+
+  const handleCloseExpanded = () => {
+    setIsClosingExpanded(true);
+    closeTimeoutRef.current = setTimeout(() => {
+      setExpandedColumnId(null);
+      setIsClosingExpanded(false);
+      deleteCookie(EXPANDED_COLUMN_COOKIE);
+      closeTimeoutRef.current = null;
+    }, CLOSE_ANIMATION_MS);
+  };
+
   // Simple drag state
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [draggedFromColumn, setDraggedFromColumn] = useState<string | null>(
@@ -69,13 +119,45 @@ export function ProjectKanbanView({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewContentRef = useRef<HTMLDivElement | null>(null);
   const columnRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const expandedViewRef = useRef<HTMLDivElement | null>(null);
+
+  // Clean up close timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  // Close expanded view when clicking outside it, but only within the viewContent section
+  useEffect(() => {
+    if (!expandedColumnId) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // Click inside the expanded view — let it pass through
+      if (expandedViewRef.current?.contains(target)) return;
+      // Only close if the click is within the viewContent section
+      const viewContent = expandedViewRef.current?.closest(
+        '[class*="viewContent"]'
+      ) as HTMLElement | null;
+      if (!viewContent?.contains(target)) return;
+      handleCloseExpanded();
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    return () => document.removeEventListener('mousedown', handleMouseDown);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedColumnId]);
 
   const getProjectsByDepartment = (columnId: string): Project[] => {
     // Projects assigned to this department
     const departmentProjects = projects.filter(p => p.current_department_id === columnId);
 
-    // Sort by closest due date at top
+    // Sort starred projects first, then by closest due date
     return [...departmentProjects].sort((a, b) => {
+      // Starred projects float to the top
+      if (a.is_starred !== b.is_starred) return a.is_starred ? -1 : 1;
+
       // Projects without due dates go to the bottom
       if (!a.due_date && !b.due_date) return 0;
       if (!a.due_date) return 1;
@@ -269,8 +351,51 @@ export function ProjectKanbanView({
     // The actual department change happens in handleDragEnd
   };
 
+  const expandedColumn = expandedColumnId
+    ? columns.find(c => c.id === expandedColumnId) ?? null
+    : null;
+  const expandedProjects = expandedColumnId
+    ? getProjectsByDepartment(expandedColumnId)
+    : [];
+
   return (
     <div className={styles.kanbanWrapper}>
+      {expandedColumn && (
+        <div
+          ref={expandedViewRef}
+          className={`${styles.expandedView} ${isClosingExpanded ? styles.expandedViewClosing : ''}`}
+        >
+          <div className={styles.expandedHeader}>
+            <div className={styles.expandedTitleRow}>
+              {expandedColumn.icon && (
+                <span className={styles.columnIcon}>{expandedColumn.icon}</span>
+              )}
+              <span className={styles.columnTitle}>{expandedColumn.title}</span>
+              <span className={styles.columnCount}>
+                ({expandedProjects.length})
+              </span>
+            </div>
+            <button
+              type="button"
+              className={styles.closeExpandButton}
+              onClick={handleCloseExpanded}
+              aria-label="Close expanded view"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <ProjectCardGrid
+            projects={expandedProjects}
+            taskStatsByProject={taskStatsByProject}
+            userTaskStatsByProject={userTaskStatsByProject}
+            onProjectClick={onProjectClick}
+            onToggleStar={onToggleStar}
+            onUpdateProject={onUpdateProject}
+          />
+        </div>
+      )}
+
+      {!expandedColumn && (
       <div
         ref={containerRef}
         className={`${styles.kanbanContainer} ${styles.departmentView}`}
@@ -295,13 +420,27 @@ export function ProjectKanbanView({
                 className={`${styles.kanbanColumnWrapper} ${styles.departmentView}`}
               >
                 <div className={styles.columnHeader}>
-                  <div className={styles.columnHeaderRow}>
+                  <div
+                    className={styles.columnHeaderRow}
+                    onClick={() => handleExpandColumn(column.id)}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleExpandColumn(column.id);
+                      }
+                    }}
+                  >
                     <span className={styles.columnTitle}>
                       {column.icon && <span className={styles.columnIcon}>{column.icon}</span>}
                       {column.title}
                     </span>
                     <span className={styles.columnCount}>
                       ({columnProjects.length})
+                    </span>
+                    <span className={styles.expandIcon}>
+                      <Expand size={13} />
                     </span>
                   </div>
                   <span
@@ -373,6 +512,7 @@ export function ProjectKanbanView({
           })}
         </div>
       </div>
+      )}
     </div>
   );
 }

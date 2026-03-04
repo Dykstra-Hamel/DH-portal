@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useRef, FormEvent, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import SearchableDropdown from '@/components/Common/SearchableDropdown/SearchableDropdown';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import Image from 'next/image';
 import { Users, ChevronDown } from 'lucide-react';
+import { leadFormatOptions, leadSourceOptions, leadTypesByFormat } from '@/types/lead';
 import styles from './AddLeadModal.module.scss';
 
 interface AddLeadModalProps {
@@ -20,6 +22,7 @@ type TabType = 'single' | 'bulk';
 type BulkStep = 'upload' | 'preview' | 'schedule' | 'processing' | 'complete';
 
 export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadModalProps) {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabType>('single');
   const [bulkStep, setBulkStep] = useState<BulkStep>('upload');
   const [isLoading, setIsLoading] = useState(false);
@@ -47,6 +50,11 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     enabled: isOpen,
   });
 
+  // Single lead taxonomy state
+  const [leadFormat, setLeadFormat] = useState<string>('call');
+  const [leadSource, setLeadSource] = useState<string>('direct');
+  const [leadType, setLeadType] = useState<string>('inbound_call');
+
   // Single lead form state
   const [singleLeadData, setSingleLeadData] = useState({
     firstName: '',
@@ -57,9 +65,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     city: '',
     state: '',
     zip: '',
-    pestType: '',
-    comments: '',
-    priority: 'medium',
   });
 
   // Bulk upload state
@@ -141,6 +146,9 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     setCustomers([]);
     setSelectedAssignee('');
     setIsAssignmentDropdownOpen(false);
+    setLeadFormat('call');
+    setLeadSource('direct');
+    setLeadType('inbound_call');
     setSingleLeadData({
       firstName: '',
       lastName: '',
@@ -150,9 +158,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
       city: '',
       state: '',
       zip: '',
-      pestType: '',
-      comments: '',
-      priority: 'medium',
     });
     setCsvFile(null);
     setParsedData(null);
@@ -208,11 +213,11 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
         body: JSON.stringify({
           companyId,
           customerId,
-          pestType: singleLeadData.pestType,
-          comments: singleLeadData.comments,
-          priority: singleLeadData.priority,
           assignedTo: isTeamAssignment() ? undefined : (selectedAssignee || undefined),
           status: selectedAssignee ? 'assigned' : 'unassigned',
+          leadFormat,
+          leadSource,
+          leadType,
         }),
       });
 
@@ -221,8 +226,10 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
         throw new Error(error.error || 'Failed to create lead');
       }
 
+      const data = await response.json();
       onSuccess?.();
       handleClose();
+      router.push(`/tickets/leads/${data.lead.id}`);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -550,6 +557,51 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
               )}
             </div>
 
+            {/* Lead Taxonomy: Format, Source, Type */}
+            <div className={styles.formRow}>
+              <div className={styles.formGroup}>
+                <label>Format *</label>
+                <select
+                  required
+                  value={leadFormat}
+                  onChange={(e) => {
+                    const fmt = e.target.value;
+                    setLeadFormat(fmt);
+                    const firstType = leadTypesByFormat[fmt]?.[0]?.value || 'manual';
+                    setLeadType(firstType);
+                  }}
+                >
+                  {leadFormatOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label>Source *</label>
+                <select
+                  required
+                  value={leadSource}
+                  onChange={(e) => setLeadSource(e.target.value)}
+                >
+                  {leadSourceOptions.map(opt => (
+                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className={styles.formGroup}>
+              <label>Type *</label>
+              <select
+                required
+                value={leadType}
+                onChange={(e) => setLeadType(e.target.value)}
+              >
+                {(leadTypesByFormat[leadFormat] || leadTypesByFormat['call']).map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+
             {/* Assignment Dropdown */}
             <div className={styles.assignmentSection}>
               <label className={styles.sectionLabel}>Assign To</label>
@@ -693,53 +745,6 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
                   </div>
                 )}
               </div>
-            </div>
-
-            {/* Lead-Specific Fields */}
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label>Pest Type</label>
-                <select
-                  value={singleLeadData.pestType}
-                  onChange={(e) => setSingleLeadData({ ...singleLeadData, pestType: e.target.value })}
-                >
-                  <option value="">Select Pest Type</option>
-                  <option value="General Pest Control">General Pest Control</option>
-                  <option value="Ant Control">Ant Control</option>
-                  <option value="Bed Bug Control">Bed Bug Control</option>
-                  <option value="Cockroach Control">Cockroach Control</option>
-                  <option value="Flea Control">Flea Control</option>
-                  <option value="Mosquito Control">Mosquito Control</option>
-                  <option value="Rodent Control">Rodent Control</option>
-                  <option value="Spider Control">Spider Control</option>
-                  <option value="Termite Control">Termite Control</option>
-                  <option value="Wasp/Bee Control">Wasp/Bee Control</option>
-                  <option value="Wildlife Control">Wildlife Control</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              <div className={styles.formGroup}>
-                <label>Priority</label>
-                <select
-                  value={singleLeadData.priority}
-                  onChange={(e) => setSingleLeadData({ ...singleLeadData, priority: e.target.value })}
-                >
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="urgent">Urgent</option>
-                </select>
-              </div>
-            </div>
-
-            <div className={styles.formGroup}>
-              <label>Comments</label>
-              <textarea
-                rows={3}
-                value={singleLeadData.comments}
-                onChange={(e) => setSingleLeadData({ ...singleLeadData, comments: e.target.value })}
-              />
             </div>
 
             <div className={styles.formActions}>

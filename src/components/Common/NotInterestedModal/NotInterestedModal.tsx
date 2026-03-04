@@ -3,6 +3,16 @@
 import { useState } from 'react';
 import styles from './NotInterestedModal.module.scss';
 
+const NOT_INTERESTED_REASONS = [
+  'Price too high',
+  'Already has a service provider',
+  'Not the right time',
+  'Not in service area',
+  'No response / Unreachable',
+  'Chose a competitor',
+  'Other',
+];
+
 interface NotInterestedModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -14,19 +24,31 @@ export function NotInterestedModal({
   onClose,
   onSubmit,
 }: NotInterestedModalProps) {
-  const [reason, setReason] = useState('');
+  const [selectedReason, setSelectedReason] = useState('');
+  const [otherReason, setOtherReason] = useState('');
 
   if (!isOpen) return null;
 
+  const isOther = selectedReason === 'Other';
+  const canSubmit = selectedReason && (!isOther || otherReason.trim());
+
+  const handleClose = () => {
+    setSelectedReason('');
+    setOtherReason('');
+    onClose();
+  };
+
   const handleSubmit = () => {
+    const reason = isOther ? otherReason.trim() : selectedReason;
     onSubmit(reason);
-    setReason('');
+    setSelectedReason('');
+    setOtherReason('');
     onClose();
   };
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
-      onClose();
+      handleClose();
     }
   };
 
@@ -42,22 +64,42 @@ export function NotInterestedModal({
           <label htmlFor="lostReason" className={styles.label}>
             Lost Reason
           </label>
-          <textarea
+          <select
             id="lostReason"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className={styles.textarea}
-            placeholder="Enter the reason this lead was lost..."
-            rows={4}
+            value={selectedReason}
+            onChange={(e) => setSelectedReason(e.target.value)}
+            className={styles.select}
             autoFocus
-          />
+          >
+            <option value="" disabled>Select a reason...</option>
+            {NOT_INTERESTED_REASONS.map((reason) => (
+              <option key={reason} value={reason}>{reason}</option>
+            ))}
+          </select>
         </div>
+
+        {isOther && (
+          <div className={styles.formGroup}>
+            <label htmlFor="otherReason" className={styles.label}>
+              Please specify
+            </label>
+            <textarea
+              id="otherReason"
+              value={otherReason}
+              onChange={(e) => setOtherReason(e.target.value)}
+              className={styles.textarea}
+              placeholder="Enter the reason this lead was lost..."
+              rows={4}
+              autoFocus
+            />
+          </div>
+        )}
 
         <div className={styles.modalActions}>
           <button
             type="button"
             className={styles.cancelButton}
-            onClick={onClose}
+            onClick={handleClose}
           >
             Cancel
           </button>
@@ -65,6 +107,7 @@ export function NotInterestedModal({
             type="button"
             className={styles.submitButton}
             onClick={handleSubmit}
+            disabled={!canSubmit}
           >
             Mark as Lost
           </button>

@@ -494,6 +494,7 @@ export async function GET(
       hero: {
         title: landingPageData?.hero_title || 'Quarterly Pest Control starting at only $44/mo',
         subtitle: landingPageData?.hero_subtitle || 'Special Offer',
+        subheading: landingPageData?.hero_subheading || null,
         description: landingPageData?.hero_description || null,
         buttonText: landingPageData?.hero_button_text || 'Upgrade Today!',
         // Use single hero image (hero_image_url) or fall back to first image from old array format
@@ -760,6 +761,7 @@ export async function POST(
         // Hero section
         hero_title: body.hero_title,
         hero_subtitle: body.hero_subtitle || 'Special Offer',
+        hero_subheading: body.hero_subheading || null,
         hero_description: body.hero_description || null,
         hero_button_text: body.hero_button_text || 'Upgrade Today!',
         hero_image_url: body.hero_image_url || null,
@@ -826,7 +828,7 @@ export async function POST(
         thankyou_greeting: body.thankyou_greeting || 'Thanks {first_name}!',
         thankyou_content: body.thankyou_content || null,
         thankyou_show_expect: body.thankyou_show_expect ?? true,
-        thankyou_expect_heading: body.thankyou_expect_heading || 'What To Expect',
+        thankyou_expect_heading: body.thankyou_expect_heading ?? 'What To Expect',
         thankyou_expect_col1_image: body.thankyou_expect_col1_image || null,
         thankyou_expect_col1_heading: body.thankyou_expect_col1_heading || null,
         thankyou_expect_col1_content: body.thankyou_expect_col1_content || null,
@@ -967,6 +969,7 @@ export async function PUT(
     // Hero section
     if (body.hero_title !== undefined) updateData.hero_title = body.hero_title;
     if (body.hero_subtitle !== undefined) updateData.hero_subtitle = body.hero_subtitle;
+    if (body.hero_subheading !== undefined) updateData.hero_subheading = body.hero_subheading;
     if (body.hero_description !== undefined) updateData.hero_description = body.hero_description;
     if (body.hero_button_text !== undefined) updateData.hero_button_text = body.hero_button_text;
     if (body.hero_image_url !== undefined) updateData.hero_image_url = body.hero_image_url;

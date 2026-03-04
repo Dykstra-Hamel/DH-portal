@@ -35,6 +35,43 @@
   color: var(--color-text);
   min-height: 100vh;
   max-width: 1626px;
+
+  // Force all elements (including buttons) to inherit the brand font,
+  // matching the behaviour of the campaign landing page.
+  * {
+    font-family: inherit;
+  }
+}
+
+// Success Banner
+.successBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 0 20px 40px;
+
+  svg {
+    flex-shrink: 0;
+  }
+
+  @media (max-width: 768px) {
+    gap: 12px;
+    padding-bottom: 20px;
+
+    svg {
+      width: 30px;
+      height: 30px;
+    }
+  }
+}
+
+.successBannerText {
+  font-family: var(--font-primary);
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.24px;
+  color: var(--accent-color);
 }
 
 .container {
@@ -303,7 +340,6 @@
   }
 
   @media (max-width: 768px) {
-    font-size: 15px;
     line-height: 24px;
   }
 }
@@ -332,7 +368,6 @@
   transition:
     border-color 0.2s ease,
     background 0.2s ease;
-  box-shadow: var(--shadow-button);
   width: fit-content;
 
   &::before {

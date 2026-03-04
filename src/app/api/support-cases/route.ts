@@ -32,6 +32,13 @@ export async function GET(request: NextRequest) {
     const dateTo = searchParams.get('dateTo');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const paginate = searchParams.get('paginate') === 'true';
+    const page = Math.max(
+      1,
+      parseInt(searchParams.get('page') || '1', 10) || 1
+    );
+    const requestedLimit = parseInt(searchParams.get('limit') || '100', 10) || 100;
+    const limit = Math.min(Math.max(1, requestedLimit), 500);
 
     // If companyId is provided, verify access
     if (companyId) {
@@ -80,7 +87,7 @@ export async function GET(request: NextRequest) {
           source,
           created_at
         )
-      `)
+      `, paginate ? { count: 'exact' } : undefined)
       .order('created_at', { ascending: false });
 
     // Apply filters
@@ -124,7 +131,13 @@ export async function GET(request: NextRequest) {
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    const { data: supportCases, error } = await query;
+    if (paginate) {
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      query = query.range(from, to);
+    }
+
+    const { data: supportCases, error, count } = await query;
 
     if (error) {
       console.error('Error fetching support cases:', error);
@@ -132,6 +145,18 @@ export async function GET(request: NextRequest) {
     }
 
     if (!supportCases || supportCases.length === 0) {
+      if (paginate) {
+        return NextResponse.json({
+          supportCases: [],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit),
+            hasMore: false,
+          },
+        });
+      }
       return NextResponse.json([]);
     }
 
@@ -229,6 +254,21 @@ export async function GET(request: NextRequest) {
         };
       }
     );
+
+    if (paginate) {
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limit);
+      return NextResponse.json({
+        supportCases: enhancedSupportCases,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasMore: page < totalPages,
+        },
+      });
+    }
 
     return NextResponse.json(enhancedSupportCases);
   } catch (error) {

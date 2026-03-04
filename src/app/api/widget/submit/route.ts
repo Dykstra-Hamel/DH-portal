@@ -621,9 +621,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Set lead source as widget_submission for widget form submissions
-    const leadSource = 'widget_submission';
-
     // Create lead with enhanced attribution data
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -633,8 +630,9 @@ export async function POST(request: NextRequest) {
           customer_id: customerId,
           partial_lead_id: partialLead?.id || null,
           service_address_id: serviceAddressId,
-          lead_source: leadSource,
-          lead_type: 'web_form',
+          format: 'form',
+          lead_source: 'widget',
+          lead_type: 'widget_form',
           lead_status: status,
           priority,
           comments: notes,

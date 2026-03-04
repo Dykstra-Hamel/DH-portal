@@ -53,7 +53,8 @@
 
 .tooltipContainer {
   position: relative;
-  display: inline-block;
+  display: block;
+  max-width: 41px;
 }
 
 .tooltip {

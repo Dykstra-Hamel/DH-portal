@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react'
 import {
   X,
   Trash2,
+  Download,
   User as UserIcon,
   Calendar,
   MessageSquare,
@@ -32,6 +33,8 @@ import {
 } from '@/types/project';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
+import { useNotificationContext } from '@/contexts/NotificationContext';
+import { scheduleScrollToElementById } from '@/lib/scroll-utils';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import styles from './ProjectTaskDetail.module.scss';
 
@@ -71,7 +74,20 @@ interface ProjectTaskDetailProps {
   departments?: ProjectDepartment[];
   mentionUsers?: MentionUser[]; // Users available for @mentions
   currentUserId?: string; // Current user's ID for checking comment ownership
+  onTaskCommentMentionsRead?: (commentIds: string[]) => void;
 }
+
+type UploadProgressState = {
+  active: boolean;
+  completed: number;
+  total: number;
+};
+
+const EMPTY_UPLOAD_PROGRESS: UploadProgressState = {
+  active: false,
+  completed: 0,
+  total: 0,
+};
 
 export default function ProjectTaskDetail({
   task,
@@ -92,6 +108,7 @@ export default function ProjectTaskDetail({
   departments = [],
   mentionUsers,
   currentUserId,
+  onTaskCommentMentionsRead,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -100,6 +117,8 @@ export default function ProjectTaskDetail({
   const [isUpdatingComment, setIsUpdatingComment] = useState(false);
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [commentUploadProgress, setCommentUploadProgress] =
+    useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
   const commentComposerDragCounterRef = useRef(0);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
@@ -143,6 +162,8 @@ export default function ProjectTaskDetail({
     task?.parent_task_id || ''
   );
   const priorityRef = useRef<HTMLDivElement>(null);
+  const processedVisibleTaskMentionsRef = useRef<string | null>(null);
+  const { refreshNotifications } = useNotificationContext();
 
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -418,13 +439,76 @@ export default function ProjectTaskDetail({
 
   useEffect(() => {
     if (!highlightedCommentId) return;
-    const element = document.getElementById(
-      `task-comment-${highlightedCommentId}`
-    );
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+
+    return scheduleScrollToElementById(`task-comment-${highlightedCommentId}`, {
+      topOffset: 24,
+    });
   }, [highlightedCommentId, task?.id, task?.comments?.length]);
+
+  const markVisibleTaskMentionsAsRead = useCallback(
+    async (commentIds: string[]) => {
+      if (commentIds.length === 0) return;
+
+      try {
+        const response = await fetch(
+          '/api/notifications/mentions/read-by-reference',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              referenceType: 'task_comment',
+              referenceIds: commentIds,
+            }),
+          }
+        );
+
+        if (!response.ok) {
+          console.error(
+            'Error marking task mentions as read:',
+            await response.text()
+          );
+          return;
+        }
+
+        const data = await response.json().catch(() => null);
+        if (data?.markedCount > 0) {
+          onTaskCommentMentionsRead?.(commentIds);
+          await refreshNotifications();
+        }
+      } catch (error) {
+        console.error('Error marking task mentions as read:', error);
+      }
+    },
+    [onTaskCommentMentionsRead, refreshNotifications]
+  );
+
+  useEffect(() => {
+    if (!task?.id || !Array.isArray(task.comments) || task.comments.length === 0) {
+      return;
+    }
+
+    const commentIds = task.comments
+      .map((comment) => comment.id)
+      .filter((id): id is string => Boolean(id));
+
+    if (commentIds.length === 0) {
+      return;
+    }
+
+    const commentSignature = task.comments
+      .map((comment) => `${comment.id}:${comment.updated_at}`)
+      .join('|');
+    const nextKey = `${task.id}:${commentSignature}`;
+
+    if (processedVisibleTaskMentionsRef.current === nextKey) {
+      return;
+    }
+
+    processedVisibleTaskMentionsRef.current = nextKey;
+    void markVisibleTaskMentionsAsRead(commentIds);
+  }, [markVisibleTaskMentionsAsRead, task?.comments, task?.id]);
 
   // Helper function for validating rich text content
   const isRichTextEmpty = (html: string): boolean => {
@@ -581,6 +665,21 @@ export default function ProjectTaskDetail({
   }, []);
 
   // Image lightbox handlers
+  const handleDownloadCommentAttachment = useCallback(async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  }, []);
+
   const handleCommentImageClick = useCallback((commentImages: Array<{ id: string; url: string; name: string }>, imageId: string) => {
     const index = commentImages.findIndex(img => img.id === imageId);
     if (index !== -1) {
@@ -638,6 +737,13 @@ export default function ProjectTaskDetail({
 
   if (!task) return null;
 
+  const commentUploadPercent =
+    commentUploadProgress.total > 0
+      ? Math.round(
+          (commentUploadProgress.completed / commentUploadProgress.total) * 100
+        )
+      : 0;
+
   const handleSubmitComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isRichTextEmpty(newComment) && pendingAttachments.length === 0) return;
@@ -654,32 +760,77 @@ export default function ProjectTaskDetail({
       // Upload attachments if any
       if (pendingAttachments.length > 0) {
         const supabase = createClient();
-        const fileMetadata = [];
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        setCommentUploadProgress({
+          active: true,
+          completed: 0,
+          total: pendingAttachments.length,
+        });
 
-        // Upload each file to storage using the createdComment.id
-        for (const file of pendingAttachments) {
-          const timestamp = Date.now();
-          const sanitizedName = sanitizeFileName(file.name);
-          const filePath = `comment-attachments/tasks/${task.id}/${createdComment.id}/${timestamp}-${sanitizedName}`;
+        const uploadResults = await Promise.allSettled(
+          pendingAttachments.map(async (file) => {
+            if (file.size > MAX_FILE_SIZE) {
+              throw new Error(`File "${file.name}" exceeds 50MB limit`);
+            }
 
-          const { error: uploadError } = await supabase.storage
-            .from('brand-assets')
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              upsert: false,
-            });
+            const timestamp = Date.now();
+            const sanitizedName = sanitizeFileName(file.name);
+            const filePath = `comment-attachments/tasks/${task.id}/${createdComment.id}/${timestamp}-${sanitizedName}`;
 
-          if (uploadError) {
-            console.error('Storage upload error:', uploadError);
-            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
+            const { error: uploadError } = await supabase.storage
+              .from('brand-assets')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (uploadError) {
+              throw new Error(
+                `Failed to upload "${file.name}": ${uploadError.message}`
+              );
+            }
+
+            setCommentUploadProgress((prev) => ({
+              ...prev,
+              completed: Math.min(prev.total, prev.completed + 1),
+            }));
+
+            return {
+              file_path: filePath,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+            };
+          })
+        );
+
+        const fileMetadata = uploadResults
+          .filter(
+            (
+              result
+            ): result is PromiseFulfilledResult<{
+              file_path: string;
+              file_name: string;
+              file_size: number;
+              mime_type: string;
+            }> => result.status === 'fulfilled'
+          )
+          .map((result) => result.value);
+
+        const firstFailedUpload = uploadResults.find(
+          (result) => result.status === 'rejected'
+        );
+
+        if (firstFailedUpload) {
+          if (fileMetadata.length > 0) {
+            await supabase.storage
+              .from('brand-assets')
+              .remove(fileMetadata.map((file) => file.file_path));
           }
-
-          fileMetadata.push({
-            file_path: filePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
-          });
+          const reason = (firstFailedUpload as PromiseRejectedResult).reason;
+          throw reason instanceof Error
+            ? reason
+            : new Error('Failed to upload one or more attachments');
         }
 
         // Save metadata via API
@@ -710,6 +861,7 @@ export default function ProjectTaskDetail({
       alert('Failed to post comment. Please try again.');
     } finally {
       setIsSubmittingComment(false);
+      setCommentUploadProgress(EMPTY_UPLOAD_PROGRESS);
     }
   };
 
@@ -1561,6 +1713,20 @@ export default function ProjectTaskDetail({
                     ))}
                   </div>
                 )}
+                {commentUploadProgress.active && (
+                  <div className={styles.uploadProgressContainer}>
+                    <div className={styles.uploadProgressLabel}>
+                      Uploading attachments {commentUploadProgress.completed}/
+                      {commentUploadProgress.total} ({commentUploadPercent}%)
+                    </div>
+                    <div className={styles.uploadProgressBar}>
+                      <div
+                        className={styles.uploadProgressFill}
+                        style={{ width: `${commentUploadPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
               <input
                 ref={commentFileInputRef}
@@ -1591,7 +1757,11 @@ export default function ProjectTaskDetail({
                 disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
                 className={styles.commentSubmitButton}
               >
-                {isSubmittingComment ? 'Posting...' : 'Post Comment'}
+                {isSubmittingComment
+                  ? commentUploadProgress.active
+                    ? `Uploading ${commentUploadPercent}%`
+                    : 'Posting...'
+                  : 'Post Comment'}
               </button>
             </form>
 
@@ -1734,6 +1904,16 @@ export default function ProjectTaskDetail({
                                           alt={attachment.file_name}
                                           loading="lazy"
                                         />
+                                        <button
+                                          className={styles.commentImageDownload}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            handleDownloadCommentAttachment(attachment.url, attachment.file_name);
+                                          }}
+                                          aria-label="Download image"
+                                        >
+                                          <Download size={13} />
+                                        </button>
                                       </div>
                                     ))}
                                   </div>
@@ -1765,6 +1945,17 @@ export default function ProjectTaskDetail({
                                           />
                                         </svg>
                                         <span>{attachment.file_name}</span>
+                                        <button
+                                          className={styles.commentFileDownload}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleDownloadCommentAttachment(attachment.url, attachment.file_name);
+                                          }}
+                                          aria-label="Download file"
+                                        >
+                                          <Download size={13} />
+                                        </button>
                                       </a>
                                     ))}
                                   </div>

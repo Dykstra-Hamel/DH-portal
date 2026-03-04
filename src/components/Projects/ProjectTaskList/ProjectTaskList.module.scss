@@ -94,6 +94,12 @@
   }
 }
 
+.taskRowBlockingHighlight {
+  background: #eaf4ff;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px #3b82f6;
+}
+
 .taskRowLast {
   border-bottom: none;
 }
@@ -155,6 +161,48 @@
   }
 }
 
+.blockedTooltipWrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.blockedTooltip {
+  position: absolute;
+  bottom: calc(100% + 10px);
+  left: 0;
+  background-color: #333;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+}
+
+.blockedTooltipArrow {
+  position: absolute;
+  top: 100%;
+  left: 10px;
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 5px solid #333;
+}
+
+.completeToggleBlocked:hover .blockedTooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
 .collapseToggle {
   border: none;
   background: transparent;
@@ -186,7 +234,7 @@
 .taskNameRow {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   min-width: 0;
   max-width: 100%;
 }
@@ -204,9 +252,8 @@
 .taskCommentBadge {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  color: var(--gray-500);
+  gap: 3px;
+  color: var(--gray-400);
   font-size: 11px;
   font-weight: 600;
   line-height: 1;
@@ -215,12 +262,30 @@
 
 .taskCommentBadgeUnread {
   font-weight: 700;
-  color: var(--gray-700);
+  color: var(--gray-600);
 }
 
 .taskCommentBadgeMention {
   font-weight: 700;
   color: var(--action-600, #0284c7);
+  animation: mentionPulse 2s ease-in-out infinite;
+}
+
+.taskAttachmentBadge {
+  display: inline-flex;
+  align-items: center;
+  color: var(--gray-400);
+  flex-shrink: 0;
+}
+
+@keyframes mentionPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .taskDueDate {
@@ -442,6 +507,15 @@
 
     &:hover {
       background: var(--action-700, #0369a1);
+    }
+  }
+
+  &.disabledDay {
+    color: var(--gray-300, #d1d5db);
+    cursor: not-allowed;
+
+    &:hover {
+      background: transparent;
     }
   }
 }

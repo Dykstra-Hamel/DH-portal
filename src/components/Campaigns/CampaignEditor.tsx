@@ -82,6 +82,7 @@ export default function CampaignEditor({
   const [landingPageData, setLandingPageData] = useState<LandingPageFormData>({
     hero_title: 'Quarterly Pest Control starting at only $44/mo',
     hero_subtitle: 'Special Offer',
+    hero_subheading: '',
     hero_description: '',
     hero_button_text: 'Upgrade Today!',
     hero_button_icon_url: '',
@@ -274,6 +275,7 @@ export default function CampaignEditor({
           hero_title:
             lp.hero.title || 'Quarterly Pest Control starting at only $44/mo',
           hero_subtitle: lp.hero.subtitle || 'Special Offer',
+          hero_subheading: lp.hero.subheading || '',
           hero_description: lp.hero.description || '',
           hero_button_text: lp.hero.buttonText || 'Upgrade Today!',
           hero_button_icon_url: lp.hero.buttonIconUrl || '',
@@ -322,7 +324,7 @@ export default function CampaignEditor({
           thankyou_content: lp.thankYou?.content || '',
           thankyou_show_expect: lp.thankYou?.showExpect ?? true,
           thankyou_expect_heading:
-            lp.thankYou?.expectHeading || 'What To Expect',
+            lp.thankYou?.expectHeading ?? 'What To Expect',
           thankyou_expect_col1_image:
             lp.thankYou?.expectColumns?.[0]?.imageUrl || '',
           thankyou_expect_col1_heading:
@@ -733,6 +735,7 @@ export default function CampaignEditor({
     setLandingPageData({
       hero_title: 'Quarterly Pest Control starting at only $44/mo',
       hero_subtitle: 'Special Offer',
+      hero_subheading: '',
       hero_description: '',
       hero_button_text: 'Upgrade Today!',
       hero_image_url: '',
@@ -1249,9 +1252,10 @@ export default function CampaignEditor({
                   </div>
                   <div className={styles.reviewItem}>
                     <span className={styles.reviewLabel}>Hero Title:</span>
-                    <span className={styles.reviewValue}>
-                      {landingPageData.hero_title}
-                    </span>
+                    <span
+                      className={styles.reviewValue}
+                      dangerouslySetInnerHTML={{ __html: landingPageData.hero_title }}
+                    />
                   </div>
                   <div className={styles.reviewItem}>
                     <span className={styles.reviewLabel}>Display Price:</span>

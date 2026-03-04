@@ -1,8 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { Lead } from '@/types/lead';
+import Link from 'next/link';
+import { Pencil } from 'lucide-react';
+import { Lead, LeadSource } from '@/types/lead';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import { authenticatedFetch } from '@/lib/api-client';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
@@ -12,6 +15,20 @@ interface LeadCallFormInfoProps {
 
 export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
   const [showCallSummary, setShowCallSummary] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [editData, setEditData] = useState({
+    lead_source: lead.lead_source || 'other',
+    utm_source: lead.utm_source || '',
+    utm_medium: lead.utm_medium || '',
+    utm_campaign: lead.utm_campaign || '',
+  });
+  const [displayValues, setDisplayValues] = useState({
+    lead_source: lead.lead_source || 'other',
+    utm_source: lead.utm_source || '',
+    utm_medium: lead.utm_medium || '',
+    utm_campaign: lead.utm_campaign || '',
+  });
 
   const capitalizeFirst = (str: string | undefined | null): string => {
     if (!str) return 'N/A';
@@ -20,19 +37,25 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
 
   const getLeadSourceDisplay = (source: string): string => {
     const sourceMap: Record<string, string> = {
-      organic: 'Organic',
-      referral: 'Referral',
-      google_cpc: 'Google CPC',
+      // New taxonomy values
+      google_ads: 'Google Ads',
+      google_organic: 'Google Organic',
       facebook_ads: 'Facebook Ads',
+      referral: 'Referral',
+      direct: 'Direct',
+      campaign: 'Campaign',
+      widget: 'Widget',
+      other: 'Other',
+      // Legacy values
+      organic: 'Google Organic',
+      google_cpc: 'Google Ads',
       linkedin: 'LinkedIn',
       email_campaign: 'Email Campaign',
       cold_call: 'Cold Call',
       trade_show: 'Trade Show',
       webinar: 'Webinar',
       content_marketing: 'Content Marketing',
-      campaign: 'Campaign',
-      widget_submission: 'Widget Submission',
-      other: 'Other',
+      widget_submission: 'Widget',
     };
     return sourceMap[source] || capitalizeFirst(source);
   };
@@ -69,12 +92,26 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
     });
   };
 
+  const handleSaveAttribution = async () => {
+    setIsSaving(true);
+    try {
+      await authenticatedFetch(`/api/leads/${lead.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(editData),
+      });
+      setDisplayValues(editData);
+      setIsEditing(false);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <>
-      {lead.lead_type === 'web_form' ? (
+      {lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' || lead.lead_source === 'campaign' ? (
         <>
           {/* Widget Details Section - only for widget submissions */}
-          {lead.lead_source === 'widget_submission' && (
+          {(lead.lead_source === 'widget' || lead.lead_source === 'widget_submission') && (
             <div className={styles.cardContent}>
               <div className={styles.callInsightsSection}>
                 <h4 className={cardStyles.defaultText}>Widget Details:</h4>
@@ -136,12 +173,21 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                   {getLeadSourceDisplay(lead.lead_source)}
                 </span>
               </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>UTM Source</span>
-                <span className={cardStyles.dataText}>
-                  {lead.utm_source || 'Direct'}
-                </span>
-              </div>
+              {lead.campaign ? (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Campaign</span>
+                  <Link href={`/campaigns/${lead.campaign.id}`} className={styles.campaignLink}>
+                    {lead.campaign.name}
+                  </Link>
+                </div>
+              ) : (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>UTM Source</span>
+                  <span className={cardStyles.dataText}>
+                    {lead.utm_source || 'Direct'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -154,13 +200,140 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                 </h4>
               </div>
               <div className={styles.transcriptContent}>
-                <span className={cardStyles.transcriptText}>
-                  {lead.comments}
-                </span>
+                {lead.lead_source === 'campaign' ? (
+                  <div className={cardStyles.transcriptText}>
+                    {lead.comments.split('\n').map((line, i) =>
+                      line === '' ? <br key={i} /> : <p key={i} className={styles.commentLine}>{line}</p>
+                    )}
+                  </div>
+                ) : (
+                  <span className={cardStyles.transcriptText}>{lead.comments}</span>
+                )}
               </div>
             </div>
           )}
         </>
+      ) : lead.lead_type === 'manual' || lead.lead_type === 'other' ? (
+        <div className={styles.cardContent}>
+          <div className={styles.callInsightsSection}>
+            <h4 className={cardStyles.defaultText}>Attribution Details:</h4>
+            {!isEditing && (
+              <button
+                className={styles.editButton}
+                onClick={() => setIsEditing(true)}
+              >
+                <Pencil size={14} /> Edit
+              </button>
+            )}
+          </div>
+
+          {isEditing ? (
+            <div className={styles.editForm}>
+              <div className={styles.formGroup}>
+                <label className={cardStyles.dataLabel}>How did you hear about us?</label>
+                <select
+                  value={editData.lead_source}
+                  onChange={e => setEditData({ ...editData, lead_source: e.target.value as LeadSource })}
+                >
+                  <option value="organic">Organic</option>
+                  <option value="referral">Referral</option>
+                  <option value="google_cpc">Google CPC</option>
+                  <option value="facebook_ads">Facebook Ads</option>
+                  <option value="linkedin">LinkedIn</option>
+                  <option value="email_campaign">Email Campaign</option>
+                  <option value="cold_call">Cold Call</option>
+                  <option value="trade_show">Trade Show</option>
+                  <option value="webinar">Webinar</option>
+                  <option value="content_marketing">Content Marketing</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className={styles.formGroup}>
+                <label className={cardStyles.dataLabel}>UTM Source</label>
+                <input
+                  type="text"
+                  value={editData.utm_source}
+                  onChange={e => setEditData({ ...editData, utm_source: e.target.value })}
+                  placeholder="e.g. google"
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={cardStyles.dataLabel}>UTM Medium</label>
+                <input
+                  type="text"
+                  value={editData.utm_medium}
+                  onChange={e => setEditData({ ...editData, utm_medium: e.target.value })}
+                  placeholder="e.g. cpc"
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label className={cardStyles.dataLabel}>UTM Campaign</label>
+                <input
+                  type="text"
+                  value={editData.utm_campaign}
+                  onChange={e => setEditData({ ...editData, utm_campaign: e.target.value })}
+                  placeholder="e.g. spring_2026"
+                />
+              </div>
+              <div className={styles.editActions}>
+                <button
+                  className={styles.cancelButton}
+                  onClick={() => {
+                    setEditData({
+                      lead_source: lead.lead_source || 'other',
+                      utm_source: lead.utm_source || '',
+                      utm_medium: lead.utm_medium || '',
+                      utm_campaign: lead.utm_campaign || '',
+                    });
+                    setIsEditing(false);
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  className={styles.saveButton}
+                  onClick={handleSaveAttribution}
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Saving...' : 'Save'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.callInsightsGrid}>
+              <div className={styles.callDetailItem}>
+                <span className={cardStyles.dataLabel}>Source</span>
+                <span className={cardStyles.dataText}>
+                  {getLeadSourceDisplay(displayValues.lead_source)}
+                </span>
+              </div>
+              {displayValues.utm_source && (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>UTM Source</span>
+                  <span className={cardStyles.dataText}>{displayValues.utm_source}</span>
+                </div>
+              )}
+              {displayValues.utm_medium && (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>UTM Medium</span>
+                  <span className={cardStyles.dataText}>{displayValues.utm_medium}</span>
+                </div>
+              )}
+              {displayValues.utm_campaign && (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>UTM Campaign</span>
+                  <span className={cardStyles.dataText}>{displayValues.utm_campaign}</span>
+                </div>
+              )}
+              {!displayValues.utm_source && !displayValues.utm_medium && !displayValues.utm_campaign && (
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Attribution</span>
+                  <span className={cardStyles.dataText}>Not yet recorded</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       ) : lead.call_record ? (
         <>
           {/* Call Insights Section */}

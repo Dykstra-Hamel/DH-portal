@@ -67,6 +67,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ projectId: task.project_id, taskId: task.id });
     }
 
+    if (type === 'monthly_service_comment') {
+      const { data: comment, error } = await supabase
+        .from('monthly_service_comments')
+        .select('id, monthly_service_id')
+        .eq('id', commentId)
+        .single();
+
+      if (error || !comment) {
+        return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({ serviceId: comment.monthly_service_id });
+    }
+
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 });
   } catch (error) {
     console.error('Error resolving comment reference:', error);

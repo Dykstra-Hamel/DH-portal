@@ -27,6 +27,11 @@
   }
 }
 
+.activityAvatar {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
 .avatarContainer {
   flex-shrink: 0;
   width: 40px;
