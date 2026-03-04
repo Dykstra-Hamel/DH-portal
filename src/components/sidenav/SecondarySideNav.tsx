@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
+import { GuardedLink } from '@/components/Common/GuardedLink/GuardedLink';
 import { usePathname } from 'next/navigation';
 import { Mails } from 'lucide-react';
 import { useNavigation } from '@/contexts/NavigationContext';
@@ -761,6 +761,8 @@ export function SecondarySideNav({
                 {group.items.map(item => {
                   const isActive =
                     pathname === item.href ||
+                    (item.href === '/admin/content-calendar' &&
+                      pathname.startsWith('/admin/content-pieces')) ||
                     (item.href === '/admin/project-management' &&
                       pathname.startsWith('/admin/project-management/') &&
                       !pathname.startsWith('/admin/project-management/tasks') &&
@@ -802,7 +804,7 @@ export function SecondarySideNav({
                           )}
                         </div>
                       ) : (
-                        <Link
+                        <GuardedLink
                           href={item.href}
                           className={`${styles.navItem} ${isActive ? styles.active : ''}`}
                           onClick={() => handleNavClick(item.countType)}
@@ -833,7 +835,7 @@ export function SecondarySideNav({
                             )}
                             {item.showRedDot && <RedDot />}
                           </div>
-                        </Link>
+                        </GuardedLink>
                       )}
                     </div>
                   );

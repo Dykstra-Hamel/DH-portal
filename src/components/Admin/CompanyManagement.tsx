@@ -22,6 +22,7 @@ import {
   Bug,
   FileCheck,
   CheckSquare,
+  Brain,
 } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
@@ -65,6 +66,10 @@ interface Company {
   google_place_id: string | null;
   google_places_listings?: GooglePlaceListing[];
   created_at: string;
+  ai_context?: string | null;
+  brand_voice_formality?: number | null;
+  brand_voice_humor?: number | null;
+  words_not_to_use?: string[] | null;
 }
 
 interface CompanyManagementProps {
@@ -88,7 +93,8 @@ type ActiveSection =
   | 'sales-config'
   | 'discounts'
   | 'email-domain'
-  | 'quote-page';
+  | 'quote-page'
+  | 'ai-content';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -118,6 +124,10 @@ export default function CompanyManagement({
     GooglePlaceListing[]
   >([]);
   const [websites, setWebsites] = useState<string[]>([]);
+  const [aiContext, setAiContext] = useState('');
+  const [brandVoiceFormality, setBrandVoiceFormality] = useState(50);
+  const [brandVoiceHumor, setBrandVoiceHumor] = useState(50);
+  const [wordsNotToUse, setWordsNotToUse] = useState<string[]>([]);
   const [loginPageImages, setLoginPageImages] = useState<string[]>([]);
   const [loginSlogans, setLoginSlogans] = useState({
     line1: '',
@@ -197,6 +207,10 @@ export default function CompanyManagement({
 
       // Set websites for editing
       setWebsites(foundCompany.website || []);
+      setAiContext(foundCompany.ai_context ?? '');
+      setBrandVoiceFormality(foundCompany.brand_voice_formality ?? 50);
+      setBrandVoiceHumor(foundCompany.brand_voice_humor ?? 50);
+      setWordsNotToUse(foundCompany.words_not_to_use ?? []);
     } catch (error) {
       console.error('Error loading company:', error);
       setError('Failed to load company');
@@ -293,6 +307,13 @@ export default function CompanyManagement({
               },
             },
           }),
+        });
+      } else if (section === 'ai-content') {
+        await adminAPI.updateCompany(companyId, {
+          ai_context: updatedData.ai_context,
+          brand_voice_formality: updatedData.brand_voice_formality,
+          brand_voice_humor: updatedData.brand_voice_humor,
+          words_not_to_use: updatedData.words_not_to_use,
         });
       } else {
         // Save company basic data
@@ -531,6 +552,7 @@ export default function CompanyManagement({
     { id: 'discounts', label: 'Discounts', icon: Tag },
     { id: 'email-domain', label: 'Email Domain', icon: Mail },
     { id: 'quote-page', label: 'Quote Page', icon: FileCheck },
+    { id: 'ai-content', label: 'AI Content', icon: Brain },
   ] as const;
 
   return (
@@ -582,7 +604,9 @@ export default function CompanyManagement({
         {/* Content Area */}
         <div className={styles.mainContent}>
           {activeSection === 'overview' && (
-            <OverviewSection company={company} />
+            <OverviewSection
+              company={company}
+            />
           )}
           {activeSection === 'contact' && (
             <ContactSection
@@ -659,6 +683,20 @@ export default function CompanyManagement({
           {activeSection === 'email-domain' && (
             <EmailDomainManager companyId={companyId} />
           )}
+          {activeSection === 'ai-content' && (
+            <AiContentSection
+              aiContext={aiContext}
+              onAiContextChange={setAiContext}
+              brandVoiceFormality={brandVoiceFormality}
+              onFormalityChange={setBrandVoiceFormality}
+              brandVoiceHumor={brandVoiceHumor}
+              onHumorChange={setBrandVoiceHumor}
+              wordsNotToUse={wordsNotToUse}
+              onWordsChange={setWordsNotToUse}
+              onSave={data => handleSave('ai-content', data)}
+              saving={saving}
+            />
+          )}
           {activeSection === 'quote-page' && (
             <QuotePageSection
               companyId={companyId}
@@ -673,7 +711,11 @@ export default function CompanyManagement({
 }
 
 // Section Components
-function OverviewSection({ company }: { company: Company }) {
+interface OverviewSectionProps {
+  company: Company;
+}
+
+function OverviewSection({ company }: OverviewSectionProps) {
   return (
     <div className={styles.section}>
       <h2>Company Overview</h2>
@@ -1433,6 +1475,150 @@ function LoginPageSection({
           {saving ? 'Saving...' : 'Save Login Page Settings'}
         </button>
       </div>
+    </div>
+  );
+}
+
+interface AiContentSectionProps {
+  aiContext: string;
+  onAiContextChange: (v: string) => void;
+  brandVoiceFormality: number;
+  onFormalityChange: (v: number) => void;
+  brandVoiceHumor: number;
+  onHumorChange: (v: number) => void;
+  wordsNotToUse: string[];
+  onWordsChange: (words: string[]) => void;
+  onSave: (data: Partial<Company>) => void;
+  saving: boolean;
+}
+
+function AiContentSection({
+  aiContext,
+  onAiContextChange,
+  brandVoiceFormality,
+  onFormalityChange,
+  brandVoiceHumor,
+  onHumorChange,
+  wordsNotToUse,
+  onWordsChange,
+  onSave,
+  saving,
+}: AiContentSectionProps) {
+  const [wordInput, setWordInput] = useState('');
+
+  const addWord = (raw: string) => {
+    const word = raw.trim().replace(/,+$/, '').trim();
+    if (word && !wordsNotToUse.includes(word)) {
+      onWordsChange([...wordsNotToUse, word]);
+    }
+    setWordInput('');
+  };
+
+  const handleWordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addWord(wordInput);
+    }
+  };
+
+  const removeWord = (word: string) => {
+    onWordsChange(wordsNotToUse.filter(w => w !== word));
+  };
+
+  return (
+    <div className={styles.section}>
+      <h2>AI Content Settings</h2>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          onSave({
+            ai_context: aiContext,
+            brand_voice_formality: brandVoiceFormality,
+            brand_voice_humor: brandVoiceHumor,
+            words_not_to_use: wordsNotToUse,
+          });
+        }}
+      >
+        <div className={styles.formGroup}>
+          <label htmlFor="ai-context">AI Context</label>
+          <textarea
+            id="ai-context"
+            value={aiContext}
+            onChange={e => onAiContextChange(e.target.value)}
+            placeholder="Short description for the AI topic generator — services offered, specialty pests, brand tone, key differentiators..."
+            rows={4}
+            disabled={saving}
+          />
+          <small>Used by the AI content topic generator. Not shown to clients.</small>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Brand Voice</label>
+          <div className={styles.voiceSlider}>
+            <span className={styles.sliderLabel}>Writing Style</span>
+            <div className={styles.sliderEndpoints}>
+              <span>Casual</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={brandVoiceFormality}
+                onChange={e => onFormalityChange(Number(e.target.value))}
+                disabled={saving}
+              />
+              <span>Formal</span>
+            </div>
+          </div>
+          <div className={styles.voiceSlider}>
+            <span className={styles.sliderLabel}>Tone</span>
+            <div className={styles.sliderEndpoints}>
+              <span>Serious</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                value={brandVoiceHumor}
+                onChange={e => onHumorChange(Number(e.target.value))}
+                disabled={saving}
+              />
+              <span>Funny</span>
+            </div>
+          </div>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Words Not To Use</label>
+          <div className={styles.wordTags}>
+            {wordsNotToUse.map(word => (
+              <span key={word} className={styles.wordTag}>
+                {word}
+                <button
+                  type="button"
+                  onClick={() => removeWord(word)}
+                  disabled={saving}
+                  aria-label={`Remove ${word}`}
+                >
+                  &#x2715;
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={wordInput}
+            onChange={e => setWordInput(e.target.value)}
+            onKeyDown={handleWordKeyDown}
+            onBlur={() => { if (wordInput.trim()) addWord(wordInput); }}
+            placeholder="Type a word and press Enter or comma to add"
+            disabled={saving}
+          />
+          <small>Words added here will never appear in AI-generated content.</small>
+        </div>
+
+        <button type="submit" disabled={saving} className={styles.saveButton}>
+          {saving ? 'Saving...' : 'Save AI Settings'}
+        </button>
+      </form>
     </div>
   );
 }

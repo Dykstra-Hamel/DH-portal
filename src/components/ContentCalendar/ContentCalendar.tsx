@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import styles from './ContentCalendar.module.scss';
 
@@ -72,6 +73,10 @@ export function ContentCalendar() {
   const [loading, setLoading] = useState(true);
   const [popover, setPopover] = useState<PopoverState | null>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  type CalendarView = 'year' | 'month';
+  const [view, setView] = useState<CalendarView>('year');
+  const [activeMonth, setActiveMonth] = useState<number>(() => new Date().getMonth() + 1); // 1–12
 
   // Editable field state for the popover
   const [editContentType, setEditContentType] = useState('');
@@ -150,6 +155,36 @@ export function ContentCalendar() {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     setPopover({ item, serviceId, monthKey, itemIndex, anchorRect: rect });
   };
+
+  const navigateMonth = (direction: 1 | -1) => {
+    setPopover(null);
+    setActiveMonth(prev => {
+      const next = prev + direction;
+      if (next > 12) { setYear(y => y + 1); return 1; }
+      if (next < 1)  { setYear(y => y - 1); return 12; }
+      return next;
+    });
+  };
+
+  const handleViewSwitch = (newView: CalendarView) => {
+    if (newView === 'month') {
+      const now = new Date();
+      setActiveMonth(year === now.getFullYear() ? now.getMonth() + 1 : 1);
+    }
+    setPopover(null);
+    setView(newView);
+  };
+
+  const monthViewRows = useMemo(() => {
+    if (view !== 'month') return [];
+    const monthKey = `${year}-${String(activeMonth).padStart(2, '0')}`;
+    const rows: Array<{ item: CalendarItem; service: ServiceCalendarRow; monthKey: string; itemIndex: number }> = [];
+    for (const service of services) {
+      const items = service.months[monthKey] || [];
+      items.forEach((item, itemIndex) => rows.push({ item, service, monthKey, itemIndex }));
+    }
+    return rows;
+  }, [view, services, year, activeMonth]);
 
   const handleSave = async () => {
     if (!popover) return;
@@ -271,6 +306,15 @@ export function ContentCalendar() {
             {editContentType ? CONTENT_TYPE_LABELS[editContentType] ?? editContentType : 'Unknown'}
           </span>
           {isPlanned && <span className={styles.popoverPlannedTag}>Planned</span>}
+          {!isPlanned && (item as ContentPieceCalendarItem).id && (
+            <Link
+              href={`/admin/content-pieces/${(item as ContentPieceCalendarItem).id}`}
+              className={styles.viewDetailsBtn}
+              title="View full details"
+            >
+              <ExternalLink size={14} />
+            </Link>
+          )}
         </div>
 
         <div className={styles.popoverFields}>
@@ -338,65 +382,179 @@ export function ContentCalendar() {
 
   return (
     <div className={styles.wrapper}>
-      {/* Year navigation */}
-      <div className={styles.yearNav}>
-        <button
-          className={styles.yearNavBtn}
-          onClick={() => setYear(y => y - 1)}
-          aria-label="Previous year"
-        >
-          <ChevronLeft size={18} />
-        </button>
-        <span className={styles.yearLabel}>{year}</span>
-        <button
-          className={styles.yearNavBtn}
-          onClick={() => setYear(y => y + 1)}
-          aria-label="Next year"
-        >
-          <ChevronRight size={18} />
-        </button>
+      <div className={styles.calendarNav}>
+        <div className={styles.navControls}>
+          <button
+            className={styles.yearNavBtn}
+            onClick={() => view === 'year' ? setYear(y => y - 1) : navigateMonth(-1)}
+            aria-label={view === 'year' ? 'Previous year' : 'Previous month'}
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className={styles.yearLabel}>
+            {view === 'year' ? year : `${MONTHS[activeMonth - 1]} ${year}`}
+          </span>
+          <button
+            className={styles.yearNavBtn}
+            onClick={() => view === 'year' ? setYear(y => y + 1) : navigateMonth(1)}
+            aria-label={view === 'year' ? 'Next year' : 'Next month'}
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+
+        <div className={styles.viewToggle}>
+          <button
+            className={`${styles.viewToggleBtn} ${view === 'year' ? styles.viewToggleBtnActive : ''}`}
+            onClick={() => handleViewSwitch('year')}
+          >
+            Year
+          </button>
+          <button
+            className={`${styles.viewToggleBtn} ${view === 'month' ? styles.viewToggleBtnActive : ''}`}
+            onClick={() => handleViewSwitch('month')}
+          >
+            Month
+          </button>
+        </div>
       </div>
 
       {loading ? (
         <div className={styles.loading}>Loading content calendar...</div>
-      ) : services.length === 0 ? (
-        <div className={styles.empty}>
-          No active monthly services have Content department templates configured.
-        </div>
-      ) : (
-        <div className={styles.tableWrapper}>
-          <table className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.serviceCol}>Service</th>
-                {MONTHS.map((m, i) => (
-                  <th key={i} className={styles.monthCol}>{m}</th>
+      ) : view === 'year' ? (
+        services.length === 0 ? (
+          <div className={styles.empty}>
+            No active monthly services have Content department templates configured.
+          </div>
+        ) : (
+          <div className={styles.tableWrapper}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.serviceCol}>Service</th>
+                  {MONTHS.map((m, i) => (
+                    <th key={i} className={styles.monthCol}>{m}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {services.map(service => (
+                  <tr key={service.id}>
+                    <td className={styles.serviceCell}>
+                      <div className={styles.serviceName}>{service.service_name}</div>
+                      <div className={styles.companyName}>{service.company_name}</div>
+                    </td>
+                    {MONTHS.map((_, monthIdx) => {
+                      const monthKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+                      const items = service.months[monthKey] || [];
+                      return (
+                        <td key={monthIdx} className={styles.monthCell}>
+                          {items.map((item, idx) =>
+                            renderBadge(item, service.id, monthKey, idx)
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
                 ))}
-              </tr>
-            </thead>
-            <tbody>
-              {services.map(service => (
-                <tr key={service.id}>
-                  <td className={styles.serviceCell}>
-                    <div className={styles.serviceName}>{service.service_name}</div>
-                    <div className={styles.companyName}>{service.company_name}</div>
-                  </td>
-                  {MONTHS.map((_, monthIdx) => {
-                    const monthKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
-                    const items = service.months[monthKey] || [];
-                    return (
-                      <td key={monthIdx} className={styles.monthCell}>
-                        {items.map((item, idx) =>
-                          renderBadge(item, service.id, monthKey, idx)
+              </tbody>
+            </table>
+          </div>
+        )
+      ) : (
+        monthViewRows.length === 0 ? (
+          <div className={styles.empty}>
+            No content pieces scheduled for {MONTHS[activeMonth - 1]} {year}.
+          </div>
+        ) : (
+          <div className={styles.tableWrapper}>
+            <table className={`${styles.table} ${styles.tableMonthView}`}>
+              <thead>
+                <tr>
+                  <th className={styles.colCompany}>Company</th>
+                  <th className={styles.colType}>Type</th>
+                  <th className={styles.colTitle}>Title</th>
+                  <th className={styles.colLink}>Link</th>
+                  <th className={styles.colDate}>Publish Date</th>
+                  <th className={styles.colStatus}>Status</th>
+                  <th className={styles.colActions}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {monthViewRows.map(({ item, service, monthKey, itemIndex }) => {
+                  const isPlanned = item.is_planned;
+                  const piece = isPlanned ? null : item as ContentPieceCalendarItem;
+                  const isCompleted = piece?.is_completed ?? false;
+                  const type = item.content_type;
+                  const color = type ? CONTENT_TYPE_COLORS[type] ?? '#6b7280' : '#6b7280';
+                  const label = type ? CONTENT_TYPE_LABELS[type] ?? type : 'Unknown';
+                  const publishDate = piece?.publish_date
+                    ? new Date(piece.publish_date + 'T00:00:00').toLocaleDateString('en-US', {
+                        month: 'short', day: 'numeric', year: 'numeric',
+                      })
+                    : '—';
+                  const rowKey = isPlanned
+                    ? `planned-${(item as PlannedContentItem).template_id}-${itemIndex}`
+                    : `piece-${piece!.id}`;
+                  const statusLabel = isPlanned ? 'Planned' : isCompleted ? 'Completed' : 'Active';
+                  const statusClass = isPlanned
+                    ? styles.statusPlanned
+                    : isCompleted ? styles.statusCompleted : styles.statusActive;
+
+                  return (
+                    <tr
+                      key={rowKey}
+                      className={`${styles.monthRow} ${isPlanned ? styles.monthRowPlanned : ''}`}
+                      onClick={e => handleBadgeClick(e, item, service.id, monthKey, itemIndex)}
+                    >
+                      <td className={styles.cellCompany}>{service.company_name}</td>
+                      <td className={styles.cellType}>
+                        <span
+                          className={`${styles.typePill} ${isPlanned ? styles.typePillPlanned : ''}`}
+                          style={{ '--badge-color': color } as React.CSSProperties}
+                        >
+                          {label}
+                        </span>
+                      </td>
+                      <td className={styles.cellTitle}>
+                        {item.title ?? <span className={styles.untitled}>Untitled</span>}
+                      </td>
+                      <td className={styles.cellLink}>
+                        {!isPlanned && piece?.link ? (
+                          <a
+                            href={piece.link}
+                            className={styles.contentLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {piece.link}
+                          </a>
+                        ) : '—'}
+                      </td>
+                      <td className={styles.cellDate}>{publishDate}</td>
+                      <td className={styles.cellStatus}>
+                        <span className={`${styles.statusPill} ${statusClass}`}>{statusLabel}</span>
+                      </td>
+                      <td className={styles.cellActions}>
+                        {!isPlanned && piece?.id && (
+                          <Link
+                            href={`/admin/content-pieces/${piece.id}`}
+                            className={styles.viewDetailsBtn}
+                            onClick={e => e.stopPropagation()}
+                            title="View detail page"
+                          >
+                            <ExternalLink size={14} />
+                          </Link>
                         )}
                       </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
       )}
 
       {renderPopover()}

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
+import { GuardedLink } from '@/components/Common/GuardedLink/GuardedLink';
 import { Mails } from 'lucide-react';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -264,7 +264,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       return pathname.startsWith('/admin/project-management') ||
         pathname.startsWith('/project-management') ||
         pathname.startsWith('/admin/monthly-services') ||
-        pathname.startsWith('/admin/content-calendar');
+        pathname.startsWith('/admin/content-calendar') ||
+        pathname.startsWith('/admin/content-pieces');
     }
     return pathname.startsWith(href);
   };
@@ -303,7 +304,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
               {item.text && <p className={styles.iconText}>{item.text}</p>}
             </div>
           ) : (
-            <Link
+            <GuardedLink
               key={item.id}
               href={item.href}
               className={`${styles.iconItem} ${isActiveRoute(item.href) ? styles.active : ''}`}
@@ -312,7 +313,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
             >
               <div className={styles.iconWrapper}>{item.icon}</div>
               {item.text && <p className={styles.iconText}>{item.text}</p>}
-            </Link>
+            </GuardedLink>
           )
         )}
       </nav>

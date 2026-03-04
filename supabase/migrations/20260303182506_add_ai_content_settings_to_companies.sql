@@ -1,0 +1,4 @@
+ALTER TABLE companies
+  ADD COLUMN IF NOT EXISTS brand_voice_formality INTEGER DEFAULT 50,
+  ADD COLUMN IF NOT EXISTS brand_voice_humor INTEGER DEFAULT 50,
+  ADD COLUMN IF NOT EXISTS words_not_to_use TEXT[] DEFAULT '{}';

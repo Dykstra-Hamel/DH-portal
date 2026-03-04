@@ -2,9 +2,60 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
 }
 
-// Year navigation
+// ── Unified nav bar ──────────────────────────────────────────────────────────
+.calendarNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.navControls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+// ── View toggle (segmented control) ─────────────────────────────────────────
+.viewToggle {
+  display: flex;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 3px;
+  gap: 2px;
+}
+
+.viewToggleBtn {
+  padding: 5px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #6b7280;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  &:hover:not(.viewToggleBtnActive) {
+    background: #e5e7eb;
+    color: #374151;
+  }
+}
+
+.viewToggleBtnActive {
+  background: white;
+  color: #111827;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+// Year navigation (kept for .yearNavBtn and .yearLabel reuse)
 .yearNav {
   display: flex;
   align-items: center;
@@ -22,7 +73,9 @@
   background: white;
   cursor: pointer;
   color: #374151;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover {
     background: #f3f4f6;
@@ -201,6 +254,25 @@
   font-style: italic;
 }
 
+.viewDetailsBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 3px 5px;
+  color: #9ca3af;
+  border-radius: 4px;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+  text-decoration: none;
+
+  &:hover {
+    color: #3b82f6;
+    background: #eff6ff;
+  }
+}
+
 // Edit form fields
 .popoverFields {
   display: flex;
@@ -278,7 +350,9 @@
   border: 1px solid #e5e7eb;
   border-radius: 6px;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 
   &:hover {
     background: #f3f4f6;
@@ -321,4 +395,134 @@
 .statusPending {
   color: #f59e0b;
   font-weight: 500;
+}
+
+// ── Month view table overrides ───────────────────────────────────────────────
+.tableMonthView {
+  min-width: 900px;
+}
+
+.colCompany {
+  width: 150px;
+  min-width: 120px;
+}
+.colType {
+  width: 110px;
+  min-width: 90px;
+}
+.colTitle {
+  min-width: 180px;
+}
+.colLink {
+  min-width: 160px;
+}
+.colDate {
+  width: 130px;
+  min-width: 110px;
+  white-space: nowrap;
+}
+.colStatus {
+  width: 110px;
+  min-width: 90px;
+}
+.colActions {
+  width: 44px;
+  min-width: 44px;
+}
+
+.monthRow {
+  cursor: pointer;
+
+  td {
+    padding: 10px 12px;
+    vertical-align: middle;
+    font-size: 13px;
+    color: #374151;
+  }
+}
+
+.monthRowPlanned {
+  td {
+    color: #9ca3af;
+  }
+}
+
+.cellCompany {
+  font-size: 12px;
+  color: #6b7280;
+}
+.cellDate {
+  font-size: 12px;
+  color: #6b7280;
+  white-space: nowrap;
+}
+.cellActions {
+  text-align: right;
+}
+.cellLink {
+  max-width: 220px;
+}
+
+.contentLink {
+  font-size: 12px;
+  color: #3b82f6;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+  max-width: 220px;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+// ── Type pill (non-interactive display badge) ────────────────────────────────
+.typePill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: white;
+  background-color: var(--badge-color, #6b7280);
+  white-space: nowrap;
+}
+
+.typePillPlanned {
+  background-color: transparent;
+  color: var(--badge-color, #6b7280);
+  border: 1.5px dashed var(--badge-color, #6b7280);
+  opacity: 0.8;
+}
+
+// ── Status pills ─────────────────────────────────────────────────────────────
+.statusPill {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.statusActive {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.statusCompleted {
+  background: #ecfdf5;
+  color: #059669;
+}
+.statusPlanned {
+  background: #f9fafb;
+  color: #9ca3af;
+  border: 1px dashed #d1d5db;
+}
+
+// ── Misc ─────────────────────────────────────────────────────────────────────
+.untitled {
+  font-style: italic;
+  color: #9ca3af;
 }

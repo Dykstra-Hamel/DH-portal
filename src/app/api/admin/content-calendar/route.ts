@@ -117,7 +117,8 @@ export async function GET(request: NextRequest) {
         publish_date,
         link,
         service_month,
-        project_tasks ( is_completed, due_date )
+        project_tasks!task_id ( is_completed, due_date ),
+        social_media_task:project_tasks!social_media_task_id ( is_completed )
       `)
       .in('monthly_service_id', serviceIds);
 
@@ -153,7 +154,12 @@ export async function GET(request: NextRequest) {
         publish_date: piece.publish_date,
         link: piece.link,
         task_id: piece.task_id,
-        is_completed: task?.is_completed ?? false,
+        is_completed: (() => {
+          const socialTask = (piece as any).social_media_task;
+          const contentDone = task?.is_completed ?? false;
+          const socialDone = socialTask ? (socialTask.is_completed ?? false) : true;
+          return contentDone && socialDone;
+        })(),
         is_planned: false,
       });
     }
