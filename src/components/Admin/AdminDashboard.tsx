@@ -21,6 +21,7 @@ import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
 import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
 import InternalDepartmentSettings from '../ProjectManagement/DepartmentSettings/InternalDepartmentSettings';
+import PestManager from './PestManager';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -173,6 +174,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
       { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
       { id: 'project-settings', label: 'Project Management' },
+      { id: 'pest-management', label: 'Pest Management' },
     ],
   },
 ];
@@ -277,6 +279,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
             <InternalCategorySettings />
           </div>
         );
+      case 'pest-management':
+        return <PestManager />;
       default:
         return <UsersManager />;
     }

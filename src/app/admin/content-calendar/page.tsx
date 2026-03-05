@@ -3,21 +3,12 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
-import { usePageActions } from '@/contexts/PageActionsContext';
 import { ContentCalendar } from '@/components/ContentCalendar/ContentCalendar';
 
 export default function ContentCalendarPage() {
   const router = useRouter();
-  const { setPageHeader } = usePageActions();
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    setPageHeader({
-      title: 'Content Calendar',
-      description: 'Year-wide view of planned content across all active monthly services',
-    });
-  }, [setPageHeader]);
 
   useEffect(() => {
     const checkAuth = async () => {

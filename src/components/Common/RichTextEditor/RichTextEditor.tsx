@@ -43,6 +43,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   // Use ref to store mentionUsers so the suggestion can always access latest value
   const mentionUsersRef = useRef<MentionUser[]>(mentionUsers || []);
 
+  // Flag to distinguish programmatic content updates from real user edits
+  const isProgrammaticUpdateRef = useRef(false);
+
   // Keep ref updated when mentionUsers changes
   useEffect(() => {
     mentionUsersRef.current = mentionUsers || [];
@@ -167,7 +170,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
     extensions,
     content: value,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      if (!isProgrammaticUpdateRef.current) {
+        onChange(editor.getHTML());
+      }
     },
     editorProps: {
       attributes: {
@@ -213,7 +218,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   // Update editor content when value changes externally
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
+      isProgrammaticUpdateRef.current = true;
       editor.commands.setContent(value);
+      isProgrammaticUpdateRef.current = false;
     }
   }, [value, editor]);
 

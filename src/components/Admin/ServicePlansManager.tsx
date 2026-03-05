@@ -104,7 +104,13 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setAvailablePestTypes(data.data.availablePestTypes || []);
+          const companyPestIds = new Set(
+            (data.data.companyPestOptions || []).map((o: { pest_id: string }) => o.pest_id)
+          );
+          const filtered = (data.data.availablePestTypes || []).filter(
+            (p: { id: string }) => companyPestIds.has(p.id)
+          );
+          setAvailablePestTypes(filtered);
         }
       }
     } catch (error) {

@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('companies')
       .select('*')
-      .order('created_at', { ascending: false });
+      .order('name', { ascending: true });
 
     if (error) {
       console.error('Error loading companies:', error);
