@@ -237,6 +237,11 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             pageHeader?.description ||
             'Year-wide view of planned content across all active monthly services',
           showAddButton: false,
+          customActions: pageHeader?.customActions ? (
+            <div className={styles.customActionsWrapper}>
+              {pageHeader.customActions}
+            </div>
+          ) : undefined,
         };
       case '/tickets/leads':
         return {

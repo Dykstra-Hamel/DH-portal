@@ -15,6 +15,12 @@ import { useNavigationGuard } from '@/contexts/NavigationGuardContext';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ContentPieceDetail.module.scss';
 
+function getDraftCount(contentType: string): number {
+  if (['pest_id', 'location', 'cluster', 'pillar'].includes(contentType)) return 1;
+  if (contentType === 'evergreen') return 2;
+  return 3;
+}
+
 const CONTENT_TYPE_LABELS: Record<string, string> = {
   blog: 'Blog',
   evergreen: 'Evergreen',
@@ -409,10 +415,13 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
   const applyDraft = async (index: number) => {
     if (!draftSuggestions) return;
     setSelectedDraftIndex(index);
-    const html = draftSuggestions[index].content
-      .split(/\n\n+/)
-      .map((para: string) => `<p>${para.replace(/\n/g, '<br>')}</p>`)
-      .join('');
+    const raw = draftSuggestions[index].content;
+    const html = raw.trimStart().startsWith('<')
+      ? raw
+      : raw
+          .split(/\n\n+/)
+          .map((para: string) => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+          .join('');
     setEditContent(html);
     setIsContentDirty(false);
     const headers = await getAuthHeaders();
@@ -862,7 +871,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
           ) : (
             <>
               <p className={styles.aiDescription}>
-                Generate 3 distinct full drafts for: <strong>{editTitle}</strong>
+                Generate {getDraftCount(editContentType)} distinct {getDraftCount(editContentType) === 1 ? 'draft' : 'drafts'} for: <strong>{editTitle}</strong>
               </p>
               <div className={styles.aiPromptRow}>
                 <textarea

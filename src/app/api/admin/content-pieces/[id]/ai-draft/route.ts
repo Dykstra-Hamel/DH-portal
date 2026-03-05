@@ -17,19 +17,25 @@ function getDraftTypeInstruction(contentType: string | null): string {
 Each draft should be specific to the company's location, mention relevant pests by name, and end with a brief call-to-action.`;
 
     case 'pest_id':
-      return `Write 1 draft, 1,200–1,400 words. Do NOT include the title. Structure the draft using question-phrased H2 headings — e.g., "What do [Pest] look like?", "Are [Pests] dangerous?", "How can I tell if I have a [Pest] problem?", "Can I get rid of [Pest] myself?". The draft must cover: appearance/identification, activity/behavior, dangers or health risks, habitat and why they enter homes, signs of infestation, DIY limitations, professional treatment approach, and prevention tips. The draft should be authoritative and factual. End with a clear call-to-action for professional treatment. Label the "approach" field with "Pest ID Draft".`;
+      return `Write 1 draft, 1,200–1,400 words. Do NOT include the title. Structure the draft using question-phrased <h2> headings — e.g., "What do [Pest] look like?", "Are [Pests] dangerous?", "How can I tell if I have a [Pest] problem?", "Can I get rid of [Pest] myself?". The draft must cover: appearance/identification, activity/behavior, dangers or health risks, habitat and why they enter homes, signs of infestation, DIY limitations, professional treatment approach, and prevention tips. The draft should be authoritative and factual. End with a clear call-to-action for professional treatment. Label the "approach" field with "Pest ID Draft".`;
 
     case 'location':
-      return `Write 1 draft, 1,800–2,500 words. Do NOT include the title. This is a comprehensive local service page. The draft must weave the location name throughout, reference local climate or environment, and be organized with H2 sections by pest/service category (e.g., termite control, mosquito control, rodent control, commercial pest control). Include a "most active pests" or seasonal context section and a local FAQ section at the end. End with a prominent scheduling or contact call-to-action. Label the "approach" field with "Location Page Draft".`;
+      return `Write 1 draft, 1,800–2,500 words. Do NOT include the title. This is a comprehensive local service page.
+
+INTRO: Write a conversational opening paragraph that drops in references to well-known local landmarks, neighborhoods, or areas that residents would actually recognize — the way a local would naturally mention them ("near [neighborhood]", "if you're off [road/area]"), NOT as a Wikipedia-style description of the city. Pull from the service areas data and location context provided.
+
+HEADINGS: Write <h2> headings for each pest/service section that are creative and specific — do NOT use the generic pattern "Service Name in City, State". Instead, write headings that describe a local scenario, benefit, or problem, e.g., "Keeping [City] Homes Termite-Free Year-Round", "How We Tackle [City]'s Mosquito Season", or "Rodent Control Built for [Region]'s Climate".
+
+Organize the draft with one <h2> section per pest/service category relevant to the company. Include a "most active pests" or seasonal context section and a local FAQ section at the end. End with a prominent scheduling or contact call-to-action. Label the "approach" field with "Location Page Draft".`;
 
     case 'pillar':
-      return `Write 1 draft, 3,000–5,000 words. Do NOT include the title. This is a comprehensive hub page. The draft must cover ALL major pest control service categories as separate H2 sections (e.g., termite control, rodent control, bed bugs, mosquitoes, ants, spiders, cockroaches), include a seasonal pest activity section, and end with a detailed FAQ. Each section should be substantive (200–400 words) and could serve as a gateway to a more specific cluster page. Include internal link callouts like "Learn more about our termite services" and end with a comprehensive CTA and contact section. Label the "approach" field with "Pillar Page Draft".`;
+      return `Write 1 draft, 3,000–5,000 words. Do NOT include the title. This is a comprehensive hub page. The draft must cover ALL major pest control service categories as separate <h2> sections (e.g., termite control, rodent control, bed bugs, mosquitoes, ants, spiders, cockroaches), include a seasonal pest activity section, and end with a detailed FAQ. Each section should be substantive (200–400 words) and could serve as a gateway to a more specific cluster page. Include internal link callouts like "Learn more about our termite services" and end with a comprehensive CTA and contact section. Label the "approach" field with "Pillar Page Draft".`;
 
     case 'cluster':
       return `Write 1 draft, 1,500–2,200 words. Do NOT include the title. This is a focused service page covering ONE pest type or ONE service category in ONE location. The draft must include: an intro establishing the local pest challenge, a "What are [Pest]?" or service overview section, a prevention section, a signs/identification section, a section on the company's specific treatment approach, a trust/why-us section, and a CTA. End with a consultation or free quote call-to-action. Label the "approach" field with "Cluster Page Draft".`;
 
     case 'evergreen':
-      return `Write 2 drafts, each 1,000–1,400 words. Do NOT include the title. These are timeless reference pages — no seasonal hooks, no date references. Use topic-based H2 headings (e.g., "Common Types of [Pest]", "Signs of a [Pest] Infestation", "How to Prevent [Pest]", "Professional [Pest] Control"). Cover: species or types relevant to the company's area, signs and symptoms, prevention strategies, and professional treatment. Use a different organizational angle for each draft:
+      return `Write 2 drafts, each 1,000–1,400 words. Do NOT include the title. These are timeless reference pages — no seasonal hooks, no date references. Use topic-based <h2> headings (e.g., "Common Types of [Pest]", "Signs of a [Pest] Infestation", "How to Prevent [Pest]", "Professional [Pest] Control"). Cover: species or types relevant to the company's area, signs and symptoms, prevention strategies, and professional treatment. Use a different organizational angle for each draft:
 1. Types + signs guide — begin with species identification and types, move through signs of infestation, prevention, and professional treatment
 2. Problem-identification guide — begin with "what are you seeing?"; help the reader diagnose the issue, explain implications, guide toward professional resolution
 
@@ -181,6 +187,8 @@ COMPANY DESCRIPTION: ${description}
 PESTS TREATED: ${pestNames || 'N/A'}
 SERVICE AREAS: ${areasSection || 'N/A'}
 CONTENT TYPE: ${piece.content_type ?? 'general'}${publishMonth ? `\nPUBLISH MONTH: ${publishMonth}` : ''}${aiContextBlock}${brandVoiceSection}
+
+FORMAT: Write all content in valid HTML. Use <h2> and <h3> for section headings, <p> for paragraphs, <strong> for bold emphasis, <em> for italics, and <ul>/<li> for bullet lists. Do NOT use markdown syntax — no ##, **, *, or other markdown characters.
 
 TOPIC: ${piece.topic}
 TITLE: ${piece.title}

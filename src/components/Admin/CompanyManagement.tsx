@@ -31,7 +31,7 @@ import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
 import ServicePlansManager from './ServicePlansManager';
 import ServiceAreasManager from './ServiceAreasManager';
-import PestManager from './PestManager';
+import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
@@ -664,7 +664,7 @@ export default function CompanyManagement({
           {activeSection === 'features' && (
             <CompanyFeaturesManager companyId={companyId} />
           )}
-          {activeSection === 'pest-management' && <PestManager />}
+          {activeSection === 'pest-management' && <CompanyPestSelector companyId={companyId} />}
           {activeSection === 'service-plans' && (
             <ServicePlansManager companyId={companyId} />
           )}

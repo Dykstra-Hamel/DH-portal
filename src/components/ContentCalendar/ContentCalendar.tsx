@@ -4,6 +4,9 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
+import type { FilterOption } from '@/components/Common/FilterPanel/FilterPanel';
 import styles from './ContentCalendar.module.scss';
 
 const MONTHS = [
@@ -68,6 +71,7 @@ interface PopoverState {
 }
 
 export function ContentCalendar() {
+  const { setPageHeader } = usePageActions();
   const [year, setYear] = useState(() => new Date().getFullYear());
   const [services, setServices] = useState<ServiceCalendarRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +88,10 @@ export function ContentCalendar() {
   const [editPublishDate, setEditPublishDate] = useState('');
   const [editLink, setEditLink] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
+  const [filterContentType, setFilterContentType] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<string | null>(null);
 
   const getAuthHeaders = useCallback(async () => {
     const supabase = createClient();
@@ -175,16 +183,117 @@ export function ContentCalendar() {
     setView(newView);
   };
 
+  const companyOptions = useMemo((): FilterOption[] => {
+    const seen = new Set<string>();
+    const opts: FilterOption[] = [];
+    for (const s of services) {
+      if (!seen.has(s.company_id)) {
+        seen.add(s.company_id);
+        opts.push({ value: s.company_id, label: s.company_name });
+      }
+    }
+    opts.sort((a, b) => a.label.localeCompare(b.label));
+    return [{ value: null, label: 'All Companies' }, ...opts];
+  }, [services]);
+
+  const contentTypeOptions: FilterOption[] = [
+    { value: null, label: 'All Types' },
+    ...Object.entries(CONTENT_TYPE_LABELS).map(([value, label]) => ({ value, label })),
+  ];
+
+  const statusOptions: FilterOption[] = [
+    { value: null, label: 'All Statuses' },
+    { value: 'planned', label: 'Planned' },
+    { value: 'active', label: 'Active' },
+    { value: 'completed', label: 'Completed' },
+  ];
+
+  const filteredServices = useMemo(() => {
+    let result = services;
+
+    if (filterCompanyId) {
+      result = result.filter(s => s.company_id === filterCompanyId);
+    }
+
+    if (filterContentType || filterStatus) {
+      result = result.map(service => {
+        const filteredMonths: Record<string, CalendarItem[]> = {};
+        for (const [monthKey, items] of Object.entries(service.months)) {
+          let filteredItems = items;
+          if (filterContentType) {
+            filteredItems = filteredItems.filter(item => item.content_type === filterContentType);
+          }
+          if (filterStatus) {
+            filteredItems = filteredItems.filter(item => {
+              if (filterStatus === 'planned') return item.is_planned;
+              const piece = item as ContentPieceCalendarItem;
+              if (filterStatus === 'completed') return !item.is_planned && piece.is_completed;
+              if (filterStatus === 'active') return !item.is_planned && !piece.is_completed;
+              return true;
+            });
+          }
+          if (filteredItems.length > 0) filteredMonths[monthKey] = filteredItems;
+        }
+        return { ...service, months: filteredMonths };
+      }).filter(service => Object.values(service.months).some(items => items.length > 0));
+    }
+
+    return result;
+  }, [services, filterCompanyId, filterContentType, filterStatus]);
+
+  const handleClearAllFilters = useCallback(() => {
+    setFilterCompanyId(null);
+    setFilterContentType(null);
+    setFilterStatus(null);
+  }, []);
+
+  useEffect(() => {
+    setPageHeader({
+      title: 'Content Calendar',
+      description: 'Year-wide view of planned content across all active monthly services',
+      customActions: (
+        <FilterPanel
+          onClearAll={handleClearAllFilters}
+          filters={[
+            {
+              key: 'company',
+              label: 'Company',
+              value: filterCompanyId,
+              options: companyOptions,
+              onChange: setFilterCompanyId,
+              searchable: true,
+            },
+            {
+              key: 'contentType',
+              label: 'Content Type',
+              value: filterContentType,
+              options: contentTypeOptions,
+              onChange: setFilterContentType,
+            },
+            {
+              key: 'status',
+              label: 'Status',
+              value: filterStatus,
+              options: statusOptions,
+              onChange: setFilterStatus,
+            },
+          ]}
+        />
+      ),
+    });
+    return () => setPageHeader(null);
+  }, [setPageHeader, filterCompanyId, filterContentType, filterStatus, companyOptions, handleClearAllFilters]);
+
   const monthViewRows = useMemo(() => {
     if (view !== 'month') return [];
     const monthKey = `${year}-${String(activeMonth).padStart(2, '0')}`;
     const rows: Array<{ item: CalendarItem; service: ServiceCalendarRow; monthKey: string; itemIndex: number }> = [];
-    for (const service of services) {
+    for (const service of filteredServices) {
       const items = service.months[monthKey] || [];
       items.forEach((item, itemIndex) => rows.push({ item, service, monthKey, itemIndex }));
     }
     return rows;
-  }, [view, services, year, activeMonth]);
+  }, [view, filteredServices, year, activeMonth]);
 
   const handleSave = async () => {
     if (!popover) return;
@@ -422,7 +531,7 @@ export function ContentCalendar() {
       {loading ? (
         <div className={styles.loading}>Loading content calendar...</div>
       ) : view === 'year' ? (
-        services.length === 0 ? (
+        filteredServices.length === 0 ? (
           <div className={styles.empty}>
             No active monthly services have Content department templates configured.
           </div>
@@ -438,7 +547,7 @@ export function ContentCalendar() {
                 </tr>
               </thead>
               <tbody>
-                {services.map(service => (
+                {filteredServices.map(service => (
                   <tr key={service.id}>
                     <td className={styles.serviceCell}>
                       <div className={styles.serviceName}>{service.service_name}</div>

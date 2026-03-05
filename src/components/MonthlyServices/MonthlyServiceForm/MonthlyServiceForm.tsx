@@ -9,6 +9,7 @@ import {
 } from '@/components/Common/Modal/Modal';
 import { Plus, Trash2, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import styles from './MonthlyServiceForm.module.scss';
+import { SearchableSelect, SearchableSelectOption } from '@/components/Common/SearchableSelect/SearchableSelect';
 
 interface Company {
   id: string;
@@ -431,6 +432,11 @@ export function MonthlyServiceForm({
     return name || user.email;
   };
 
+  const companyOptions: SearchableSelectOption[] = companies.map(c => ({
+    value: c.id,
+    label: c.name,
+  }));
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="large">
       <form className={styles.addServiceForm} onSubmit={handleSubmit}>
@@ -450,21 +456,17 @@ export function MonthlyServiceForm({
                   <label htmlFor="company" className={styles.label}>
                     Company <span className={styles.required}>*</span>
                   </label>
-                  <select
+                  <SearchableSelect
                     id="company"
                     value={companyId}
-                    onChange={e => setCompanyId(e.target.value)}
-                    className={styles.select}
-                    required
+                    options={companyOptions}
+                    onChange={(val) => setCompanyId(val)}
+                    placeholder="Select a company..."
+                    searchPlaceholder="Search companies..."
+                    noResultsText="No companies found"
                     disabled={isEditMode}
-                  >
-                    <option value="">Select a company...</option>
-                    {companies.map(company => (
-                      <option key={company.id} value={company.id}>
-                        {company.name}
-                      </option>
-                    ))}
-                  </select>
+                    ariaLabel="Company"
+                  />
                 </div>
 
                 <div className={styles.formGroup}>

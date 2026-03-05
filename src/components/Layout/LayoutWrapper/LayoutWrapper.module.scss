@@ -1,3 +1,9 @@
+.customActionsWrapper {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
 .layoutWrapper {
   display: flex;
   flex-direction: column;
