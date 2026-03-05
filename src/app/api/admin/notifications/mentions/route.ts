@@ -26,6 +26,7 @@ interface MentionItem {
   projectShortcode: string | null;
   taskId: string | null;
   taskTitle: string | null;
+  proofId: string | null;
   monthlyServiceId: string | null;
   monthlyServiceName: string | null;
   senderFirstName: string | null;
@@ -121,7 +122,11 @@ export async function GET(request: NextRequest) {
       .filter((item) => item.reference_type === 'monthly_service_comment' && item.reference_id)
       .map((item) => item.reference_id as string);
 
-    const [projectCommentsResult, taskCommentsResult, monthlyServiceCommentsResult] = await Promise.all([
+    const proofReferenceIds = mentions
+      .filter((item) => item.reference_type === 'proof' && item.reference_id)
+      .map((item) => item.reference_id as string);
+
+    const [projectCommentsResult, taskCommentsResult, monthlyServiceCommentsResult, proofFeedbackResult, proofsResult] = await Promise.all([
       projectCommentIds.length > 0
         ? supabase
             .from('project_comments')
@@ -140,13 +145,33 @@ export async function GET(request: NextRequest) {
             .select('id, comment, monthly_service_id, user_id')
             .in('id', monthlyServiceCommentIds)
         : Promise.resolve({ data: [], error: null }),
+      proofReferenceIds.length > 0
+        ? supabase
+            .from('proof_feedback')
+            .select('id, comment, project_id, user_id, proof_id')
+            .in('id', proofReferenceIds)
+        : Promise.resolve({ data: [], error: null }),
+      proofReferenceIds.length > 0
+        ? supabase
+            .from('project_proofs')
+            .select('id, project_id')
+            .in('id', proofReferenceIds)
+        : Promise.resolve({ data: [], error: null }),
     ]);
 
-    if (projectCommentsResult.error || taskCommentsResult.error || monthlyServiceCommentsResult.error) {
+    if (
+      projectCommentsResult.error ||
+      taskCommentsResult.error ||
+      monthlyServiceCommentsResult.error ||
+      proofFeedbackResult.error ||
+      proofsResult.error
+    ) {
       console.error('Error fetching mention comment records:', {
         projectError: projectCommentsResult.error,
         taskError: taskCommentsResult.error,
         monthlyError: monthlyServiceCommentsResult.error,
+        proofFeedbackError: proofFeedbackResult.error,
+        proofError: proofsResult.error,
       });
       return NextResponse.json({ error: 'Failed to fetch mention details' }, { status: 500 });
     }
@@ -199,6 +224,9 @@ export async function GET(request: NextRequest) {
     (monthlyServiceCommentsResult.data || []).forEach((comment) => {
       if (comment.user_id) senderUserIds.add(comment.user_id);
     });
+    (proofFeedbackResult.data || []).forEach((feedback) => {
+      if (feedback.user_id) senderUserIds.add(feedback.user_id);
+    });
 
     const { data: senderProfiles, error: senderProfilesError } =
       senderUserIds.size > 0
@@ -221,6 +249,16 @@ export async function GET(request: NextRequest) {
     (projectCommentsResult.data || []).forEach((comment) => {
       if (comment.project_id) {
         projectIds.add(comment.project_id);
+      }
+    });
+    (proofFeedbackResult.data || []).forEach((feedback) => {
+      if (feedback.project_id) {
+        projectIds.add(feedback.project_id);
+      }
+    });
+    (proofsResult.data || []).forEach((proof) => {
+      if (proof.project_id) {
+        projectIds.add(proof.project_id);
       }
     });
 
@@ -296,6 +334,12 @@ export async function GET(request: NextRequest) {
     const monthlyServiceCommentById = new Map(
       (monthlyServiceCommentsResult.data || []).map((comment) => [comment.id, comment])
     );
+    const proofFeedbackById = new Map(
+      (proofFeedbackResult.data || []).map((feedback) => [feedback.id, feedback])
+    );
+    const proofById = new Map(
+      (proofsResult.data || []).map((proof) => [proof.id, proof])
+    );
     const taskById = new Map((tasks || []).map((task) => [task.id, task]));
     const projectById = new Map((projectsResult.data || []).map((project) => [project.id, project]));
     const monthlyServiceById = new Map(
@@ -329,6 +373,7 @@ export async function GET(request: NextRequest) {
       let projectShortcode: string | null = null;
       let taskId: string | null = null;
       let taskTitle: string | null = null;
+      let proofId: string | null = null;
       let monthlyServiceId: string | null = null;
       let monthlyServiceName: string | null = null;
       let commentText = '';
@@ -380,6 +425,22 @@ export async function GET(request: NextRequest) {
         hasAttachments = monthlyCommentsWithAttachments.has(referenceId);
       }
 
+      if (referenceType === 'proof' && referenceId) {
+        const feedback = proofFeedbackById.get(referenceId);
+        const proof = proofById.get(referenceId);
+        proofId = feedback?.proof_id || proof?.id || null;
+        projectId = feedback?.project_id || proof?.project_id || null;
+        senderUserId = feedback?.user_id || null;
+        const project = projectId ? projectById.get(projectId) : null;
+        projectName = project?.name || null;
+        projectShortcode = project?.shortcode || null;
+        const companyRaw = project?.company;
+        const company = Array.isArray(companyRaw) ? companyRaw[0] ?? null : companyRaw ?? null;
+        companyName = company?.name || null;
+        companyIconUrl = getCompanyIconUrl(company?.branding);
+        commentText = stripHtml(feedback?.comment || '');
+      }
+
       const fallbackText = stripHtml(notification.message || '') || 'You were mentioned in a comment.';
       const senderProfile = senderUserId ? senderProfileById.get(senderUserId) : null;
 
@@ -397,6 +458,7 @@ export async function GET(request: NextRequest) {
         projectShortcode,
         taskId,
         taskTitle,
+        proofId,
         monthlyServiceId,
         monthlyServiceName,
         senderFirstName: senderProfile?.first_name || null,

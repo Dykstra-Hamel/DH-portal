@@ -113,7 +113,8 @@ const formatSource = (ticket: Ticket): string => {
     outbound: 'Outbound',
     website: 'Website',
   };
-  return sourceMap[ticket.source] || ticket.source;
+  if (!ticket.source) return 'Unknown';
+  return sourceMap[ticket.source] || ticket.source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 const formatServiceType = (serviceType: string): string => {

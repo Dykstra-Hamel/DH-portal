@@ -67,6 +67,7 @@ interface MentionItem {
   projectShortcode: string | null;
   taskId: string | null;
   taskTitle: string | null;
+  proofId: string | null;
   monthlyServiceId: string | null;
   monthlyServiceName: string | null;
   senderFirstName: string | null;
@@ -1700,7 +1701,7 @@ export function TaskListView({
                 return (
                   <React.Fragment key={projectGroup.project?.id || 'no-project'}>
                     <div
-                      className={styles.projectGroupHeader}
+                      className={`${styles.projectGroupHeader}${isExpanded && hasTasks ? ` ${styles.projectGroupHeaderExpanded}` : ''}`}
                       onClick={() =>
                         projectGroup.project &&
                         onProjectClick &&
@@ -1988,6 +1989,13 @@ export function TaskListView({
       return mention.projectShortcode
         ? formatProjectShortcode(mention.projectShortcode)
         : mention.projectName || 'Project';
+    }
+
+    if (mention.referenceType === 'proof') {
+      const projectLabel = mention.projectShortcode
+        ? formatProjectShortcode(mention.projectShortcode)
+        : mention.projectName || 'Project';
+      return `${projectLabel} • Proof`;
     }
 
     return mention.title || 'Mention';
@@ -2673,7 +2681,7 @@ export function TaskListView({
                           key={projectGroup.project?.id || 'no-project'}
                         >
                           <div
-                            className={styles.projectGroupHeader}
+                            className={`${styles.projectGroupHeader}${isExpanded && hasTasks ? ` ${styles.projectGroupHeaderExpanded}` : ''}`}
                             onClick={() =>
                               projectGroup.project &&
                               onProjectClick &&

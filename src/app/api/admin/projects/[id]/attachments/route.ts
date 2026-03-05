@@ -117,10 +117,14 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permissions
-    const canEdit = await canEditProject(supabase, projectId, user.id);
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Any authenticated user with access to this project (via RLS) can add attachments.
+    const { data: project, error: projectError } = await supabase
+      .from('projects')
+      .select('attachments')
+      .eq('id', projectId)
+      .single();
+    if (projectError || !project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
 
     // Parse JSON body (file(s) already uploaded directly to storage)
@@ -177,17 +181,6 @@ export async function POST(
       uploaded_by: user.id,
       uploaded_at: new Date().toISOString(),
     }));
-
-    // Get current attachments
-    const { data: project, error: fetchError } = await supabase
-      .from('projects')
-      .select('attachments')
-      .eq('id', projectId)
-      .single();
-
-    if (fetchError) {
-      return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
-    }
 
     // Update attachments array
     const currentAttachments = project.attachments || [];

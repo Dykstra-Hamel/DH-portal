@@ -557,13 +557,20 @@
   transform: rotate(90deg);
 }
 
+.projectGroupHeaderExpanded {
+  &::after {
+    display: none;
+  }
+}
+
 .projectTaskList {
   list-style: none;
-  margin: 0 0 5px;
-  padding: 0 0 0 40px;
+  margin: 0;
+  padding: 0 0 8px 40px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
 }
 
 .projectTaskListCompact {

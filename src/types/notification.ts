@@ -12,7 +12,8 @@ export interface Notification {
     | 'new_lead_assigned'
     | 'new_support_case_unassigned'
     | 'new_support_case_assigned'
-    | 'mention';
+    | 'mention'
+    | 'proof_feedback';
   title: string;
   message: string;
   reference_id?: string;
@@ -24,7 +25,8 @@ export interface Notification {
     | 'support_case'
     | 'project_comment'
     | 'task_comment'
-    | 'monthly_service_comment';
+    | 'monthly_service_comment'
+    | 'proof';
   assigned_to?: string;
   read: boolean;
   created_at: string;

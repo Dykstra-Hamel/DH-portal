@@ -1,0 +1,133 @@
+.viewer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  background: var(--gray-100, #f3f4f6);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.overlay {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: auto;
+  min-height: 0;
+  user-select: none;
+}
+
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.88);
+  color: var(--gray-600, #4b5563);
+  font-size: 13px;
+  font-weight: 500;
+  z-index: 20;
+}
+
+.loadingSpinner {
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--gray-300, #d1d5db);
+  border-top-color: var(--action-500, #0080f0);
+  border-radius: 999px;
+  animation: spin 0.7s linear infinite;
+}
+
+.proofImage {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.pdfDocument {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pdfPage {
+  max-width: 100%;
+}
+
+.unsupportedState {
+  margin: auto;
+  padding: 14px 16px;
+  border: 1px dashed var(--gray-300, #d1d5db);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--gray-500, #6b7280);
+  background: white;
+}
+
+.pdfControls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 8px;
+  background: white;
+  border-top: 1px solid var(--gray-200, #e5e7eb);
+  flex-shrink: 0;
+}
+
+.pageButton {
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--gray-300, #d1d5db);
+  border-radius: 5px;
+  background: white;
+  color: var(--gray-700, #374151);
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-50, #f9fafb);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.pageIndicator {
+  font-size: 13px;
+  color: var(--gray-600, #4b5563);
+}
+
+.pendingPinMarker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--action-300, #7dd3fc);
+  border: 2px dashed var(--action-500, #0284c7);
+  pointer-events: none;
+  z-index: 15;
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

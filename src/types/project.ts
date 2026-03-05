@@ -463,6 +463,53 @@ export interface ProjectAttachment {
   uploaded_at: string;
 }
 
+export interface ProjectProof {
+  id: string;
+  project_id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by: string;
+  is_current: boolean;
+  is_final: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  uploaded_by_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+}
+
+export interface ProofFeedback {
+  id: string;
+  proof_id: string;
+  project_id: string;
+  user_id: string;
+  x_percent: number | null;
+  y_percent: number | null;
+  page_number: number;
+  comment: string;
+  pin_number: number;
+  is_resolved: boolean;
+  created_at: string;
+  updated_at: string;
+  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+}
+
+export interface ProofFeedbackActivity {
+  id: string;
+  proof_id: string;
+  user_id: string;
+  comment: string;
+  pin_number: number;
+  x_percent: number | null;
+  y_percent: number | null;
+  page_number: number;
+  is_resolved: boolean;
+  created_at: string;
+  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+  proof?: { id: string; file_name: string; version: number; is_current: boolean; mime_type: string };
+}
+
 export interface ProjectComment {
   id: string;
   project_id: string;

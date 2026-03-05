@@ -442,6 +442,32 @@ export function useNotifications() {
             router.push('/admin/monthly-services');
           }
           break;
+        case 'proof':
+          try {
+            const response = await fetch(
+              `/api/admin/notifications/comment-reference?type=proof&referenceId=${notification.reference_id}`
+            );
+            if (!response.ok) {
+              throw new Error('Failed to resolve proof notification');
+            }
+            const data = await response.json();
+            if (data.projectId && data.proofId) {
+              const feedbackParam = data.feedbackId
+                ? `&proofFeedbackId=${data.feedbackId}`
+                : '';
+              router.push(
+                `/admin/project-management/${data.projectId}?tab=proofs&proofId=${data.proofId}${feedbackParam}`
+              );
+            } else if (data.projectId) {
+              router.push(`/admin/project-management/${data.projectId}?tab=proofs`);
+            } else {
+              router.push('/admin/project-management');
+            }
+          } catch (error) {
+            console.error('Error resolving proof notification:', error);
+            router.push('/admin/project-management');
+          }
+          break;
         default:
           console.warn('Unknown reference type:', notification.reference_type);
       }
