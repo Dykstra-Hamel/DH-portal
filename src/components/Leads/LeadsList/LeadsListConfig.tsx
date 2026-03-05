@@ -3,7 +3,7 @@
 import React from 'react';
 import { Lead, leadStatusOptions } from '@/types/lead';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
-import { ChevronRight, Mail, MessageSquare, Phone } from 'lucide-react';
+import { ChevronRight, Mail, MailQuestionMark, MessageSquare, Phone } from 'lucide-react';
 import { formatDateWithOrdinal } from '@/lib/date-utils';
 import { getTimeAgo } from '@/lib/time-utils';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
@@ -100,7 +100,7 @@ const getFormatIcon = (lead: Lead) => {
     case 'text':
       return <MessageSquare size={18} className={styles.textIcon} color="#0088CC" />;
     default:
-      return null;
+      return <MailQuestionMark size={18} className={styles.questionIcon} />;
   }
 };
 

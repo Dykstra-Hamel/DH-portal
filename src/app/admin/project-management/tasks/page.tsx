@@ -38,6 +38,7 @@ interface MentionListItem {
   projectShortcode: string | null;
   taskId: string | null;
   taskTitle: string | null;
+  proofId: string | null;
   monthlyServiceId: string | null;
   monthlyServiceName: string | null;
   senderFirstName: string | null;
@@ -506,6 +507,9 @@ export default function AdminTasksPage() {
       await openTaskDetailById(mention.taskId, mention.projectId);
     } else if (mention.referenceType === 'project_comment' && mention.projectId) {
       window.location.href = `/admin/project-management/${mention.projectId}?commentId=${mention.referenceId}`;
+    } else if (mention.referenceType === 'proof' && mention.projectId) {
+      const proofId = mention.proofId || mention.referenceId;
+      window.location.href = `/admin/project-management/${mention.projectId}?tab=proofs&proofId=${proofId}&proofFeedbackId=${mention.referenceId}`;
     } else if (mention.referenceType === 'monthly_service_comment' && mention.monthlyServiceId) {
       window.location.href = `/admin/monthly-services/${mention.monthlyServiceId}?commentId=${mention.referenceId}`;
     }

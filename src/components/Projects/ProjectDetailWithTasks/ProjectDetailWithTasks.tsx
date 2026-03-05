@@ -12,7 +12,7 @@ import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
-import { Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, ProofFeedbackActivity, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
@@ -20,7 +20,6 @@ import { adminAPI } from '@/lib/api-client';
 import { parseDateString } from '@/lib/date-utils';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
-import { scheduleScrollToElementById } from '@/lib/scroll-utils';
 import ProjectDetail from '../ProjectDetail/ProjectDetail';
 import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
@@ -28,6 +27,12 @@ import ProjectTaskDetail from '../ProjectTaskDetail/ProjectTaskDetail';
 import ApplyTemplateModal from '../ApplyTemplateModal/ApplyTemplateModal';
 import DuplicateProjectModal from '../DuplicateProjectModal/DuplicateProjectModal';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
+import dynamic from 'next/dynamic';
+const ProofsTab = dynamic(() => import('../ProofsTab/ProofsTab'), { ssr: false });
+const PDFLightbox = dynamic(
+  () => import('@/components/Common/PDFLightbox/PDFLightbox').then((mod) => mod.PDFLightbox),
+  { ssr: false }
+);
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ProjectDetailWithTasks.module.scss';
 
@@ -121,6 +126,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [allInternalCategories, setAllInternalCategories] = useState<ProjectCategory[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [comments, setComments] = useState<ProjectComment[]>([]);
+  const [proofActivity, setProofActivity] = useState<ProofFeedbackActivity[]>([]);
+  const [isInitialTasksLoaded, setIsInitialTasksLoaded] = useState(false);
+  const [isInitialCommentsLoaded, setIsInitialCommentsLoaded] = useState(false);
+  const [isInitialProofActivityLoaded, setIsInitialProofActivityLoaded] = useState(false);
+  const [proofToOpen, setProofToOpen] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
@@ -162,8 +172,14 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [highlightedProjectCommentId, setHighlightedProjectCommentId] = useState<string | null>(null);
   const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
   const highlightTimeoutRef = React.useRef<number | null>(null);
+  const commentsFeedRef = React.useRef<HTMLDivElement>(null);
+  const commentsListRef = React.useRef<HTMLDivElement>(null);
+  const commentsBottomAnchorRef = React.useRef<HTMLDivElement>(null);
+  const hasAutoScrolledCommentsRef = React.useRef(false);
+  const shouldStickCommentsToBottomRef = React.useRef(true);
   const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
   const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [activeContentTab, setActiveContentTab] = useState<'attachments' | 'proofs'>('attachments');
   const [projectAttachments, setProjectAttachments] = useState<ProjectAttachment[]>(project?.attachments || []);
   const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
   const [projectUploadProgress, setProjectUploadProgress] =
@@ -173,8 +189,17 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
   const [currentLightboxImages, setCurrentLightboxImages] = useState<Array<{ id: string; url: string; name: string }>>([]);
+  const [pdfLightboxOpen, setPdfLightboxOpen] = useState(false);
+  const [pdfLightboxUrl, setPdfLightboxUrl] = useState('');
+  const [pdfLightboxName, setPdfLightboxName] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
+  const deepLinkCommentId = searchParams.get('commentId');
+  const deepLinkTaskId = searchParams.get('taskId');
+  const deepLinkTab = searchParams.get('tab');
+  const deepLinkProofId = searchParams.get('proofId');
+  const isInitialContentReady =
+    isInitialTasksLoaded && isInitialCommentsLoaded && isInitialProofActivityLoaded;
   const processedCommentRef = React.useRef<string | null>(null);
   const { setPageHeader } = usePageActions();
   const { refreshNotifications } = useNotificationContext();
@@ -287,7 +312,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   React.useEffect(() => {
     if (!project?.id) return;
 
-    fetchTasks(project.id);
+    let cancelled = false;
+    setIsInitialTasksLoaded(false);
+
+    void fetchTasks(project.id).finally(() => {
+      if (!cancelled) {
+        setIsInitialTasksLoaded(true);
+      }
+    });
+
     // Also fetch users for assignment (fetch in parallel)
     adminAPI.getUsers().then(data => setUsers(data || [])).catch(() => {});
     // Fetch departments (fetch in parallel)
@@ -300,6 +333,10 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       .then(res => res.json())
       .then(data => setAllInternalCategories(data || []))
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [project?.id, fetchTasks]);
 
   React.useEffect(() => {
@@ -500,16 +537,57 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
   }, [project?.id, project]);
 
+  const fetchProofActivity = useCallback(async () => {
+    if (!project?.id) return;
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/proof-activity`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setProofActivity(data.activity ?? []);
+    } catch {
+      // silent
+    }
+  }, [project?.id]);
+
   React.useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    if (!project?.id) return;
+
+    let cancelled = false;
+    hasAutoScrolledCommentsRef.current = false;
+    setIsInitialCommentsLoaded(false);
+    setIsInitialProofActivityLoaded(false);
+
+    void fetchComments().finally(() => {
+      if (!cancelled) {
+        setIsInitialCommentsLoaded(true);
+      }
+    });
+
+    void fetchProofActivity().finally(() => {
+      if (!cancelled) {
+        setIsInitialProofActivityLoaded(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, fetchComments, fetchProofActivity]);
+
+  useEffect(() => {
+    if (deepLinkTab !== 'proofs' && !deepLinkProofId) return;
+    setActiveContentTab('proofs');
+    if (deepLinkProofId) {
+      setProofToOpen(deepLinkProofId);
+    }
+  }, [deepLinkTab, deepLinkProofId]);
 
   // Realtime subscription — re-fetch comments when another user adds/edits/deletes
   useEffect(() => {
     if (!project?.id) return;
 
     const supabase = createClient();
-    const channel = supabase
+    const commentsChannel = supabase
       .channel(`project-comments:${project.id}`)
       .on(
         'postgres_changes',
@@ -519,16 +597,29 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
           table: 'project_comments',
           filter: `project_id=eq.${project.id}`,
         },
-        () => {
-          fetchComments();
-        }
+        () => { fetchComments(); }
+      )
+      .subscribe();
+
+    const proofFeedbackChannel = supabase
+      .channel(`project-proof-feedback-activity:${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'proof_feedback',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => { fetchProofActivity(); }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(commentsChannel);
+      supabase.removeChannel(proofFeedbackChannel);
     };
-  }, [project?.id, fetchComments]);
+  }, [project?.id, fetchComments, fetchProofActivity]);
 
   const handleCreateTask = useCallback(() => {
     setEditingTask(null);
@@ -1055,6 +1146,27 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     openTaskDetailById(task.id);
   };
 
+  const scrollCommentsToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const feedElement = commentsFeedRef.current;
+    if (!feedElement) return;
+    const maxTop = Math.max(0, feedElement.scrollHeight - feedElement.clientHeight);
+    shouldStickCommentsToBottomRef.current = true;
+    if (behavior === 'auto') {
+      feedElement.scrollTop = maxTop;
+      feedElement.scrollTop = Math.max(0, feedElement.scrollHeight - feedElement.clientHeight);
+    } else {
+      feedElement.scrollTo({ top: maxTop, behavior });
+    }
+  }, []);
+
+  const handleCommentsFeedScroll = useCallback(() => {
+    const listElement = commentsFeedRef.current;
+    if (!listElement) return;
+    const distanceFromBottom =
+      listElement.scrollHeight - listElement.scrollTop - listElement.clientHeight;
+    shouldStickCommentsToBottomRef.current = distanceFromBottom <= 24;
+  }, []);
+
   const markMentionReferenceAsRead = useCallback(
     async (referenceType: 'project_comment', referenceId: string) => {
       try {
@@ -1083,8 +1195,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   );
 
   React.useEffect(() => {
-    const commentId = searchParams.get('commentId');
-    const taskId = searchParams.get('taskId');
+    const commentId = deepLinkCommentId;
+    const taskId = deepLinkTaskId;
     if (!commentId) return;
 
     const key = `${taskId || 'project'}:${commentId}`;
@@ -1104,18 +1216,105 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
 
     processedCommentRef.current = key;
-  }, [markMentionReferenceAsRead, openTaskDetailById, searchParams, selectedTask]);
+  }, [deepLinkCommentId, deepLinkTaskId, markMentionReferenceAsRead, openTaskDetailById, selectedTask]);
 
   React.useEffect(() => {
     if (!highlightedProjectCommentId) return;
+    if (isCommentsCollapsed) return;
+    const rafId = window.requestAnimationFrame(() => {
+      const targetComment = document.getElementById(
+        `project-comment-${highlightedProjectCommentId}`
+      );
+      targetComment?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [highlightedProjectCommentId, comments.length, isCommentsCollapsed]);
 
-    return scheduleScrollToElementById(
-      `project-comment-${highlightedProjectCommentId}`,
-      {
-        topOffset: 120,
+  React.useEffect(() => {
+    hasAutoScrolledCommentsRef.current = false;
+    shouldStickCommentsToBottomRef.current = true;
+  }, [project?.id]);
+
+  React.useEffect(() => {
+    if (isCommentsCollapsed) {
+      hasAutoScrolledCommentsRef.current = false;
+      shouldStickCommentsToBottomRef.current = true;
+    }
+  }, [isCommentsCollapsed]);
+
+  React.useLayoutEffect(() => {
+    const mergedFeedCount = comments.length + proofActivity.length;
+    if (!isInitialContentReady) return;
+    if (isCommentsCollapsed) return;
+    if (mergedFeedCount === 0) return;
+    if (deepLinkCommentId) return;
+    if (highlightedProjectCommentId) return;
+    if (hasAutoScrolledCommentsRef.current) return;
+    if (!commentsFeedRef.current) return;
+    scrollCommentsToBottom('auto');
+    hasAutoScrolledCommentsRef.current = true;
+    shouldStickCommentsToBottomRef.current = true;
+  }, [
+    comments.length,
+    proofActivity.length,
+    isInitialContentReady,
+    deepLinkCommentId,
+    highlightedProjectCommentId,
+    isCommentsCollapsed,
+    scrollCommentsToBottom,
+  ]);
+
+  React.useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    if (!isInitialContentReady) return;
+    if (isCommentsCollapsed) return;
+    if (deepLinkCommentId) return;
+    if (highlightedProjectCommentId) return;
+    if (!hasAutoScrolledCommentsRef.current) return;
+
+    const listElement = commentsListRef.current;
+    if (!listElement) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (!shouldStickCommentsToBottomRef.current) return;
+      scrollCommentsToBottom('auto');
+    });
+
+    resizeObserver.observe(listElement);
+    return () => resizeObserver.disconnect();
+  }, [
+    comments.length,
+    proofActivity.length,
+    isInitialContentReady,
+    deepLinkCommentId,
+    highlightedProjectCommentId,
+    isCommentsCollapsed,
+    scrollCommentsToBottom,
+  ]);
+
+  React.useEffect(() => {
+    if (!isInitialContentReady) return;
+    if (isCommentsCollapsed) return;
+    if (deepLinkCommentId) return;
+    if (highlightedProjectCommentId) return;
+    if (!hasAutoScrolledCommentsRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      if (shouldStickCommentsToBottomRef.current) {
+        scrollCommentsToBottom('auto');
       }
-    );
-  }, [highlightedProjectCommentId, comments.length]);
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    comments.length,
+    proofActivity.length,
+    isInitialContentReady,
+    deepLinkCommentId,
+    highlightedProjectCommentId,
+    isCommentsCollapsed,
+    scrollCommentsToBottom,
+  ]);
 
   React.useEffect(() => {
     if (!highlightedProjectCommentId && !highlightedTaskCommentId) {
@@ -1495,6 +1694,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setComments(prev => [...prev, comment]);
       setNewComment('');
       setPendingAttachments([]);
+      hasAutoScrolledCommentsRef.current = true;
+      shouldStickCommentsToBottomRef.current = true;
+      window.requestAnimationFrame(() => {
+        scrollCommentsToBottom('smooth');
+      });
       onProjectUpdate?.();
     } catch (error) {
       console.error('Error posting comment:', error);
@@ -1595,6 +1799,20 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }));
     return converted;
   }, [users]);
+
+  // Merged comment feed: project comments + proof feedback activity, sorted by created_at
+  const mergedFeed = useMemo(() => {
+    const commentItems = comments.map((c) => ({ ...c, _type: 'comment' as const }));
+    const activityItems = proofActivity.map((a) => ({ ...a, _type: 'proof_feedback' as const }));
+    return [...commentItems, ...activityItems].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [comments, proofActivity]);
+
+  const handleOpenProofFromActivity = useCallback((proofId: string) => {
+    setActiveContentTab('proofs');
+    setProofToOpen(proofId);
+  }, []);
 
   const handleSaveProjectDescription = async () => {
     if (!project?.id) return;
@@ -1749,6 +1967,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       project.members?.some((m: { user_id: string }) => m.user_id === user.id)
     );
   }, [user, project]);
+  const canUploadProjectAttachments = useMemo(() => Boolean(project?.id), [project?.id]);
 
   const uploadProjectFiles = useCallback(async (files: File[]) => {
     if (!project?.id || files.length === 0) return;
@@ -1922,6 +2141,63 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       window.open(`/api/admin/projects/${project?.id}/attachments/${attachmentId}/url`, '_blank');
     }
   }, [project?.id]);
+
+  const handleDownloadCommentAttachment = useCallback(async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to download attachment');
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  }, []);
+
+  const handleDeleteCommentAttachment = useCallback(
+    async (commentId: string, attachmentId: string) => {
+      if (!project?.id) return;
+      try {
+        const response = await fetch(
+          `/api/admin/projects/${project.id}/comments/${commentId}/attachments?attachmentId=${attachmentId}`,
+          { method: 'DELETE' }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to delete attachment');
+        }
+
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  attachments: (comment.attachments || []).filter(
+                    (attachment) => attachment.id !== attachmentId
+                  ),
+                }
+              : comment
+          )
+        );
+        setToastMessage('Attachment deleted.');
+        setToastType('success');
+        setShowToast(true);
+        onProjectUpdate?.();
+      } catch (error) {
+        console.error('Error deleting comment attachment:', error);
+        setToastMessage('Failed to delete attachment.');
+        setToastType('error');
+        setShowToast(true);
+      }
+    },
+    [onProjectUpdate, project?.id]
+  );
 
   const handleDeleteProjectAttachment = useCallback((attachmentId: string) => {
     setAttachmentToDelete(attachmentId);
@@ -2177,8 +2453,13 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     );
   };
 
-  // Show loading skeleton while project data is being fetched (after all hooks are called)
-  if (projectLoading || !project) {
+  const isInitialContentLoading =
+    !projectLoading &&
+    Boolean(project) &&
+    (!isInitialTasksLoaded || !isInitialCommentsLoaded || !isInitialProofActivityLoaded);
+
+  // Show loading skeleton while initial page data is being fetched (after all hooks are called)
+  if (projectLoading || !project || isInitialContentLoading) {
     return <ProjectDetailSkeleton />;
   }
 
@@ -2191,6 +2472,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
           currentIndex={lightboxImageIndex}
           onClose={handleCloseLightbox}
           onNavigate={handleNavigateLightbox}
+        />
+      )}
+
+      {/* PDF Lightbox */}
+      {pdfLightboxOpen && (
+        <PDFLightbox
+          url={pdfLightboxUrl}
+          name={pdfLightboxName}
+          onClose={() => setPdfLightboxOpen(false)}
         />
       )}
 
@@ -2331,15 +2621,43 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
               </div>
             )}
 
+            {/* Content Tab Bar */}
+            <div className={styles.contentTabBar}>
+              <button
+                className={`${styles.contentTab} ${activeContentTab === 'attachments' ? styles.contentTabActive : ''}`}
+                onClick={() => setActiveContentTab('attachments')}
+              >
+                Attachments
+              </button>
+              <button
+                className={`${styles.contentTab} ${activeContentTab === 'proofs' ? styles.contentTabActive : ''}`}
+                onClick={() => setActiveContentTab('proofs')}
+              >
+                Proofs
+              </button>
+            </div>
+
+            {activeContentTab === 'proofs' && project && (
+              <ProofsTab
+                project={project}
+                user={user}
+                canEdit={true}
+                mentionUsers={mentionUsers}
+                autoOpenProofId={proofToOpen}
+                onProofModalClosed={() => setProofToOpen(null)}
+              />
+            )}
+
             {/* Project Attachments Section */}
             <div
               className={styles.projectAttachments}
+              style={{ display: activeContentTab === 'attachments' ? undefined : 'none' }}
               onDragEnter={handleProjectDragEnter}
               onDragLeave={handleProjectDragLeave}
               onDragOver={handleProjectDragOver}
               onDrop={handleProjectDrop}
             >
-              {canEditProject && (
+              {canUploadProjectAttachments && (
                 <input
                   type="file"
                   multiple
@@ -2350,7 +2668,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                 />
               )}
 
-              {(projectAttachments.length > 0 || canEditProject) && (
+              {(projectAttachments.length > 0 || canUploadProjectAttachments) && (
                 <div className={styles.attachmentsGrid}>
                   {projectAttachments.map((attachment) => {
                     const isImage = attachment.mime_type.startsWith('image/');
@@ -2392,11 +2710,16 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                             )}
                           </div>
                         ) : (
-                          <a
-                            href={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <div
                             className={styles.documentWrapper}
+                            style={{ cursor: attachment.mime_type === 'application/pdf' ? 'pointer' : 'default' }}
+                            onClick={() => {
+                              if (attachment.mime_type === 'application/pdf') {
+                                setPdfLightboxUrl(`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`);
+                                setPdfLightboxName(attachment.file_name);
+                                setPdfLightboxOpen(true);
+                              }
+                            }}
                           >
                             <div className={styles.documentIcon}>
                               <FileText size={48} />
@@ -2404,7 +2727,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                             <button
                               className={styles.downloadImageButton}
                               onClick={(e) => {
-                                e.preventDefault();
                                 e.stopPropagation();
                                 handleDownloadProjectAttachment(attachment.id, attachment.file_name);
                               }}
@@ -2416,7 +2738,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                               <button
                                 className={styles.deleteImageButton}
                                 onClick={(e) => {
-                                  e.preventDefault();
                                   e.stopPropagation();
                                   handleDeleteProjectAttachment(attachment.id);
                                 }}
@@ -2425,14 +2746,14 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 <X size={14} />
                               </button>
                             )}
-                          </a>
+                          </div>
                         )}
                         <span className={styles.attachmentFileName}>{attachment.file_name}</span>
                       </div>
                     );
                   })}
 
-                  {canEditProject && (
+                  {canUploadProjectAttachments && (
                     <div
                       className={`${styles.attachmentItem} ${styles.addNewBox} ${isDraggingProjectFile ? styles.addNewBoxActive : ''}`}
                       onClick={() => document.getElementById('project-file-input')?.click()}
@@ -2549,32 +2870,92 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                 <h3 className={styles.sectionTitle}>
                   Comments <span className={styles.sectionCount}>({comments.length})</span>
                 </h3>
+
               </div>
               {!isCommentsCollapsed && (
                 <>
-                  {comments.length > 0 ? (
-                    <div className={styles.commentsList}>
-                      {comments.map(comment => {
-                        const authorName = comment.user_profile
-                          ? `${comment.user_profile.first_name || ''} ${comment.user_profile.last_name || ''}`.trim() || comment.user_profile.email
-                          : 'Unknown';
-                        const isCommentOwner = comment.user_id === user.id;
-                        const isEditing = editingCommentId === comment.id;
-                        const isEdited = Boolean(
-                          comment.updated_at &&
-                            new Date(comment.updated_at).getTime() !==
-                              new Date(comment.created_at).getTime()
-                        );
-                        return (
-                          <div
-                            key={comment.id}
-                            id={`project-comment-${comment.id}`}
-                            className={`${styles.commentItem} ${
-                              highlightedProjectCommentId === comment.id
-                                ? styles.commentHighlight
-                                : ''
-                            }`}
-                          >
+                  <div
+                    ref={commentsFeedRef}
+                    className={styles.commentsFeed}
+                    onScroll={handleCommentsFeedScroll}
+                  >
+                    {mergedFeed.length > 0 ? (
+                      <div ref={commentsListRef} className={styles.commentsList}>
+                        {mergedFeed.map(item => {
+                          // ── Proof feedback activity (system message) ──
+                          if (item._type === 'proof_feedback') {
+                            const activity = item as typeof item & { _type: 'proof_feedback' };
+                            const authorName = activity.user_profile
+                              ? `${activity.user_profile.first_name || ''} ${activity.user_profile.last_name || ''}`.trim()
+                              : 'Someone';
+                            const proofInfo = activity.proof;
+                            const isPin = activity.x_percent !== null;
+                            return (
+                              <div key={`pfa-${activity.id}`} className={styles.proofActivityMessage}>
+                                <MiniAvatar
+                                  firstName={activity.user_profile?.first_name || undefined}
+                                  lastName={activity.user_profile?.last_name || undefined}
+                                  email=""
+                                  avatarUrl={activity.user_profile?.avatar_url || null}
+                                  size="small"
+                                  showTooltip={false}
+                                  className={styles.commentAvatarMini}
+                                />
+                                <div className={styles.proofActivityContent}>
+                                  <span className={styles.proofActivityText}>
+                                    <strong>{authorName}</strong>
+                                    {isPin ? ' pinned feedback' : ' left feedback'}{' '}
+                                    {proofInfo && (
+                                      <>on <em>v{proofInfo.version} — {proofInfo.file_name}</em></>
+                                    )}
+                                  </span>
+                                  {activity.comment && (
+                                    <span
+                                      className={styles.proofActivityComment}
+                                      dangerouslySetInnerHTML={{ __html: activity.comment }}
+                                    />
+                                  )}
+                                  <div className={styles.proofActivityFooter}>
+                                    <span className={styles.proofActivityDate}>
+                                      {formatCommentDate(activity.created_at)}
+                                    </span>
+                                    {proofInfo && (
+                                      <button
+                                        className={styles.proofActivityLink}
+                                        onClick={() => handleOpenProofFromActivity(proofInfo.id)}
+                                      >
+                                        View Proof
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // ── Regular comment ──
+                          const comment = item as typeof item & { _type: 'comment' };
+                          const authorName = comment.user_profile
+                            ? `${comment.user_profile.first_name || ''} ${comment.user_profile.last_name || ''}`.trim() || comment.user_profile.email
+                            : 'Unknown';
+                          const isCommentOwner = comment.user_id === user.id;
+                          const commentAuthorLabel = isCommentOwner ? 'Me' : authorName;
+                          const isEditing = editingCommentId === comment.id;
+                          const isEdited = Boolean(
+                            comment.updated_at &&
+                              new Date(comment.updated_at).getTime() !==
+                                new Date(comment.created_at).getTime()
+                          );
+                          return (
+                            <div
+                              key={comment.id}
+                              id={`project-comment-${comment.id}`}
+                              className={[
+                                styles.commentItem,
+                                isCommentOwner ? styles.commentItemMine : styles.commentItemOther,
+                                highlightedProjectCommentId === comment.id ? styles.commentHighlight : '',
+                              ].filter(Boolean).join(' ')}
+                            >
                             <div className={styles.commentMeta}>
                               <MiniAvatar
                                 firstName={comment.user_profile?.first_name || undefined}
@@ -2586,7 +2967,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 className={styles.commentAvatarMini}
                               />
                               <div className={styles.commentMetaDetails}>
-                                <span className={styles.commentAuthor}>{authorName}</span>
+                                <span className={styles.commentAuthor}>{commentAuthorLabel}</span>
                                 <span className={styles.commentDate}>
                                   {formatCommentDate(comment.created_at)}
                                   {isEdited && (
@@ -2688,6 +3069,38 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                                 alt={attachment.file_name}
                                                 className={styles.commentImage}
                                               />
+                                              <button
+                                                type="button"
+                                                className={`${styles.commentDownloadButton} ${
+                                                  isCommentOwner ? styles.commentDownloadButtonWithDelete : ''
+                                                }`}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDownloadCommentAttachment(
+                                                    attachment.url,
+                                                    attachment.file_name
+                                                  );
+                                                }}
+                                                aria-label="Download attachment"
+                                              >
+                                                <Download size={14} />
+                                              </button>
+                                              {isCommentOwner && (
+                                                <button
+                                                  type="button"
+                                                  className={styles.commentDeleteButton}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void handleDeleteCommentAttachment(
+                                                      comment.id,
+                                                      attachment.id
+                                                    );
+                                                  }}
+                                                  aria-label="Delete attachment"
+                                                >
+                                                  <X size={14} />
+                                                </button>
+                                              )}
                                             </div>
                                           ))}
                                         </div>
@@ -2695,36 +3108,71 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                       {fileAttachments.length > 0 && (
                                         <div className={styles.commentAttachments}>
                                           {fileAttachments.map((attachment: { id: string; url: string; file_name: string; mime_type?: string | null }) => (
-                                            <a
-                                              key={attachment.id}
-                                              href={attachment.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className={styles.attachmentCard}
-                                            >
-                                              <div className={styles.attachmentIcon}>
-                                                {attachment.mime_type === 'application/pdf' ? (
-                                                  <FileText size={16} />
-                                                ) : (
-                                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                    <path
-                                                      d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-                                                      stroke="currentColor"
-                                                      strokeWidth="2"
-                                                      strokeLinecap="round"
-                                                      strokeLinejoin="round"
-                                                    />
-                                                    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                  </svg>
-                                                )}
-                                              </div>
-                                              <div className={styles.attachmentInfo}>
-                                                <span className={styles.attachmentName}>{attachment.file_name}</span>
-                                                {attachment.mime_type === 'application/pdf' && (
-                                                  <span className={styles.attachmentBadge}>PDF</span>
-                                                )}
-                                              </div>
-                                            </a>
+                                            <div key={attachment.id} className={styles.commentAttachmentCardWrapper}>
+                                              <a
+                                                href={attachment.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={styles.attachmentCard}
+                                              >
+                                                <div className={styles.attachmentIcon}>
+                                                  {attachment.mime_type === 'application/pdf' ? (
+                                                    <FileText size={16} />
+                                                  ) : (
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                      <path
+                                                        d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                      />
+                                                      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                  )}
+                                                </div>
+                                                <div className={styles.attachmentInfo}>
+                                                  <span className={styles.attachmentName}>{attachment.file_name}</span>
+                                                  {attachment.mime_type === 'application/pdf' && (
+                                                    <span className={styles.attachmentBadge}>PDF</span>
+                                                  )}
+                                                </div>
+                                              </a>
+                                              <button
+                                                type="button"
+                                                className={`${styles.commentDownloadButton} ${
+                                                  isCommentOwner ? styles.commentDownloadButtonWithDelete : ''
+                                                }`}
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  handleDownloadCommentAttachment(
+                                                    attachment.url,
+                                                    attachment.file_name
+                                                  );
+                                                }}
+                                                aria-label="Download attachment"
+                                              >
+                                                <Download size={14} />
+                                              </button>
+                                              {isCommentOwner && (
+                                                <button
+                                                  type="button"
+                                                  className={styles.commentDeleteButton}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    void handleDeleteCommentAttachment(
+                                                      comment.id,
+                                                      attachment.id
+                                                    );
+                                                  }}
+                                                  aria-label="Delete attachment"
+                                                >
+                                                  <X size={14} />
+                                                </button>
+                                              )}
+                                            </div>
                                           ))}
                                         </div>
                                       )}
@@ -2733,13 +3181,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 })()}
                               </>
                             )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className={styles.commentsEmpty}>No comments yet.</div>
-                  )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className={styles.commentsEmpty}>No comments yet.</div>
+                    )}
+                    <div ref={commentsBottomAnchorRef} className={styles.commentsBottomAnchor} aria-hidden="true" />
+                  </div>
 
                   <form
                     onSubmit={handleSubmitComment}

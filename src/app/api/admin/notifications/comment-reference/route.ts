@@ -20,11 +20,11 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
-    const commentId = searchParams.get('commentId');
+    const referenceId = searchParams.get('referenceId') || searchParams.get('commentId');
 
-    if (!type || !commentId) {
+    if (!type || !referenceId) {
       return NextResponse.json(
-        { error: 'type and commentId are required' },
+        { error: 'type and referenceId are required' },
         { status: 400 }
       );
     }
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
       const { data: comment, error } = await supabase
         .from('project_comments')
         .select('id, project_id')
-        .eq('id', commentId)
+        .eq('id', referenceId)
         .single();
 
       if (error || !comment) {
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
       const { data: taskComment, error } = await supabase
         .from('project_task_comments')
         .select('id, task_id')
-        .eq('id', commentId)
+        .eq('id', referenceId)
         .single();
 
       if (error || !taskComment) {
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
       const { data: comment, error } = await supabase
         .from('monthly_service_comments')
         .select('id, monthly_service_id')
-        .eq('id', commentId)
+        .eq('id', referenceId)
         .single();
 
       if (error || !comment) {
@@ -79,6 +79,36 @@ export async function GET(request: NextRequest) {
       }
 
       return NextResponse.json({ serviceId: comment.monthly_service_id });
+    }
+
+    if (type === 'proof') {
+      // First try resolving as proof feedback ID
+      const { data: feedback } = await supabase
+        .from('proof_feedback')
+        .select('id, project_id, proof_id')
+        .eq('id', referenceId)
+        .maybeSingle();
+
+      if (feedback) {
+        return NextResponse.json({
+          projectId: feedback.project_id,
+          proofId: feedback.proof_id,
+          feedbackId: feedback.id,
+        });
+      }
+
+      // Fallback: resolve as proof ID
+      const { data: proof, error: proofError } = await supabase
+        .from('project_proofs')
+        .select('id, project_id')
+        .eq('id', referenceId)
+        .single();
+
+      if (proofError || !proof) {
+        return NextResponse.json({ error: 'Proof not found' }, { status: 404 });
+      }
+
+      return NextResponse.json({ projectId: proof.project_id, proofId: proof.id });
     }
 
     return NextResponse.json({ error: 'Invalid type' }, { status: 400 });

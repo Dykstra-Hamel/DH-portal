@@ -1,6 +1,18 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  webpack: (config, { isServer }) => {
+    // React-PDF imports `pdfjs-dist` directly. During Node builds, force the
+    // legacy PDF.js bundle to avoid Node-runtime warnings from the modern build.
+    if (isServer) {
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        'pdfjs-dist$': 'pdfjs-dist/legacy/build/pdf.mjs',
+      };
+    }
+
+    return config;
+  },
   images: {
     remotePatterns: [
       {
