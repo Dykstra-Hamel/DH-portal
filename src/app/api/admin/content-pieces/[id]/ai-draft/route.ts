@@ -164,9 +164,13 @@ export async function POST(
     const aiContextBlock = company?.ai_context
       ? `\nCOMPANY CONTEXT (provided by admin):\n${company.ai_context}`
       : '';
+    const formalityLabel = (v: number) =>
+      v <= 12 ? 'Very casual' : v <= 37 ? 'Casual' : v <= 62 ? 'Balanced' : v <= 87 ? 'Formal' : 'Very formal';
+    const humorLabel = (v: number) =>
+      v <= 12 ? 'Very serious and professional' : v <= 37 ? 'Serious' : v <= 62 ? 'Balanced' : v <= 87 ? 'Funny' : 'Very funny and humorous';
     const brandVoiceLines = [
-      company?.brand_voice_formality != null ? `WRITING STYLE: ${company.brand_voice_formality < 30 ? 'Very casual' : company.brand_voice_formality > 70 ? 'Very formal' : 'Neutral'} (${company.brand_voice_formality}/100)` : '',
-      company?.brand_voice_humor != null ? `TONE: ${company.brand_voice_humor < 30 ? 'Serious and professional' : company.brand_voice_humor > 70 ? 'Light and humorous' : 'Balanced'} (${company.brand_voice_humor}/100)` : '',
+      company?.brand_voice_formality != null ? `WRITING STYLE: ${formalityLabel(company.brand_voice_formality)} (${company.brand_voice_formality}/100)` : '',
+      company?.brand_voice_humor != null ? `TONE: ${humorLabel(company.brand_voice_humor)} (${company.brand_voice_humor}/100)` : '',
       company?.words_not_to_use?.length ? `WORDS TO NEVER USE: ${company.words_not_to_use.join(', ')}` : '',
     ].filter(Boolean).join('\n');
     const brandVoiceSection = brandVoiceLines ? `\nBRAND VOICE:\n${brandVoiceLines}` : '';

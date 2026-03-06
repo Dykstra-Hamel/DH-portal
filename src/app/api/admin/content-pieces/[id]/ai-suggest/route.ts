@@ -328,8 +328,8 @@ DEDUPLICATION RULE:
 ${pastContentInstruction}
 
 ${company?.ai_context ? `COMPANY AI CONTEXT (provided by admin):\n${company.ai_context}` : ''}
-${brandVoiceFormality != null ? `WRITING STYLE: ${brandVoiceFormality < 30 ? 'Very casual' : brandVoiceFormality > 70 ? 'Very formal' : 'Neutral'} (${brandVoiceFormality}/100)` : ''}
-${brandVoiceHumor != null ? `TONE: ${brandVoiceHumor < 30 ? 'Serious and professional' : brandVoiceHumor > 70 ? 'Light and humorous' : 'Balanced'} (${brandVoiceHumor}/100)` : ''}
+${brandVoiceFormality != null ? `WRITING STYLE: ${brandVoiceFormality <= 12 ? 'Very casual' : brandVoiceFormality <= 37 ? 'Casual' : brandVoiceFormality <= 62 ? 'Balanced' : brandVoiceFormality <= 87 ? 'Formal' : 'Very formal'} (${brandVoiceFormality}/100)` : ''}
+${brandVoiceHumor != null ? `TONE: ${brandVoiceHumor <= 12 ? 'Very serious and professional' : brandVoiceHumor <= 37 ? 'Serious' : brandVoiceHumor <= 62 ? 'Balanced' : brandVoiceHumor <= 87 ? 'Funny' : 'Very funny and humorous'} (${brandVoiceHumor}/100)` : ''}
 ${wordsNotToUse?.length ? `WORDS TO NEVER USE: ${wordsNotToUse.join(', ')}` : ''}
 
 INSTRUCTIONS:

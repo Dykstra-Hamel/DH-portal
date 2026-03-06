@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import ServiceAreaMap from '@/components/Widget/ServiceAreaMap';
-import { getCompanyCoordinates, createCachedGeocodeResult } from '@/lib/geocoding';
+import { getCompanyCoordinates, createCachedGeocodeResult, isCacheValid } from '@/lib/geocoding';
 import { adminAPI } from '@/lib/api-client';
 import styles from './ServiceAreasManager.module.scss';
 
@@ -26,62 +26,15 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
   const [serviceAreas, setServiceAreas] = useState<any[]>([]);
   const [showServiceAreaMap, setShowServiceAreaMap] = useState(true);
   const [googleApiKey, setGoogleApiKey] = useState<string>('');
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [zipCodes, setZipCodes] = useState<string[]>([]);
-
-  // Track if we've already geocoded to prevent re-centering after initial load
-  const hasGeocodedRef = useRef(false);
-  // Track if we've passed the initial center to the map
-  const hasPassedCenterRef = useRef(false);
-  // Store the initial center to pass only once
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
 
   // Create stable callback for ServiceAreaMap to prevent infinite loop
   const handleAreasChange = useCallback((areas: any[]) => {
     setServiceAreas(areas);
   }, []);
-
-  // Geocode company address - wrapped in useCallback to match WidgetConfig
-  const geocodeCompanyAddress = useCallback(async (company: Company) => {
-    // Only geocode once per component mount
-    if (hasGeocodedRef.current) return;
-
-    try {
-      const coordinates = await getCompanyCoordinates(company);
-      setMapCenter({ lat: coordinates.lat, lng: coordinates.lng });
-      hasGeocodedRef.current = true; // Mark as geocoded
-
-      // Cache the result in widget_config if it's not already cached
-      if (!company.widget_config?.geocodedAddress) {
-        const cachedResult = createCachedGeocodeResult(coordinates);
-        // Update the company config to include the cached geocode result
-        try {
-          await adminAPI.updateCompany(company.id, {
-            widget_config: {
-              ...company.widget_config,
-              geocodedAddress: cachedResult,
-            },
-          });
-        } catch (error) {
-          console.error('Failed to cache geocoded address:', error);
-          // Non-critical error, don't block the UI
-        }
-      }
-    } catch (error) {
-      console.error('Error geocoding company address:', error);
-      // setMapCenter will remain null, ServiceAreaMap will use fallback
-    }
-  }, []);
-
-  // Set initial center only once when mapCenter is first available
-  useEffect(() => {
-    if (mapCenter && !hasPassedCenterRef.current) {
-      setInitialCenter(mapCenter);
-      hasPassedCenterRef.current = true;
-    }
-  }, [mapCenter]);
 
   // Fetch Google API key on mount
   useEffect(() => {
@@ -101,9 +54,6 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
 
   // Load service areas and geocode company address
   useEffect(() => {
-    // Reset flags when companyId changes
-    hasGeocodedRef.current = false;
-    hasPassedCenterRef.current = false;
     setInitialCenter(undefined);
 
     const loadData = async () => {
@@ -112,19 +62,41 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
       try {
         setLoading(true);
 
-        // Fetch company details using adminAPI (same as WidgetConfig)
-        const companies = await adminAPI.getCompanies();
+        // Fetch company details and service areas in parallel
+        const [companies, areasResponse] = await Promise.all([
+          adminAPI.getCompanies(),
+          fetch(`/api/service-areas/${companyId}`),
+        ]);
+
         const company = companies.find((c: Company) => c.id === companyId);
 
         if (company) {
-          // Geocode company address for map centering (only happens once per company)
-          geocodeCompanyAddress(company);
+          // Await geocoding so initialCenter is set before loading=false
+          const coordinates = await getCompanyCoordinates(company);
+          setInitialCenter({ lat: coordinates.lat, lng: coordinates.lng });
+
+          // Save to cache whenever the existing cache is missing, expired, or address-mismatched
+          const existingCache = company.widget_config?.geocodedAddress;
+          const cachedLower = existingCache?.address?.toLowerCase() ?? '';
+          const cacheNeedsUpdate =
+            !existingCache ||
+            !isCacheValid(existingCache) ||
+            (company.city && !cachedLower.includes(company.city.toLowerCase())) ||
+            (company.state && !cachedLower.includes(company.state.toLowerCase()));
+
+          if (cacheNeedsUpdate) {
+            const cachedResult = createCachedGeocodeResult(coordinates);
+            adminAPI.updateCompany(company.id, {
+              widget_config: { ...company.widget_config, geocodedAddress: cachedResult },
+            }).catch((err: unknown) => {
+              console.error('Failed to cache geocoded address:', err);
+            });
+          }
         }
 
-        // Load service areas
-        const response = await fetch(`/api/service-areas/${companyId}`);
-        if (response.ok) {
-          const data = await response.json();
+        // Process service areas response
+        if (areasResponse.ok) {
+          const data = await areasResponse.json();
           if (data.success) {
             const areas = data.serviceAreas || [];
             // Separate geographic areas from zip codes
@@ -146,7 +118,7 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
     };
 
     loadData();
-  }, [companyId, geocodeCompanyAddress]);
+  }, [companyId]);
 
   const saveServiceAreas = async (areas: any[]) => {
     try {

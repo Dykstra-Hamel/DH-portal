@@ -45,7 +45,7 @@ function buildAddressString(company: Company): string {
 /**
  * Check if cached geocode result is still valid
  */
-function isCacheValid(cachedResult: CachedGeocodeResult): boolean {
+export function isCacheValid(cachedResult: CachedGeocodeResult): boolean {
   const cachedTime = new Date(cachedResult.cachedAt).getTime();
   const now = Date.now();
   return (now - cachedTime) < CACHE_TIMEOUT_MS;
@@ -117,11 +117,15 @@ export async function getCompanyCoordinates(company: Company): Promise<GeocodeRe
   const cachedResult = company.widget_config?.geocodedAddress as CachedGeocodeResult | undefined;
   
   if (cachedResult && isCacheValid(cachedResult)) {
-    return {
-      lat: cachedResult.lat,
-      lng: cachedResult.lng,
-      address: cachedResult.address,
-    };
+    // Validate cached address still matches company city/state
+    const cachedLower = cachedResult.address.toLowerCase();
+    const cityMatch = !company.city || cachedLower.includes(company.city.toLowerCase());
+    const stateMatch = !company.state || cachedLower.includes(company.state.toLowerCase());
+
+    if (cityMatch && stateMatch) {
+      return { lat: cachedResult.lat, lng: cachedResult.lng, address: cachedResult.address };
+    }
+    // Address mismatch — fall through to re-geocode
   }
 
   // Build address string from company components

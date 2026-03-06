@@ -35,6 +35,8 @@ import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -114,6 +116,7 @@ export default function CompanyManagement({
 }: CompanyManagementProps) {
   const router = useRouter();
   const supabase = createClient();
+  const { setPageHeader } = usePageActions();
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -138,6 +141,25 @@ export default function CompanyManagement({
   useEffect(() => {
     loadCompany();
   }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!company) return;
+    setPageHeader({
+      title: company.name,
+      description: 'Company Management',
+      titleLeading: (
+        <button
+          type="button"
+          onClick={() => router.push('/admin')}
+          className={headerStyles.backButton}
+          aria-label="Back to Admin"
+        >
+          <ArrowLeft size={16} />
+        </button>
+      ),
+    });
+    return () => setPageHeader(null);
+  }, [company, setPageHeader, router]);
 
   const loadCompany = async () => {
     try {
@@ -208,8 +230,9 @@ export default function CompanyManagement({
       // Set websites for editing
       setWebsites(foundCompany.website || []);
       setAiContext(foundCompany.ai_context ?? '');
-      setBrandVoiceFormality(foundCompany.brand_voice_formality ?? 50);
-      setBrandVoiceHumor(foundCompany.brand_voice_humor ?? 50);
+      const snapToStep = (v: number) => Math.round(v / 25) * 25;
+      setBrandVoiceFormality(snapToStep(foundCompany.brand_voice_formality ?? 50));
+      setBrandVoiceHumor(snapToStep(foundCompany.brand_voice_humor ?? 50));
       setWordsNotToUse(foundCompany.words_not_to_use ?? []);
     } catch (error) {
       console.error('Error loading company:', error);
@@ -557,20 +580,6 @@ export default function CompanyManagement({
 
   return (
     <div className={styles.companyManagement}>
-      <div className={styles.header}>
-        <button
-          onClick={() => router.push('/admin')}
-          className={styles.backButton}
-        >
-          <ArrowLeft size={16} />
-          Back to Admin
-        </button>
-        <div className={styles.companyTitle}>
-          <h1>{company.name}</h1>
-          <p>Company Management</p>
-        </div>
-      </div>
-
       {error && (
         <div className={styles.errorMessage}>
           <strong>Error:</strong> {error}
@@ -1479,6 +1488,22 @@ function LoginPageSection({
   );
 }
 
+const getFormalityLabel = (v: number) => {
+  if (v <= 12) return 'Very Casual';
+  if (v <= 37) return 'Casual';
+  if (v <= 62) return 'Balanced';
+  if (v <= 87) return 'Formal';
+  return 'Very Formal';
+};
+
+const getHumorLabel = (v: number) => {
+  if (v <= 12) return 'Very Serious';
+  if (v <= 37) return 'Serious';
+  if (v <= 62) return 'Balanced';
+  if (v <= 87) return 'Funny';
+  return 'Very Funny';
+};
+
 interface AiContentSectionProps {
   aiContext: string;
   onAiContextChange: (v: string) => void;
@@ -1562,12 +1587,14 @@ function AiContentSection({
                 type="range"
                 min={0}
                 max={100}
+                step={25}
                 value={brandVoiceFormality}
                 onChange={e => onFormalityChange(Number(e.target.value))}
                 disabled={saving}
               />
               <span>Formal</span>
             </div>
+            <p className={styles.sliderValueLabel}>{getFormalityLabel(brandVoiceFormality)}</p>
           </div>
           <div className={styles.voiceSlider}>
             <span className={styles.sliderLabel}>Tone</span>
@@ -1577,12 +1604,14 @@ function AiContentSection({
                 type="range"
                 min={0}
                 max={100}
+                step={25}
                 value={brandVoiceHumor}
                 onChange={e => onHumorChange(Number(e.target.value))}
                 disabled={saving}
               />
               <span>Funny</span>
             </div>
+            <p className={styles.sliderValueLabel}>{getHumorLabel(brandVoiceHumor)}</p>
           </div>
         </div>
 
