@@ -7,6 +7,7 @@ export interface ContentPieceCalendarItem {
   title: string | null;
   publish_date: string | null;
   link: string | null;
+  topic: string | null;
   task_id: string | null;
   is_completed: boolean;
   is_planned: false;
@@ -116,11 +117,13 @@ export async function GET(request: NextRequest) {
         title,
         publish_date,
         link,
+        topic,
         service_month,
         project_tasks!task_id ( is_completed, due_date ),
         social_media_task:project_tasks!social_media_task_id ( is_completed )
       `)
-      .in('monthly_service_id', serviceIds);
+      .in('monthly_service_id', serviceIds)
+      .order('created_at', { ascending: true });
 
     if (piecesError) {
       console.error('Error fetching content pieces for calendar:', piecesError);
@@ -153,6 +156,7 @@ export async function GET(request: NextRequest) {
         title: piece.title,
         publish_date: piece.publish_date,
         link: piece.link,
+        topic: (piece as any).topic,
         task_id: piece.task_id,
         is_completed: (() => {
           const socialTask = (piece as any).social_media_task;

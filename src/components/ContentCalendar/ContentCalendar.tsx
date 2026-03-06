@@ -40,6 +40,7 @@ interface ContentPieceCalendarItem {
   title: string | null;
   publish_date: string | null;
   link: string | null;
+  topic: string | null;
   task_id: string | null;
   is_completed: boolean;
   is_planned: false;
@@ -87,6 +88,7 @@ export function ContentCalendar() {
   const [editTitle, setEditTitle] = useState('');
   const [editPublishDate, setEditPublishDate] = useState('');
   const [editLink, setEditLink] = useState('');
+  const [editTopic, setEditTopic] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
   const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
@@ -136,6 +138,11 @@ export function ContentCalendar() {
     setEditLink(
       !item.is_planned && (item as ContentPieceCalendarItem).link
         ? (item as ContentPieceCalendarItem).link!
+        : ''
+    );
+    setEditTopic(
+      !item.is_planned && (item as ContentPieceCalendarItem).topic
+        ? (item as ContentPieceCalendarItem).topic!
         : ''
     );
   }, [popover]);
@@ -307,6 +314,7 @@ export function ContentCalendar() {
         title: editTitle || null,
         publish_date: editPublishDate || null,
         link: editLink || null,
+        topic: editTopic || null,
       };
 
       let savedPiece: ContentPieceCalendarItem | null = null;
@@ -344,6 +352,7 @@ export function ContentCalendar() {
             title: data.contentPiece.title,
             publish_date: data.contentPiece.publish_date,
             link: data.contentPiece.link,
+            topic: data.contentPiece.topic,
             task_id: data.contentPiece.task_id,
             is_completed: false,
             is_planned: false as const,
@@ -442,6 +451,15 @@ export function ContentCalendar() {
             <option value="pest_id">Pest ID</option>
             <option value="other">Other</option>
           </select>
+
+          <label className={styles.fieldLabel}>Topic</label>
+          <input
+            type="text"
+            className={styles.fieldInput}
+            value={editTopic}
+            onChange={e => setEditTopic(e.target.value)}
+            placeholder="Content topic..."
+          />
 
           <label className={styles.fieldLabel}>Title</label>
           <input

@@ -32,7 +32,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { content_type, title, publish_date, link } = body;
+    const { content_type, title, publish_date, link, topic } = body;
 
     if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
       return NextResponse.json({ error: 'Invalid content_type' }, { status: 400 });
@@ -43,6 +43,7 @@ export async function PATCH(
     if ('title' in body) updateData.title = title || null;
     if ('publish_date' in body) updateData.publish_date = publish_date || null;
     if ('link' in body) updateData.link = link || null;
+    if ('topic' in body) updateData.topic = topic || null;
 
     const { data: contentPiece, error: updateError } = await supabase
       .from('monthly_service_content_pieces')
