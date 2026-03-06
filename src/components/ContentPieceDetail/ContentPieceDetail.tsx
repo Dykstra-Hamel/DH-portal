@@ -281,7 +281,11 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
     setSelectedTask(updated);
 
     if ('is_completed' in updates) {
-      onPieceUpdate({ ...contentPiece, task_is_completed: updated.is_completed });
+      if (taskId === contentPiece.task_id) {
+        onPieceUpdate({ ...contentPiece, task_is_completed: updated.is_completed });
+      } else if (taskId === contentPiece.social_media_task_id) {
+        onPieceUpdate({ ...contentPiece, social_media_task_is_completed: updated.is_completed });
+      }
     }
   };
 
