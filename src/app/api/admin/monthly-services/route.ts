@@ -54,13 +54,18 @@ export async function GET(request: NextRequest) {
         )
       `
       )
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .eq('is_active', true);
 
     if (servicesError) {
       console.error('Error fetching services:', servicesError);
       return NextResponse.json({ error: 'Failed to fetch services' }, { status: 500 });
     }
+
+    services.sort((a, b) => {
+      const nameA = (a.companies as any)?.name ?? '';
+      const nameB = (b.companies as any)?.name ?? '';
+      return nameA.localeCompare(nameB);
+    });
 
     // For each service, fetch task templates and generated tasks for the month
     const servicesWithProgress = await Promise.all(
