@@ -200,7 +200,7 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     newAreaNameRef.current = '';
     newAreaPriorityRef.current = 0;
     setDrawingMode(null);
-    // Keep isCreatingArea true so form stays visible for next area
+    setIsCreatingArea(false);
   }, []);
 
   const handleCircleComplete = useCallback((circle: google.maps.Circle) => {
@@ -237,7 +237,7 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
     newAreaNameRef.current = '';
     newAreaPriorityRef.current = 0;
     setDrawingMode(null);
-    // Keep isCreatingArea true so form stays visible for next area
+    setIsCreatingArea(false);
   }, []);
 
   const onLoad = useCallback(
@@ -457,12 +457,7 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
                     newAreaNameRef.current = e.target.value;
                   }}
                   placeholder="Enter area name"
-                  className={!newAreaName.trim() && drawingMode === null ? styles.error : ''}
-                  required
                 />
-                {!newAreaName.trim() && drawingMode === null && (
-                  <span className={styles.fieldError}>Area name is required</span>
-                )}
               </div>
 
               <div className={styles.formGroup}>
@@ -484,13 +479,11 @@ const ServiceAreaMap: React.FC<ServiceAreaMapProps> = ({
                 <p className={styles.instruction}>
                   {drawingMode === 'polygon'
                     ? 'Click on the map to draw a polygon area'
-                    : drawingMode === 'radius'
-                      ? 'Click on the map to place the circle center, then drag to set the radius'
-                      : 'Ready to draw another area, or click "Save Service Areas" below when finished.'}
+                    : 'Click on the map to place the circle center, then drag to set the radius'}
                 </p>
                 
                 <button onClick={cancelDrawing} className={styles.cancelButton}>
-                  Done Adding Areas
+                  Cancel
                 </button>
               </div>
             </div>

@@ -510,6 +510,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           };
         }
 
+        // Show lower header for company detail pages
+        if (pathname.match(/^\/admin\/companies\/[^\/]+$/)) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
+              description: pageHeader.description,
+              showAddButton: false,
+            };
+          }
+          return null;
+        }
+
         return {
           title: 'Page',
           description: 'Welcome to this section of the application.',
