@@ -183,7 +183,8 @@
 
 // Content type badges
 .badge {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 4px;
   padding: 3px 7px;
@@ -194,7 +195,7 @@
   background-color: var(--badge-color, #6b7280);
   border: none;
   cursor: pointer;
-  margin: 2px 2px 2px 0;
+  margin: 2px 0;
   transition: opacity 0.15s ease;
   line-height: 1.4;
 

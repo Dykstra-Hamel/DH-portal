@@ -1318,3 +1318,17 @@
   color: #78350f;
   margin-top: 8px;
 }
+
+.contentPieceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary, #2563eb);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}

@@ -123,6 +123,7 @@ export async function GET(request: NextRequest) {
         social_media_task:project_tasks!social_media_task_id ( is_completed )
       `)
       .in('monthly_service_id', serviceIds)
+      .order('sort_order', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
 
     if (piecesError) {
