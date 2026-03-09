@@ -231,7 +231,8 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
 
     if (taskRes.ok) {
       const taskData = await taskRes.json();
-      setSelectedTask(taskData.task ?? taskData);
+      const task = taskData.task ?? taskData;
+      setSelectedTask({ ...task, monthly_service_id: contentPiece.monthly_service_id });
     }
     if (usersRes.ok) {
       const usersData = await usersRes.json();
@@ -257,7 +258,8 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
 
     if (taskRes.ok) {
       const taskData = await taskRes.json();
-      setSelectedTask(taskData.task ?? taskData);
+      const task = taskData.task ?? taskData;
+      setSelectedTask({ ...task, monthly_service_id: contentPiece.monthly_service_id });
     }
     if (usersRes.ok) setUsers(await usersRes.json());
     if (depsRes.ok) {
@@ -960,6 +962,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
           isStarred={taskId => isStarred('task', taskId)}
           monthlyServiceDepartments={departments}
           mentionUsers={mentionUsers}
+          hideContentPieceLink
         />
       )}
 

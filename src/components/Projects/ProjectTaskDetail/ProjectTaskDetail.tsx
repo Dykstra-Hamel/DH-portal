@@ -76,6 +76,7 @@ interface ProjectTaskDetailProps {
   mentionUsers?: MentionUser[]; // Users available for @mentions
   currentUserId?: string; // Current user's ID for checking comment ownership
   onTaskCommentMentionsRead?: (commentIds: string[]) => void;
+  hideContentPieceLink?: boolean;
 }
 
 type UploadProgressState = {
@@ -110,6 +111,7 @@ export default function ProjectTaskDetail({
   mentionUsers,
   currentUserId,
   onTaskCommentMentionsRead,
+  hideContentPieceLink,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -1532,7 +1534,7 @@ export default function ProjectTaskDetail({
                         placeholder="https://..."
                       />
                     </div>
-                    {contentPieceId && (
+                    {contentPieceId && !hideContentPieceLink && (
                       <div className={styles.detailItemFullWidth}>
                         <a
                           href={`/admin/content-pieces/${contentPieceId}`}
@@ -1540,6 +1542,17 @@ export default function ProjectTaskDetail({
                         >
                           <ExternalLink size={13} />
                           View full content piece
+                        </a>
+                      </div>
+                    )}
+                    {hideContentPieceLink && (task as any)?.monthly_service_id && (
+                      <div className={styles.detailItemFullWidth}>
+                        <a
+                          href={`/admin/monthly-services/${(task as any).monthly_service_id}`}
+                          className={styles.contentPieceLink}
+                        >
+                          <ExternalLink size={13} />
+                          View monthly service
                         </a>
                       </div>
                     )}

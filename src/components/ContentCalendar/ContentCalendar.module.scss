@@ -220,25 +220,12 @@
   line-height: 1;
 }
 
-// Popover
-.popover {
-  position: absolute;
-  z-index: 1000;
-  width: 280px;
-  background: white;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-  padding: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.popoverHeader {
+// Modal content header
+.modalHeader {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 16px;
 }
 
 .popoverTypeBadge {
@@ -275,7 +262,7 @@
 }
 
 // Edit form fields
-.popoverFields {
+.modalFields {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -312,13 +299,7 @@
   }
 }
 
-// Action buttons
-.popoverActions {
-  display: flex;
-  gap: 8px;
-  border-top: 1px solid #f3f4f6;
-  padding-top: 10px;
-}
+// Action buttons (inside ModalBottom)
 
 .saveBtn {
   flex: 1;
@@ -440,6 +421,10 @@
     font-size: 13px;
     color: #374151;
   }
+}
+
+.monthRowCompleted {
+  background-color: var(--action-50);
 }
 
 .monthRowPlanned {

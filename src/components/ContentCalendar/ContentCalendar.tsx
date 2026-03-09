@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
 import type { FilterOption } from '@/components/Common/FilterPanel/FilterPanel';
+import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import styles from './ContentCalendar.module.scss';
 
 const MONTHS = [
@@ -68,7 +69,6 @@ interface PopoverState {
   serviceId: string;
   monthKey: string;
   itemIndex: number;
-  anchorRect: DOMRect;
 }
 
 export function ContentCalendar() {
@@ -77,10 +77,9 @@ export function ContentCalendar() {
   const [services, setServices] = useState<ServiceCalendarRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [popover, setPopover] = useState<PopoverState | null>(null);
-  const popoverRef = useRef<HTMLDivElement>(null);
 
   type CalendarView = 'year' | 'month';
-  const [view, setView] = useState<CalendarView>('year');
+  const [view, setView] = useState<CalendarView>('month');
   const [activeMonth, setActiveMonth] = useState<number>(() => new Date().getMonth() + 1); // 1–12
 
   // Editable field state for the popover
@@ -147,18 +146,6 @@ export function ContentCalendar() {
     );
   }, [popover]);
 
-  // Close popover on outside click
-  useEffect(() => {
-    if (!popover) return;
-    const handleClick = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        setPopover(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
-  }, [popover]);
-
   const handleBadgeClick = (
     e: React.MouseEvent,
     item: CalendarItem,
@@ -167,8 +154,7 @@ export function ContentCalendar() {
     itemIndex: number
   ) => {
     e.stopPropagation();
-    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
-    setPopover({ item, serviceId, monthKey, itemIndex, anchorRect: rect });
+    setPopover({ item, serviceId, monthKey, itemIndex });
   };
 
   const navigateMonth = (direction: 1 | -1) => {
@@ -245,7 +231,7 @@ export function ContentCalendar() {
       }).filter(service => Object.values(service.months).some(items => items.length > 0));
     }
 
-    return result;
+    return result.sort((a, b) => a.service_name.localeCompare(b.service_name));
   }, [services, filterCompanyId, filterContentType, filterStatus]);
 
   const handleClearAllFilters = useCallback(() => {
@@ -299,6 +285,7 @@ export function ContentCalendar() {
       const items = service.months[monthKey] || [];
       items.forEach((item, itemIndex) => rows.push({ item, service, monthKey, itemIndex }));
     }
+    rows.sort((a, b) => a.service.company_name.localeCompare(b.service.company_name));
     return rows;
   }, [view, filteredServices, year, activeMonth]);
 
@@ -405,90 +392,92 @@ export function ContentCalendar() {
 
   const renderPopover = () => {
     if (!popover) return null;
-    const { item, anchorRect } = popover;
+    const { item } = popover;
     const isPlanned = item.is_planned;
     const currentColor = editContentType
       ? CONTENT_TYPE_COLORS[editContentType] ?? '#6b7280'
       : '#6b7280';
 
-    const top = anchorRect.bottom + window.scrollY + 8;
-    const left = Math.min(anchorRect.left + window.scrollX, window.innerWidth - 300);
-
     return (
-      <div ref={popoverRef} className={styles.popover} style={{ top, left }}>
-        <div className={styles.popoverHeader}>
-          <span
-            className={styles.popoverTypeBadge}
-            style={{ background: currentColor }}
-          >
-            {editContentType ? CONTENT_TYPE_LABELS[editContentType] ?? editContentType : 'Unknown'}
-          </span>
-          {isPlanned && <span className={styles.popoverPlannedTag}>Planned</span>}
-          {!isPlanned && (item as ContentPieceCalendarItem).id && (
-            <Link
-              href={`/admin/content-pieces/${(item as ContentPieceCalendarItem).id}`}
-              className={styles.viewDetailsBtn}
-              title="View full details"
+      <Modal isOpen={!!popover} onClose={() => setPopover(null)} size="small">
+        <ModalTop
+          title={isPlanned ? 'Planned Content' : 'Edit Content'}
+          onClose={() => setPopover(null)}
+        />
+        <ModalMiddle>
+          <div className={styles.modalHeader}>
+            <span
+              className={styles.popoverTypeBadge}
+              style={{ background: currentColor }}
             >
-              <ExternalLink size={14} />
-            </Link>
-          )}
-        </div>
+              {editContentType ? CONTENT_TYPE_LABELS[editContentType] ?? editContentType : 'Unknown'}
+            </span>
+            {isPlanned && <span className={styles.popoverPlannedTag}>Planned</span>}
+            {!isPlanned && (item as ContentPieceCalendarItem).id && (
+              <Link
+                href={`/admin/content-pieces/${(item as ContentPieceCalendarItem).id}`}
+                className={styles.viewDetailsBtn}
+                title="View full details"
+              >
+                <ExternalLink size={14} />
+              </Link>
+            )}
+          </div>
 
-        <div className={styles.popoverFields}>
-          <label className={styles.fieldLabel}>Content Type</label>
-          <select
-            className={styles.fieldSelect}
-            value={editContentType}
-            onChange={e => setEditContentType(e.target.value)}
-          >
-            <option value="">Select type...</option>
-            <option value="blog">Blog</option>
-            <option value="evergreen">Evergreen</option>
-            <option value="location">Location</option>
-            <option value="pillar">Pillar</option>
-            <option value="cluster">Cluster</option>
-            <option value="pest_id">Pest ID</option>
-            <option value="other">Other</option>
-          </select>
+          <div className={styles.modalFields}>
+            <label className={styles.fieldLabel}>Content Type</label>
+            <select
+              className={styles.fieldSelect}
+              value={editContentType}
+              onChange={e => setEditContentType(e.target.value)}
+            >
+              <option value="">Select type...</option>
+              <option value="blog">Blog</option>
+              <option value="evergreen">Evergreen</option>
+              <option value="location">Location</option>
+              <option value="pillar">Pillar</option>
+              <option value="cluster">Cluster</option>
+              <option value="pest_id">Pest ID</option>
+              <option value="other">Other</option>
+            </select>
 
-          <label className={styles.fieldLabel}>Topic</label>
-          <input
-            type="text"
-            className={styles.fieldInput}
-            value={editTopic}
-            onChange={e => setEditTopic(e.target.value)}
-            placeholder="Content topic..."
-          />
+            <label className={styles.fieldLabel}>Topic</label>
+            <input
+              type="text"
+              className={styles.fieldInput}
+              value={editTopic}
+              onChange={e => setEditTopic(e.target.value)}
+              placeholder="Content topic..."
+            />
 
-          <label className={styles.fieldLabel}>Title</label>
-          <input
-            type="text"
-            className={styles.fieldInput}
-            value={editTitle}
-            onChange={e => setEditTitle(e.target.value)}
-            placeholder="Content title..."
-          />
+            <label className={styles.fieldLabel}>Title</label>
+            <input
+              type="text"
+              className={styles.fieldInput}
+              value={editTitle}
+              onChange={e => setEditTitle(e.target.value)}
+              placeholder="Content title..."
+            />
 
-          <label className={styles.fieldLabel}>Publish Date</label>
-          <input
-            type="date"
-            className={styles.fieldInput}
-            value={editPublishDate}
-            onChange={e => setEditPublishDate(e.target.value)}
-          />
+            <label className={styles.fieldLabel}>Publish Date</label>
+            <input
+              type="date"
+              className={styles.fieldInput}
+              value={editPublishDate}
+              onChange={e => setEditPublishDate(e.target.value)}
+            />
 
-          <label className={styles.fieldLabel}>Link</label>
-          <input
-            type="url"
-            className={styles.fieldInput}
-            value={editLink}
-            onChange={e => setEditLink(e.target.value)}
-            placeholder="https://..."
-          />
-        </div>
-
-        <div className={styles.popoverActions}>
+            <label className={styles.fieldLabel}>Link</label>
+            <input
+              type="url"
+              className={styles.fieldInput}
+              value={editLink}
+              onChange={e => setEditLink(e.target.value)}
+              placeholder="https://..."
+            />
+          </div>
+        </ModalMiddle>
+        <ModalBottom>
           <button
             className={styles.saveBtn}
             onClick={handleSave}
@@ -502,8 +491,8 @@ export function ContentCalendar() {
           >
             Cancel
           </button>
-        </div>
-      </div>
+        </ModalBottom>
+      </Modal>
     );
   };
 
@@ -631,7 +620,7 @@ export function ContentCalendar() {
                   return (
                     <tr
                       key={rowKey}
-                      className={`${styles.monthRow} ${isPlanned ? styles.monthRowPlanned : ''}`}
+                      className={`${styles.monthRow} ${isPlanned ? styles.monthRowPlanned : ''} ${isCompleted ? styles.monthRowCompleted : ''}`}
                       onClick={e => handleBadgeClick(e, item, service.id, monthKey, itemIndex)}
                     >
                       <td className={styles.cellCompany}>{service.company_name}</td>
