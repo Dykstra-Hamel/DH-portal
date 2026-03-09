@@ -195,11 +195,13 @@ export async function generateTasksForMonth(
     }
 
     const departmentAssignments: { task_id: string; department_id: string }[] = [];
-    const pieceLinksToUpdate: { id: string; task_id: string }[] = [];
-    const newContentPieces: { monthly_service_id: string; task_id: string; content_type: string | null; service_month: string }[] = [];
-    const unmatchedContentTasks: { task: { id: string }; template: TaskTemplate }[] = [];
+    const pieceLinksToUpdate: { id: string; task_id: string; sort_order: number }[] = [];
+    const newContentPieces: { monthly_service_id: string; task_id: string; content_type: string | null; service_month: string; sort_order: number }[] = [];
+    const unmatchedContentTasks: { task: { id: string }; template: TaskTemplate; sort_order: number }[] = [];
 
     // Build department assignments; Pass 1: typed matches for Content-dept tasks
+    let contentTaskSortOrder = 0;
+
     createdTasks.forEach((task, index) => {
       const template = templates[index];
       if (template.department_id) {
@@ -210,6 +212,8 @@ export async function generateTasksForMonth(
 
         // For Content-department tasks, link an existing unlinked piece or create a new one
         if (contentDeptId && template.department_id === contentDeptId) {
+          contentTaskSortOrder++;
+          const sortOrder = contentTaskSortOrder;
           const contentType = template.content_type || null;
           let matched = false;
 
@@ -218,7 +222,7 @@ export async function generateTasksForMonth(
             while (available.length > 0) {
               const id = available.shift()!;
               if (!claimedIds.has(id)) {
-                pieceLinksToUpdate.push({ id, task_id: task.id });
+                pieceLinksToUpdate.push({ id, task_id: task.id, sort_order: sortOrder });
                 claimedIds.add(id);
                 matched = true;
                 break;
@@ -227,7 +231,7 @@ export async function generateTasksForMonth(
           }
 
           if (!matched) {
-            unmatchedContentTasks.push({ task, template });
+            unmatchedContentTasks.push({ task, template, sort_order: sortOrder });
           }
         }
       }
@@ -235,10 +239,10 @@ export async function generateTasksForMonth(
 
     // Pass 2: generic fallback — assign unmatched tasks to any remaining unlinked pieces
     const remainingPool = allUnlinkedIds.filter(id => !claimedIds.has(id));
-    for (const { task, template } of unmatchedContentTasks) {
+    for (const { task, template, sort_order } of unmatchedContentTasks) {
       if (remainingPool.length > 0) {
         const id = remainingPool.shift()!;
-        pieceLinksToUpdate.push({ id, task_id: task.id });
+        pieceLinksToUpdate.push({ id, task_id: task.id, sort_order });
       } else {
         // Pass 3: no unlinked piece available — create a new one
         newContentPieces.push({
@@ -246,6 +250,7 @@ export async function generateTasksForMonth(
           task_id: task.id,
           content_type: template.content_type || null,
           service_month: targetMonth,
+          sort_order,
         });
       }
     }
@@ -264,10 +269,10 @@ export async function generateTasksForMonth(
     // Link existing unlinked pieces to their matched tasks
     if (pieceLinksToUpdate.length > 0) {
       await Promise.all(
-        pieceLinksToUpdate.map(({ id, task_id }) =>
+        pieceLinksToUpdate.map(({ id, task_id, sort_order }) =>
           supabase
             .from('monthly_service_content_pieces')
-            .update({ task_id })
+            .update({ task_id, sort_order })
             .eq('id', id)
         )
       );

@@ -37,6 +37,7 @@ export async function GET(
       .from('monthly_service_content_pieces')
       .select('*')
       .eq('monthly_service_id', id)
+      .order('sort_order', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
 
     if (taskId) {
@@ -85,7 +86,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { content_type, title, publish_date, link, task_id, service_month } = body;
+    const { content_type, title, publish_date, link, task_id, service_month, topic } = body;
 
     if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
       return NextResponse.json({ error: 'Invalid content_type' }, { status: 400 });
@@ -100,6 +101,7 @@ export async function POST(
         title: title || null,
         publish_date: publish_date || null,
         link: link || null,
+        topic: topic || null,
         service_month: service_month || null,
         created_by: user.id,
       })

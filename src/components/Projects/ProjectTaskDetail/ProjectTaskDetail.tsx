@@ -19,6 +19,7 @@ import {
   Lock,
   AlertCircle,
   Layers,
+  ExternalLink,
 } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
@@ -153,6 +154,9 @@ export default function ProjectTaskDetail({
   const [contentPieceId, setContentPieceId] = useState<string | null>(null);
   const [contentType, setContentType] = useState<string>('');
   const [isUpdatingContentType, setIsUpdatingContentType] = useState(false);
+  const [contentPieceTopicDraft, setContentPieceTopicDraft] = useState<string>('');
+  const [contentPieceTitleDraft, setContentPieceTitleDraft] = useState<string>('');
+  const [contentPieceLinkDraft, setContentPieceLinkDraft] = useState<string>('');
   const [departmentDraft, setDepartmentDraft] = useState(
     task?.department_id || ''
   );
@@ -321,6 +325,9 @@ export default function ProjectTaskDetail({
       setMonthlyServiceDepartmentId('');
       setContentPieceId(null);
       setContentType('');
+      setContentPieceTopicDraft('');
+      setContentPieceTitleDraft('');
+      setContentPieceLinkDraft('');
     }
     setParentTaskDraft(task.parent_task_id || '');
     setIsActivityCollapsed(true);
@@ -354,6 +361,9 @@ export default function ProjectTaskDetail({
         const piece = data.contentPieces?.[0] || null;
         setContentPieceId(piece?.id || null);
         setContentType(piece?.content_type || '');
+        setContentPieceTopicDraft(piece?.topic || '');
+        setContentPieceTitleDraft(piece?.title || '');
+        setContentPieceLinkDraft(piece?.link || '');
       }
     } catch (error) {
       console.error('Error fetching content piece:', error);
@@ -403,6 +413,47 @@ export default function ProjectTaskDetail({
       setContentType(previousType);
     } finally {
       setIsUpdatingContentType(false);
+    }
+  };
+
+  const handleContentPieceFieldSave = async (
+    field: 'topic' | 'title' | 'link',
+    value: string
+  ) => {
+    if (!task) return;
+    const monthlyServiceId = (task as any).monthly_service_id;
+    if (!monthlyServiceId) return;
+    // Nothing to save and no record to create
+    if (!value && !contentPieceId) return;
+
+    try {
+      if (!contentPieceId) {
+        // No content piece yet — create one with this field value included
+        const response = await fetch(
+          `/api/admin/monthly-services/${monthlyServiceId}/content`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ task_id: task.id, [field]: value }),
+          }
+        );
+        if (!response.ok) throw new Error('Failed to create content piece');
+        const data = await response.json();
+        const newId = data.contentPiece?.id || null;
+        if (newId) setContentPieceId(newId);
+      } else {
+        // Existing content piece — just PATCH the field
+        await fetch(
+          `/api/admin/monthly-services/${monthlyServiceId}/content/${contentPieceId}`,
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ [field]: value || null }),
+          }
+        );
+      }
+    } catch (error) {
+      console.error(`Error saving content piece ${field}:`, error);
     }
   };
 
@@ -1441,6 +1492,58 @@ export default function ProjectTaskDetail({
                       <option value="other">Other</option>
                     </select>
                   </div>
+                )}
+
+              {(task as any)?.monthly_service_id &&
+                monthlyServiceDepartments.find(
+                  d => d.id === monthlyServiceDepartmentId && d.name === 'Content'
+                ) && (
+                  <>
+                    <div className={styles.detailItem}>
+                      <div className={styles.detailLabel}>Topic</div>
+                      <input
+                        type="text"
+                        className={styles.editInput}
+                        value={contentPieceTopicDraft}
+                        onChange={e => setContentPieceTopicDraft(e.target.value)}
+                        onBlur={() => handleContentPieceFieldSave('topic', contentPieceTopicDraft)}
+                        placeholder="Enter topic..."
+                      />
+                    </div>
+                    <div className={styles.detailItem}>
+                      <div className={styles.detailLabel}>Title</div>
+                      <input
+                        type="text"
+                        className={styles.editInput}
+                        value={contentPieceTitleDraft}
+                        onChange={e => setContentPieceTitleDraft(e.target.value)}
+                        onBlur={() => handleContentPieceFieldSave('title', contentPieceTitleDraft)}
+                        placeholder="Enter title..."
+                      />
+                    </div>
+                    <div className={styles.detailItemFullWidth}>
+                      <div className={styles.detailLabel}>URL</div>
+                      <input
+                        type="text"
+                        className={styles.editInput}
+                        value={contentPieceLinkDraft}
+                        onChange={e => setContentPieceLinkDraft(e.target.value)}
+                        onBlur={() => handleContentPieceFieldSave('link', contentPieceLinkDraft)}
+                        placeholder="https://..."
+                      />
+                    </div>
+                    {contentPieceId && (
+                      <div className={styles.detailItemFullWidth}>
+                        <a
+                          href={`/admin/content-pieces/${contentPieceId}`}
+                          className={styles.contentPieceLink}
+                        >
+                          <ExternalLink size={13} />
+                          View full content piece
+                        </a>
+                      </div>
+                    )}
+                  </>
                 )}
 
               <div className={styles.detailItem}>
