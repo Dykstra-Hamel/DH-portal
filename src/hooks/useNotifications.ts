@@ -442,6 +442,9 @@ export function useNotifications() {
             router.push('/admin/monthly-services');
           }
           break;
+        case 'monthly_service':
+          router.push(`/admin/monthly-services/${notification.reference_id}`);
+          break;
         case 'proof':
           try {
             const response = await fetch(

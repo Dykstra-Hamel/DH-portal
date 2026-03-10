@@ -50,6 +50,7 @@ interface ContentPiece {
   publish_date: string | null;
   link: string | null;
   notes: string | null;
+  google_doc_link: string | null;
   topic: string | null;
   ai_topics:    { items: string[]; prompt: string; generated_at: string } | null;
   ai_headlines: { items: string[]; prompt: string; generated_at: string } | null;
@@ -98,6 +99,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
   const [editTopic, setEditTopic] = useState(contentPiece.topic || '');
   const [editPublishDate, setEditPublishDate] = useState(contentPiece.publish_date || '');
   const [editLink, setEditLink] = useState(contentPiece.link || '');
+  const [editGoogleDocLink, setEditGoogleDocLink] = useState<string>(contentPiece.google_doc_link ?? '');
   const [editNotes, setEditNotes] = useState(contentPiece.notes || '');
   const [editContent, setEditContent] = useState<string>(contentPiece.content || '');
   const [isContentDirty, setIsContentDirty] = useState(false);
@@ -186,6 +188,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
           topic: editTopic || null,
           publish_date: editPublishDate || null,
           link: editLink || null,
+          google_doc_link: editGoogleDocLink || null,
           notes: editNotes || null,
           content: editContent || null,
         }),
@@ -272,6 +275,17 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
 
   const handleUpdateTask = async (taskId: string, updates: Partial<ProjectTask>) => {
     const headers = await getAuthHeaders();
+
+    // When called with empty updates (used as a refresh signal after comment ops),
+    // fetch the full task via GET so comments are included in the response.
+    if (Object.keys(updates).length === 0) {
+      const res = await fetch(`/api/admin/tasks/${taskId}`, { method: 'GET', headers });
+      if (!res.ok) return;
+      const data = await res.json();
+      setSelectedTask(data.task ?? data);
+      return;
+    }
+
     const res = await fetch(`/api/admin/tasks/${taskId}`, {
       method: 'PATCH',
       headers,
@@ -301,7 +315,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
     });
     if (!res.ok) return null;
     const data = await res.json();
-    return data.comment ?? data;
+    return data;
   };
 
   const handleUpdateProgress = async (progress: number) => {
@@ -638,6 +652,17 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                 value={editLink}
                 onChange={e => setEditLink(e.target.value)}
                 placeholder="https://..."
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Google Doc Link</label>
+              <input
+                type="url"
+                className={styles.input}
+                value={editGoogleDocLink}
+                onChange={e => setEditGoogleDocLink(e.target.value)}
+                placeholder="https://docs.google.com/..."
               />
             </div>
 

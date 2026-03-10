@@ -13,7 +13,8 @@ export interface Notification {
     | 'new_support_case_unassigned'
     | 'new_support_case_assigned'
     | 'mention'
-    | 'proof_feedback';
+    | 'proof_feedback'
+    | 'task_reassignment';
   title: string;
   message: string;
   reference_id?: string;
@@ -26,7 +27,8 @@ export interface Notification {
     | 'project_comment'
     | 'task_comment'
     | 'monthly_service_comment'
-    | 'proof';
+    | 'proof'
+    | 'monthly_service';
   assigned_to?: string;
   read: boolean;
   created_at: string;

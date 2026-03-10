@@ -43,7 +43,7 @@ export async function GET(
           is_completed,
           due_date,
           assigned_to,
-          profiles:assigned_to ( id, first_name, last_name )
+          profiles:assigned_to ( id, first_name, last_name, email, avatar_url )
         ),
         social_media_task:project_tasks!social_media_task_id (
           id,
@@ -51,7 +51,7 @@ export async function GET(
           is_completed,
           due_date,
           assigned_to,
-          profiles:assigned_to ( id, first_name, last_name )
+          profiles:assigned_to ( id, first_name, last_name, email, avatar_url )
         )
       `)
       .eq('id', id)
@@ -74,6 +74,7 @@ export async function GET(
       publish_date: piece.publish_date,
       link: piece.link,
       notes: piece.notes ?? null,
+      google_doc_link: (piece as any).google_doc_link ?? null,
       topic: (piece as any).topic ?? null,
       ai_topics:    (piece as any).ai_topics    ?? null,
       ai_headlines: (piece as any).ai_headlines ?? null,
@@ -94,6 +95,8 @@ export async function GET(
       task_assignee_name: task?.profiles
         ? `${(task.profiles as any).first_name ?? ''} ${(task.profiles as any).last_name ?? ''}`.trim() || null
         : null,
+      task_assignee_email: task?.profiles ? (task.profiles as any).email ?? null : null,
+      task_assignee_avatar_url: task?.profiles ? (task.profiles as any).avatar_url ?? null : null,
       social_media_task_id: (piece as any).social_media_task_id ?? null,
       social_media_task_title: socialTask?.title ?? null,
       social_media_task_is_completed: socialTask?.is_completed ?? null,
@@ -102,6 +105,8 @@ export async function GET(
       social_media_task_assignee_name: socialTask?.profiles
         ? `${(socialTask.profiles as any).first_name ?? ''} ${(socialTask.profiles as any).last_name ?? ''}`.trim() || null
         : null,
+      social_media_task_assignee_email: socialTask?.profiles ? (socialTask.profiles as any).email ?? null : null,
+      social_media_task_assignee_avatar_url: socialTask?.profiles ? (socialTask.profiles as any).avatar_url ?? null : null,
     };
 
     return NextResponse.json({ contentPiece: result });
@@ -136,7 +141,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { content_type, title, publish_date, link, notes, topic, content } = body;
+    const { content_type, title, publish_date, link, notes, google_doc_link, topic, content } = body;
 
     if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
       return NextResponse.json({ error: 'Invalid content_type' }, { status: 400 });
@@ -148,6 +153,7 @@ export async function PATCH(
     if ('publish_date' in body) updateData.publish_date = publish_date || null;
     if ('link' in body) updateData.link = link || null;
     if ('notes' in body) updateData.notes = notes || null;
+    if ('google_doc_link' in body) updateData.google_doc_link = google_doc_link || null;
     if ('topic' in body) updateData.topic = topic ?? null;
     if ('ai_topics'    in body) updateData.ai_topics    = body.ai_topics    ?? null;
     if ('ai_headlines' in body) updateData.ai_headlines = body.ai_headlines ?? null;

@@ -381,7 +381,7 @@
 
 // ── Month view table overrides ───────────────────────────────────────────────
 .tableMonthView {
-  min-width: 900px;
+  min-width: 1200px;
 }
 
 .colCompany {
@@ -398,6 +398,10 @@
 .colLink {
   min-width: 160px;
 }
+.colGoogleDoc {
+  width: 110px;
+  min-width: 90px;
+}
 .colDate {
   width: 130px;
   min-width: 110px;
@@ -410,6 +414,43 @@
 .colActions {
   width: 44px;
   min-width: 44px;
+}
+.colTask {
+  width: 140px;
+  min-width: 110px;
+}
+.cellTask {
+  white-space: nowrap;
+}
+.taskChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #e5e7eb;
+  color: #374151;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s;
+
+  &:hover {
+    background: #d1d5db;
+  }
+}
+.taskChipDone {
+  background: #d1fae5;
+  color: #065f46;
+}
+.taskChipAvatar {
+  background: transparent;
+  padding: 0;
+
+  &:hover {
+    background: transparent;
+  }
 }
 
 .monthRow {
@@ -447,6 +488,9 @@
 }
 .cellLink {
   max-width: 220px;
+}
+.cellGoogleDoc {
+  white-space: nowrap;
 }
 
 .contentLink {

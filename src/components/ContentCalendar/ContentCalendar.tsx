@@ -1,13 +1,28 @@
 'use client';
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
 import type { FilterOption } from '@/components/Common/FilterPanel/FilterPanel';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
+import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
+import { useStarredItems } from '@/hooks/useStarredItems';
+import { ProjectTask } from '@/types/project';
+import {
+  createAdminContentPieceChannel,
+  subscribeToContentPieceUpdates,
+  removeContentPieceChannel,
+} from '@/lib/realtime/content-piece-channel';
+import {
+  createAdminProjectChannel,
+  subscribeToProjectUpdates,
+  removeProjectChannel,
+} from '@/lib/realtime/project-channel';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import styles from './ContentCalendar.module.scss';
 
 const MONTHS = [
@@ -41,10 +56,20 @@ interface ContentPieceCalendarItem {
   title: string | null;
   publish_date: string | null;
   link: string | null;
+  google_doc_link: string | null;
   topic: string | null;
   task_id: string | null;
   is_completed: boolean;
   is_planned: false;
+  task_is_completed: boolean | null;
+  task_assignee_name: string | null;
+  task_assignee_email: string | null;
+  task_assignee_avatar_url: string | null;
+  social_media_task_id: string | null;
+  social_media_task_is_completed: boolean | null;
+  social_media_task_assignee_name: string | null;
+  social_media_task_assignee_email: string | null;
+  social_media_task_assignee_avatar_url: string | null;
 }
 
 interface PlannedContentItem {
@@ -74,7 +99,15 @@ interface PopoverState {
 export function ContentCalendar() {
   const { setPageHeader } = usePageActions();
   const [year, setYear] = useState(() => new Date().getFullYear());
+  const yearRef = useRef(year);
+  useEffect(() => { yearRef.current = year; }, [year]);
+
+  const contentPieceChannelRef = useRef<RealtimeChannel | null>(null);
+  const projectTaskChannelRef = useRef<RealtimeChannel | null>(null);
+
   const [services, setServices] = useState<ServiceCalendarRow[]>([]);
+  const servicesRef = useRef<ServiceCalendarRow[]>([]);
+  useEffect(() => { servicesRef.current = services; }, [services]);
   const [loading, setLoading] = useState(true);
   const [popover, setPopover] = useState<PopoverState | null>(null);
 
@@ -93,6 +126,13 @@ export function ContentCalendar() {
   const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
   const [filterContentType, setFilterContentType] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string | null>(null);
+
+  const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
+  const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+  const [taskPanelUsers, setTaskPanelUsers] = useState<any[]>([]);
+  const [taskPanelDepartments, setTaskPanelDepartments] = useState<{ id: string; name: string; icon?: string }[]>([]);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
+  const { isStarred, toggleStar } = useStarredItems();
 
   const getAuthHeaders = useCallback(async () => {
     const supabase = createClient();
@@ -119,9 +159,162 @@ export function ContentCalendar() {
     }
   }, [getAuthHeaders]);
 
+  const fetchAndUpdatePiece = useCallback(async (recordId: string) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/content-pieces/${recordId}`, { headers });
+    if (!res.ok) return;
+    const { contentPiece: cp } = await res.json();
+
+    const is_completed = (cp.task_is_completed ?? false) &&
+      (cp.social_media_task_id ? (cp.social_media_task_is_completed ?? false) : true);
+
+    const updatedItem: ContentPieceCalendarItem = {
+      id: cp.id,
+      content_type: cp.content_type,
+      title: cp.title,
+      publish_date: cp.publish_date,
+      link: cp.link,
+      google_doc_link: cp.google_doc_link,
+      topic: cp.topic,
+      task_id: cp.task_id,
+      is_completed,
+      is_planned: false,
+      task_is_completed: cp.task_is_completed,
+      task_assignee_name: cp.task_assignee_name,
+      task_assignee_email: cp.task_assignee_email ?? null,
+      task_assignee_avatar_url: cp.task_assignee_avatar_url ?? null,
+      social_media_task_id: cp.social_media_task_id,
+      social_media_task_is_completed: cp.social_media_task_is_completed,
+      social_media_task_assignee_name: cp.social_media_task_assignee_name,
+      social_media_task_assignee_email: cp.social_media_task_assignee_email ?? null,
+      social_media_task_assignee_avatar_url: cp.social_media_task_assignee_avatar_url ?? null,
+    };
+
+    setServices(prev => prev.map(service => {
+      const updatedMonths = { ...service.months };
+      let changed = false;
+      for (const [monthKey, items] of Object.entries(updatedMonths)) {
+        const idx = items.findIndex(
+          item => !item.is_planned && (item as ContentPieceCalendarItem).id === recordId
+        );
+        if (idx !== -1) {
+          const newItems = [...items];
+          newItems[idx] = updatedItem;
+          updatedMonths[monthKey] = newItems;
+          changed = true;
+        }
+      }
+      return changed ? { ...service, months: updatedMonths } : service;
+    }));
+  }, [getAuthHeaders]);
+
+  const fetchAndInsertPiece = useCallback(async (recordId: string) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/content-pieces/${recordId}`, { headers });
+    if (!res.ok) return;
+    const { contentPiece: cp } = await res.json();
+
+    const monthKey = cp.service_month ||
+      (cp.publish_date ? cp.publish_date.slice(0, 7) : null) ||
+      (cp.task_due_date ? cp.task_due_date.slice(0, 7) : null);
+    if (!monthKey) return;
+    if (parseInt(monthKey.slice(0, 4), 10) !== yearRef.current) return;
+
+    const is_completed = (cp.task_is_completed ?? false) &&
+      (cp.social_media_task_id ? (cp.social_media_task_is_completed ?? false) : true);
+
+    const newItem: ContentPieceCalendarItem = {
+      id: cp.id,
+      content_type: cp.content_type,
+      title: cp.title,
+      publish_date: cp.publish_date,
+      link: cp.link,
+      google_doc_link: cp.google_doc_link,
+      topic: cp.topic,
+      task_id: cp.task_id,
+      is_completed,
+      is_planned: false,
+      task_is_completed: cp.task_is_completed,
+      task_assignee_name: cp.task_assignee_name,
+      task_assignee_email: cp.task_assignee_email ?? null,
+      task_assignee_avatar_url: cp.task_assignee_avatar_url ?? null,
+      social_media_task_id: cp.social_media_task_id,
+      social_media_task_is_completed: cp.social_media_task_is_completed,
+      social_media_task_assignee_name: cp.social_media_task_assignee_name,
+      social_media_task_assignee_email: cp.social_media_task_assignee_email ?? null,
+      social_media_task_assignee_avatar_url: cp.social_media_task_assignee_avatar_url ?? null,
+    };
+
+    setServices(prev => prev.map(service => {
+      if (service.id !== cp.monthly_service_id) return service;
+      const existing = service.months[monthKey] || [];
+      if (existing.some(i => !i.is_planned && (i as ContentPieceCalendarItem).id === cp.id)) return service;
+      return { ...service, months: { ...service.months, [monthKey]: [...existing, newItem] } };
+    }));
+  }, [getAuthHeaders]);
+
   useEffect(() => {
     fetchCalendar(year);
   }, [year, fetchCalendar]);
+
+  useEffect(() => {
+    // Subscribe to content piece changes
+    const cpChannel = createAdminContentPieceChannel();
+    contentPieceChannelRef.current = cpChannel;
+    subscribeToContentPieceUpdates(cpChannel, (payload) => {
+      if (payload.action === 'UPDATE') {
+        fetchAndUpdatePiece(payload.record_id);
+      } else if (payload.action === 'INSERT') {
+        fetchAndInsertPiece(payload.record_id);
+      } else if (payload.action === 'DELETE') {
+        setServices(prev => prev.map(service => {
+          const updatedMonths = { ...service.months };
+          let changed = false;
+          for (const [monthKey, items] of Object.entries(updatedMonths)) {
+            const filtered = items.filter(
+              item => item.is_planned || (item as ContentPieceCalendarItem).id !== payload.record_id
+            );
+            if (filtered.length !== items.length) {
+              updatedMonths[monthKey] = filtered;
+              changed = true;
+            }
+          }
+          return changed ? { ...service, months: updatedMonths } : service;
+        }));
+      }
+    });
+
+    // Subscribe to project_tasks changes (for assignee / completion updates)
+    const ptChannel = createAdminProjectChannel();
+    projectTaskChannelRef.current = ptChannel;
+    subscribeToProjectUpdates(ptChannel, (payload) => {
+      if (payload.table !== 'project_tasks') return;
+      for (const service of servicesRef.current) {
+        for (const items of Object.values(service.months)) {
+          for (const item of items) {
+            if (!item.is_planned) {
+              const piece = item as ContentPieceCalendarItem;
+              if (piece.task_id === payload.record_id || piece.social_media_task_id === payload.record_id) {
+                fetchAndUpdatePiece(piece.id);
+              }
+            }
+          }
+        }
+      }
+    });
+
+    return () => {
+      removeContentPieceChannel(cpChannel);
+      removeProjectChannel(ptChannel);
+    };
+  }, [fetchAndUpdatePiece, fetchAndInsertPiece]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getSession().then(({ data }) => {
+      setCurrentUserId(data.session?.user?.id ?? '');
+    });
+  }, []);
 
   // Initialize edit fields when popover opens
   useEffect(() => {
@@ -289,6 +482,66 @@ export function ContentCalendar() {
     return rows;
   }, [view, filteredServices, year, activeMonth]);
 
+  const mentionUsers = useMemo(() => {
+    return taskPanelUsers.map(u => {
+      const profile = (u as any).profiles;
+      return {
+        id: profile?.id || u.id,
+        first_name: profile?.first_name || null,
+        last_name: profile?.last_name || null,
+        email: profile?.email || (u as any).email || null,
+        avatar_url: profile?.avatar_url || null,
+      };
+    });
+  }, [taskPanelUsers]);
+
+  const handleOpenTaskPanel = useCallback(async (taskId: string, monthlyServiceId: string) => {
+    const headers = await getAuthHeaders();
+    const [taskRes, usersRes, depsRes] = await Promise.all([
+      fetch(`/api/admin/tasks/${taskId}`, { headers }),
+      fetch('/api/admin/users?include_system=true', { headers }),
+      fetch('/api/admin/monthly-services/departments', { headers }),
+    ]);
+    if (taskRes.ok) {
+      const taskData = await taskRes.json();
+      const task = taskData.task ?? taskData;
+      setSelectedTask({ ...task, monthly_service_id: monthlyServiceId });
+    }
+    if (usersRes.ok) setTaskPanelUsers(await usersRes.json());
+    if (depsRes.ok) {
+      const depsData = await depsRes.json();
+      setTaskPanelDepartments(depsData.departments || []);
+    }
+    setIsTaskDetailOpen(true);
+  }, [getAuthHeaders]);
+
+  const handleUpdateTask = async (taskId: string, updates: Partial<ProjectTask>) => {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/tasks/${taskId}`, {
+      method: 'PATCH', headers,
+      body: JSON.stringify(updates),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    setSelectedTask(data.task ?? data);
+  };
+
+  const handleAddComment = async (comment: string) => {
+    if (!selectedTask) return null;
+    const headers = await getAuthHeaders();
+    const res = await fetch(`/api/admin/tasks/${selectedTask.id}/comments`, {
+      method: 'POST', headers,
+      body: JSON.stringify({ comment }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()).comment ?? null;
+  };
+
+  const handleUpdateProgress = async (progress: number) => {
+    if (!selectedTask) return;
+    await handleUpdateTask(selectedTask.id, { progress_percentage: progress });
+  };
+
   const handleSave = async () => {
     if (!popover) return;
     const { item, serviceId, monthKey, itemIndex } = popover;
@@ -339,10 +592,20 @@ export function ContentCalendar() {
             title: data.contentPiece.title,
             publish_date: data.contentPiece.publish_date,
             link: data.contentPiece.link,
+            google_doc_link: data.contentPiece.google_doc_link ?? null,
             topic: data.contentPiece.topic,
             task_id: data.contentPiece.task_id,
             is_completed: false,
             is_planned: false as const,
+            task_is_completed: null,
+            task_assignee_name: null,
+            task_assignee_email: null,
+            task_assignee_avatar_url: null,
+            social_media_task_id: null,
+            social_media_task_is_completed: null,
+            social_media_task_assignee_name: null,
+            social_media_task_assignee_email: null,
+            social_media_task_assignee_avatar_url: null,
           };
         }
       }
@@ -591,6 +854,9 @@ export function ContentCalendar() {
                   <th className={styles.colType}>Type</th>
                   <th className={styles.colTitle}>Title</th>
                   <th className={styles.colLink}>Link</th>
+                  <th className={styles.colGoogleDoc}>Google Doc</th>
+                  <th className={styles.colTask}>Content Task</th>
+                  <th className={styles.colTask}>Social Task</th>
                   <th className={styles.colDate}>Publish Date</th>
                   <th className={styles.colStatus}>Status</th>
                   <th className={styles.colActions}></th>
@@ -648,6 +914,57 @@ export function ContentCalendar() {
                           </a>
                         ) : '—'}
                       </td>
+                      <td className={styles.cellGoogleDoc}>
+                        {!isPlanned && piece?.google_doc_link ? (
+                          <a
+                            href={piece.google_doc_link}
+                            className={styles.contentLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={e => e.stopPropagation()}
+                          >
+                            View Doc
+                          </a>
+                        ) : '—'}
+                      </td>
+                      <td className={styles.cellTask}>
+                        {!isPlanned && piece?.task_id ? (
+                          <button
+                            className={`${styles.taskChip} ${piece.task_is_completed ? styles.taskChipDone : ''} ${piece.task_assignee_email ? styles.taskChipAvatar : ''}`}
+                            onClick={e => { e.stopPropagation(); handleOpenTaskPanel(piece.task_id!, service.id); }}
+                          >
+                            {piece.task_assignee_email ? (
+                              <MiniAvatar
+                                firstName={piece.task_assignee_name?.split(' ')[0] || undefined}
+                                lastName={piece.task_assignee_name?.split(' ').slice(1).join(' ') || undefined}
+                                email={piece.task_assignee_email}
+                                avatarUrl={piece.task_assignee_avatar_url}
+                                size="small"
+                                showTooltip={true}
+                              />
+                            ) : 'Unassigned'}
+                          </button>
+                        ) : '—'}
+                      </td>
+                      <td className={styles.cellTask}>
+                        {!isPlanned && piece?.social_media_task_id ? (
+                          <button
+                            className={`${styles.taskChip} ${piece.social_media_task_is_completed ? styles.taskChipDone : ''} ${piece.social_media_task_assignee_email ? styles.taskChipAvatar : ''}`}
+                            onClick={e => { e.stopPropagation(); handleOpenTaskPanel(piece.social_media_task_id!, service.id); }}
+                          >
+                            {piece.social_media_task_assignee_email ? (
+                              <MiniAvatar
+                                firstName={piece.social_media_task_assignee_name?.split(' ')[0] || undefined}
+                                lastName={piece.social_media_task_assignee_name?.split(' ').slice(1).join(' ') || undefined}
+                                email={piece.social_media_task_assignee_email}
+                                avatarUrl={piece.social_media_task_assignee_avatar_url}
+                                size="small"
+                                showTooltip={true}
+                              />
+                            ) : 'Unassigned'}
+                          </button>
+                        ) : '—'}
+                      </td>
                       <td className={styles.cellDate}>{publishDate}</td>
                       <td className={styles.cellStatus}>
                         <span className={`${styles.statusPill} ${statusClass}`}>{statusLabel}</span>
@@ -674,6 +991,25 @@ export function ContentCalendar() {
       )}
 
       {renderPopover()}
+
+      {isTaskDetailOpen && selectedTask && (
+        <ProjectTaskDetail
+          task={selectedTask}
+          onClose={() => { setIsTaskDetailOpen(false); setSelectedTask(null); }}
+          onUpdate={handleUpdateTask}
+          onDelete={() => { setIsTaskDetailOpen(false); setSelectedTask(null); }}
+          onAddComment={handleAddComment}
+          onCreateSubtask={() => {}}
+          onUpdateProgress={handleUpdateProgress}
+          users={taskPanelUsers}
+          currentUserId={currentUserId}
+          onToggleStar={taskId => toggleStar('task', taskId)}
+          isStarred={taskId => isStarred('task', taskId)}
+          monthlyServiceDepartments={taskPanelDepartments}
+          mentionUsers={mentionUsers}
+          hideContentPieceLink
+        />
+      )}
     </div>
   );
 }

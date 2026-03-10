@@ -7,10 +7,20 @@ export interface ContentPieceCalendarItem {
   title: string | null;
   publish_date: string | null;
   link: string | null;
+  google_doc_link: string | null;
   topic: string | null;
   task_id: string | null;
   is_completed: boolean;
   is_planned: false;
+  task_is_completed: boolean | null;
+  task_assignee_name: string | null;
+  task_assignee_email: string | null;
+  task_assignee_avatar_url: string | null;
+  social_media_task_id: string | null;
+  social_media_task_is_completed: boolean | null;
+  social_media_task_assignee_name: string | null;
+  social_media_task_assignee_email: string | null;
+  social_media_task_assignee_avatar_url: string | null;
 }
 
 export interface PlannedContentItem {
@@ -113,14 +123,16 @@ export async function GET(request: NextRequest) {
         id,
         monthly_service_id,
         task_id,
+        social_media_task_id,
         content_type,
         title,
         publish_date,
         link,
+        google_doc_link,
         topic,
         service_month,
-        project_tasks!task_id ( is_completed, due_date ),
-        social_media_task:project_tasks!social_media_task_id ( is_completed )
+        project_tasks!task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) ),
+        social_media_task:project_tasks!social_media_task_id ( is_completed, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) )
       `)
       .in('monthly_service_id', serviceIds)
       .order('sort_order', { ascending: true, nullsFirst: false })
@@ -151,21 +163,35 @@ export async function GET(request: NextRequest) {
       if (!piecesByServiceMonth[serviceId]) piecesByServiceMonth[serviceId] = {};
       if (!piecesByServiceMonth[serviceId][monthKey]) piecesByServiceMonth[serviceId][monthKey] = [];
 
+      const socialTask = (piece as any).social_media_task;
       piecesByServiceMonth[serviceId][monthKey].push({
         id: piece.id,
         content_type: piece.content_type,
         title: piece.title,
         publish_date: piece.publish_date,
         link: piece.link,
+        google_doc_link: (piece as any).google_doc_link ?? null,
         topic: (piece as any).topic,
         task_id: piece.task_id,
         is_completed: (() => {
-          const socialTask = (piece as any).social_media_task;
           const contentDone = task?.is_completed ?? false;
           const socialDone = socialTask ? (socialTask.is_completed ?? false) : true;
           return contentDone && socialDone;
         })(),
         is_planned: false,
+        task_is_completed: task?.is_completed ?? null,
+        task_assignee_name: task?.profiles
+          ? `${(task.profiles as any).first_name ?? ''} ${(task.profiles as any).last_name ?? ''}`.trim() || null
+          : null,
+        task_assignee_email: task?.profiles ? (task.profiles as any).email ?? null : null,
+        task_assignee_avatar_url: task?.profiles ? (task.profiles as any).avatar_url ?? null : null,
+        social_media_task_id: (piece as any).social_media_task_id ?? null,
+        social_media_task_is_completed: socialTask?.is_completed ?? null,
+        social_media_task_assignee_name: socialTask?.profiles
+          ? `${(socialTask.profiles as any).first_name ?? ''} ${(socialTask.profiles as any).last_name ?? ''}`.trim() || null
+          : null,
+        social_media_task_assignee_email: socialTask?.profiles ? (socialTask.profiles as any).email ?? null : null,
+        social_media_task_assignee_avatar_url: socialTask?.profiles ? (socialTask.profiles as any).avatar_url ?? null : null,
       });
     }
 
