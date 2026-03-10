@@ -25,7 +25,7 @@ const ALLOWED_TYPES = [
 
 /**
  * GET /api/admin/projects/[id]/proofs
- * Returns { currentProof, archivedProofs }
+ * Returns { proofGroups }
  */
 export async function GET(
   request: NextRequest,
@@ -40,6 +40,16 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const { data: groups, error: groupsError } = await supabase
+      .from('proof_groups')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: true });
+
+    if (groupsError) {
+      return NextResponse.json({ error: 'Failed to fetch proof groups' }, { status: 500 });
+    }
+
     const { data: proofs, error: proofsError } = await supabase
       .from('project_proofs')
       .select(`
@@ -47,16 +57,29 @@ export async function GET(
         uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)
       `)
       .eq('project_id', projectId)
-      .order('created_at', { ascending: false });
+      .order('version', { ascending: true });
 
     if (proofsError) {
       return NextResponse.json({ error: 'Failed to fetch proofs' }, { status: 500 });
     }
 
-    const currentProof = proofs?.find((p: any) => p.is_current) ?? null;
-    const archivedProofs = proofs?.filter((p: any) => !p.is_current) ?? [];
+    const proofsByGroup = new Map<string, any[]>();
+    for (const proof of proofs ?? []) {
+      const list = proofsByGroup.get(proof.group_id) ?? [];
+      list.push(proof);
+      proofsByGroup.set(proof.group_id, list);
+    }
 
-    return NextResponse.json({ currentProof, archivedProofs });
+    const proofGroups = (groups ?? []).map((group: any) => {
+      const groupProofs = proofsByGroup.get(group.id) ?? [];
+      const currentProof = groupProofs.find((p) => p.is_current) ?? null;
+      const archivedProofs = groupProofs
+        .filter((p) => !p.is_current)
+        .sort((a, b) => b.version - a.version);
+      return { ...group, currentProof, archivedProofs };
+    });
+
+    return NextResponse.json({ proofGroups });
   } catch (error) {
     console.error('Error fetching proofs:', error);
     return NextResponse.json({ error: 'Failed to fetch proofs' }, { status: 500 });
@@ -65,7 +88,8 @@ export async function GET(
 
 /**
  * POST /api/admin/projects/[id]/proofs
- * Register a proof already uploaded to storage; archives the current proof first.
+ * Mode A (no group_id): create new proof group + first proof
+ * Mode B (group_id provided): upload new version within existing group
  */
 export async function POST(
   request: NextRequest,
@@ -81,7 +105,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { file_path, file_name, file_size, mime_type } = body;
+    const { file_path, file_name, file_size, mime_type, group_id } = body;
 
     if (!file_path || !file_name || !file_size || !mime_type) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -96,19 +120,57 @@ export async function POST(
     }
 
     const adminClient = createAdminClient();
+    let resolvedGroupId: string;
 
-    // Archive existing current proof
-    await adminClient
-      .from('project_proofs')
-      .update({ is_current: false })
-      .eq('project_id', projectId)
-      .eq('is_current', true);
+    if (!group_id) {
+      // Mode A: new proof group
+      const baseName = file_name.replace(/\.[^.]+$/, ''); // strip extension
+      const groupName = baseName
+        .split(/[-_.\s]+/)
+        .filter(Boolean)
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
 
-    // Get max version for this project
+      const { data: newGroup, error: groupError } = await adminClient
+        .from('proof_groups')
+        .insert({ project_id: projectId, name: groupName })
+        .select('id')
+        .single();
+
+      if (groupError || !newGroup) {
+        console.error('Error creating proof group:', groupError);
+        return NextResponse.json({ error: 'Failed to create proof group' }, { status: 500 });
+      }
+
+      resolvedGroupId = newGroup.id;
+    } else {
+      // Mode B: new version within existing group — validate ownership
+      const { data: existingGroup, error: groupFetchError } = await adminClient
+        .from('proof_groups')
+        .select('id')
+        .eq('id', group_id)
+        .eq('project_id', projectId)
+        .single();
+
+      if (groupFetchError || !existingGroup) {
+        return NextResponse.json({ error: 'Proof group not found' }, { status: 404 });
+      }
+
+      resolvedGroupId = existingGroup.id;
+
+      // Archive current proof within this group only
+      await adminClient
+        .from('project_proofs')
+        .update({ is_current: false })
+        .eq('group_id', resolvedGroupId)
+        .eq('is_current', true);
+    }
+
+    // Get max version within this group
     const { data: versionData } = await adminClient
       .from('project_proofs')
       .select('version')
-      .eq('project_id', projectId)
+      .eq('group_id', resolvedGroupId)
       .order('version', { ascending: false })
       .limit(1)
       .single();
@@ -120,6 +182,7 @@ export async function POST(
       .from('project_proofs')
       .insert({
         project_id: projectId,
+        group_id: resolvedGroupId,
         file_path,
         file_name,
         file_size,

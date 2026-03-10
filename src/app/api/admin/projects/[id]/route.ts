@@ -15,6 +15,9 @@ export async function GET(
       .select(
         `
         *,
+        project_subtype_details:project_type_subtypes!projects_project_subtype_id_fkey(
+          id, name, has_custom_attributes, custom_attribute_schema
+        ),
         company:companies(
           id,
           name,
@@ -126,6 +129,7 @@ export async function PUT(
       description,
       project_type,
       project_subtype,
+      project_subtype_id,
       requested_by,
       assigned_to,
       status,
@@ -187,6 +191,7 @@ export async function PUT(
       project_type,
       type_code: projectTypeToCode[project_type] || null, // Update type_code to trigger shortcode regeneration
       project_subtype: project_subtype || null,
+      project_subtype_id: project_subtype_id || null,
       assigned_to: assigned_to || null,
       status,
       priority,
@@ -320,6 +325,47 @@ export async function PUT(
         error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const supabase = await createClient();
+    const { id } = await params;
+    const body = await request.json();
+
+    const { custom_attribute_values } = body;
+
+    const updateData: Record<string, any> = {
+      updated_at: new Date().toISOString(),
+    };
+
+    if (custom_attribute_values !== undefined) {
+      updateData.custom_attribute_values = custom_attribute_values;
+    }
+
+    const { data: project, error } = await supabase
+      .from('projects')
+      .update(updateData)
+      .eq('id', id)
+      .select('id, custom_attribute_values')
+      .single();
+
+    if (error) {
+      console.error('Error patching project:', error);
+      return NextResponse.json({ error: 'Failed to update project' }, { status: 500 });
+    }
+
+    return NextResponse.json(project);
+  } catch (error) {
+    console.error('Error in project PATCH:', error);
+    return NextResponse.json(
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

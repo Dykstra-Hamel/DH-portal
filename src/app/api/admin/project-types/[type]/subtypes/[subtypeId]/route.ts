@@ -28,12 +28,14 @@ export async function PUT(
 
     // Parse request body
     const body = await request.json();
-    const { name, description, sort_order } = body;
+    const { name, description, sort_order, has_custom_attributes, custom_attribute_schema } = body;
 
     const updateData: any = {};
     if (name !== undefined) updateData.name = name;
     if (description !== undefined) updateData.description = description;
     if (sort_order !== undefined) updateData.sort_order = sort_order;
+    if (has_custom_attributes !== undefined) updateData.has_custom_attributes = has_custom_attributes;
+    if (custom_attribute_schema !== undefined) updateData.custom_attribute_schema = custom_attribute_schema;
 
     // Update subtype
     const { data: subtype, error } = await supabase

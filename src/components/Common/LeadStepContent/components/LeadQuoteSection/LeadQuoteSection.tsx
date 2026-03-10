@@ -1312,6 +1312,7 @@ export function LeadQuoteSection({
         icon={<ScrollText size={20} />}
         isCollapsible={true}
         startExpanded={true}
+        isActive={activeSection === 'quote'}
       >
         <div
           className={styles.cardContent}

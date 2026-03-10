@@ -158,7 +158,7 @@ export async function POST(
     // Get monthly service details for company_id and service name
     const { data: monthlyService, error: serviceError } = await supabase
       .from('monthly_services')
-      .select('id, service_name, company_id')
+      .select('id, service_name, company_id, company:companies(name)')
       .eq('id', monthlyServiceId)
       .single();
 
@@ -251,6 +251,7 @@ export async function POST(
         commenterName,
         contextType: 'monthly_service',
         contextName: monthlyService.service_name,
+        clientName: (monthlyService.company as { name?: string } | null)?.name || null,
         commentText: body.comment,
         deepLinkUrl,
       }).catch(() => {});

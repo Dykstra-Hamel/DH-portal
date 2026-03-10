@@ -35,6 +35,7 @@ export function LeadSchedulingSection({
         icon={<CalendarCheck size={20} />}
         isCollapsible={true}
         startExpanded={true}
+        isActive={activeSection === 'scheduling'}
       >
       <div
         className={styles.cardContent}

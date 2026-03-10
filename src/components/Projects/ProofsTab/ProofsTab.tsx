@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { CheckCircle, Download, FileText, Trash2, Upload, X } from 'lucide-react';
+import { CheckCircle, Download, FileText, Pencil, Trash2, Upload, X } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeFileName } from '@/lib/storage-utils';
-import { Project, ProjectProof, ProofFeedback } from '@/types/project';
+import { Project, ProjectProof, ProofFeedback, ProofGroup } from '@/types/project';
 import dynamic from 'next/dynamic';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import { Toast } from '@/components/Common/Toast/Toast';
 import styles from './ProofsTab.module.scss';
 
 const ProofViewer = dynamic(() => import('../ProofViewer/ProofViewer'), {
@@ -63,13 +64,12 @@ interface ProofsTabProps {
 }
 
 export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOpenProofId, onProofModalClosed }: ProofsTabProps) {
-  const [currentProof, setCurrentProof] = useState<ProjectProof | null>(null);
-  const [archivedProofs, setArchivedProofs] = useState<ProjectProof[]>([]);
+  const [proofGroups, setProofGroups] = useState<ProofGroup[]>([]);
   const [isProofsLoading, setIsProofsLoading] = useState(true);
   const [feedbackItems, setFeedbackItems] = useState<ProofFeedback[]>([]);
   const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
-  const [showArchived, setShowArchived] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingGroupId, setUploadingGroupId] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [activePinId, setActivePinId] = useState<string | null>(null);
   const [hoveredPinId, setHoveredPinId] = useState<string | null>(null);
@@ -79,7 +79,10 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   const [isAdmin, setIsAdmin] = useState(false);
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const groupFileInputRef = useRef<HTMLInputElement>(null);
+  const pendingGroupIdRef = useRef<string | null>(null);
 
   const fetchProofs = useCallback(async (showLoading = false) => {
     if (showLoading) {
@@ -89,12 +92,15 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
       const res = await fetch(`/api/admin/projects/${project.id}/proofs`);
       if (!res.ok) return;
       const data = await res.json();
-      setCurrentProof(data.currentProof);
-      setArchivedProofs(data.archivedProofs ?? []);
+      const groups: ProofGroup[] = data.proofGroups ?? [];
+      setProofGroups(groups);
       setViewingProof((prev) => {
         if (!prev) return null;
-        const allProofs = [data.currentProof, ...(data.archivedProofs ?? [])].filter(Boolean);
-        return allProofs.find((p: ProjectProof) => p.id === prev.id) ?? null;
+        const allProofs = groups.flatMap((g) => [
+          ...(g.currentProof ? [g.currentProof] : []),
+          ...(g.archivedProofs ?? []),
+        ]);
+        return allProofs.find((p) => p.id === prev.id) ?? null;
       });
     } catch {
       // silent
@@ -130,14 +136,13 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   }, [fetchProofs, user]);
 
   useEffect(() => {
-    const proofToFetch = viewingProof ?? currentProof;
-    if (proofToFetch) {
-      void fetchFeedback(proofToFetch.id, true);
+    if (viewingProof) {
+      void fetchFeedback(viewingProof.id, true);
     } else {
       setFeedbackItems([]);
       setIsFeedbackLoading(false);
     }
-  }, [fetchFeedback, viewingProof, currentProof]);
+  }, [fetchFeedback, viewingProof]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -157,8 +162,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
         'postgres_changes',
         { event: '*', schema: 'public', table: 'proof_feedback', filter: `project_id=eq.${project.id}` },
         () => {
-          const proofToFetch = viewingProof ?? currentProof;
-          if (proofToFetch) void fetchFeedback(proofToFetch.id, false);
+          if (viewingProof) void fetchFeedback(viewingProof.id, false);
         }
       )
       .subscribe();
@@ -167,7 +171,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
       supabase.removeChannel(proofsChannel);
       supabase.removeChannel(feedbackChannel);
     };
-  }, [fetchFeedback, fetchProofs, project.id, viewingProof, currentProof]);
+  }, [fetchFeedback, fetchProofs, project.id, viewingProof]);
 
   useEffect(() => {
     if (proofModalOpen) {
@@ -181,18 +185,22 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   // Auto-open modal when parent requests a specific proof to be shown
   useEffect(() => {
     if (!autoOpenProofId) return;
-    const allProofs = currentProof ? [currentProof, ...archivedProofs] : archivedProofs;
+    const allProofs = proofGroups.flatMap((g) => [
+      ...(g.currentProof ? [g.currentProof] : []),
+      ...(g.archivedProofs ?? []),
+    ]);
     const target = allProofs.find((p) => p.id === autoOpenProofId);
     if (target) {
-      setViewingProof(target.is_current ? null : target);
+      setViewingProof(target);
       setProofModalOpen(true);
     }
-  }, [autoOpenProofId, currentProof, archivedProofs]);
+  }, [autoOpenProofId, proofGroups]);
 
-  const uploadProof = useCallback(async (file: File) => {
+  const uploadProof = useCallback(async (file: File, groupId?: string) => {
     if (!canEdit) return;
     setUploadError(null);
     setIsUploading(true);
+    setUploadingGroupId(groupId ?? null);
 
     try {
       const supabase = createClient();
@@ -213,6 +221,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
           file_name: file.name,
           file_size: file.size,
           mime_type: file.type,
+          ...(groupId ? { group_id: groupId } : {}),
         }),
       });
 
@@ -223,11 +232,12 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
       }
 
       await fetchProofs(false);
-      setViewingProof(null);
+      setToastVisible(true);
     } catch (err: any) {
       setUploadError(err.message ?? 'Upload failed');
     } finally {
       setIsUploading(false);
+      setUploadingGroupId(null);
     }
   }, [canEdit, project.id, fetchProofs]);
 
@@ -240,6 +250,19 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
       return;
     }
     uploadProof(file);
+  };
+
+  const handleGroupFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const groupId = pendingGroupIdRef.current;
+    pendingGroupIdRef.current = null;
+    e.target.value = '';
+    if (!file || !groupId) return;
+    if (!PROOF_ALLOWED_TYPES.includes(file.type)) {
+      setUploadError('Only images (JPEG, PNG, WebP, GIF) and PDFs are allowed for proofs.');
+      return;
+    }
+    uploadProof(file, groupId);
   };
 
   const handleProofAction = useCallback(async (proofId: string, action: string) => {
@@ -278,6 +301,19 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     }
   }, [project.id, fetchProofs, viewingProof]);
 
+  const handleRenameGroup = useCallback(async (groupId: string, name: string) => {
+    try {
+      await fetch(`/api/admin/projects/${project.id}/proof-groups/${groupId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      });
+      await fetchProofs(false);
+    } catch {
+      // silent
+    }
+  }, [project.id, fetchProofs]);
+
   const handleDownloadProof = useCallback(async (proof: ProjectProof) => {
     try {
       const res = await fetch(`/api/admin/projects/${project.id}/proofs/${proof.id}/url`);
@@ -295,11 +331,10 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   }, [project.id]);
 
   const handleAddFeedback = useCallback(async (x: number, y: number, page: number, comment: string) => {
-    const proofToUse = viewingProof ?? currentProof;
-    if (!proofToUse) return;
+    if (!viewingProof) return;
 
     try {
-      const res = await fetch(`/api/admin/projects/${project.id}/proofs/${proofToUse.id}/feedback`, {
+      const res = await fetch(`/api/admin/projects/${project.id}/proofs/${viewingProof.id}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ x_percent: x, y_percent: y, page_number: page, comment }),
@@ -310,15 +345,14 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     } catch {
       // silent
     }
-  }, [viewingProof, currentProof, project.id]);
+  }, [viewingProof, project.id]);
 
   const handleAddComment = useCallback(async () => {
-    const proofToUse = viewingProof ?? currentProof;
-    if (!proofToUse || isRichTextEmpty(generalComment)) return;
+    if (!viewingProof || isRichTextEmpty(generalComment)) return;
 
     setIsSubmittingComment(true);
     try {
-      const res = await fetch(`/api/admin/projects/${project.id}/proofs/${proofToUse.id}/feedback`, {
+      const res = await fetch(`/api/admin/projects/${project.id}/proofs/${viewingProof.id}/feedback`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment: generalComment }),
@@ -332,15 +366,14 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     } finally {
       setIsSubmittingComment(false);
     }
-  }, [viewingProof, currentProof, project.id, generalComment]);
+  }, [viewingProof, project.id, generalComment]);
 
   const handleResolvePin = useCallback(async (id: string, resolved: boolean) => {
-    const proofToUse = viewingProof ?? currentProof;
-    if (!proofToUse) return;
+    if (!viewingProof) return;
 
     try {
       const res = await fetch(
-        `/api/admin/projects/${project.id}/proofs/${proofToUse.id}/feedback/${id}`,
+        `/api/admin/projects/${project.id}/proofs/${viewingProof.id}/feedback/${id}`,
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -353,15 +386,14 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     } catch {
       // silent
     }
-  }, [viewingProof, currentProof, project.id]);
+  }, [viewingProof, project.id]);
 
   const handleDeletePin = useCallback(async (id: string) => {
-    const proofToUse = viewingProof ?? currentProof;
-    if (!proofToUse) return;
+    if (!viewingProof) return;
 
     try {
       const res = await fetch(
-        `/api/admin/projects/${project.id}/proofs/${proofToUse.id}/feedback/${id}`,
+        `/api/admin/projects/${project.id}/proofs/${viewingProof.id}/feedback/${id}`,
         { method: 'DELETE' }
       );
       if (!res.ok) return;
@@ -370,7 +402,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     } catch {
       // silent
     }
-  }, [viewingProof, currentProof, project.id, activePinId]);
+  }, [viewingProof, project.id, activePinId]);
 
   const handleCloseModal = useCallback(() => {
     setProofModalOpen(false);
@@ -381,18 +413,17 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   }, [onProofModalClosed]);
 
   const openProofModal = useCallback((proof: ProjectProof) => {
-    setViewingProof(proof.is_current ? null : proof);
+    setViewingProof(proof);
     setProofModalOpen(true);
   }, []);
 
-  const displayedProof = viewingProof ?? currentProof;
+  const allProofsCount = proofGroups.reduce((acc, g) => {
+    return acc + (g.currentProof ? 1 : 0) + (g.archivedProofs?.length ?? 0);
+  }, 0);
+
   const unresolvedCount = isFeedbackLoading
     ? 0
     : feedbackItems.filter((f) => !f.is_resolved).length;
-
-  const allProofs = currentProof
-    ? [currentProof, ...archivedProofs]
-    : archivedProofs;
 
   return (
     <div className={styles.proofsTab}>
@@ -412,12 +443,20 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
               onChange={handleFileSelect}
               disabled={isUploading}
             />
+            <input
+              ref={groupFileInputRef}
+              type="file"
+              accept={PROOF_ALLOWED_TYPES.join(',')}
+              style={{ display: 'none' }}
+              onChange={handleGroupFileSelect}
+              disabled={isUploading}
+            />
             <button
               className={styles.uploadButton}
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
             >
-              {isUploading ? (
+              {isUploading && !uploadingGroupId ? (
                 <>
                   <span className={styles.uploadSpinner} aria-hidden="true" />
                   Uploading…
@@ -440,13 +479,13 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
         </div>
       )}
 
-      {/* Proof cards */}
+      {/* Proof group cards */}
       {isProofsLoading ? (
         <div className={styles.loadingState}>
           <div className={styles.loadingSpinner} />
           <p>Loading proofs...</p>
         </div>
-      ) : allProofs.length === 0 ? (
+      ) : allProofsCount === 0 && proofGroups.length === 0 ? (
         <div className={styles.emptyState}>
           {canEdit ? (
             <>
@@ -474,70 +513,51 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
           )}
         </div>
       ) : (
-        <div className={styles.proofList}>
-          {/* Current proof first */}
-          {currentProof && (
-            <ProofCard
-              proof={currentProof}
+        <div className={styles.proofGroups}>
+          {proofGroups.map((group) => (
+            <ProofGroupCard
+              key={group.id}
+              group={group}
               projectId={project.id}
               canEdit={canEdit}
               actionInProgress={actionInProgress}
-              onOpen={() => openProofModal(currentProof)}
-              onMarkFinal={() => handleProofAction(currentProof.id, 'mark_final')}
-              onUnmarkFinal={() => handleProofAction(currentProof.id, 'unmark_final')}
-              onDownload={() => handleDownloadProof(currentProof)}
-              onDelete={() => handleDeleteProof(currentProof.id)}
+              uploadingGroupId={uploadingGroupId}
+              onOpen={openProofModal}
+              onProofAction={handleProofAction}
+              onDownload={handleDownloadProof}
+              onDelete={handleDeleteProof}
+              onRenameGroup={handleRenameGroup}
+              onUploadNewVersion={() => {
+                pendingGroupIdRef.current = group.id;
+                groupFileInputRef.current?.click();
+              }}
             />
-          )}
-
-          {/* Archived proofs */}
-          {archivedProofs.length > 0 && (
-            <div className={styles.archivedSection}>
-              <button
-                className={styles.archivedLink}
-                onClick={() => setShowArchived((v) => !v)}
-              >
-                {showArchived ? 'Hide' : 'View'} Archived Proofs ({archivedProofs.length})
-              </button>
-              {showArchived && (
-                <div className={styles.proofList} style={{ marginTop: 8 }}>
-                  {archivedProofs.map((proof) => (
-                    <ProofCard
-                      key={proof.id}
-                      proof={proof}
-                      projectId={project.id}
-                      canEdit={canEdit}
-                      actionInProgress={actionInProgress}
-                      onOpen={() => openProofModal(proof)}
-                      onMarkFinal={() => handleProofAction(proof.id, 'mark_final')}
-                      onUnmarkFinal={() => handleProofAction(proof.id, 'unmark_final')}
-                      onRestoreCurrent={() => handleProofAction(proof.id, 'restore_current')}
-                      onDownload={() => handleDownloadProof(proof)}
-                      onDelete={() => handleDeleteProof(proof.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          ))}
         </div>
       )}
 
+      <Toast
+        message="Proof uploaded successfully."
+        isVisible={toastVisible}
+        onClose={() => setToastVisible(false)}
+        type="success"
+      />
+
       {/* Proof review modal */}
-      {proofModalOpen && displayedProof && (
+      {proofModalOpen && viewingProof && (
         <div className={styles.proofModal}>
           <div className={styles.proofModalBackdrop} onClick={handleCloseModal} />
           <div className={styles.proofModalContent}>
             <div className={styles.proofModalHeader}>
               <div className={styles.proofModalTitle}>
-                <span className={styles.proofModalFileName}>{displayedProof.file_name}</span>
-                {displayedProof.is_final && (
-                  <span className={styles.finalBadge}>Final Version</span>
+                <span className={styles.proofModalFileName}>{viewingProof.file_name}</span>
+                {viewingProof.is_approved && (
+                  <span className={styles.approvedBadge}>Approved</span>
                 )}
                 <span className={styles.proofModalVersion}>
-                  {displayedProof.is_current
-                    ? `v${displayedProof.version} (current)`
-                    : `v${displayedProof.version} (archived)`}
+                  {viewingProof.is_current
+                    ? `v${viewingProof.version} (current)`
+                    : `v${viewingProof.version} (archived)`}
                 </span>
               </div>
               <button className={styles.proofModalClose} onClick={handleCloseModal} aria-label="Close">
@@ -548,10 +568,10 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
             <div className={styles.proofModalBody}>
               <div className={styles.viewerWrapper}>
                 <ProofViewer
-                  proof={displayedProof}
+                  proof={viewingProof}
                   projectId={project.id}
                   feedbackItems={feedbackItems}
-                  canAddFeedback={!displayedProof.is_final}
+                  canAddFeedback={!viewingProof.is_approved}
                   mentionUsers={mentionUsers}
                   activePinId={activePinId}
                   hoveredPinId={hoveredPinId}
@@ -574,9 +594,9 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                   </span>
                 </div>
 
-                {displayedProof.is_final && (
-                  <div className={styles.finalNotice}>
-                    This proof is marked as final. Feedback is locked.
+                {viewingProof.is_approved && (
+                  <div className={styles.approvedNotice}>
+                    This proof is marked as approved. Feedback is locked.
                   </div>
                 )}
 
@@ -588,8 +608,8 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                     </div>
                   ) : feedbackItems.length === 0 ? (
                     <p className={styles.emptyFeedback}>
-                      {displayedProof.is_final
-                        ? 'No feedback was left on this proof.'
+                      {viewingProof.is_approved
+                        ? 'No feedback was left on this approved proof.'
                         : 'No feedback yet. Leave a comment below or click on the proof to pin a specific spot.'}
                     </p>
                   ) : (
@@ -642,7 +662,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                   )}
                 </div>
 
-                {!displayedProof.is_final && (
+                {!viewingProof.is_approved && (
                   <div className={styles.commentComposer}>
                     <RichTextEditor
                       value={generalComment}
@@ -669,6 +689,279 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   );
 }
 
+// ─── Proof Group Card ──────────────────────────────────────────────────────────
+
+interface ProofGroupCardProps {
+  group: ProofGroup;
+  projectId: string;
+  canEdit: boolean;
+  actionInProgress: string | null;
+  uploadingGroupId: string | null;
+  onOpen: (proof: ProjectProof) => void;
+  onProofAction: (proofId: string, action: string) => void;
+  onDownload: (proof: ProjectProof) => void;
+  onDelete: (proofId: string) => void;
+  onRenameGroup: (groupId: string, name: string) => void;
+  onUploadNewVersion: () => void;
+}
+
+function ProofGroupCard({
+  group,
+  projectId,
+  canEdit,
+  actionInProgress,
+  uploadingGroupId,
+  onOpen,
+  onProofAction,
+  onDownload,
+  onDelete,
+  onRenameGroup,
+  onUploadNewVersion,
+}: ProofGroupCardProps) {
+  const [isArchivedModalOpen, setIsArchivedModalOpen] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(group.name);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  const proof = group.currentProof ?? null;
+  const isUploadingThis = uploadingGroupId === group.id;
+  const archivedCount = group.archivedProofs?.length ?? 0;
+  const isImage = proof?.mime_type.startsWith('image/');
+  const thumbUrl = proof ? `/api/admin/projects/${projectId}/proofs/${proof.id}/url` : null;
+  const uploaderName = proof?.uploaded_by_profile
+    ? `${proof.uploaded_by_profile.first_name} ${proof.uploaded_by_profile.last_name}`
+    : 'Team member';
+
+  const isDeleting = proof ? actionInProgress === `${proof.id}-delete` : false;
+  const isActioning = proof ? (actionInProgress?.startsWith(proof.id) && !isDeleting) : false;
+
+  const startRename = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRenameValue(group.name);
+    setIsRenaming(true);
+    setTimeout(() => renameInputRef.current?.select(), 0);
+  };
+
+  const commitRename = () => {
+    setIsRenaming(false);
+    const trimmed = renameValue.trim();
+    if (trimmed && trimmed !== group.name) {
+      onRenameGroup(group.id, trimmed);
+    } else {
+      setRenameValue(group.name);
+    }
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') commitRename();
+    if (e.key === 'Escape') { setIsRenaming(false); setRenameValue(group.name); }
+  };
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('[data-action]')) return;
+    if (proof) onOpen(proof);
+  };
+
+  useEffect(() => {
+    if (!isArchivedModalOpen) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsArchivedModalOpen(false);
+      }
+    };
+
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isArchivedModalOpen]);
+
+  return (
+    <div className={styles.proofGroups}>
+      <div
+        className={`${styles.proofCard} ${proof?.is_approved ? styles.proofCardApproved : ''}`}
+        onClick={handleCardClick}
+        style={{ cursor: proof ? 'pointer' : 'default' }}
+      >
+        {/* Thumbnail */}
+        <div
+          className={styles.proofCardThumb}
+          data-action="true"
+          onClick={(e) => { e.stopPropagation(); if (proof) onOpen(proof); }}
+        >
+          {proof ? (
+            isImage ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={thumbUrl!} alt={proof.file_name} className={styles.proofCardThumbImg} />
+            ) : (
+              <div className={styles.proofCardThumbDoc}><FileText size={28} /></div>
+            )
+          ) : (
+            <div className={styles.proofCardThumbDoc}><FileText size={28} /></div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className={styles.proofCardInfo}>
+          {/* Group name row — editable */}
+          <div className={styles.groupNameRow} data-action="true">
+            {isRenaming ? (
+              <input
+                ref={renameInputRef}
+                className={styles.groupNameInput}
+                value={renameValue}
+                onChange={(e) => setRenameValue(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={handleRenameKeyDown}
+                onClick={(e) => e.stopPropagation()}
+                autoFocus
+              />
+            ) : (
+              <>
+                <span className={styles.groupNameLabel}>{group.name}</span>
+                {canEdit && (
+                  <button className={styles.groupNameEditButton} onClick={startRename} aria-label="Rename group">
+                    <Pencil size={12} />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {proof ? (
+            <>
+              <div className={styles.proofCardNameRow}>
+                <span className={styles.proofCardName}>{proof.file_name}</span>
+                {proof.is_approved && <span className={styles.approvedBadge}>Approved</span>}
+              </div>
+              <span className={styles.proofCardMeta}>
+                Version {proof.version} · Uploaded by {uploaderName}
+              </span>
+              <span className={styles.proofCardDate}>{formatProofDate(proof.created_at)}</span>
+            </>
+          ) : (
+            <span className={styles.proofCardMeta}>No proof uploaded yet</span>
+          )}
+
+          {/* Action buttons */}
+          <div className={styles.proofCardActions} data-action="true">
+            {canEdit && proof && !proof.is_approved && (
+              <button
+                className={styles.markApprovedButton}
+                onClick={(e) => { e.stopPropagation(); onProofAction(proof.id, 'mark_approved'); }}
+                disabled={!!isActioning}
+              >
+                <CheckCircle size={14} />
+                Mark as Approved
+              </button>
+            )}
+            {canEdit && proof && proof.is_approved && (
+              <button
+                className={styles.unmarkApprovedButton}
+                onClick={(e) => { e.stopPropagation(); onProofAction(proof.id, 'unmark_approved'); }}
+                disabled={!!isActioning}
+              >
+                Unmark Approved
+              </button>
+            )}
+            {canEdit && (
+              <button
+                className={styles.uploadVersionButton}
+                onClick={(e) => { e.stopPropagation(); onUploadNewVersion(); }}
+                disabled={isUploadingThis}
+              >
+                {isUploadingThis ? (
+                  <><span className={styles.uploadSpinnerDark} aria-hidden="true" />Uploading…</>
+                ) : (
+                  <><Upload size={13} />Upload New Version</>
+                )}
+              </button>
+            )}
+            {proof && (
+              <button
+                className={styles.downloadButton}
+                onClick={(e) => { e.stopPropagation(); onDownload(proof); }}
+              >
+                <Download size={14} />
+                Download
+              </button>
+            )}
+            {archivedCount > 0 && (
+              <button
+                className={styles.groupArchivedLink}
+                onClick={(e) => { e.stopPropagation(); setIsArchivedModalOpen(true); }}
+              >
+                View previous versions ({archivedCount})
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Delete current proof */}
+        {canEdit && proof && (
+          <button
+            className={styles.proofCardDelete}
+            data-action="true"
+            onClick={(e) => { e.stopPropagation(); onDelete(proof.id); }}
+            disabled={isDeleting}
+            aria-label="Delete proof"
+          >
+            <Trash2 size={16} />
+          </button>
+        )}
+      </div>
+      {archivedCount > 0 && isArchivedModalOpen && (
+        <div className={styles.archivedVersionsModal}>
+          <div
+            className={styles.archivedVersionsModalBackdrop}
+            onClick={() => setIsArchivedModalOpen(false)}
+          />
+          <div className={styles.archivedVersionsModalContent}>
+            <div className={styles.archivedVersionsModalHeader}>
+              <div className={styles.archivedVersionsModalTitle}>
+                <span className={styles.archivedVersionsGroupName}>{group.name}</span>
+                <span className={styles.archivedVersionsCount}>
+                  {archivedCount} previous version{archivedCount === 1 ? '' : 's'}
+                </span>
+              </div>
+              <button
+                className={styles.proofModalClose}
+                onClick={() => setIsArchivedModalOpen(false)}
+                aria-label="Close previous versions"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className={styles.archivedVersionsModalBody}>
+              <div className={styles.proofList}>
+                {(group.archivedProofs ?? []).map((archived) => (
+                  <ProofCard
+                    key={archived.id}
+                    proof={archived}
+                    projectId={projectId}
+                    canEdit={canEdit}
+                    actionInProgress={actionInProgress}
+                    onOpen={() => {
+                      setIsArchivedModalOpen(false);
+                      onOpen(archived);
+                    }}
+                    onMarkApproved={() => onProofAction(archived.id, 'mark_approved')}
+                    onUnmarkApproved={() => onProofAction(archived.id, 'unmark_approved')}
+                    onRestoreCurrent={() => onProofAction(archived.id, 'restore_current')}
+                    onDownload={() => onDownload(archived)}
+                    onDelete={() => onDelete(archived.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Proof Card ────────────────────────────────────────────────────────────────
 
 interface ProofCardProps {
@@ -677,8 +970,8 @@ interface ProofCardProps {
   canEdit: boolean;
   actionInProgress: string | null;
   onOpen: () => void;
-  onMarkFinal: () => void;
-  onUnmarkFinal: () => void;
+  onMarkApproved: () => void;
+  onUnmarkApproved: () => void;
   onRestoreCurrent?: () => void;
   onDownload: () => void;
   onDelete: () => void;
@@ -690,8 +983,8 @@ function ProofCard({
   canEdit,
   actionInProgress,
   onOpen,
-  onMarkFinal,
-  onUnmarkFinal,
+  onMarkApproved,
+  onUnmarkApproved,
   onRestoreCurrent,
   onDownload,
   onDelete,
@@ -712,7 +1005,7 @@ function ProofCard({
 
   return (
     <div
-      className={`${styles.proofCard} ${proof.is_final ? styles.proofCardFinal : ''}`}
+      className={`${styles.proofCard} ${proof.is_approved ? styles.proofCardApproved : ''}`}
       onClick={handleCardClick}
       style={{ cursor: 'pointer' }}
     >
@@ -732,7 +1025,7 @@ function ProofCard({
       <div className={styles.proofCardInfo}>
         <div className={styles.proofCardNameRow}>
           <span className={styles.proofCardName}>{proof.file_name}</span>
-          {proof.is_final && <span className={styles.finalBadge}>Final Version</span>}
+          {proof.is_approved && <span className={styles.approvedBadge}>Approved</span>}
         </div>
         <span className={styles.proofCardMeta}>
           Version {proof.version} · Uploaded by {uploaderName}
@@ -741,23 +1034,23 @@ function ProofCard({
 
         {/* Action buttons */}
         <div className={styles.proofCardActions} data-action="true">
-          {canEdit && !proof.is_final && (
+          {canEdit && proof.is_current && !proof.is_approved && (
             <button
-              className={styles.markFinalButton}
-              onClick={(e) => { e.stopPropagation(); onMarkFinal(); }}
+              className={styles.markApprovedButton}
+              onClick={(e) => { e.stopPropagation(); onMarkApproved(); }}
               disabled={!!isActioning}
             >
               <CheckCircle size={14} />
-              Mark as Final
+              Mark as Approved
             </button>
           )}
-          {canEdit && proof.is_final && (
+          {canEdit && proof.is_current && proof.is_approved && (
             <button
-              className={styles.unmarkFinalButton}
-              onClick={(e) => { e.stopPropagation(); onUnmarkFinal(); }}
+              className={styles.unmarkApprovedButton}
+              onClick={(e) => { e.stopPropagation(); onUnmarkApproved(); }}
               disabled={!!isActioning}
             >
-              Unmark Final
+              Unmark Approved
             </button>
           )}
           {canEdit && onRestoreCurrent && !proof.is_current && (

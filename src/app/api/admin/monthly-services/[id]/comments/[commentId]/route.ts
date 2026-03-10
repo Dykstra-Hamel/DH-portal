@@ -56,7 +56,7 @@ export async function PUT(
     // Fetch original comment, monthly service details, and commenter profile in parallel
     const [{ data: originalComment }, { data: monthlyService }, { data: commenterProfile }] = await Promise.all([
       supabase.from('monthly_service_comments').select('comment').eq('id', commentId).single(),
-      supabase.from('monthly_services').select('service_name, company_id').eq('id', monthlyServiceId).single(),
+      supabase.from('monthly_services').select('service_name, company_id, company:companies(name)').eq('id', monthlyServiceId).single(),
       supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
     ]);
 
@@ -123,6 +123,7 @@ export async function PUT(
           commenterName,
           contextType: 'monthly_service',
           contextName: monthlyService.service_name,
+          clientName: (monthlyService.company as { name?: string } | null)?.name || null,
           commentText: body.comment,
           deepLinkUrl,
         }).catch(() => {});
@@ -147,6 +148,7 @@ export async function PUT(
           commenterName,
           contextType: 'monthly_service',
           contextName: monthlyService.service_name,
+          clientName: (monthlyService.company as { name?: string } | null)?.name || null,
           commentText: body.comment,
           deepLinkUrl,
         }).catch(() => {});

@@ -5,9 +5,9 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 /**
  * PATCH /api/admin/projects/[id]/proofs/[proofId]
  * Actions:
- *   { action: 'mark_final' }      — set is_final = true (disables new feedback)
- *   { action: 'unmark_final' }    — set is_final = false
- *   { action: 'restore_current' } — make this proof current, archive the current one
+ *   { action: 'mark_approved' }    — set is_approved = true (disables new feedback)
+ *   { action: 'unmark_approved' }  — set is_approved = false
+ *   { action: 'restore_current' }  — make this proof current, archive the current one
  */
 export async function PATCH(
   request: NextRequest,
@@ -25,38 +25,38 @@ export async function PATCH(
     const body = await request.json();
     const { action } = body;
 
-    if (!['mark_final', 'unmark_final', 'restore_current'].includes(action)) {
+    if (!['mark_approved', 'unmark_approved', 'restore_current'].includes(action)) {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
     }
 
     const adminClient = createAdminClient();
 
-    if (action === 'mark_final') {
+    if (action === 'mark_approved') {
       const { data: proof, error } = await adminClient
         .from('project_proofs')
-        .update({ is_final: true, updated_at: new Date().toISOString() })
+        .update({ is_approved: true, updated_at: new Date().toISOString() })
         .eq('id', proofId)
         .eq('project_id', projectId)
         .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)`)
         .single();
 
       if (error || !proof) {
-        return NextResponse.json({ error: 'Failed to mark proof as final' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to mark proof as approved' }, { status: 500 });
       }
       return NextResponse.json({ proof });
     }
 
-    if (action === 'unmark_final') {
+    if (action === 'unmark_approved') {
       const { data: proof, error } = await adminClient
         .from('project_proofs')
-        .update({ is_final: false, updated_at: new Date().toISOString() })
+        .update({ is_approved: false, updated_at: new Date().toISOString() })
         .eq('id', proofId)
         .eq('project_id', projectId)
         .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)`)
         .single();
 
       if (error || !proof) {
-        return NextResponse.json({ error: 'Failed to unmark proof as final' }, { status: 500 });
+        return NextResponse.json({ error: 'Failed to unmark proof as approved' }, { status: 500 });
       }
       return NextResponse.json({ proof });
     }
@@ -65,7 +65,7 @@ export async function PATCH(
       // Verify the target proof exists and belongs to this project
       const { data: targetProof, error: targetError } = await adminClient
         .from('project_proofs')
-        .select('id, project_id, is_current')
+        .select('id, project_id, group_id, is_current')
         .eq('id', proofId)
         .eq('project_id', projectId)
         .single();
@@ -78,11 +78,11 @@ export async function PATCH(
         return NextResponse.json({ error: 'Proof is already current' }, { status: 400 });
       }
 
-      // Step 1: archive the existing current proof
+      // Step 1: archive the existing current proof within this group only
       await adminClient
         .from('project_proofs')
         .update({ is_current: false, updated_at: new Date().toISOString() })
-        .eq('project_id', projectId)
+        .eq('group_id', targetProof.group_id)
         .eq('is_current', true);
 
       // Step 2: restore target proof as current

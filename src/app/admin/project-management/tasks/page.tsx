@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useUser } from '@/hooks/useUser';
@@ -9,9 +9,12 @@ import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
+import { ViewToggle } from '@/components/Common/ViewToggle/ViewToggle';
+import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
 import { Task } from '@/types/taskManagement';
-import { ProjectTask, Project, User } from '@/types/project';
+import { ProjectTask, Project, User, statusOptions as projectStatusOptions } from '@/types/project';
 import { createClient } from '@/lib/supabase/client';
+import { LayoutList, CalendarDays, Archive, Search } from 'lucide-react';
 import styles from '@/app/project-management/projectManagement.module.scss';
 
 type ViewType = 'list' | 'calendar' | 'archive';
@@ -74,7 +77,7 @@ const setBooleanCookie = (name: string, value: boolean, days = 365) => {
 };
 
 export default function AdminTasksPage() {
-  const { registerPageAction } = usePageActions();
+  const { registerPageAction, setPageHeader } = usePageActions();
   const { markAsRead } = useNotificationContext();
   const { user } = useUser();
   const { isStarred, toggleStar, refetch: refetchStarredItems } = useStarredItems();
@@ -106,6 +109,21 @@ export default function AdminTasksPage() {
     useState(false);
   const [projectsCardPreferenceLoaded, setProjectsCardPreferenceLoaded] =
     useState(false);
+
+  // Filter state (lifted from TaskListView)
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [companyFilter, setCompanyFilter] = useState('all');
+  const [dueDateFilter, setDueDateFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when it opens
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
 
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
@@ -170,6 +188,23 @@ export default function AdminTasksPage() {
     return meta;
   }, [tasks]);
 
+  const companyOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    projects.forEach(project => {
+      if (project.company?.id && project.company?.name) {
+        map.set(project.company.id, project.company.name);
+      }
+    });
+    Object.values(monthlyServiceMetaByTaskId).forEach(meta => {
+      if (meta.companyId && meta.companyName) {
+        map.set(meta.companyId, meta.companyName);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects, monthlyServiceMetaByTaskId]);
+
   // Calculate task stats by project for progress bars
   const taskStatsByProject = useMemo(() => {
     const stats: Record<string, { completed: number; total: number }> = {};
@@ -202,6 +237,95 @@ export default function AdminTasksPage() {
       setShowTaskModal(true);
     });
   }, [registerPageAction]);
+
+  // Set page header with view toggle and filters
+  useEffect(() => {
+    setPageHeader({
+      title: 'My Tasks',
+      description: 'Your assigned tasks across all projects',
+      customActions: (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+          <div className={`${styles.searchToggleWrapper} ${isSearchOpen ? styles.searchToggleWrapperOpen : ''}`}>
+            <button
+              className={styles.searchIconButton}
+              type="button"
+              aria-label="Search tasks"
+              onClick={() => setIsSearchOpen(true)}
+            >
+              <Search size={16} />
+            </button>
+            <div className={`${styles.searchExpandable} ${isSearchOpen ? styles.searchExpandableOpen : ''}`}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className={styles.searchExpandableInput}
+                onBlur={() => { if (!searchQuery) setIsSearchOpen(false); }}
+                onKeyDown={e => { if (e.key === 'Escape') { setIsSearchOpen(false); setSearchQuery(''); } }}
+              />
+            </div>
+          </div>
+          <ViewToggle
+            value={currentView}
+            onChange={(v) => setCurrentView(v as ViewType)}
+            options={[
+              { value: 'list', icon: <LayoutList size={16} />, label: 'List' },
+              { value: 'calendar', icon: <CalendarDays size={16} />, label: 'Calendar' },
+              { value: 'archive', icon: <Archive size={16} />, label: 'Archive' },
+            ]}
+          />
+          <FilterPanel
+            onClearAll={() => {
+              setStatusFilter('all');
+              setCompanyFilter('all');
+              setDueDateFilter('all');
+            }}
+            filters={[
+              {
+                key: 'company',
+                label: 'Company',
+                value: companyFilter === 'all' ? null : companyFilter,
+                options: [
+                  { value: null, label: 'All Companies' },
+                  ...companyOptions.map(c => ({ value: c.id, label: c.name })),
+                ],
+                onChange: (v) => setCompanyFilter(v ?? 'all'),
+                searchable: true,
+              },
+              ...(currentView !== 'archive' ? [
+                {
+                  key: 'dueDate',
+                  label: 'Due Date',
+                  value: dueDateFilter === 'all' ? null : dueDateFilter,
+                  options: [
+                    { value: null, label: 'All Due Dates' },
+                    { value: 'today', label: 'Today' },
+                    { value: 'this_week', label: 'This Week' },
+                    { value: 'this_month', label: 'This Month' },
+                    { value: 'next_30_days', label: 'Next 30 Days' },
+                  ],
+                  onChange: (v: string | null) => setDueDateFilter(v ?? 'all'),
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  value: statusFilter === 'all' ? null : statusFilter,
+                  options: [
+                    { value: null, label: 'All Statuses' },
+                    ...projectStatusOptions.map(s => ({ value: s.value, label: s.label })),
+                  ],
+                  onChange: (v: string | null) => setStatusFilter(v ?? 'all'),
+                },
+              ] : []),
+            ]}
+          />
+        </div>
+      ),
+    });
+    return () => setPageHeader(null);
+  }, [currentView, companyFilter, dueDateFilter, statusFilter, searchQuery, isSearchOpen, companyOptions, setPageHeader]);
 
   // Fetch tasks from admin API
   const fetchTasks = useCallback(async () => {
@@ -770,38 +894,6 @@ export default function AdminTasksPage() {
     );
   }, [projectsCardExpandPreference, projectsCardPreferenceLoaded]);
 
-  const viewTabs = (
-    <div className={styles.viewTabs}>
-      <button
-        className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
-        onClick={() => setCurrentView('list')}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
-          <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        List
-      </button>
-      <button
-        className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
-        onClick={() => setCurrentView('calendar')}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
-          <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Calendar
-      </button>
-      <button
-        className={`${styles.viewTab} ${currentView === 'archive' ? styles.active : ''}`}
-        onClick={() => setCurrentView('archive')}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M2 5L8 2L14 5M2 5V12L8 15M2 5L8 8M14 5V12L8 15M14 5L8 8M8 8V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Archive
-      </button>
-    </div>
-  );
-
   const isProjectCompletedStatus = (status?: string | null) =>
     status === 'complete' || status === 'completed';
 
@@ -863,11 +955,6 @@ export default function AdminTasksPage() {
         ) : (
           <div className={styles.taskPageLayout}>
             <div className={styles.taskMainContent}>
-              {currentView === 'calendar' && (
-                <div className={styles.taskViewTabsRow}>
-                  {viewTabs}
-                </div>
-              )}
               {currentView === 'list' && (
                 <TaskListView
                   tasks={projectTasks}
@@ -882,7 +969,11 @@ export default function AdminTasksPage() {
                   onUpdateTask={handleInlineTaskUpdate}
                   currentUserId={user?.id}
                   groupTasksByProject
-                  viewTabsElement={viewTabs}
+                  statusFilter={statusFilter}
+                  companyFilter={companyFilter}
+                  dueDateFilter={dueDateFilter}
+                  searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
                   personalTasks={personalTasks}
                   monthlyServices={monthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
@@ -928,7 +1019,9 @@ export default function AdminTasksPage() {
                   onUpdateTask={handleInlineTaskUpdate}
                   currentUserId={user?.id}
                   groupTasksByProject
-                  viewTabsElement={viewTabs}
+                  companyFilter={companyFilter}
+                  searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
                   personalTasks={completedPersonalTasks}
                   monthlyServices={completedMonthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}

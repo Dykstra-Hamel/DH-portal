@@ -101,20 +101,6 @@ const formatAssigneeName = (
   return `${profile.first_name} ${lastInitial}.`;
 };
 
-const getProjectStaleness = (
-  project: Project
-): 'fresh' | 'stale-2' | 'stale-3' => {
-  if (!project.updated_at) return 'fresh';
-  const updatedDate = new Date(project.updated_at);
-  const today = new Date();
-  const diffTime = Math.abs(today.getTime() - updatedDate.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays >= 10) return 'stale-3';
-  if (diffDays >= 5) return 'stale-2';
-  return 'fresh';
-};
-
 export function ProjectCard({
   project,
   onProjectClick,
@@ -126,7 +112,6 @@ export function ProjectCard({
 }: ProjectCardProps) {
   const progress = calculateProgress(project, taskStats);
   const userProgress = userTaskStats;
-  const staleness = getProjectStaleness(project);
   const dropdownStatusOptions = (() => {
     const hasPrintCategory =
       project.categories?.some(category =>
@@ -191,7 +176,7 @@ export function ProjectCard({
 
   return (
     <div
-      className={`${styles.projectCard} ${staleness === 'stale-2' ? styles.staleCard2 : ''} ${staleness === 'stale-3' ? styles.staleCard3 : ''} ${project.has_unread_mentions ? styles.hasMentionBorder : ''}`}
+      className={`${styles.projectCard} ${project.has_unread_mentions ? styles.hasMentionBorder : ''}`}
       onClick={() => onProjectClick?.(project)}
     >
       {/* New Comment Badge */}

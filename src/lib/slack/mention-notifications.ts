@@ -6,6 +6,7 @@ interface MentionNotificationData {
   commenterName: string;
   contextType: 'project' | 'task' | 'monthly_service';
   contextName: string;
+  clientName?: string | null;
   commentText: string;
   deepLinkUrl: string;
 }
@@ -14,25 +15,37 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, '');
 }
 
-function buildContextLine(commenterName: string, contextType: MentionNotificationData['contextType'], contextName: string): string {
+function buildContextLine(
+  commenterName: string,
+  contextType: MentionNotificationData['contextType'],
+  contextName: string,
+  clientName?: string | null
+): string {
+  const clientSuffix = clientName ? ` for *${clientName}*` : '';
   switch (contextType) {
     case 'project':
-      return `*${commenterName}* tagged you in a comment on project *${contextName}*`;
+      return `*${commenterName}* tagged you in a comment on project *${contextName}*${clientSuffix}`;
     case 'task':
-      return `*${commenterName}* tagged you in a comment on task *${contextName}*`;
+      return `*${commenterName}* tagged you in a comment on task *${contextName}*${clientSuffix}`;
     case 'monthly_service':
-      return `*${commenterName}* tagged you in a comment on service *${contextName}*`;
+      return `*${commenterName}* tagged you in a comment on service *${contextName}*${clientSuffix}`;
   }
 }
 
-function buildEditContextLine(commenterName: string, contextType: MentionNotificationData['contextType'], contextName: string): string {
+function buildEditContextLine(
+  commenterName: string,
+  contextType: MentionNotificationData['contextType'],
+  contextName: string,
+  clientName?: string | null
+): string {
+  const clientSuffix = clientName ? ` for *${clientName}*` : '';
   switch (contextType) {
     case 'project':
-      return `*${commenterName}* edited a comment you were tagged in on project *${contextName}*`;
+      return `*${commenterName}* edited a comment you were tagged in on project *${contextName}*${clientSuffix}`;
     case 'task':
-      return `*${commenterName}* edited a comment you were tagged in on task *${contextName}*`;
+      return `*${commenterName}* edited a comment you were tagged in on task *${contextName}*${clientSuffix}`;
     case 'monthly_service':
-      return `*${commenterName}* edited a comment you were tagged in on service *${contextName}*`;
+      return `*${commenterName}* edited a comment you were tagged in on service *${contextName}*${clientSuffix}`;
   }
 }
 
@@ -41,7 +54,12 @@ export async function sendMentionSlackNotifications(data: MentionNotificationDat
   if (!process.env.SLACK_BOT_TOKEN) return;
 
   const client = new WebClient(process.env.SLACK_BOT_TOKEN);
-  const contextLine = buildContextLine(data.commenterName, data.contextType, data.contextName);
+  const contextLine = buildContextLine(
+    data.commenterName,
+    data.contextType,
+    data.contextName,
+    data.clientName
+  );
   const plainText = stripHtml(data.commentText).slice(0, 500);
 
   const blocks: any[] = [
@@ -84,7 +102,7 @@ export async function sendMentionSlackNotifications(data: MentionNotificationDat
 
     await client.chat.postMessage({
       channel: slackUserId,
-      text: `${data.commenterName} tagged you in a comment on ${data.contextName}`,
+      text: `${data.commenterName} tagged you in a comment on ${data.contextName}${data.clientName ? ` for ${data.clientName}` : ''}`,
       blocks,
     });
   });
@@ -97,7 +115,12 @@ export async function sendEditedCommentSlackNotifications(data: MentionNotificat
   if (!process.env.SLACK_BOT_TOKEN) return;
 
   const client = new WebClient(process.env.SLACK_BOT_TOKEN);
-  const contextLine = buildEditContextLine(data.commenterName, data.contextType, data.contextName);
+  const contextLine = buildEditContextLine(
+    data.commenterName,
+    data.contextType,
+    data.contextName,
+    data.clientName
+  );
   const plainText = stripHtml(data.commentText).slice(0, 500);
 
   const blocks: any[] = [
@@ -140,7 +163,7 @@ export async function sendEditedCommentSlackNotifications(data: MentionNotificat
 
     await client.chat.postMessage({
       channel: slackUserId,
-      text: `${data.commenterName} edited a comment you were tagged in on ${data.contextName}`,
+      text: `${data.commenterName} edited a comment you were tagged in on ${data.contextName}${data.clientName ? ` for ${data.clientName}` : ''}`,
       blocks,
     });
   });

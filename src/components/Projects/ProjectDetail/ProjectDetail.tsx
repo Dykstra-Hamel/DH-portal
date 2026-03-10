@@ -18,6 +18,7 @@ import {
   CheckSquare,
   Plus,
   X,
+  Settings,
 } from 'lucide-react';
 import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
@@ -69,12 +70,16 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     completion_date: project.completion_date || '',
     project_type: project.project_type || '',
     project_subtype: project.project_subtype || '',
+    project_subtype_id: project.project_subtype_id || null as string | null,
     is_billable: project.is_billable || false,
     quoted_price: project.quoted_price?.toString() || '',
     scope: project.scope || '',
     category_ids: project.categories?.map(c => c.category_id) || [],
     company_id: project.company?.id || '',
   }));
+  const [customAttributeValues, setCustomAttributeValues] = useState<Record<string, string | number | null>>(
+    project.custom_attribute_values || {}
+  );
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
@@ -94,6 +99,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
   const hasUserEditedRef = React.useRef(false);
   const saveTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastSavedDataRef = React.useRef<string>('');
+  const specsTimeoutRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingSpecValuesRef = React.useRef<Record<string, string | number | null>>({});
 
   // Filter status options based on project categories and is_billable
   const availableStatusOptions = useMemo(() => {
@@ -247,6 +254,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       completion_date: source.completion_date || '',
       project_type: source.project_type || '',
       project_subtype: source.project_subtype || '',
+      project_subtype_id: source.project_subtype_id || null as string | null,
       is_billable: source.is_billable || false,
       quoted_price: source.quoted_price?.toString() || '',
       scope: source.scope || '',
@@ -357,6 +365,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           completion_date: editFormData.completion_date || null,
           project_type: editFormData.project_type,
           project_subtype: editFormData.project_subtype || null,
+          project_subtype_id: editFormData.project_subtype_id || null,
           is_billable: editFormData.is_billable,
           quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
           scope: editFormData.scope || null,
@@ -452,6 +461,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           completion_date: editFormData.completion_date || null,
           project_type: editFormData.project_type,
           project_subtype: editFormData.project_subtype || null,
+          project_subtype_id: editFormData.project_subtype_id || null,
           is_billable: editFormData.is_billable,
           quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
           scope: editFormData.scope || null,
@@ -700,6 +710,39 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
   };
 
+  const handleCustomAttributeChange = React.useCallback((fieldId: string, value: string | number | null, immediate = false) => {
+    const newValues = { ...customAttributeValues, [fieldId]: value };
+    setCustomAttributeValues(newValues);
+    pendingSpecValuesRef.current = newValues;
+
+    if (specsTimeoutRef.current) {
+      clearTimeout(specsTimeoutRef.current);
+    }
+
+    const doSave = async () => {
+      try {
+        const res = await fetch(`/api/admin/projects/${project.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ custom_attribute_values: pendingSpecValuesRef.current }),
+        });
+        if (res.ok) {
+          setToastMessage('Specs saved.');
+          setToastType('success');
+          setShowToast(true);
+        }
+      } catch (error) {
+        console.error('Error saving custom attribute value:', error);
+      }
+    };
+
+    if (immediate) {
+      doSave();
+    } else {
+      specsTimeoutRef.current = setTimeout(doSave, 1500);
+    }
+  }, [customAttributeValues, project.id]);
+
   const handleCardExpand = (cardId: string) => {
     setExpandedCardId(cardId);
     if (!isSidebarExpanded) {
@@ -824,10 +867,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 className={styles.editSelect}
                 value={editFormData.project_subtype}
                 onChange={(e) => {
+                  const selectedSubtype = availableSubtypes.find(s => s.name === e.target.value);
                   hasUserEditedRef.current = true;
                   setEditFormData({
                     ...editFormData,
                     project_subtype: e.target.value,
+                    project_subtype_id: selectedSubtype?.id || null,
                   });
                 }}
                 disabled={isFetchingSubtypes}
@@ -964,6 +1009,64 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           )}
         </div>
       </InfoCard>
+
+      {(() => {
+        const subtype = project.project_subtype_details;
+        const hasSpecs = subtype?.has_custom_attributes && subtype.custom_attribute_schema.length > 0;
+        if (!hasSpecs) return null;
+        return (
+          <InfoCard
+            title="Specs"
+            icon={<Settings size={20} />}
+            startExpanded={false}
+            onExpand={() => handleCardExpand('specifications')}
+            onCollapse={() => handleCardCollapse('specifications')}
+            forceCollapse={shouldForceCollapse('specifications')}
+            forceExpand={shouldForceExpand('specifications')}
+            isCompact={!isSidebarExpanded}
+            inSidebar={true}
+          >
+            <div className={`${styles.cardContent} ${styles.cardContentFlushLeft}`}>
+              <div className={styles.specsGrid}>
+                {subtype!.custom_attribute_schema.map((field) => (
+                  <div
+                    key={field.id}
+                    className={`${styles.specsField} ${(field.columns ?? 2) === 1 ? styles.specsFieldHalf : styles.specsFieldFull}`}
+                  >
+                    <div className={styles.infoLabel}>{field.label}</div>
+                    {field.type === 'select' ? (
+                      <select
+                        className={styles.editSelect}
+                        value={(customAttributeValues[field.id] as string) || ''}
+                        onChange={(e) => handleCustomAttributeChange(field.id, e.target.value || null, true)}
+                      >
+                        <option value="">Not set</option>
+                        {(field.options || []).map((opt) => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
+                    ) : field.type === 'textarea' ? (
+                      <textarea
+                        className={styles.editInput}
+                        value={(customAttributeValues[field.id] as string) || ''}
+                        onChange={(e) => handleCustomAttributeChange(field.id, e.target.value || null)}
+                        rows={3}
+                      />
+                    ) : (
+                      <input
+                        type={field.type === 'number' ? 'number' : 'text'}
+                        className={styles.editInput}
+                        value={(customAttributeValues[field.id] as string | number) ?? ''}
+                        onChange={(e) => handleCustomAttributeChange(field.id, e.target.value || null)}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </InfoCard>
+        );
+      })()}
 
       <InfoCard
         title="Notes"

@@ -178,6 +178,70 @@
   }
 }
 
+// Expandable search toggle (icon-only until clicked, underline on open)
+.searchToggleWrapper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-bottom: 1px solid transparent;
+  flex-shrink: 0;
+  transition: border-bottom-color 0.2s ease;
+
+  &.searchToggleWrapperOpen {
+    border-bottom-color: var(--gray-300, #d1d5db);
+  }
+
+  &:focus-within {
+    border-bottom-color: var(--gray-800, #252c37);
+  }
+}
+
+.searchIconButton {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  color: var(--gray-400, #9ca3af);
+  flex-shrink: 0;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--gray-700, #374151);
+  }
+
+  .searchToggleWrapperOpen & {
+    color: var(--gray-700, #374151);
+  }
+}
+
+.searchExpandable {
+  width: 0;
+  overflow: hidden;
+  transition: width 0.25s ease;
+
+  &.searchExpandableOpen {
+    width: 160px;
+  }
+}
+
+.searchExpandableInput {
+  width: 160px;
+  padding: 0 0 0 4px;
+  font-family: var(--font-satoshi);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-800, #252c37);
+  background: transparent;
+  border: none;
+  outline: none;
+
+  &::placeholder {
+    color: var(--gray-400, #9ca3af);
+  }
+}
+
 .filterControls {
   display: flex;
   align-items: flex-end;

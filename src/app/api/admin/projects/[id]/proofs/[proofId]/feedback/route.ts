@@ -141,7 +141,7 @@ export async function POST(
     // Collect all project members for notifications
     const { data: project } = await adminClient
       .from('projects')
-      .select('name, company_id, requested_by, assigned_to, members:project_members(user_id)')
+      .select('name, company_id, company:companies(name), requested_by, assigned_to, members:project_members(user_id)')
       .eq('id', projectId)
       .single();
 
@@ -170,6 +170,7 @@ export async function POST(
         recipientUserIds: broadcastRecipientIds,
         authorName,
         projectName: project.name,
+        clientName: (project.company as { name?: string } | null)?.name || null,
         comment,
         deepLinkUrl,
       }).catch(() => {});
@@ -220,6 +221,7 @@ export async function POST(
           commenterName: authorName,
           contextType: 'project',
           contextName: project.name,
+          clientName: (project.company as { name?: string } | null)?.name || null,
           commentText: comment,
           deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL || ''}/admin/project-management/${projectId}?tab=proofs&proofId=${proofId}&proofFeedbackId=${feedbackRow.id}`,
         }).catch(() => {});

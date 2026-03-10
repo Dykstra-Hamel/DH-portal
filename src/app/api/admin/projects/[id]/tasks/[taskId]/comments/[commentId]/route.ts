@@ -52,7 +52,7 @@ export async function PATCH(
     // Fetch original comment and context data in parallel
     const [{ data: originalComment }, { data: task }, { data: commenterProfile }] = await Promise.all([
       supabase.from('project_task_comments').select('comment').eq('id', commentId).single(),
-      supabase.from('project_tasks').select('id, title, projects(id, name, company_id)').eq('id', taskId).single(),
+      supabase.from('project_tasks').select('id, title, projects(id, name, company_id, company:companies(name))').eq('id', taskId).single(),
       supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
     ]);
 
@@ -85,7 +85,12 @@ export async function PATCH(
     }
 
     if (task) {
-      const project = (task.projects as unknown) as { id: string; name: string; company_id: string } | null;
+      const project = (task.projects as unknown) as {
+        id: string;
+        name: string;
+        company_id: string;
+        company?: { name?: string } | null;
+      } | null;
       const newMentions = extractMentionedUserIds(body.comment);
       const deepLinkUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?taskId=${taskId}&commentId=${commentId}`;
 
@@ -111,6 +116,7 @@ export async function PATCH(
           commenterName,
           contextType: 'task',
           contextName: task.title,
+          clientName: project?.company?.name || null,
           commentText: body.comment,
           deepLinkUrl,
         }).catch(() => {});
@@ -135,6 +141,7 @@ export async function PATCH(
           commenterName,
           contextType: 'task',
           contextName: task.title,
+          clientName: project?.company?.name || null,
           commentText: body.comment,
           deepLinkUrl,
         }).catch(() => {});

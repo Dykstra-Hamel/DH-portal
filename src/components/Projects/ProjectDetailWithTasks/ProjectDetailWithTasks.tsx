@@ -670,7 +670,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   }, [project, router]);
 
   const handleBackToProjects = useCallback(() => {
-    router.push('/admin/project-management');
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/admin/project-management');
+    }
   }, [router]);
 
   const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null; current_department_id?: string | null }) => {

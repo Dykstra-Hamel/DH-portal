@@ -95,8 +95,12 @@ interface TaskListViewProps {
   ) => Promise<void> | void;
   groupTasksByProject?: boolean;
   currentUserId?: string;
-  viewTabsElement?: React.ReactNode;
   personalTasks?: Task[];
+  statusFilter?: string;
+  companyFilter?: string;
+  dueDateFilter?: string;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
   monthlyServices?: Task[];
   monthlyServiceMetaByTaskId?: Record<
     string,
@@ -135,8 +139,12 @@ export function TaskListView({
   onUpdateTask,
   groupTasksByProject = false,
   currentUserId,
-  viewTabsElement,
   personalTasks,
+  statusFilter: statusFilterProp,
+  companyFilter: companyFilterProp,
+  dueDateFilter: dueDateFilterProp,
+  searchQuery: searchQueryProp,
+  onSearchQueryChange,
   monthlyServices,
   monthlyServiceMetaByTaskId,
   mentions,
@@ -153,9 +161,10 @@ export function TaskListView({
   onProjectsCardExpandPreferenceChange,
   archiveMode = false,
 }: TaskListViewProps) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
+  const statusFilter = (statusFilterProp ?? 'all') as StatusFilter;
+  const companyFilter = companyFilterProp ?? 'all';
+  const dueDateFilter = (dueDateFilterProp ?? 'all') as DueDateFilter;
+  const searchQuery = searchQueryProp ?? '';
   const [archiveDateFrom, setArchiveDateFrom] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -164,7 +173,6 @@ export function TaskListView({
   const [archiveDateTo, setArchiveDateTo] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('due_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -1664,11 +1672,46 @@ export function TaskListView({
       return parsed ? parsed.getTime() : Number.POSITIVE_INFINITY;
     };
 
+    const cwoProjectIdsWithTasks = starredProjectGroups
+      .filter(g => g.project?.id && g.tasks.length > 0)
+      .map(g => g.project!.id);
+
+    const areAllCWOExpanded =
+      cwoProjectIdsWithTasks.length === 0
+        ? false
+        : cwoProjectIdsWithTasks.every(id => expandedWorkingOnProjects[id] !== false);
+
+    const setAllCWOExpanded = (nextExpanded: boolean) => {
+      setExpandedWorkingOnProjects(prev => {
+        const next = { ...prev };
+        cwoProjectIdsWithTasks.forEach(id => { next[id] = nextExpanded; });
+        return next;
+      });
+    };
+
     return (
       <InfoCard
         title="Currently Working On"
         isCollapsible={true}
         startExpanded={true}
+        headerRight={
+          cwoProjectIdsWithTasks.length > 0 ? (
+            <div className={styles.projectsCardHeaderToggleRow}>
+              <label className={styles.projectsCardToggle}>
+                <input
+                  type="checkbox"
+                  checked={areAllCWOExpanded}
+                  onChange={event => setAllCWOExpanded(event.target.checked)}
+                  aria-label="Expand all working-on projects"
+                />
+                <span className={styles.projectsCardToggleSlider}></span>
+              </label>
+              <span className={styles.projectsCardToggleText}>
+                {areAllCWOExpanded ? 'Collapse' : 'Expand'}
+              </span>
+            </div>
+          ) : undefined
+        }
       >
         <div className={styles.starredProjectsList}>
           {starredProjectGroups.length > 0 && (
@@ -1678,8 +1721,8 @@ export function TaskListView({
                 const projectId = projectGroup.project?.id;
                 const hasTasks = projectGroup.tasks.length > 0;
                 const isExpanded = projectId
-                  ? !!expandedWorkingOnProjects[projectId]
-                  : false;
+                  ? expandedWorkingOnProjects[projectId] !== false
+                  : true;
                 const projectName = projectGroup.project?.name || 'No Project';
                 const projectCode = projectGroup.project?.shortcode
                   ? formatProjectShortcode(projectGroup.project.shortcode)
@@ -1735,9 +1778,16 @@ export function TaskListView({
                           />
                         </div>
                       )}
-                      <span className={styles.projectGroupTitle}>
-                        {projectName}
-                      </span>
+                      <div className={styles.projectGroupTitleStack}>
+                        <span className={styles.projectGroupTitle}>
+                          {projectName}
+                        </span>
+                        {projectCode && (
+                          <span className={styles.projectGroupCode}>
+                            {projectCode}
+                          </span>
+                        )}
+                      </div>
                       <div className={styles.projectHeaderRight}>
                         {projectGroup.project && (
                           <div
@@ -1783,11 +1833,14 @@ export function TaskListView({
                             <span>{formatDate(projectDueDate)}</span>
                           </span>
                         )}
-                        {projectCode && (
-                          <span className={styles.projectGroupCode}>
-                            {projectCode}
-                          </span>
-                        )}
+                        {projectGroup.project?.status && (() => {
+                          const statusOption = projectStatusOptions.find(s => s.value === projectGroup.project!.status);
+                          return statusOption ? (
+                            <span className={styles.projectGroupCode} style={{ color: statusOption.color }}>
+                              {statusOption.label}
+                            </span>
+                          ) : null;
+                        })()}
                         {projectGroup.project && onToggleStarProject && (
                           <div className={styles.projectStarAction}>
                             <StarButton
@@ -2479,99 +2532,26 @@ export function TaskListView({
 
   return (
     <div className={styles.tasksContainer}>
-      {/* Filters and View Tabs */}
-      <div className={styles.filtersAndViewTabs}>
-        <div className={styles.filters}>
-          <div className={styles.searchBar}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M14 14L10.5 10.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+      {/* Archive date range */}
+      {archiveMode && (
+        <div className={styles.taskListTopBar}>
+          <div className={styles.dateRangeFilter}>
             <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className={styles.searchInput}
+              type="date"
+              className={styles.filterDateInput}
+              value={archiveDateFrom}
+              onChange={e => setArchiveDateFrom(e.target.value)}
+            />
+            <span className={styles.dateRangeSeparator}>to</span>
+            <input
+              type="date"
+              className={styles.filterDateInput}
+              value={archiveDateTo}
+              onChange={e => setArchiveDateTo(e.target.value)}
             />
           </div>
-
-          <select
-            className={styles.filterSelect}
-            value={companyFilter}
-            onChange={e => setCompanyFilter(e.target.value)}
-          >
-            <option value="all">All Companies</option>
-            {companyOptions.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-
-          {archiveMode ? (
-            <div className={styles.dateRangeFilter}>
-              <input
-                type="date"
-                className={styles.filterDateInput}
-                value={archiveDateFrom}
-                onChange={e => setArchiveDateFrom(e.target.value)}
-              />
-              <span className={styles.dateRangeSeparator}>to</span>
-              <input
-                type="date"
-                className={styles.filterDateInput}
-                value={archiveDateTo}
-                onChange={e => setArchiveDateTo(e.target.value)}
-              />
-            </div>
-          ) : (
-            <select
-              className={styles.filterSelect}
-              value={dueDateFilter}
-              onChange={e => setDueDateFilter(e.target.value as DueDateFilter)}
-            >
-              <option value="all">All Due Dates</option>
-              <option value="today">Today</option>
-              <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
-              <option value="next_30_days">Next 30 Days</option>
-            </select>
-          )}
-
-          {!archiveMode && (
-            <select
-              className={styles.filterSelect}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              <option value="all">All Status</option>
-              {projectStatusOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
-
-        {/* View Tabs */}
-        {viewTabsElement && (
-          <div className={styles.viewTabsWrapper}>{viewTabsElement}</div>
-        )}
-      </div>
+      )}
 
       {/* Tasks List */}
       {groupTasksByProject ? (
@@ -2717,9 +2697,16 @@ export function TaskListView({
                               </div>
                             )}
 
-                            <span className={styles.projectGroupTitle}>
-                              {projectName}
-                            </span>
+                            <div className={styles.projectGroupTitleStack}>
+                              <span className={styles.projectGroupTitle}>
+                                {projectName}
+                              </span>
+                              {projectCode && (
+                                <span className={styles.projectGroupCode}>
+                                  {projectCode}
+                                </span>
+                              )}
+                            </div>
                             <div className={styles.projectHeaderRight}>
                               {projectGroup.project && (
                                 <div
@@ -2765,11 +2752,14 @@ export function TaskListView({
                                   <span>{formatDate(projectDueDate)}</span>
                                 </span>
                               )}
-                              {projectCode && (
-                                <span className={styles.projectGroupCode}>
-                                  {projectCode}
-                                </span>
-                              )}
+                              {projectGroup.project?.status && (() => {
+                                const statusOption = projectStatusOptions.find(s => s.value === projectGroup.project!.status);
+                                return statusOption ? (
+                                  <span className={styles.projectGroupCode} style={{ color: statusOption.color }}>
+                                    {statusOption.label}
+                                  </span>
+                                ) : null;
+                              })()}
                               {projectGroup.project && onToggleStarProject && (
                                 <div className={styles.projectStarAction}>
                                   <StarButton

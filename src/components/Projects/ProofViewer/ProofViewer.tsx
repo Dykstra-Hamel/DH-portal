@@ -131,6 +131,7 @@ export default function ProofViewer({
             }}
             onLoadError={() => setIsProofLoading(false)}
             className={styles.pdfDocument}
+            loading={null}
           >
             <Page
               pageNumber={currentPage}
