@@ -45,6 +45,10 @@
   --gray-800: #252c37;
   --gray-900: #161a22;
   --gray-950: #0c0e12;
+  --ui-gray-200: #e5e7eb;
+  --ui-gray-800: #252c37;
+  --UI-Gray-200: var(--ui-gray-200);
+  --UI-Gray-800: var(--ui-gray-800);
 
   /* Slates */
   --slate-50: #fafafc;

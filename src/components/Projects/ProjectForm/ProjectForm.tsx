@@ -593,7 +593,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                 <select
                   value={formData.project_subtype}
                   onChange={e => {
-                    setFormData({ ...formData, project_subtype: e.target.value });
+                    const selectedSubtype = availableSubtypes.find(s => s.name === e.target.value);
+                    setFormData({ ...formData, project_subtype: e.target.value, project_subtype_id: selectedSubtype?.id || '' });
                   }}
                   disabled={isFetchingSubtypes}
                 >
@@ -601,7 +602,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
                     {isFetchingSubtypes ? 'Loading subtypes...' : availableSubtypes.length === 0 ? 'No subtypes available' : 'Select Subtype'}
                   </option>
                   {availableSubtypes.map(subtype => (
-                    <option key={subtype.id} value={subtype.name}>
+                    <option key={subtype.id} value={subtype.name} data-id={subtype.id}>
                       {subtype.name}
                     </option>
                   ))}

@@ -128,7 +128,7 @@ export async function POST(
     // Get project details for company_id and project name
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, name, company_id')
+      .select('id, name, company_id, company:companies(name)')
       .eq('id', projectId)
       .single();
 
@@ -221,6 +221,7 @@ export async function POST(
         commenterName,
         contextType: 'project',
         contextName: project.name,
+        clientName: (project.company as { name?: string } | null)?.name || null,
         commentText: body.comment,
         deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?commentId=${comment.id}`,
       }).catch(() => {});

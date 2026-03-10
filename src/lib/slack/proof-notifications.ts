@@ -52,6 +52,7 @@ export async function sendProofFeedbackSlackNotifications(data: {
   recipientUserIds: string[];
   authorName: string;
   projectName: string;
+  clientName?: string | null;
   comment: string;
   deepLinkUrl: string;
 }): Promise<void> {
@@ -59,7 +60,8 @@ export async function sendProofFeedbackSlackNotifications(data: {
   if (!process.env.SLACK_BOT_TOKEN) return;
 
   const client = new WebClient(process.env.SLACK_BOT_TOKEN);
-  const contextLine = `*${data.authorName}* left feedback on a proof for project *${data.projectName}*`;
+  const clientSuffix = data.clientName ? ` for *${data.clientName}*` : '';
+  const contextLine = `*${data.authorName}* left feedback on a proof for project *${data.projectName}*${clientSuffix}`;
   const truncatedComment = stripHtml(data.comment).slice(0, 300);
 
   const blocks: any[] = [
@@ -89,7 +91,7 @@ export async function sendProofFeedbackSlackNotifications(data: {
     if (!slackUserId) return;
     await client.chat.postMessage({
       channel: slackUserId,
-      text: `${data.authorName} left feedback on a proof for ${data.projectName}`,
+      text: `${data.authorName} left feedback on a proof for ${data.projectName}${data.clientName ? ` for ${data.clientName}` : ''}`,
       blocks,
     });
   });

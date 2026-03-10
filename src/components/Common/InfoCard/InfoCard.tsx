@@ -15,6 +15,7 @@ interface InfoCardProps {
   forceExpand?: boolean;
   isCompact?: boolean;
   inSidebar?: boolean;
+  isActive?: boolean;
 }
 
 export function InfoCard({
@@ -31,6 +32,7 @@ export function InfoCard({
   forceExpand = false,
   isCompact = false,
   inSidebar = false,
+  isActive = false,
 }: InfoCardProps) {
   const [isExpanded, setIsExpanded] = useState(startExpanded);
 
@@ -65,7 +67,7 @@ export function InfoCard({
 
   return (
     <div
-      className={`${styles.infoCard} ${isExpanded ? styles.expandedCard : ''} ${isCompact ? styles.compact : ''} ${inSidebar ? styles.inSidebar : ''} ${className}`}
+      className={`${styles.infoCard} ${isExpanded ? styles.expandedCard : ''} ${isCompact ? styles.compact : ''} ${inSidebar ? styles.inSidebar : ''} ${isActive ? styles.activeCard : ''} ${className}`}
     >
       <div
         className={`${styles.header} ${isCollapsible ? styles.clickable : ''} ${!isExpanded ? styles.collapsed : styles.expanded}`}
@@ -96,16 +98,17 @@ export function InfoCard({
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="21"
-                viewBox="0 0 20 21"
+                width="10"
+                height="6"
+                viewBox="-0.3335 0 10 6"
                 fill="none"
                 className={!isExpanded ? styles.rotated : ''}
+                aria-hidden="true"
               >
                 <path
-                  d="M6 12.2539L10 7.80946L14 12.2539"
-                  stroke="#99A1AF"
-                  strokeWidth="1.5"
+                  d="M8.6665 4.66666L4.6665 0.666664L0.666504 4.66666"
+                  stroke="currentColor"
+                  strokeWidth="1.33333"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />

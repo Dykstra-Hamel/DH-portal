@@ -128,7 +128,7 @@ export async function POST(
     // Get task and project details for company_id and names
     const { data: task, error: taskError } = await supabase
       .from('project_tasks')
-      .select('id, title, project_id, projects(id, name, company_id)')
+      .select('id, title, project_id, projects(id, name, company_id, company:companies(name))')
       .eq('id', taskId)
       .single();
 
@@ -137,7 +137,12 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const project = (task.projects as unknown) as { id: string; name: string; company_id: string } | null;
+    const project = (task.projects as unknown) as {
+      id: string;
+      name: string;
+      company_id: string;
+      company?: { name?: string } | null;
+    } | null;
 
     // Get commenter's profile for notification message
     const { data: commenterProfile } = await supabase
@@ -214,6 +219,7 @@ export async function POST(
         commenterName,
         contextType: 'task',
         contextName: task.title,
+        clientName: project?.company?.name || null,
         commentText: body.comment,
         deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?taskId=${taskId}&commentId=${comment.id}`,
       }).catch(() => {});

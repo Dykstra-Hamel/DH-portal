@@ -53,6 +53,7 @@ export function LeadContactSection({
         icon={<SquareUserRound size={20} />}
         isCollapsible={true}
         startExpanded={true}
+        isActive={activeSection === 'contact'}
       >
         <div
           className={styles.cardContent}

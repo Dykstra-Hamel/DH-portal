@@ -60,7 +60,7 @@ export async function PATCH(
 
     // Fetch project and commenter profile in parallel
     const [{ data: project }, { data: commenterProfile }] = await Promise.all([
-      supabase.from('projects').select('name, company_id').eq('id', projectId).single(),
+      supabase.from('projects').select('name, company_id, company:companies(name)').eq('id', projectId).single(),
       supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
     ]);
 
@@ -116,6 +116,7 @@ export async function PATCH(
           commenterName,
           contextType: 'project',
           contextName: project.name,
+          clientName: (project.company as { name?: string } | null)?.name || null,
           commentText: body.comment,
           deepLinkUrl,
         }).catch(() => {});
@@ -140,6 +141,7 @@ export async function PATCH(
           commenterName,
           contextType: 'project',
           contextName: project.name,
+          clientName: (project.company as { name?: string } | null)?.name || null,
           commentText: body.comment,
           deepLinkUrl,
         }).catch(() => {});

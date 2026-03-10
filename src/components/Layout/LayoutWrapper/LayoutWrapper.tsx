@@ -86,8 +86,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       case '/project-management/tasks':
       case '/admin/project-management/tasks':
         return {
-          title: 'Tasks',
-          description: 'View and manage all tasks.',
+          title: pageHeader?.title || 'Tasks',
+          description: pageHeader?.description || 'View and manage all tasks.',
           showAddButton: false,
           actionButtons: [
             {
@@ -95,6 +95,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               onClick: getPageAction('add-task') || (() => {}),
             },
           ],
+          customActions: pageHeader?.customActions,
         };
       case '/dashboard':
         return {

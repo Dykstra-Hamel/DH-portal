@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
-import { ProjectTypeSubtype } from '@/types/project';
+import { X, Plus, ChevronUp, ChevronDown } from 'lucide-react';
+import { ProjectTypeSubtype, AttributeField } from '@/types/project';
 import styles from './CategorySettings.module.scss';
 
 interface SubtypeFormModalProps {
@@ -13,6 +13,13 @@ interface SubtypeFormModalProps {
   mode: 'create' | 'edit';
 }
 
+const FIELD_TYPES = [
+  { value: 'text', label: 'Text' },
+  { value: 'number', label: 'Number' },
+  { value: 'select', label: 'Dropdown' },
+  { value: 'textarea', label: 'Long Text' },
+];
+
 export default function SubtypeFormModal({
   isOpen,
   onClose,
@@ -22,6 +29,8 @@ export default function SubtypeFormModal({
 }: SubtypeFormModalProps) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [hasCustomAttributes, setHasCustomAttributes] = useState(false);
+  const [attributeSchema, setAttributeSchema] = useState<AttributeField[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -30,9 +39,13 @@ export default function SubtypeFormModal({
       if (mode === 'edit' && subtype) {
         setName(subtype.name);
         setDescription(subtype.description || '');
+        setHasCustomAttributes(subtype.has_custom_attributes || false);
+        setAttributeSchema(subtype.custom_attribute_schema || []);
       } else {
         setName('');
         setDescription('');
+        setHasCustomAttributes(false);
+        setAttributeSchema([]);
       }
       setError('');
       setIsSaving(false);
@@ -54,6 +67,8 @@ export default function SubtypeFormModal({
       await onSave({
         name: name.trim(),
         description: description.trim() || null,
+        has_custom_attributes: hasCustomAttributes,
+        custom_attribute_schema: hasCustomAttributes ? attributeSchema : [],
       });
 
       onClose();
@@ -62,6 +77,33 @@ export default function SubtypeFormModal({
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const addField = () => {
+    const newField: AttributeField = {
+      id: crypto.randomUUID(),
+      label: '',
+      type: 'text',
+    };
+    setAttributeSchema([...attributeSchema, newField]);
+  };
+
+  const removeField = (index: number) => {
+    setAttributeSchema(attributeSchema.filter((_, i) => i !== index));
+  };
+
+  const moveField = (index: number, direction: 'up' | 'down') => {
+    const newSchema = [...attributeSchema];
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= newSchema.length) return;
+    [newSchema[index], newSchema[targetIndex]] = [newSchema[targetIndex], newSchema[index]];
+    setAttributeSchema(newSchema);
+  };
+
+  const updateField = (index: number, updates: Partial<AttributeField>) => {
+    const newSchema = [...attributeSchema];
+    newSchema[index] = { ...newSchema[index], ...updates };
+    setAttributeSchema(newSchema);
   };
 
   if (!isOpen) return null;
@@ -111,6 +153,104 @@ export default function SubtypeFormModal({
                 rows={3}
               />
             </div>
+
+            <div className={styles.attributeToggleRow}>
+              <label className={styles.attributeToggleLabel}>
+                <input
+                  type="checkbox"
+                  checked={hasCustomAttributes}
+                  onChange={(e) => setHasCustomAttributes(e.target.checked)}
+                />
+                <span>Enable custom attribute fields for this subtype</span>
+              </label>
+            </div>
+
+            {hasCustomAttributes && (
+              <div className={styles.attributeFieldList}>
+                <div className={styles.attributeFieldListHeader}>
+                  <span className={styles.label}>Custom Fields</span>
+                </div>
+
+                {attributeSchema.map((field, index) => (
+                  <div key={field.id} className={styles.attributeFieldRow}>
+                    <div className={styles.attributeFieldMain}>
+                      <input
+                        type="text"
+                        className={styles.input}
+                        value={field.label}
+                        onChange={(e) => updateField(index, { label: e.target.value })}
+                        placeholder="Field label"
+                      />
+                      <select
+                        className={styles.attributeTypeSelect}
+                        value={field.type}
+                        onChange={(e) => updateField(index, { type: e.target.value as AttributeField['type'], options: undefined })}
+                      >
+                        {FIELD_TYPES.map(t => (
+                          <option key={t.value} value={t.value}>{t.label}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {field.type === 'select' && (
+                      <input
+                        type="text"
+                        className={styles.attributeOptionsInput}
+                        value={field.options?.join(', ') || ''}
+                        onChange={(e) => updateField(index, { options: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                        placeholder="Options (comma-separated)"
+                      />
+                    )}
+
+                    <div className={styles.attributeFieldActions}>
+                      <button
+                        type="button"
+                        className={`${styles.attributeColumnButton} ${(field.columns ?? 2) === 1 ? styles.attributeColumnButtonActive : ''}`}
+                        onClick={() => updateField(index, { columns: (field.columns ?? 2) === 1 ? 2 : 1 })}
+                        title={(field.columns ?? 2) === 1 ? 'Half width — click for full' : 'Full width — click for half'}
+                      >
+                        {(field.columns ?? 2) === 1 ? '½' : '■'}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.attributeOrderButton}
+                        onClick={() => moveField(index, 'up')}
+                        disabled={index === 0}
+                        title="Move up"
+                      >
+                        <ChevronUp size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.attributeOrderButton}
+                        onClick={() => moveField(index, 'down')}
+                        disabled={index === attributeSchema.length - 1}
+                        title="Move down"
+                      >
+                        <ChevronDown size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.attributeRemoveButton}
+                        onClick={() => removeField(index)}
+                        title="Remove field"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  className={styles.addFieldButton}
+                  onClick={addField}
+                >
+                  <Plus size={14} />
+                  Add Field
+                </button>
+              </div>
+            )}
           </div>
 
           <div className={styles.modalFooter}>
