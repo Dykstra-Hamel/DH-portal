@@ -106,6 +106,71 @@ export async function sendTaskUnblockedNotification(
   }
 }
 
+export interface TaskReassignedNotificationData {
+  taskId: string;
+  taskTitle: string;
+  monthlyServiceId: string;
+  newAssigneeId: string;
+}
+
+/**
+ * Sends a DM to the newly assigned user when a monthly service task is reassigned
+ */
+export async function sendTaskReassignedNotification(
+  data: TaskReassignedNotificationData
+): Promise<{ success: boolean; error?: string }> {
+  if (!process.env.SLACK_BOT_TOKEN) {
+    return { success: false, error: 'Slack not configured' };
+  }
+
+  const slackUserId = await getSlackUserIdByDatabaseUserId(data.newAssigneeId);
+  if (!slackUserId) {
+    return { success: false, error: 'User not found in Slack' };
+  }
+
+  const slackClient = new WebClient(process.env.SLACK_BOT_TOKEN);
+
+  const blocks: any[] = [
+    {
+      type: 'header',
+      text: { type: 'plain_text', text: '📋 Task Assigned to You', emoji: true },
+    },
+    {
+      type: 'section',
+      text: {
+        type: 'mrkdwn',
+        text: `You have been assigned to the task *${data.taskTitle}*`,
+      },
+    },
+  ];
+
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    blocks.push({
+      type: 'actions',
+      elements: [
+        {
+          type: 'button',
+          text: { type: 'plain_text', text: 'View Task', emoji: true },
+          url: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/monthly-services/${data.monthlyServiceId}`,
+          action_id: 'view_reassigned_task',
+        },
+      ],
+    });
+  }
+
+  try {
+    const result = await slackClient.chat.postMessage({
+      channel: slackUserId,
+      text: `You have been assigned to the task "${data.taskTitle}"`,
+      blocks,
+    });
+    return result.ok ? { success: true } : { success: false, error: result.error };
+  } catch (error) {
+    console.error('Error sending task reassignment Slack notification:', error);
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+  }
+}
+
 /**
  * Batch send notifications for multiple unblocked tasks
  */
