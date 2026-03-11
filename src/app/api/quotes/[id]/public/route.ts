@@ -46,10 +46,14 @@ export async function GET(
             plan_features,
             plan_faqs,
             plan_image_url,
-            plan_disclaimer
+            plan_disclaimer,
+            plan_name,
+            plan_terms
           ),
           addon_service:add_on_services(
-            addon_description
+            addon_description,
+            addon_name,
+            addon_terms
           ),
           bundle_plan:bundle_plans(
             bundle_features,

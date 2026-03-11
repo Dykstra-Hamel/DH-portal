@@ -34,6 +34,7 @@ export interface AddOnService {
   // Display & Content
   addon_image_url: string | null;
   addon_disclaimer: string | null;
+  addon_terms: string | null;
   addon_features: string[] | null;
   addon_faqs: Array<{ question: string; answer: string }> | null;
   display_order: number;
@@ -70,6 +71,7 @@ export interface AddOnServiceFormData {
   treatment_frequency: 'monthly' | 'bi-monthly' | 'quarterly' | 'on-demand' | null;
   addon_features: string[];
   addon_faqs: Array<{ question: string; answer: string }>;
+  addon_terms: string;
   eligibility_mode: 'all' | 'specific';
   eligible_plan_ids: string[];
   is_active: boolean;

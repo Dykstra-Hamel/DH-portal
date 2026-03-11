@@ -1,7 +1,7 @@
 import { QuoteSignedEmailData } from './types';
 import { generateQuoteSignedEmailTemplate } from './templates/quote-signed';
 import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
-import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
+import { sendEmailRouted } from '@/lib/email/router';
 
 /**
  * Send quote signed notification email to the assigned user
@@ -34,7 +34,7 @@ export async function sendQuoteSignedNotification(
     const html = generateQuoteSignedEmailTemplate(data);
 
     // Send email using AWS SES
-    const result = await sendEmailWithFallback({
+    const result = await sendEmailRouted({
       tenantName,
       from: fromEmail,
       fromName,

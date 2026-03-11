@@ -2,7 +2,7 @@ import { EmailRecipient, LeadNotificationData } from './types';
 import { generateLeadCreatedEmailTemplate } from './templates/lead-created';
 import { generateLeadSchedulingEmailTemplate } from './templates/lead-scheduling';
 import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
-import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
+import { sendEmailRouted } from '@/lib/email/router';
 import { getNotificationRecipients } from './notification-preferences';
 import type { NotificationType } from '@/types/notifications';
 
@@ -44,7 +44,7 @@ export async function sendLeadCreatedNotifications(
           : generateLeadCreatedEmailTemplate(recipientName, leadData);
 
         // Send email using AWS SES with fallback
-        const result = await sendEmailWithFallback({
+        const result = await sendEmailRouted({
           tenantName,
           from: fromEmail,
           fromName,

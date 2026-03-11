@@ -64,11 +64,24 @@ export default function SubtypeFormModal({
     setIsSaving(true);
 
     try {
+      const normalizedAttributeSchema = hasCustomAttributes
+        ? attributeSchema.map((field) => {
+            if (field.type !== 'select') {
+              return field;
+            }
+
+            return {
+              ...field,
+              options: (field.options || []).map((option) => option.trim()).filter(Boolean),
+            };
+          })
+        : [];
+
       await onSave({
         name: name.trim(),
         description: description.trim() || null,
         has_custom_attributes: hasCustomAttributes,
-        custom_attribute_schema: hasCustomAttributes ? attributeSchema : [],
+        custom_attribute_schema: normalizedAttributeSchema,
       });
 
       onClose();
@@ -197,7 +210,15 @@ export default function SubtypeFormModal({
                         type="text"
                         className={styles.attributeOptionsInput}
                         value={field.options?.join(', ') || ''}
-                        onChange={(e) => updateField(index, { options: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                        onChange={(e) =>
+                          updateField(index, {
+                            options: e.target.value
+                              .split(',')
+                              .map((option, optionIndex) =>
+                                optionIndex === 0 ? option : option.replace(/^\s+/, '')
+                              ),
+                          })
+                        }
                         placeholder="Options (comma-separated)"
                       />
                     )}
