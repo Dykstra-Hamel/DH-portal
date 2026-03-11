@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { getAvatarColor } from '@/lib/avatarColor';
 import styles from './MiniAvatar.module.scss';
 
 interface MiniAvatarProps {
   firstName?: string;
   lastName?: string;
   email: string;
+  userId?: string;
   avatarUrl?: string | null;
   size?: 'small' | 'medium' | 'large';
   className?: string;
@@ -18,6 +20,7 @@ export function MiniAvatar({
   firstName,
   lastName,
   email,
+  userId,
   avatarUrl,
   size = 'medium',
   className = '',
@@ -68,7 +71,10 @@ export function MiniAvatar({
 
   return (
     <div className={styles.tooltipContainer}>
-      <div className={`${styles.miniAvatar} ${styles[size]} ${className}`}>
+      <div
+        className={`${styles.miniAvatar} ${styles[size]} ${className}`}
+        style={{ backgroundColor: getAvatarColor(userId || email) }}
+      >
         {showTooltip && (
           <div className={styles.tooltip}>
             {getDisplayName()}

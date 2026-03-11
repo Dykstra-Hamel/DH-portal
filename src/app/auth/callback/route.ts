@@ -14,6 +14,24 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
+      // Sync avatar_url from OAuth metadata into profiles (handles users who
+      // originally signed up via email and later connected Google)
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const avatarUrl =
+          user.user_metadata?.avatar_url ||
+          user.user_metadata?.picture ||
+          user.user_metadata?.profile_image ||
+          user.user_metadata?.profile_picture_url ||
+          null;
+        if (avatarUrl) {
+          await supabase
+            .from('profiles')
+            .update({ avatar_url: avatarUrl, updated_at: new Date().toISOString() })
+            .eq('id', user.id)
+            .is('avatar_url', null);
+        }
+      }
       return NextResponse.redirect(`${origin}${next}`);
     }
   }

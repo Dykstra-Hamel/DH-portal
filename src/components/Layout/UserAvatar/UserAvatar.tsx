@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { User, Settings, LogOut, Shield } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
+import { getAvatarColor } from '@/lib/avatarColor';
 import styles from './UserAvatar.module.scss';
 
 interface Profile {
@@ -172,7 +173,10 @@ export function UserAvatar() {
         onClick={toggleDropdown}
         aria-label="User menu"
       >
-        <div className={styles.avatar}>
+        <div
+          className={styles.avatar}
+          style={!getAvatarUrl() && user ? { backgroundColor: getAvatarColor(user.email!) } : undefined}
+        >
           {getAvatarUrl() ? (
             <Image
               src={getAvatarUrl()!}
@@ -197,7 +201,10 @@ export function UserAvatar() {
           <div className={styles.userDropdown}>
             <div className={styles.dropdownHeader}>
               <div className={styles.userInfo}>
-                <div className={styles.avatarLarge}>
+                <div
+                  className={styles.avatarLarge}
+                  style={!getAvatarUrl() && user ? { backgroundColor: getAvatarColor(user.email!) } : undefined}
+                >
                   {getAvatarUrl() ? (
                     <Image
                       src={getAvatarUrl()!}
