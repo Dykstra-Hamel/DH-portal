@@ -2,7 +2,7 @@ import { CallSummaryEmailData } from './types';
 import { generateCallSummaryEmailTemplate } from './templates/call-summary';
 import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
 import { validateEmails } from './lead-notifications';
-import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
+import { sendEmailRouted } from '@/lib/email/router';
 
 export async function sendCallSummaryNotifications(
   recipients: string[],
@@ -48,7 +48,7 @@ export async function sendCallSummaryNotifications(
         const emailHtml = generateCallSummaryEmailTemplate(recipientName, callData);
 
         // Send email using AWS SES
-        const result = await sendEmailWithFallback({
+        const result = await sendEmailRouted({
           tenantName,
           from: fromEmail,
           fromName,

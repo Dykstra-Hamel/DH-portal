@@ -102,6 +102,9 @@ export default function QuoteContent({
   );
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsViewed, setTermsViewed] = useState(false);
+  const [termsNudge, setTermsNudge] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [heroImageUrl, setHeroImageUrl] = useState<string>(
@@ -628,25 +631,44 @@ export default function QuoteContent({
 
               <div className={styles.termsSection}>
                 <h3>Terms and Conditions</h3>
-                <div className={styles.termsContent}>
-                  <p>
-                    By signing below, you agree to the following terms and
-                    conditions:
-                  </p>
-                  <div
-                    dangerouslySetInnerHTML={{ __html: company.quote_terms }}
-                  />
+                <p className={styles.termsIntro}>
+                  Please review the full terms and conditions before signing.
+                </p>
+
+                <div className={styles.viewTermsRow}>
+                  <button
+                    type="button"
+                    className={`${styles.viewTermsButton} ${termsNudge ? styles.viewTermsNudge : ''}`}
+                    onClick={() => { setTermsModalOpen(true); setTermsViewed(true); setTermsNudge(false); }}
+                  >
+                    View Terms and Conditions
+                  </button>
+                  {termsViewed && (
+                    <span className={styles.viewedBadge}>&#10003; Viewed</span>
+                  )}
                 </div>
 
-                <div className={styles.checkboxGroup}>
+                <div
+                  className={styles.checkboxGroup}
+                  onClick={() => {
+                    if (!termsViewed) {
+                      setTermsNudge(true);
+                      setTimeout(() => setTermsNudge(false), 2000);
+                    }
+                  }}
+                >
                   <input
                     type="checkbox"
                     id="terms-checkbox"
                     checked={termsAccepted}
+                    disabled={!termsViewed}
                     onChange={e => setTermsAccepted(e.target.checked)}
                   />
                   <label htmlFor="terms-checkbox" className={styles.termsLabel}>
                     I have read and accept the terms and conditions
+                    {!termsViewed && termsNudge && (
+                      <span className={styles.termsHint}> &mdash; You must view the terms first</span>
+                    )}
                   </label>
                 </div>
 
@@ -734,6 +756,56 @@ export default function QuoteContent({
                   </Link>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {termsModalOpen && (
+        <div className={styles.termsModal}>
+          <div className={styles.termsModalContent}>
+            <div className={styles.termsModalHeader}>
+              <h3>Terms and Conditions</h3>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className={styles.termsModalClose}
+              >
+                &#215;
+              </button>
+            </div>
+            <div className={styles.termsModalBody}>
+              <div dangerouslySetInnerHTML={{ __html: company.quote_terms }} />
+
+              {quote.line_items
+                .filter((item: any) => item.service_plan?.plan_terms)
+                .map((item: any, i: number) => (
+                  <div key={`plan-terms-${i}`} className={styles.specificTermsBlock}>
+                    <h4>{item.service_plan.plan_name} &mdash; Terms and Conditions</h4>
+                    <div dangerouslySetInnerHTML={{ __html: item.service_plan.plan_terms }} />
+                  </div>
+                ))
+              }
+
+              {quote.line_items
+                .filter((item: any) => item.addon_service?.addon_terms)
+                .map((item: any, i: number) => (
+                  <div key={`addon-terms-${i}`} className={styles.specificTermsBlock}>
+                    <h4>{item.addon_service.addon_name} &mdash; Terms and Conditions</h4>
+                    <div dangerouslySetInnerHTML={{ __html: item.addon_service.addon_terms }} />
+                  </div>
+                ))
+              }
+            </div>
+            <div className={styles.termsModalFooter}>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className={styles.termsModalCloseBtn}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

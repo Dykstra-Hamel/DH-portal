@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from '@/lib/email';
-import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
+import { getCompanyName } from '@/lib/email';
+import { sendEmailRouted } from '@/lib/email/router';
 
 interface EmailSendRequest {
   to: string;
@@ -49,73 +49,34 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get company information for proper from name
+    // Get company name for from display
     const fromName = await getCompanyName(companyId);
-    const fromEmail = await getCompanyFromEmail(companyId);
 
-    // IMPORTANT: If using fallback email domain, use fallback tenant directly
-    // Company tenants are only associated with their own custom domains, not pmpcentral.io
-    const FALLBACK_FROM_EMAIL = 'noreply@pmpcentral.io';
-
-    let result;
-
-    if (fromEmail === FALLBACK_FROM_EMAIL) {
-      // Using fallback email - send directly with fallback tenant (no retry needed)
-      const { sendEmail } = await import('@/lib/aws-ses/send-email');
-      result = await sendEmail({
-        tenantName: process.env.FALLBACK_SES_TENANT_NAME || 'pmpcentral-fallback',
-        from: fromEmail,
-        fromName,
-        to,
-        subject,
-        html,
-        text: text || undefined,
-        companyId,
-        leadId,
-        customerId,
-        templateId,
+    const result = await sendEmailRouted({
+      tenantName: '',
+      from: 'noreply@pmpcentral.io',
+      fromName,
+      to,
+      subject,
+      html,
+      text: text || undefined,
+      companyId,
+      leadId,
+      customerId,
+      templateId,
+      source,
+      campaignId,
+      executionId,
+      tags: [
+        'automation',
         source,
-        campaignId,
-        executionId,
-        tags: [
-          'automation',
-          source,
-          ...(templateId ? [`template-${templateId}`] : []),
-          ...(leadId ? [`lead-${leadId}`] : []),
-          ...(campaignId ? [`campaign-${campaignId}`] : []),
-        ],
-      });
-    } else {
-      // Using custom domain - use fallback mechanism as safety net
-      const tenantName = await getCompanyTenantName(companyId);
-      result = await sendEmailWithFallback({
-        tenantName,
-        from: fromEmail,
-        fromName,
-        to,
-        subject,
-        html,
-        text: text || undefined,
-        companyId,
-        leadId,
-        customerId,
-        templateId,
-        source,
-        campaignId,
-        executionId,
-        tags: [
-          'automation',
-          source,
-          ...(templateId ? [`template-${templateId}`] : []),
-          ...(leadId ? [`lead-${leadId}`] : []),
-          ...(campaignId ? [`campaign-${campaignId}`] : []),
-        ],
-      });
-    }
+        ...(templateId ? [`template-${templateId}`] : []),
+        ...(leadId ? [`lead-${leadId}`] : []),
+        ...(campaignId ? [`campaign-${campaignId}`] : []),
+      ],
+    });
 
     if (!result.success) {
-      console.error('AWS SES error:', result.error);
-
       return NextResponse.json(
         {
           success: false,
@@ -128,7 +89,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       messageId: result.messageId,
-      provider: 'aws-ses',
       to,
       subject,
       sentAt: result.sentAt,
@@ -136,11 +96,11 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error in email send API:', error);
-    
+
     return NextResponse.json(
-      { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Internal server error' 
+      {
+        success: false,
+        error: error instanceof Error ? error.message : 'Internal server error'
       },
       { status: 500 }
     );
@@ -153,7 +113,6 @@ export async function GET() {
     const { isSESConfigured } = await import('@/lib/aws-ses/client');
     const { FALLBACK_FROM_EMAIL } = await import('@/lib/email');
 
-    // Basic health check for AWS SES configuration
     if (!isSESConfigured()) {
       return NextResponse.json(
         { success: false, error: 'AWS SES not configured. Check AWS credentials.' },
@@ -163,7 +122,7 @@ export async function GET() {
 
     return NextResponse.json({
       success: true,
-      provider: 'aws-ses',
+      provider: 'aws-ses (default, per-company routing active)',
       configured: true,
       fallbackEmail: FALLBACK_FROM_EMAIL,
     });

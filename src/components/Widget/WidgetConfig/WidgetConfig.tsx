@@ -96,6 +96,7 @@ interface ServicePlan {
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
+  plan_terms: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
