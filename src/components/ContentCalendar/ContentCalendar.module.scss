@@ -453,6 +453,18 @@
   }
 }
 
+.taskCompletedCheck {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--success-600, #04ae6a);
+  color: var(--white, #fff);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
 .monthRow {
   cursor: pointer;
 
