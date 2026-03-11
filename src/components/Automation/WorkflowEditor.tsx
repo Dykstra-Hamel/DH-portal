@@ -43,6 +43,8 @@ interface WorkflowStep {
   assign_to_user_id?: string;
   condition?: any;
   branches?: WorkflowBranch[];
+  true_steps?: WorkflowStep[];
+  false_steps?: WorkflowStep[];
   call_variables?: any;
   archive_reason?: string;
   required?: boolean;
@@ -120,12 +122,20 @@ const LEAD_SOURCES = [
 ];
 const LEAD_STATUSES = [
   { value: 'new', label: 'New' },
-  { value: 'contacted', label: 'Contacted' },
-  { value: 'qualified', label: 'Qualified' },
+  { value: 'in_process', label: 'In Process' },
   { value: 'quoted', label: 'Quoted' },
+  { value: 'scheduling', label: 'Scheduling' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
-  { value: 'unqualified', label: 'Unqualified' },
+];
+
+const BRANCH_STEP_TYPES = [
+  { value: 'send_email', label: 'Email' },
+  { value: 'send_sms', label: 'SMS' },
+  { value: 'wait', label: 'Wait' },
+  { value: 'make_call', label: 'Call' },
+  { value: 'update_lead_status', label: 'Update Status' },
+  { value: 'archive_call', label: 'Archive Call' },
 ];
 
 export default function WorkflowEditor({
@@ -144,7 +154,7 @@ export default function WorkflowEditor({
     workflow_steps: [] as WorkflowStep[],
     is_active: false,
     auto_cancel_on_status: true,
-    cancel_on_statuses: ['won', 'closed_won', 'converted'],
+    cancel_on_statuses: ['won', 'lost'],
     agent_id: '',
   });
   const [templates, setTemplates] = useState<EmailTemplate[]>([]);
@@ -157,6 +167,7 @@ export default function WorkflowEditor({
     text: string;
   } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+  const [expandedBranchSteps, setExpandedBranchSteps] = useState<Set<string>>(new Set());
   const [testing, setTesting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [showTestResults, setShowTestResults] = useState(false);
@@ -246,11 +257,7 @@ export default function WorkflowEditor({
           workflow_steps: workflow.workflow_steps || [],
           is_active: workflow.is_active || false,
           auto_cancel_on_status: workflow.auto_cancel_on_status !== false,
-          cancel_on_statuses: workflow.cancel_on_statuses || [
-            'won',
-            'closed_won',
-            'converted',
-          ],
+          cancel_on_statuses: workflow.cancel_on_statuses || ['won', 'lost'],
           agent_id: workflow.agent_id || '',
         });
       } else {
@@ -264,7 +271,7 @@ export default function WorkflowEditor({
           workflow_steps: [],
           is_active: true,
           auto_cancel_on_status: true,
-          cancel_on_statuses: ['won', 'closed_won', 'converted'],
+          cancel_on_statuses: ['won', 'lost'],
           agent_id: '',
         });
       }
@@ -423,6 +430,8 @@ export default function WorkflowEditor({
       newStep.call_variables = {};
     } else if (stepType === 'conditional') {
       newStep.branches = [];
+      newStep.true_steps = [];
+      newStep.false_steps = [];
       newStep.condition = {
         field: 'urgency',
         operator: 'equals',
@@ -485,6 +494,306 @@ export default function WorkflowEditor({
       }
       return newSet;
     });
+  };
+
+  const toggleBranchStepExpansion = (key: string) => {
+    setExpandedBranchSteps(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(key)) {
+        newSet.delete(key);
+      } else {
+        newSet.add(key);
+      }
+      return newSet;
+    });
+  };
+
+  const addStepToBranch = (parentId: string, branch: 'true' | 'false', stepType: string) => {
+    const newStep: WorkflowStep = {
+      id: `step-${Date.now()}`,
+      type: stepType as WorkflowStep['type'],
+    };
+    if (stepType === 'send_email') {
+      newStep.delay_minutes = 0;
+    } else if (stepType === 'send_sms') {
+      newStep.delay_minutes = 0;
+      newStep.sms_message = '';
+    } else if (stepType === 'wait') {
+      newStep.delay_minutes = 60;
+    } else if (stepType === 'make_call') {
+      newStep.delay_minutes = 0;
+      newStep.call_variables = {};
+    }
+    const branchKey = `${branch}_steps` as 'true_steps' | 'false_steps';
+    setFormData(prev => ({
+      ...prev,
+      workflow_steps: prev.workflow_steps.map(s =>
+        s.id === parentId
+          ? { ...s, [branchKey]: [...(s[branchKey] || []), newStep] }
+          : s
+      ),
+    }));
+    setExpandedBranchSteps(prev => new Set(prev).add(`${parentId}-${branch}-${newStep.id}`));
+  };
+
+  const updateBranchStep = (
+    parentId: string,
+    branch: 'true' | 'false',
+    stepId: string,
+    updates: Partial<WorkflowStep>
+  ) => {
+    const branchKey = `${branch}_steps` as 'true_steps' | 'false_steps';
+    setFormData(prev => ({
+      ...prev,
+      workflow_steps: prev.workflow_steps.map(s =>
+        s.id === parentId
+          ? {
+              ...s,
+              [branchKey]: (s[branchKey] || []).map(bs =>
+                bs.id === stepId ? { ...bs, ...updates } : bs
+              ),
+            }
+          : s
+      ),
+    }));
+  };
+
+  const deleteBranchStep = (parentId: string, branch: 'true' | 'false', stepId: string) => {
+    const branchKey = `${branch}_steps` as 'true_steps' | 'false_steps';
+    setFormData(prev => ({
+      ...prev,
+      workflow_steps: prev.workflow_steps.map(s =>
+        s.id === parentId
+          ? { ...s, [branchKey]: (s[branchKey] || []).filter(bs => bs.id !== stepId) }
+          : s
+      ),
+    }));
+    setExpandedBranchSteps(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(`${parentId}-${branch}-${stepId}`);
+      return newSet;
+    });
+  };
+
+  const renderBranchStep = (
+    branchStep: WorkflowStep,
+    parentId: string,
+    branch: 'true' | 'false',
+    index: number
+  ) => {
+    const expandKey = `${parentId}-${branch}-${branchStep.id}`;
+    const isExpanded = expandedBranchSteps.has(expandKey);
+
+    return (
+      <div key={branchStep.id} className={styles.branchStepItem}>
+        <div
+          className={styles.branchStepHeader}
+          onClick={() => toggleBranchStepExpansion(expandKey)}
+        >
+          <div className={styles.branchStepInfo}>
+            <span className={styles.branchStepTitle}>
+              {getBranchStepIcon(branchStep.type)}{' '}
+              {index + 1}. {getStepTypeName(branchStep.type)}
+            </span>
+            <span className={styles.branchStepDesc}>
+              {getStepDescription(branchStep, templates, callingAgents)}
+            </span>
+          </div>
+          <div className={styles.branchStepActions}>
+            <button
+              onClick={e => {
+                e.stopPropagation();
+                deleteBranchStep(parentId, branch, branchStep.id);
+              }}
+              className={styles.deleteButton}
+            >
+              <Trash2 size={12} />
+            </button>
+            <button className={styles.expandButton}>
+              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
+          </div>
+        </div>
+        {isExpanded && (
+          <div className={styles.branchStepContent}>
+            {branchStep.type === 'send_email' && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>Email Template *</label>
+                  <select
+                    value={branchStep.template_id || ''}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        template_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select a template</option>
+                    {templates.map(template => (
+                      <option key={template.id} value={template.id}>
+                        {template.name} - {template.subject_line}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Delay (minutes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10080"
+                    value={branchStep.delay_minutes || 0}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        delay_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
+                </div>
+              </>
+            )}
+            {branchStep.type === 'send_sms' && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>SMS Agent *</label>
+                  <select
+                    value={branchStep.sms_agent_id || ''}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        sms_agent_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select an SMS agent</option>
+                    {smsAgents.map(agent => (
+                      <option key={agent.id} value={agent.agent_id}>
+                        {agent.agent_name} - {agent.phone_number}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>SMS Message *</label>
+                  <textarea
+                    value={branchStep.sms_message || ''}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        sms_message: e.target.value,
+                      })
+                    }
+                    placeholder="Enter your SMS message..."
+                    rows={3}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Delay (minutes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10080"
+                    value={branchStep.delay_minutes || 0}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        delay_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
+                </div>
+              </>
+            )}
+            {branchStep.type === 'wait' && (
+              <div className={styles.formGroup}>
+                <label>Wait Duration (minutes) *</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="10080"
+                  value={branchStep.delay_minutes || 60}
+                  onChange={e =>
+                    updateBranchStep(parentId, branch, branchStep.id, {
+                      delay_minutes: parseInt(e.target.value) || 60,
+                    })
+                  }
+                />
+              </div>
+            )}
+            {branchStep.type === 'make_call' && (
+              <>
+                <div className={styles.formGroup}>
+                  <label>Outbound Calling Agent *</label>
+                  <select
+                    value={branchStep.agent_id || ''}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        agent_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">Select an agent</option>
+                    {callingAgents.map(agent => (
+                      <option key={agent.id} value={agent.agent_id}>
+                        {agent.agent_name}
+                        {agent.phone_number ? ` - ${agent.phone_number}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Delay (minutes)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="10080"
+                    value={branchStep.delay_minutes || 0}
+                    onChange={e =>
+                      updateBranchStep(parentId, branch, branchStep.id, {
+                        delay_minutes: parseInt(e.target.value) || 0,
+                      })
+                    }
+                  />
+                  <small>0 = immediate, 60 = 1 hour, 1440 = 1 day</small>
+                </div>
+              </>
+            )}
+            {branchStep.type === 'update_lead_status' && (
+              <div className={styles.formGroup}>
+                <label>New Lead Status *</label>
+                <select
+                  value={branchStep.new_status || ''}
+                  onChange={e =>
+                    updateBranchStep(parentId, branch, branchStep.id, {
+                      new_status: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">Select status</option>
+                  {LEAD_STATUSES.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {branchStep.type === 'archive_call' && (
+              <div className={styles.formGroup}>
+                <label>Archive Reason (optional)</label>
+                <input
+                  type="text"
+                  value={branchStep.archive_reason || ''}
+                  onChange={e =>
+                    updateBranchStep(parentId, branch, branchStep.id, {
+                      archive_reason: e.target.value,
+                    })
+                  }
+                  placeholder="Reason for archiving"
+                />
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
   };
 
   const renderStepContent = (step: WorkflowStep, index: number) => {
@@ -745,19 +1054,79 @@ export default function WorkflowEditor({
                 </div>
                 <div className={styles.formGroup}>
                   <label>Value *</label>
-                  <input
-                    type="text"
-                    value={step.condition?.value || ''}
-                    onChange={e =>
-                      updateStep(step.id, {
-                        condition: { ...step.condition, value: e.target.value },
-                      })
-                    }
-                    placeholder="Enter comparison value"
-                  />
-                  <small>
-                    For &quot;In Array&quot;, separate values with commas
-                  </small>
+                  {step.condition?.field === 'lead_status' ? (
+                    <select
+                      value={step.condition?.value || ''}
+                      onChange={e =>
+                        updateStep(step.id, {
+                          condition: { ...step.condition, value: e.target.value },
+                        })
+                      }
+                    >
+                      <option value="">Select status</option>
+                      {LEAD_STATUSES.map(s => (
+                        <option key={s.value} value={s.value}>{s.label}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <>
+                      <input
+                        type="text"
+                        value={step.condition?.value || ''}
+                        onChange={e =>
+                          updateStep(step.id, {
+                            condition: { ...step.condition, value: e.target.value },
+                          })
+                        }
+                        placeholder="Enter comparison value"
+                      />
+                      <small>
+                        For &quot;In Array&quot;, separate values with commas
+                      </small>
+                    </>
+                  )}
+                </div>
+                <div className={styles.branchPaths}>
+                  {(['true', 'false'] as const).map(branch => (
+                    <div
+                      key={branch}
+                      className={`${styles.branchPath} ${branch === 'true' ? styles.trueBranch : styles.falseBranch}`}
+                    >
+                      <div className={styles.branchPathHeader}>
+                        <GitBranch size={14} />
+                        <span>
+                          {branch === 'true'
+                            ? 'YES — Condition Met'
+                            : 'NO — Condition Not Met'}
+                        </span>
+                      </div>
+                      <div className={styles.branchSteps}>
+                        {((branch === 'true' ? step.true_steps : step.false_steps) || []).map(
+                          (bs, i) => renderBranchStep(bs, step.id, branch, i)
+                        )}
+                        {((branch === 'true' ? step.true_steps : step.false_steps) || []).length === 0 && (
+                          <p className={styles.emptyBranch}>
+                            No steps — workflow continues to next main step
+                          </p>
+                        )}
+                      </div>
+                      <div className={styles.addBranchStepButtons}>
+                        {BRANCH_STEP_TYPES.map(type => (
+                          <button
+                            key={type.value}
+                            className={styles.addBranchStepButton}
+                            onClick={e => {
+                              e.stopPropagation();
+                              addStepToBranch(step.id, branch, type.value);
+                            }}
+                          >
+                            {getBranchStepIcon(type.value)}
+                            {type.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </>
             )}
@@ -772,13 +1141,9 @@ export default function WorkflowEditor({
                   }
                 >
                   <option value="">Select status</option>
-                  <option value="new">New</option>
-                  <option value="contacted">Contacted</option>
-                  <option value="qualified">Qualified</option>
-                  <option value="quoted">Quoted</option>
-                  <option value="won">Won</option>
-                  <option value="lost">Lost</option>
-                  <option value="unqualified">Unqualified</option>
+                  {LEAD_STATUSES.map(s => (
+                    <option key={s.value} value={s.value}>{s.label}</option>
+                  ))}
                 </select>
               </div>
             )}
@@ -1220,8 +1585,8 @@ export default function WorkflowEditor({
                       Auto-cancel when lead reaches terminal status
                     </label>
                     <small className={styles.fieldHint}>
-                      Automatically cancel pending workflows when lead is won,
-                      converted, or closed
+                      Automatically cancel pending workflows when lead reaches a
+                      selected status
                     </small>
                   </div>
 
@@ -1365,6 +1730,25 @@ export default function WorkflowEditor({
       </div>
     </div>
   );
+}
+
+function getBranchStepIcon(type: string) {
+  switch (type) {
+    case 'send_email':
+      return <Mail size={12} />;
+    case 'send_sms':
+      return <MessageSquare size={12} />;
+    case 'wait':
+      return <Clock size={12} />;
+    case 'make_call':
+      return <PhoneCall size={12} />;
+    case 'update_lead_status':
+      return <Settings size={12} />;
+    case 'archive_call':
+      return <Archive size={12} />;
+    default:
+      return null;
+  }
 }
 
 function getStepTypeName(type: string): string {
