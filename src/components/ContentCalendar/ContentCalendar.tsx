@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ExternalLink, Check } from 'lucide-react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -933,7 +933,9 @@ export function ContentCalendar() {
                             className={`${styles.taskChip} ${piece.task_is_completed ? styles.taskChipDone : ''} ${piece.task_assignee_email ? styles.taskChipAvatar : ''}`}
                             onClick={e => { e.stopPropagation(); handleOpenTaskPanel(piece.task_id!, service.id); }}
                           >
-                            {piece.task_assignee_email ? (
+                            {piece.task_is_completed ? (
+                              <span className={styles.taskCompletedCheck}><Check size={12} /></span>
+                            ) : piece.task_assignee_email ? (
                               <MiniAvatar
                                 firstName={piece.task_assignee_name?.split(' ')[0] || undefined}
                                 lastName={piece.task_assignee_name?.split(' ').slice(1).join(' ') || undefined}
@@ -952,7 +954,9 @@ export function ContentCalendar() {
                             className={`${styles.taskChip} ${piece.social_media_task_is_completed ? styles.taskChipDone : ''} ${piece.social_media_task_assignee_email ? styles.taskChipAvatar : ''}`}
                             onClick={e => { e.stopPropagation(); handleOpenTaskPanel(piece.social_media_task_id!, service.id); }}
                           >
-                            {piece.social_media_task_assignee_email ? (
+                            {piece.social_media_task_is_completed ? (
+                              <span className={styles.taskCompletedCheck}><Check size={12} /></span>
+                            ) : piece.social_media_task_assignee_email ? (
                               <MiniAvatar
                                 firstName={piece.social_media_task_assignee_name?.split(' ')[0] || undefined}
                                 lastName={piece.social_media_task_assignee_name?.split(' ').slice(1).join(' ') || undefined}
