@@ -1112,6 +1112,13 @@ export function LeadQuoteSection({
         // Broadcast will trigger real-time update
         await broadcastQuoteUpdate(data.data);
 
+        // Keep lead pest_type in sync with quote primary_pest
+        try {
+          await adminAPI.updateLead(lead.id, { pest_type: pestName });
+        } catch (err) {
+          console.error('Failed to sync lead pest_type', err);
+        }
+
         onShowToast?.('Primary pest updated', 'success');
       }
     } catch (error) {

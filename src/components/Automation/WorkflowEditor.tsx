@@ -42,7 +42,7 @@ interface WorkflowStep {
   new_status?: string;
   assign_to_user_id?: string;
   condition?: any;
-  branches?: WorkflowBranch[];
+  branches?: ConditionalBranch[];
   true_steps?: WorkflowStep[];
   false_steps?: WorkflowStep[];
   call_variables?: any;
@@ -57,6 +57,14 @@ interface WorkflowBranch {
   condition_value: any;
   branch_name: string;
   branch_steps: WorkflowStep[];
+}
+
+interface ConditionalBranch {
+  id: string;
+  label: string;
+  value: string;
+  isDefault: boolean;
+  steps: WorkflowStep[];
 }
 
 interface EmailTemplate {
@@ -82,7 +90,7 @@ const WORKFLOW_TYPES = [
 ];
 
 const TRIGGER_TYPES = [
-  { value: 'manual', label: 'Manual (Campaign Use)' },
+  { value: 'manual', label: 'Manual (Campaign Use or Lead Automation)' },
   // { value: 'lead_created', label: 'New Lead Created' }, // Disabled - process not refined yet
   {
     value: 'widget_schedule_completed',
@@ -167,7 +175,9 @@ export default function WorkflowEditor({
     text: string;
   } | null>(null);
   const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
-  const [expandedBranchSteps, setExpandedBranchSteps] = useState<Set<string>>(new Set());
+  const [expandedBranchSteps, setExpandedBranchSteps] = useState<Set<string>>(
+    new Set()
+  );
   const [testing, setTesting] = useState(false);
   const [testResults, setTestResults] = useState<any>(null);
   const [showTestResults, setShowTestResults] = useState(false);
@@ -429,14 +439,24 @@ export default function WorkflowEditor({
       newStep.delay_minutes = 0;
       newStep.call_variables = {};
     } else if (stepType === 'conditional') {
-      newStep.branches = [];
-      newStep.true_steps = [];
-      newStep.false_steps = [];
-      newStep.condition = {
-        field: 'urgency',
-        operator: 'equals',
-        value: 'high',
-      };
+      const ts = Date.now();
+      newStep.condition = { field: 'pest_type', operator: 'equals' };
+      newStep.branches = [
+        {
+          id: `branch-${ts}-1`,
+          label: 'Branch 1',
+          value: '',
+          isDefault: false,
+          steps: [],
+        },
+        {
+          id: `branch-${ts}-default`,
+          label: 'Default',
+          value: '',
+          isDefault: true,
+          steps: [],
+        },
+      ];
     }
 
     setFormData(prev => ({
@@ -508,7 +528,11 @@ export default function WorkflowEditor({
     });
   };
 
-  const addStepToBranch = (parentId: string, branch: 'true' | 'false', stepType: string) => {
+  const addStepToBranch = (
+    parentId: string,
+    branchId: string,
+    stepType: string
+  ) => {
     const newStep: WorkflowStep = {
       id: `step-${Date.now()}`,
       type: stepType as WorkflowStep['type'],
@@ -524,61 +548,173 @@ export default function WorkflowEditor({
       newStep.delay_minutes = 0;
       newStep.call_variables = {};
     }
-    const branchKey = `${branch}_steps` as 'true_steps' | 'false_steps';
-    setFormData(prev => ({
-      ...prev,
-      workflow_steps: prev.workflow_steps.map(s =>
-        s.id === parentId
-          ? { ...s, [branchKey]: [...(s[branchKey] || []), newStep] }
-          : s
-      ),
-    }));
-    setExpandedBranchSteps(prev => new Set(prev).add(`${parentId}-${branch}-${newStep.id}`));
+    if (branchId === 'true' || branchId === 'false') {
+      const branchKey = `${branchId}_steps` as 'true_steps' | 'false_steps';
+      setFormData(prev => ({
+        ...prev,
+        workflow_steps: prev.workflow_steps.map(s =>
+          s.id === parentId
+            ? { ...s, [branchKey]: [...(s[branchKey] || []), newStep] }
+            : s
+        ),
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        workflow_steps: prev.workflow_steps.map(s =>
+          s.id !== parentId
+            ? s
+            : {
+                ...s,
+                branches: (s.branches || []).map(b =>
+                  b.id !== branchId ? b : { ...b, steps: [...b.steps, newStep] }
+                ),
+              }
+        ),
+      }));
+    }
+    setExpandedBranchSteps(prev =>
+      new Set(prev).add(`${parentId}-${branchId}-${newStep.id}`)
+    );
   };
 
   const updateBranchStep = (
     parentId: string,
-    branch: 'true' | 'false',
+    branchId: string,
     stepId: string,
     updates: Partial<WorkflowStep>
   ) => {
-    const branchKey = `${branch}_steps` as 'true_steps' | 'false_steps';
+    if (branchId === 'true' || branchId === 'false') {
+      const branchKey = `${branchId}_steps` as 'true_steps' | 'false_steps';
+      setFormData(prev => ({
+        ...prev,
+        workflow_steps: prev.workflow_steps.map(s =>
+          s.id === parentId
+            ? {
+                ...s,
+                [branchKey]: (s[branchKey] || []).map(bs =>
+                  bs.id === stepId ? { ...bs, ...updates } : bs
+                ),
+              }
+            : s
+        ),
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        workflow_steps: prev.workflow_steps.map(s =>
+          s.id !== parentId
+            ? s
+            : {
+                ...s,
+                branches: (s.branches || []).map(b =>
+                  b.id !== branchId
+                    ? b
+                    : {
+                        ...b,
+                        steps: b.steps.map(bs =>
+                          bs.id === stepId ? { ...bs, ...updates } : bs
+                        ),
+                      }
+                ),
+              }
+        ),
+      }));
+    }
+  };
+
+  const deleteBranchStep = (
+    parentId: string,
+    branchId: string,
+    stepId: string
+  ) => {
+    if (branchId === 'true' || branchId === 'false') {
+      const branchKey = `${branchId}_steps` as 'true_steps' | 'false_steps';
+      setFormData(prev => ({
+        ...prev,
+        workflow_steps: prev.workflow_steps.map(s =>
+          s.id === parentId
+            ? {
+                ...s,
+                [branchKey]: (s[branchKey] || []).filter(
+                  bs => bs.id !== stepId
+                ),
+              }
+            : s
+        ),
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        workflow_steps: prev.workflow_steps.map(s =>
+          s.id !== parentId
+            ? s
+            : {
+                ...s,
+                branches: (s.branches || []).map(b =>
+                  b.id !== branchId
+                    ? b
+                    : {
+                        ...b,
+                        steps: b.steps.filter(bs => bs.id !== stepId),
+                      }
+                ),
+              }
+        ),
+      }));
+    }
+    setExpandedBranchSteps(prev => {
+      const newSet = new Set(prev);
+      newSet.delete(`${parentId}-${branchId}-${stepId}`);
+      return newSet;
+    });
+  };
+
+  const addBranch = (parentId: string) => {
+    const newBranch: ConditionalBranch = {
+      id: `branch-${Date.now()}`,
+      label: 'New Branch',
+      value: '',
+      isDefault: false,
+      steps: [],
+    };
     setFormData(prev => ({
       ...prev,
       workflow_steps: prev.workflow_steps.map(s =>
-        s.id === parentId
-          ? {
+        s.id !== parentId
+          ? s
+          : {
               ...s,
-              [branchKey]: (s[branchKey] || []).map(bs =>
-                bs.id === stepId ? { ...bs, ...updates } : bs
-              ),
+              branches: [
+                ...(s.branches || []).slice(0, -1),
+                newBranch,
+                (s.branches || [])[(s.branches?.length ?? 1) - 1],
+              ],
             }
-          : s
       ),
     }));
   };
 
-  const deleteBranchStep = (parentId: string, branch: 'true' | 'false', stepId: string) => {
-    const branchKey = `${branch}_steps` as 'true_steps' | 'false_steps';
+  const deleteBranch = (parentId: string, branchId: string) => {
     setFormData(prev => ({
       ...prev,
       workflow_steps: prev.workflow_steps.map(s =>
-        s.id === parentId
-          ? { ...s, [branchKey]: (s[branchKey] || []).filter(bs => bs.id !== stepId) }
-          : s
+        s.id !== parentId
+          ? s
+          : {
+              ...s,
+              branches: (s.branches || []).filter(
+                b => b.isDefault || b.id !== branchId
+              ),
+            }
       ),
     }));
-    setExpandedBranchSteps(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(`${parentId}-${branch}-${stepId}`);
-      return newSet;
-    });
   };
 
   const renderBranchStep = (
     branchStep: WorkflowStep,
     parentId: string,
-    branch: 'true' | 'false',
+    branch: string,
     index: number
   ) => {
     const expandKey = `${parentId}-${branch}-${branchStep.id}`;
@@ -592,8 +728,8 @@ export default function WorkflowEditor({
         >
           <div className={styles.branchStepInfo}>
             <span className={styles.branchStepTitle}>
-              {getBranchStepIcon(branchStep.type)}{' '}
-              {index + 1}. {getStepTypeName(branchStep.type)}
+              {getBranchStepIcon(branchStep.type)} {index + 1}.{' '}
+              {getStepTypeName(branchStep.type)}
             </span>
             <span className={styles.branchStepDesc}>
               {getStepDescription(branchStep, templates, callingAgents)}
@@ -770,7 +906,9 @@ export default function WorkflowEditor({
                 >
                   <option value="">Select status</option>
                   {LEAD_STATUSES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1025,9 +1163,6 @@ export default function WorkflowEditor({
                     <option value="pest_type">Pest Type</option>
                     <option value="lead_source">Lead Source</option>
                     <option value="lead_status">Lead Status</option>
-                    <option value="lead_age_hours">Lead Age (Hours)</option>
-                    <option value="call_outcome">Call Outcome</option>
-                    <option value="email_opened">Email Opened</option>
                   </select>
                 </div>
                 <div className={styles.formGroup}>
@@ -1046,88 +1181,253 @@ export default function WorkflowEditor({
                     <option value="">Select operator</option>
                     <option value="equals">Equals</option>
                     <option value="not_equals">Not Equals</option>
-                    <option value="greater_than">Greater Than</option>
-                    <option value="less_than">Less Than</option>
+                    {!(step.branches && step.branches.length > 0) &&
+                      step.condition?.field !== 'pest_type' && (
+                        <option value="greater_than">Greater Than</option>
+                      )}
+                    {!(step.branches && step.branches.length > 0) &&
+                      step.condition?.field !== 'pest_type' && (
+                        <option value="less_than">Less Than</option>
+                      )}
                     <option value="contains">Contains</option>
-                    <option value="in_array">In Array</option>
+                    {!(step.branches && step.branches.length > 0) &&
+                      step.condition?.field !== 'pest_type' && (
+                        <option value="in_array">In Array</option>
+                      )}
                   </select>
                 </div>
-                <div className={styles.formGroup}>
-                  <label>Value *</label>
-                  {step.condition?.field === 'lead_status' ? (
-                    <select
-                      value={step.condition?.value || ''}
-                      onChange={e =>
-                        updateStep(step.id, {
-                          condition: { ...step.condition, value: e.target.value },
-                        })
-                      }
-                    >
-                      <option value="">Select status</option>
-                      {LEAD_STATUSES.map(s => (
-                        <option key={s.value} value={s.value}>{s.label}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <>
-                      <input
-                        type="text"
+
+                {/* Legacy: top-level value input (only for old binary workflows) */}
+                {!(step.branches && step.branches.length > 0) && (
+                  <div className={styles.formGroup}>
+                    <label>Value *</label>
+                    {step.condition?.field === 'lead_status' ? (
+                      <select
                         value={step.condition?.value || ''}
                         onChange={e =>
                           updateStep(step.id, {
-                            condition: { ...step.condition, value: e.target.value },
+                            condition: {
+                              ...step.condition,
+                              value: e.target.value,
+                            },
                           })
                         }
-                        placeholder="Enter comparison value"
-                      />
-                      <small>
-                        For &quot;In Array&quot;, separate values with commas
-                      </small>
-                    </>
-                  )}
-                </div>
-                <div className={styles.branchPaths}>
-                  {(['true', 'false'] as const).map(branch => (
-                    <div
-                      key={branch}
-                      className={`${styles.branchPath} ${branch === 'true' ? styles.trueBranch : styles.falseBranch}`}
-                    >
-                      <div className={styles.branchPathHeader}>
-                        <GitBranch size={14} />
-                        <span>
-                          {branch === 'true'
-                            ? 'YES — Condition Met'
-                            : 'NO — Condition Not Met'}
-                        </span>
-                      </div>
-                      <div className={styles.branchSteps}>
-                        {((branch === 'true' ? step.true_steps : step.false_steps) || []).map(
-                          (bs, i) => renderBranchStep(bs, step.id, branch, i)
-                        )}
-                        {((branch === 'true' ? step.true_steps : step.false_steps) || []).length === 0 && (
-                          <p className={styles.emptyBranch}>
-                            No steps — workflow continues to next main step
-                          </p>
-                        )}
-                      </div>
-                      <div className={styles.addBranchStepButtons}>
-                        {BRANCH_STEP_TYPES.map(type => (
-                          <button
-                            key={type.value}
-                            className={styles.addBranchStepButton}
-                            onClick={e => {
-                              e.stopPropagation();
-                              addStepToBranch(step.id, branch, type.value);
-                            }}
-                          >
-                            {getBranchStepIcon(type.value)}
-                            {type.label}
-                          </button>
+                      >
+                        <option value="">Select status</option>
+                        {LEAD_STATUSES.map(s => (
+                          <option key={s.value} value={s.value}>
+                            {s.label}
+                          </option>
                         ))}
-                      </div>
+                      </select>
+                    ) : (
+                      <>
+                        <input
+                          type="text"
+                          value={step.condition?.value || ''}
+                          onChange={e =>
+                            updateStep(step.id, {
+                              condition: {
+                                ...step.condition,
+                                value: e.target.value,
+                              },
+                            })
+                          }
+                          placeholder="Enter comparison value"
+                        />
+                        <small>
+                          For &quot;In Array&quot;, separate values with commas
+                        </small>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Multi-branch UI */}
+                {step.branches && step.branches.length > 0 ? (
+                  <>
+                    <div className={styles.multiBranchList}>
+                      {(step.branches || []).map(branch => (
+                        <div
+                          key={branch.id}
+                          className={`${styles.multiBranch} ${branch.isDefault ? styles.defaultBranch : styles.namedBranch}`}
+                        >
+                          <div className={styles.multiBranchHeader}>
+                            <GitBranch size={14} />
+                            {branch.isDefault ? (
+                              <span className={styles.defaultBranchLabel}>
+                                Default (Fallback)
+                              </span>
+                            ) : (
+                              <input
+                                type="text"
+                                className={styles.branchLabelInput}
+                                value={branch.label}
+                                placeholder="Branch name"
+                                onClick={e => e.stopPropagation()}
+                                onChange={e =>
+                                  updateStep(step.id, {
+                                    branches: (step.branches || []).map(b =>
+                                      b.id === branch.id
+                                        ? { ...b, label: e.target.value }
+                                        : b
+                                    ),
+                                  })
+                                }
+                              />
+                            )}
+                            {!branch.isDefault && (
+                              <div className={styles.branchValueInput}>
+                                {step.condition?.field === 'lead_status' ? (
+                                  <select
+                                    value={branch.value}
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={e =>
+                                      updateStep(step.id, {
+                                        branches: (step.branches || []).map(
+                                          b =>
+                                            b.id === branch.id
+                                              ? { ...b, value: e.target.value }
+                                              : b
+                                        ),
+                                      })
+                                    }
+                                  >
+                                    <option value="">Select status</option>
+                                    {LEAD_STATUSES.map(s => (
+                                      <option key={s.value} value={s.value}>
+                                        {s.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    type="text"
+                                    value={branch.value}
+                                    placeholder="Match value"
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={e =>
+                                      updateStep(step.id, {
+                                        branches: (step.branches || []).map(
+                                          b =>
+                                            b.id === branch.id
+                                              ? { ...b, value: e.target.value }
+                                              : b
+                                        ),
+                                      })
+                                    }
+                                  />
+                                )}
+                              </div>
+                            )}
+                            {!branch.isDefault && (
+                              <button
+                                className={styles.deleteBranchButton}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  deleteBranch(step.id, branch.id);
+                                }}
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            )}
+                          </div>
+                          <div className={styles.branchSteps}>
+                            {branch.steps.map((bs, i) =>
+                              renderBranchStep(bs, step.id, branch.id, i)
+                            )}
+                            {branch.steps.length === 0 && (
+                              <p className={styles.emptyBranch}>
+                                No steps — workflow continues to next main step
+                              </p>
+                            )}
+                          </div>
+                          <div className={styles.addBranchStepButtons}>
+                            {BRANCH_STEP_TYPES.map(type => (
+                              <button
+                                key={type.value}
+                                className={styles.addBranchStepButton}
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  addStepToBranch(
+                                    step.id,
+                                    branch.id,
+                                    type.value
+                                  );
+                                }}
+                              >
+                                {getBranchStepIcon(type.value)}
+                                {type.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                    <button
+                      className={styles.addBranchButton}
+                      onClick={e => {
+                        e.stopPropagation();
+                        addBranch(step.id);
+                      }}
+                    >
+                      <Plus size={14} />
+                      Add Branch
+                    </button>
+                  </>
+                ) : (
+                  /* Legacy binary UI */
+                  <div className={styles.branchPaths}>
+                    {(['true', 'false'] as const).map(branch => (
+                      <div
+                        key={branch}
+                        className={`${styles.branchPath} ${branch === 'true' ? styles.trueBranch : styles.falseBranch}`}
+                      >
+                        <div className={styles.branchPathHeader}>
+                          <GitBranch size={14} />
+                          <span>
+                            {branch === 'true'
+                              ? 'YES — Condition Met'
+                              : 'NO — Condition Not Met'}
+                          </span>
+                        </div>
+                        <div className={styles.branchSteps}>
+                          {(
+                            (branch === 'true'
+                              ? step.true_steps
+                              : step.false_steps) || []
+                          ).map((bs, i) =>
+                            renderBranchStep(bs, step.id, branch, i)
+                          )}
+                          {(
+                            (branch === 'true'
+                              ? step.true_steps
+                              : step.false_steps) || []
+                          ).length === 0 && (
+                            <p className={styles.emptyBranch}>
+                              No steps — workflow continues to next main step
+                            </p>
+                          )}
+                        </div>
+                        <div className={styles.addBranchStepButtons}>
+                          {BRANCH_STEP_TYPES.map(type => (
+                            <button
+                              key={type.value}
+                              className={styles.addBranchStepButton}
+                              onClick={e => {
+                                e.stopPropagation();
+                                addStepToBranch(step.id, branch, type.value);
+                              }}
+                            >
+                              {getBranchStepIcon(type.value)}
+                              {type.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
 
@@ -1142,7 +1442,9 @@ export default function WorkflowEditor({
                 >
                   <option value="">Select status</option>
                   {LEAD_STATUSES.map(s => (
-                    <option key={s.value} value={s.value}>{s.label}</option>
+                    <option key={s.value} value={s.value}>
+                      {s.label}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -1797,6 +2099,10 @@ function getStepDescription(
       return 'Calling agent not selected';
     case 'conditional':
       if (step.condition) {
+        if (step.branches && step.branches.length > 0) {
+          const nonDefault = step.branches.filter(b => !b.isDefault);
+          return `Branch on ${step.condition.field} ${step.condition.operator} (${nonDefault.length} branch${nonDefault.length !== 1 ? 'es' : ''})`;
+        }
         return `Branch on ${step.condition.field} ${step.condition.operator} ${step.condition.value}`;
       }
       return 'Conditional branch not configured';
