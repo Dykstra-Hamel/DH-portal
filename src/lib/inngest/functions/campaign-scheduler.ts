@@ -326,8 +326,19 @@ export const campaignProcessContactsHandler = inngest.createFunction(
       }
     }
 
-    // Use configurable batch size from campaign
-    const BATCH_SIZE = campaign.batch_size || 10;
+    // Detect workflow step types to determine batch size cap
+    const { data: workflow } = await supabase
+      .from('automation_workflows')
+      .select('workflow_steps')
+      .eq('id', workflowId)
+      .single();
+    const workflowSteps = workflow?.workflow_steps || [];
+    const hasPhoneSteps = workflowSteps.some((s: any) => s.type === 'make_call');
+    const hasSmsSteps = workflowSteps.some((s: any) => s.type === 'send_sms');
+
+    // Use configurable batch size from campaign, capped by workflow type
+    const MAX_BATCH_SIZE = (!hasPhoneSteps && !hasSmsSteps) ? 25 : 10;
+    const BATCH_SIZE = Math.min(campaign.batch_size || 10, MAX_BATCH_SIZE);
     const BATCH_INTERVAL_MS = (campaign.batch_interval_minutes || 10) * 60 * 1000;
 
     // Filter contacts to respect daily limit
