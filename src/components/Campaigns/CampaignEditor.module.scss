@@ -244,6 +244,26 @@
   font-size: 0.9375rem;
 }
 
+.batchSizeInput {
+  width: 64px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  font-size: 0.9375rem;
+  color: var(--brand-black);
+  background: var(--white);
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+  }
+}
+
+.batchSizeHint {
+  color: var(--gray-600);
+  font-size: 0.875rem;
+}
+
 .modalFooter {
   display: flex;
   justify-content: space-between;
