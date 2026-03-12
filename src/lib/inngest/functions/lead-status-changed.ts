@@ -201,15 +201,17 @@ export const leadStatusChangedHandler = inngest.createFunction(
             workflow_id: workflow.id,
             company_id: companyId,
             lead_id: leadId,
-            trigger_event: 'lead_status_changed',
-            trigger_data: {
-              fromStatus,
-              toStatus,
-              leadData,
-              userId,
-              timestamp,
-            },
             execution_status: 'pending',
+            execution_data: {
+              trigger_event: 'lead_status_changed',
+              trigger_data: {
+                fromStatus,
+                toStatus,
+                leadData,
+                userId,
+                timestamp,
+              },
+            },
             created_at: new Date().toISOString(),
           })
           .select()

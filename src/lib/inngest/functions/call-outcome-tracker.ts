@@ -81,9 +81,9 @@ export const callOutcomeTracker = inngest.createFunction(
       // Update lead status based on call outcome
       switch (callOutcome) {
         case 'successful':
-          updates.lead_status = 'contacted';
+          updates.lead_status = 'in_process';
           if (callAnalysis?.appointmentScheduled) {
-            updates.lead_status = 'qualified';
+            updates.lead_status = 'scheduling';
             updates.appointment_scheduled = true;
           }
           break;
@@ -92,7 +92,7 @@ export const callOutcomeTracker = inngest.createFunction(
           // We'll handle this by incrementing in a separate query
           break;
         case 'voicemail':
-          updates.lead_status = 'contacted';
+          updates.lead_status = 'in_process';
           updates.voicemail_left = true;
           break;
         case 'failed':

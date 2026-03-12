@@ -12,6 +12,7 @@ import {
   formatDiscount,
 } from '@/lib/campaign-utils';
 import { isPhoneSuppressed } from '@/lib/suppression';
+import { getGeminiClient } from '@/lib/ai/gemini-client';
 
 interface StepResult {
   stepIndex: number;
@@ -133,6 +134,7 @@ export const workflowExecuteHandler = inngest.createFunction(
 
     // Execute all workflow steps in sequence
     const stepResults: StepResult[] = [];
+    let branchCancellation: object | null = null;
 
     for (let stepIndex = 0; stepIndex < workflowSteps.length; stepIndex++) {
       const currentStep = workflowSteps[stepIndex];
@@ -325,7 +327,8 @@ export const workflowExecuteHandler = inngest.createFunction(
                 result = await executeConditionalStep(
                   currentStep,
                   leadData,
-                  attribution
+                  attribution,
+                  leadId
                 );
                 break;
               case 'update_lead_status':
@@ -427,6 +430,383 @@ export const workflowExecuteHandler = inngest.createFunction(
         result: stepResult,
         success: stepResult?.success !== false,
       });
+
+      // Execute branch steps if this is a conditional step
+      const conditionalResult = stepResult as any;
+
+      // MULTI-BRANCH MODE
+      if (currentStep.type === 'conditional' && conditionalResult?.isMultiBranch === true) {
+        const branches: any[] = currentStep.branches || [];
+        const selectedBranch =
+          branches.find((b: any) => !b.isDefault && b.id === conditionalResult.matchedBranchId)
+          ?? branches.find((b: any) => b.isDefault);
+
+        const branchSteps: any[] = selectedBranch?.steps || [];
+        const branchLabel: string = selectedBranch?.id || 'default';
+
+        for (let branchIdx = 0; branchIdx < branchSteps.length; branchIdx++) {
+          const branchStep = branchSteps[branchIdx];
+
+          const branchStatusCheck = await step.run(
+            `check-cancellation-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+            async () => {
+              const supabase = createAdminClient();
+              const { data: currentExecution } = await supabase
+                .from('automation_executions')
+                .select('execution_status, execution_data')
+                .eq('id', executionId)
+                .single();
+
+              let isCancelled =
+                currentExecution?.execution_status === 'cancelled' ||
+                currentExecution?.execution_data?.cancellationProcessed === true;
+              let cancellationReason = isCancelled ? 'Database status or cancellation flag' : null;
+
+              if (!isCancelled && triggerType === 'partial_lead_automation' && leadData?.partialLeadId) {
+                const { data: partialLead } = await supabase
+                  .from('partial_leads')
+                  .select('converted_to_lead_id')
+                  .eq('id', leadData.partialLeadId)
+                  .single();
+
+                if (partialLead?.converted_to_lead_id) {
+                  isCancelled = true;
+                  cancellationReason = `Partial lead converted to full lead (ID: ${partialLead.converted_to_lead_id})`;
+                  await supabase
+                    .from('automation_executions')
+                    .update({
+                      execution_status: 'cancelled',
+                      completed_at: new Date().toISOString(),
+                      execution_data: {
+                        ...currentExecution?.execution_data,
+                        cancellationReason,
+                        cancellationProcessed: true,
+                        cancelledAtStep: `${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+                      },
+                    })
+                    .eq('id', executionId);
+                }
+              }
+
+              return { shouldContinue: !isCancelled, cancellationReason };
+            }
+          );
+
+          if (!branchStatusCheck.shouldContinue) {
+            await step.run(
+              `save-steps-before-branch-cancellation-${stepIndex}-multi`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_data')
+                  .eq('id', executionId)
+                  .single();
+                await supabase
+                  .from('automation_executions')
+                  .update({
+                    execution_data: {
+                      ...currentExecution?.execution_data,
+                      stepResults,
+                      completedSteps: stepResults.length,
+                      cancelledAtStep: `${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+                    },
+                  })
+                  .eq('id', executionId);
+                return { stepsSaved: stepResults.length };
+              }
+            );
+
+            await inngest.send({
+              name: 'workflow/completed',
+              data: { executionId, workflowId, companyId, triggerType, success: false, cancelled: true, cancellationReason: branchStatusCheck.cancellationReason },
+            });
+
+            branchCancellation = {
+              success: true,
+              cancelled: true,
+              cancelledAt: `${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+              cancellationReason: branchStatusCheck.cancellationReason,
+            };
+            break;
+          }
+
+          const branchResult = await step.run(
+            `execute-step-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+            async () => {
+              switch (branchStep.type) {
+                case 'send_email':
+                  return await executeEmailStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
+                case 'send_sms':
+                  return await executeSMSStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
+                case 'make_call':
+                  return await executeMakeCallStep(branchStep, leadData, companyId, leadId, customerId, executionId);
+                case 'wait':
+                case 'delay':
+                  return await executeDelayStep(branchStep);
+                case 'update_lead_status':
+                  return await executeUpdateLeadStatusStep(branchStep, leadId, companyId);
+                case 'archive_call':
+                  return { success: true, archived: true, reason: branchStep.archive_reason };
+                default:
+                  return { success: true, skipped: true };
+              }
+            }
+          );
+
+          stepResults.push({
+            stepIndex,
+            stepType: `${selectedBranch?.label || 'default'}_branch:${branchStep.type}`,
+            completedAt: new Date().toISOString(),
+            result: branchResult,
+            success: branchResult?.success !== false,
+          });
+
+          const branchDelay = branchStep.delay_minutes || 0;
+          if (branchDelay > 0) {
+            await step.sleep(
+              `delay-step-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+              `${branchDelay}m`
+            );
+
+            const postDelayCheck = await step.run(
+              `check-cancellation-post-delay-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_status, execution_data')
+                  .eq('id', executionId)
+                  .single();
+                const isCancelled =
+                  currentExecution?.execution_status === 'cancelled' ||
+                  currentExecution?.execution_data?.cancellationProcessed === true;
+                return { shouldContinue: !isCancelled };
+              }
+            );
+
+            if (!postDelayCheck.shouldContinue) {
+              branchCancellation = { success: true, cancelled: true, cancelledAfterDelay: true };
+              break;
+            }
+          }
+        }
+      }
+
+      // LEGACY BINARY MODE
+      if (currentStep.type === 'conditional' && conditionalResult?.conditionMet !== undefined) {
+        const branchPath = conditionalResult.conditionMet ? 'true' : 'false';
+        const branchSteps: any[] = conditionalResult.conditionMet
+          ? (currentStep.true_steps || [])
+          : (currentStep.false_steps || []);
+
+        for (let branchIdx = 0; branchIdx < branchSteps.length; branchIdx++) {
+          const branchStep = branchSteps[branchIdx];
+
+          // Cancellation check before each branch step
+          const branchStatusCheck = await step.run(
+            `check-cancellation-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+            async () => {
+              const supabase = createAdminClient();
+              const { data: currentExecution } = await supabase
+                .from('automation_executions')
+                .select('execution_status, execution_data')
+                .eq('id', executionId)
+                .single();
+
+              let isCancelled =
+                currentExecution?.execution_status === 'cancelled' ||
+                currentExecution?.execution_data?.cancellationProcessed === true;
+              let cancellationReason = isCancelled
+                ? 'Database status or cancellation flag'
+                : null;
+
+              if (
+                !isCancelled &&
+                triggerType === 'partial_lead_automation' &&
+                leadData?.partialLeadId
+              ) {
+                const { data: partialLead } = await supabase
+                  .from('partial_leads')
+                  .select('converted_to_lead_id')
+                  .eq('id', leadData.partialLeadId)
+                  .single();
+
+                if (partialLead?.converted_to_lead_id) {
+                  isCancelled = true;
+                  cancellationReason = `Partial lead converted to full lead (ID: ${partialLead.converted_to_lead_id})`;
+                  await supabase
+                    .from('automation_executions')
+                    .update({
+                      execution_status: 'cancelled',
+                      completed_at: new Date().toISOString(),
+                      execution_data: {
+                        ...currentExecution?.execution_data,
+                        cancellationReason,
+                        cancellationProcessed: true,
+                        cancelledAtStep: `${stepIndex}-${branchPath}-branch-${branchIdx}`,
+                      },
+                    })
+                    .eq('id', executionId);
+                }
+              }
+
+              return { shouldContinue: !isCancelled, cancellationReason };
+            }
+          );
+
+          if (!branchStatusCheck.shouldContinue) {
+            await step.run(
+              `save-steps-before-branch-cancellation-${stepIndex}`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_data')
+                  .eq('id', executionId)
+                  .single();
+                await supabase
+                  .from('automation_executions')
+                  .update({
+                    execution_data: {
+                      ...currentExecution?.execution_data,
+                      stepResults,
+                      completedSteps: stepResults.length,
+                      cancelledAtStep: `${stepIndex}-${branchPath}-branch-${branchIdx}`,
+                    },
+                  })
+                  .eq('id', executionId);
+                return { stepsSaved: stepResults.length };
+              }
+            );
+
+            await inngest.send({
+              name: 'workflow/completed',
+              data: {
+                executionId,
+                workflowId,
+                companyId,
+                triggerType,
+                success: false,
+                cancelled: true,
+                cancellationReason: branchStatusCheck.cancellationReason,
+              },
+            });
+
+            branchCancellation = {
+              success: true,
+              cancelled: true,
+              cancelledAt: `${stepIndex}-${branchPath}-branch-${branchIdx}`,
+              cancellationReason: branchStatusCheck.cancellationReason,
+            };
+            break;
+          }
+
+          // Execute the branch step
+          const branchResult = await step.run(
+            `execute-step-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+            async () => {
+              switch (branchStep.type) {
+                case 'send_email':
+                  return await executeEmailStep(
+                    branchStep,
+                    leadData,
+                    companyId,
+                    leadId,
+                    customerId,
+                    attribution,
+                    partialLeadData,
+                    executionId,
+                    execution?.execution_data?.campaignId,
+                    workflowId
+                  );
+                case 'send_sms':
+                  return await executeSMSStep(
+                    branchStep,
+                    leadData,
+                    companyId,
+                    leadId,
+                    customerId,
+                    attribution,
+                    partialLeadData,
+                    executionId
+                  );
+                case 'make_call':
+                  return await executeMakeCallStep(
+                    branchStep,
+                    leadData,
+                    companyId,
+                    leadId,
+                    customerId,
+                    executionId
+                  );
+                case 'wait':
+                case 'delay':
+                  return await executeDelayStep(branchStep);
+                case 'update_lead_status':
+                  return await executeUpdateLeadStatusStep(
+                    branchStep,
+                    leadId,
+                    companyId
+                  );
+                case 'archive_call':
+                  return {
+                    success: true,
+                    archived: true,
+                    reason: branchStep.archive_reason,
+                  };
+                default:
+                  return { success: true, skipped: true };
+              }
+            }
+          );
+
+          stepResults.push({
+            stepIndex,
+            stepType: `${branchPath}_branch:${branchStep.type}`,
+            completedAt: new Date().toISOString(),
+            result: branchResult,
+            success: branchResult?.success !== false,
+          });
+
+          // Handle delay for branch steps
+          const branchDelay = branchStep.delay_minutes || 0;
+          if (branchDelay > 0) {
+            await step.sleep(
+              `delay-step-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+              `${branchDelay}m`
+            );
+
+            // Post-delay cancellation check
+            const postDelayCheck = await step.run(
+              `check-cancellation-post-delay-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_status, execution_data')
+                  .eq('id', executionId)
+                  .single();
+                const isCancelled =
+                  currentExecution?.execution_status === 'cancelled' ||
+                  currentExecution?.execution_data?.cancellationProcessed === true;
+                return { shouldContinue: !isCancelled };
+              }
+            );
+
+            if (!postDelayCheck.shouldContinue) {
+              branchCancellation = {
+                success: true,
+                cancelled: true,
+                cancelledAfterDelay: true,
+              };
+              break;
+            }
+          }
+        }
+      }
+
+      if (branchCancellation) return branchCancellation;
 
       // Handle delay if this step requires it
       const stepDelayMinutes =
@@ -1690,16 +2070,111 @@ async function executeDelayStep(step: any) {
 async function executeConditionalStep(
   step: any,
   leadData: any,
-  attribution: any
+  attribution: any,
+  leadId?: string
 ) {
-  // Simple condition evaluation
   const condition = step.condition || {};
 
+  // Fetch current lead data from DB so the condition reflects live state,
+  // not the stale snapshot from the trigger payload.
+  let currentLeadData = leadData;
+  if (leadId) {
+    const supabase = createAdminClient();
+    const { data: freshLead } = await supabase
+      .from('leads')
+      .select('*, customers(*)')
+      .eq('id', leadId)
+      .single();
+    if (freshLead) {
+      currentLeadData = { ...leadData, ...freshLead };
+    }
+  }
+
+  // MULTI-BRANCH MODE
+  if (Array.isArray(step.branches) && step.branches.length > 0) {
+    const fieldValue = currentLeadData[condition.field] ?? attribution?.[condition.field] ?? null;
+    const nonDefault = step.branches.filter((b: any) => !b.isDefault);
+    let matchedBranchId: string | null = null;
+
+    // --- Phase 1: fast exact/substring matching (no AI cost) ---
+    for (const branch of nonDefault) {
+      let matched = false;
+      switch (condition.operator) {
+        case 'equals':
+          matched = String(fieldValue).toLowerCase() === String(branch.value).toLowerCase();
+          break;
+        case 'not_equals':
+          matched = String(fieldValue).toLowerCase() !== String(branch.value).toLowerCase();
+          break;
+        case 'contains':
+          matched = String(fieldValue).toLowerCase().includes(String(branch.value).toLowerCase());
+          break;
+        default:
+          matched = String(fieldValue).toLowerCase() === String(branch.value).toLowerCase();
+      }
+      if (matched) {
+        matchedBranchId = branch.id;
+        break;
+      }
+    }
+
+    // --- Phase 2: Gemini fuzzy fallback (only when no exact match found) ---
+    if (matchedBranchId === null && nonDefault.length > 0 && fieldValue !== null && fieldValue !== '') {
+      try {
+        const gemini = getGeminiClient();
+        const branchList = nonDefault
+          .map((b: any) => `- ID: "${b.id}", Match value: "${b.value}"`)
+          .join('\n');
+
+        const prompt = `You are a workflow routing assistant for a pest control company.
+
+A workflow step needs to route to the correct branch based on a lead's data.
+
+Field being checked: "${condition.field}"
+Operator: "${condition.operator}"
+Actual value from the lead: "${fieldValue}"
+
+Available branches:
+${branchList}
+
+Determine which branch ID (if any) the actual value most closely corresponds to.
+Consider: alternate spellings, pluralization, abbreviations, common synonyms, and industry terminology.
+Examples: "Bedbugs" matches "Bed Bugs", "Google Organic" matches "organic", "Roaches" matches "Cockroaches".
+
+If the operator is "not_equals", find the branch whose value does NOT match the lead value.
+If no branch is a reasonable match, return null.
+
+Respond with JSON only:
+{
+  "matchedBranchId": "<id string or null>",
+  "reasoning": "<one sentence>"
+}`;
+
+        const aiResponse = await gemini.generate<{ matchedBranchId: string | null; reasoning: string }>(
+          prompt,
+          { jsonMode: true, temperature: 0.1, maxOutputTokens: 256 }
+        );
+
+        if (aiResponse.success && aiResponse.data?.matchedBranchId) {
+          const validId = nonDefault.find((b: any) => b.id === aiResponse.data!.matchedBranchId);
+          if (validId) {
+            matchedBranchId = aiResponse.data.matchedBranchId;
+          }
+        }
+      } catch {
+        // Gemini unavailable — fall through to Default branch (no-op)
+      }
+    }
+
+    return { success: true, isMultiBranch: true, matchedBranchId, fieldValue };
+  }
+
+  // LEGACY MODE
   let conditionMet = true;
 
   if (condition.field && condition.operator && condition.value) {
     const fieldValue =
-      leadData[condition.field] || attribution[condition.field];
+      currentLeadData[condition.field] || attribution?.[condition.field];
 
     switch (condition.operator) {
       case 'equals':
@@ -1720,7 +2195,7 @@ async function executeConditionalStep(
     success: true,
     conditionMet,
     condition,
-    fieldValue: leadData[condition.field] || attribution[condition.field],
+    fieldValue: currentLeadData[condition.field] || attribution?.[condition.field],
   };
 }
 
@@ -1930,11 +2405,11 @@ async function executeMakeCallStep(
     // Don't throw - call was successful even if logging failed
   }
 
-  // Update lead status to contacted
+  // Update lead status to in_process
   await supabase
     .from('leads')
     .update({
-      lead_status: 'contacted',
+      lead_status: 'in_process',
       last_contacted_at: new Date().toISOString(),
     })
     .eq('id', leadId);
