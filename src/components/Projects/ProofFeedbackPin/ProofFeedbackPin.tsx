@@ -1,14 +1,17 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState, useEffect, useCallback } from 'react';
+import { Check, Copy } from 'lucide-react';
 import { ProofFeedback } from '@/types/project';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import { copyTextToClipboard, htmlToPlainText } from '@/lib/clipboard';
 import styles from './ProofFeedbackPin.module.scss';
 
 interface ProofFeedbackPinProps {
   pin: ProofFeedback;
   isActive: boolean;
   isHovered: boolean;
+  sizeScale?: number;
   onClick: () => void;
   onClosePopover: () => void;
   currentUserId: string;
@@ -32,6 +35,7 @@ export default function ProofFeedbackPin({
   pin,
   isActive,
   isHovered,
+  sizeScale = 1,
   onClick,
   onClosePopover,
   currentUserId,
@@ -40,11 +44,35 @@ export default function ProofFeedbackPin({
   onDelete,
 }: ProofFeedbackPinProps) {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const copyResetTimeoutRef = useRef<number | null>(null);
+  const [copied, setCopied] = useState(false);
   const canDelete = pin.user_id === currentUserId || isAdmin;
 
   const authorName = pin.user_profile
     ? `${pin.user_profile.first_name} ${pin.user_profile.last_name}`
     : 'Unknown';
+
+  useEffect(() => {
+    return () => {
+      if (copyResetTimeoutRef.current !== null) {
+        window.clearTimeout(copyResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleCopyComment = useCallback(async () => {
+    const plainText = htmlToPlainText(pin.comment);
+    const success = await copyTextToClipboard(plainText);
+    if (!success) return;
+
+    setCopied(true);
+    if (copyResetTimeoutRef.current !== null) {
+      window.clearTimeout(copyResetTimeoutRef.current);
+    }
+    copyResetTimeoutRef.current = window.setTimeout(() => {
+      setCopied(false);
+    }, 1500);
+  }, [pin.comment]);
 
   return (
     <div
@@ -52,6 +80,7 @@ export default function ProofFeedbackPin({
       style={{
         left: `${pin.x_percent! * 100}%`,
         top: `${pin.y_percent! * 100}%`,
+        ['--pin-size-scale' as string]: sizeScale,
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -78,10 +107,24 @@ export default function ProofFeedbackPin({
             <span className={styles.authorName}>{authorName}</span>
             <span className={styles.timestamp}>{formatRelativeTime(pin.created_at)}</span>
           </div>
-          <div
-            className={`${styles.comment} ${pin.is_resolved ? styles.commentResolved : ''}`}
-            dangerouslySetInnerHTML={{ __html: pin.comment }}
-          />
+          <div className={styles.commentRow}>
+            <div
+              className={`${styles.comment} ${pin.is_resolved ? styles.commentResolved : ''}`}
+              dangerouslySetInnerHTML={{ __html: pin.comment }}
+            />
+            <button
+              type="button"
+              className={`${styles.copyButton} ${copied ? styles.copyButtonActive : ''}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                void handleCopyComment();
+              }}
+              aria-label="Copy pin text"
+              title={copied ? 'Copied' : 'Copy text'}
+            >
+              {copied ? <Check size={12} /> : <Copy size={12} />}
+            </button>
+          </div>
           <div className={styles.popoverActions}>
             <button
               className={`${styles.resolveButton} ${pin.is_resolved ? styles.resolveButtonActive : ''}`}

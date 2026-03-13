@@ -6,7 +6,7 @@ import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeFileName } from '@/lib/storage-utils';
-import { ArrowLeft, Check, ChevronDown, Copy, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
@@ -42,6 +42,8 @@ interface ProjectDetailWithTasksProps {
   user: User;
   onProjectUpdate?: () => void;
 }
+
+const COMMENTS_INITIAL_VISIBLE_COUNT = 10;
 
 const formatHeaderDate = (value?: string | null) => {
   if (!value) return 'Not set';
@@ -153,6 +155,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [showCompleteConfirmation, setShowCompleteConfirmation] = useState(false);
   const [isTasksCollapsed, setIsTasksCollapsed] = useState(false);
   const [isCommentsCollapsed, setIsCommentsCollapsed] = useState(false);
+  const [showAllCommentsInFeed, setShowAllCommentsInFeed] = useState(false);
   const [isEditingProjectDescription, setIsEditingProjectDescription] = useState(false);
   const [blockedTaskHoverRef, setBlockedTaskHoverRef] = useState<{
     id: string | null;
@@ -724,12 +727,20 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setIsHeaderStatusOpen(false);
       return;
     }
+
+    // Route completion through the confirmation modal
+    if (status === 'complete') {
+      setIsHeaderStatusOpen(false);
+      setShowCompleteConfirmation(true);
+      return;
+    }
+
     setIsUpdatingHeaderStatus(true);
     setIsHeaderStatusOpen(false);
     try {
       await updateProjectFields({
         status,
-        completion_date: status === 'complete' ? new Date().toISOString() : null,
+        completion_date: null,
       });
       setToastMessage('Project status updated.');
       setToastType('success');
@@ -810,10 +821,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       );
 
       setIsProjectComplete(true);
-      setToastMessage('Project marked complete.');
-      setToastType('success');
-      setShowToast(true);
       onProjectUpdate?.();
+      handleBackToProjects();
     } catch (error) {
       console.error('Error completing project:', error);
       setToastMessage('Failed to mark project complete.');
@@ -825,20 +834,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   }, [
     isCompletingProject,
     onProjectUpdate,
-    project?.assigned_to_profile,
-    project?.description,
-    project?.due_date,
-    project?.id,
-    project?.is_billable,
-    project?.name,
-    project?.notes,
-    project?.primary_file_path,
-    project?.priority,
-    project?.project_subtype,
-    project?.project_type,
-    project?.quoted_price,
-    project?.start_date,
-    project?.tags,
+    handleBackToProjects,
     tasks,
     updateTask,
     project,
@@ -1232,11 +1228,12 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       targetComment?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     });
     return () => window.cancelAnimationFrame(rafId);
-  }, [highlightedProjectCommentId, comments.length, isCommentsCollapsed]);
+  }, [highlightedProjectCommentId, comments.length, isCommentsCollapsed, showAllCommentsInFeed]);
 
   React.useEffect(() => {
     hasAutoScrolledCommentsRef.current = false;
     shouldStickCommentsToBottomRef.current = true;
+    setShowAllCommentsInFeed(false);
   }, [project?.id]);
 
   React.useEffect(() => {
@@ -1812,6 +1809,47 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
     );
   }, [comments, proofActivity]);
+
+  const hasOlderCommentsInFeed = useMemo(
+    () =>
+      !showAllCommentsInFeed &&
+      comments.length > COMMENTS_INITIAL_VISIBLE_COUNT,
+    [comments.length, showAllCommentsInFeed]
+  );
+
+  const visibleMergedFeed = useMemo(() => {
+    if (showAllCommentsInFeed) return mergedFeed;
+    if (comments.length <= COMMENTS_INITIAL_VISIBLE_COUNT) return mergedFeed;
+
+    let commentsRemaining = COMMENTS_INITIAL_VISIBLE_COUNT;
+    let startIndex = 0;
+
+    for (let index = mergedFeed.length - 1; index >= 0; index -= 1) {
+      if (mergedFeed[index]._type === 'comment') {
+        commentsRemaining -= 1;
+      }
+
+      if (commentsRemaining === 0) {
+        startIndex = index;
+        break;
+      }
+    }
+
+    return mergedFeed.slice(startIndex);
+  }, [comments.length, mergedFeed, showAllCommentsInFeed]);
+
+  React.useEffect(() => {
+    if (!deepLinkCommentId) return;
+    if (showAllCommentsInFeed) return;
+
+    const isDeepLinkedCommentVisible = visibleMergedFeed.some(
+      (item) => item._type === 'comment' && item.id === deepLinkCommentId
+    );
+
+    if (!isDeepLinkedCommentVisible) {
+      setShowAllCommentsInFeed(true);
+    }
+  }, [deepLinkCommentId, showAllCommentsInFeed, visibleMergedFeed]);
 
   const handleOpenProofFromActivity = useCallback((proofId: string) => {
     setActiveContentTab('proofs');
@@ -2881,11 +2919,22 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                   <div
                     ref={commentsFeedRef}
                     className={styles.commentsFeed}
-                    onScroll={handleCommentsFeedScroll}
                   >
                     {mergedFeed.length > 0 ? (
                       <div ref={commentsListRef} className={styles.commentsList}>
-                        {mergedFeed.map(item => {
+                        {hasOlderCommentsInFeed && (
+                          <div className={styles.loadOlderCommentsRow}>
+                            <button
+                              type="button"
+                              className={styles.loadOlderCommentsButton}
+                              onClick={() => setShowAllCommentsInFeed(true)}
+                            >
+                              <ChevronUp size={12} />
+                              <span>Load Older Comments</span>
+                            </button>
+                          </div>
+                        )}
+                        {visibleMergedFeed.map(item => {
                           // ── Proof feedback activity (system message) ──
                           if (item._type === 'proof_feedback') {
                             const activity = item as typeof item & { _type: 'proof_feedback' };

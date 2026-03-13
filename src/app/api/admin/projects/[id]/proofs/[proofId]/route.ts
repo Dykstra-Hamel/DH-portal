@@ -125,7 +125,7 @@ export async function DELETE(
 
     const { data: proof, error: fetchError } = await adminClient
       .from('project_proofs')
-      .select('file_path')
+      .select('id, file_path, group_id, is_current')
       .eq('id', proofId)
       .eq('project_id', projectId)
       .single();
@@ -150,7 +150,61 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to delete proof' }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    const { data: remainingProofs, error: remainingError } = await adminClient
+      .from('project_proofs')
+      .select('id, version')
+      .eq('project_id', projectId)
+      .eq('group_id', proof.group_id)
+      .order('version', { ascending: false });
+
+    if (remainingError) {
+      return NextResponse.json({ error: 'Failed to refresh proof group after delete' }, { status: 500 });
+    }
+
+    const remainingCount = remainingProofs?.length ?? 0;
+
+    if (remainingCount === 0) {
+      const { error: deleteGroupError } = await adminClient
+        .from('proof_groups')
+        .delete()
+        .eq('id', proof.group_id)
+        .eq('project_id', projectId);
+
+      if (deleteGroupError) {
+        return NextResponse.json({ error: 'Failed to delete empty proof group' }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, groupDeleted: true });
+    }
+
+    // If the current proof was deleted, promote the highest version remaining in the group.
+    if (proof.is_current) {
+      const promotedProof = remainingProofs[0];
+      const updatedAt = new Date().toISOString();
+
+      const { error: clearCurrentError } = await adminClient
+        .from('project_proofs')
+        .update({ is_current: false, updated_at: updatedAt })
+        .eq('project_id', projectId)
+        .eq('group_id', proof.group_id)
+        .eq('is_current', true);
+
+      if (clearCurrentError) {
+        return NextResponse.json({ error: 'Failed to update proof group current state' }, { status: 500 });
+      }
+
+      const { error: promoteError } = await adminClient
+        .from('project_proofs')
+        .update({ is_current: true, updated_at: updatedAt })
+        .eq('id', promotedProof.id)
+        .eq('project_id', projectId);
+
+      if (promoteError) {
+        return NextResponse.json({ error: 'Failed to promote previous proof version' }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true, groupDeleted: false });
   } catch (error) {
     console.error('Error deleting proof:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

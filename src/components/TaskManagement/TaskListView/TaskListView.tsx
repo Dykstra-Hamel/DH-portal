@@ -22,6 +22,7 @@ import {
 import { Task, TaskStatus } from '@/types/taskManagement';
 import {
   Project,
+  User,
   statusOptions as projectStatusOptions,
 } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
@@ -95,7 +96,9 @@ interface TaskListViewProps {
   ) => Promise<void> | void;
   groupTasksByProject?: boolean;
   currentUserId?: string;
+  users?: User[];
   personalTasks?: Task[];
+  assignedPersonalTasks?: Task[];
   statusFilter?: string;
   companyFilter?: string;
   dueDateFilter?: string;
@@ -139,7 +142,9 @@ export function TaskListView({
   onUpdateTask,
   groupTasksByProject = false,
   currentUserId,
+  users,
   personalTasks,
+  assignedPersonalTasks,
   statusFilter: statusFilterProp,
   companyFilter: companyFilterProp,
   dueDateFilter: dueDateFilterProp,
@@ -207,6 +212,10 @@ export function TaskListView({
   const [pastMentionsModalItems, setPastMentionsModalItems] = useState<
     MentionItem[]
   >([]);
+  const [personalTasksMode, setPersonalTasksMode] = useState<
+    'personal' | 'assigned'
+  >('personal');
+  const showingAssignedTasks = personalTasksMode === 'assigned';
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -630,14 +639,44 @@ export function TaskListView({
     return personalTasks.filter(task => task.recurring_frequency !== 'monthly');
   }, [personalTasks]);
 
+  const sidebarAssignedPersonalTasks = useMemo(() => {
+    if (!assignedPersonalTasks) return [];
+    return assignedPersonalTasks.filter(
+      task => task.recurring_frequency !== 'monthly'
+    );
+  }, [assignedPersonalTasks]);
+
   const sidebarMonthlyServices = useMemo(() => {
     if (monthlyServices) return monthlyServices;
     if (!personalTasks) return [];
     return personalTasks.filter(task => task.recurring_frequency === 'monthly');
   }, [monthlyServices, personalTasks]);
 
+  const usersById = useMemo(() => {
+    const map = new Map<string, User>();
+
+    if (!users) return map;
+
+    users.forEach(user => {
+      map.set(user.id, user);
+      if (user.profiles?.id) {
+        map.set(user.profiles.id, user);
+      }
+    });
+
+    return map;
+  }, [users]);
+
+  const activePersonalTasksSource = useMemo(
+    () =>
+      personalTasksMode === 'assigned'
+        ? sidebarAssignedPersonalTasks
+        : sidebarPersonalTasks,
+    [personalTasksMode, sidebarAssignedPersonalTasks, sidebarPersonalTasks]
+  );
+
   const personalTasksList = useMemo(() => {
-    return sidebarPersonalTasks
+    return activePersonalTasksSource
       .filter(task => {
         const project = getProjectForTask(task.project_id);
         return matchesTaskFilters(task, project, task.due_date);
@@ -648,7 +687,7 @@ export function TaskListView({
           : getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b)
       );
   }, [
-    sidebarPersonalTasks,
+    activePersonalTasksSource,
     getProjectForTask,
     matchesTaskFilters,
     getTaskDueDateSortValue,
@@ -2230,8 +2269,15 @@ export function TaskListView({
 
   const renderPersonalTaskRow = (task: Task) => {
     const overdue = isOverdue(task.due_date, task.status);
-    const isEditing = editingTaskId === task.id;
-    const showDatePicker = datePickerTaskId === task.id;
+    const isEditing = !showingAssignedTasks && editingTaskId === task.id;
+    const showDatePicker = !showingAssignedTasks && datePickerTaskId === task.id;
+    const assignee = task.assigned_to ? usersById.get(task.assigned_to) : null;
+    const assigneeProfile = assignee?.profiles;
+    const assigneeEmail =
+      assigneeProfile?.email ||
+      assignee?.email ||
+      task.assigned_to ||
+      'unknown';
 
     return (
       <li
@@ -2239,26 +2285,39 @@ export function TaskListView({
         className={`${styles.personalTaskRow} ${styles.projectTaskItem} ${task.status === 'completed' ? styles.taskCompleted : ''}`}
         onClick={() => onTaskClick(task)}
       >
-        <button
-          type="button"
-          className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
-          onClick={event => handleToggleComplete(event, task)}
-          aria-label={
-            task.status === 'completed'
-              ? 'Mark task incomplete'
-              : 'Mark task complete'
-          }
-          disabled={
-            !onToggleComplete ||
-            !!(task.blocked_by_task && !task.blocked_by_task.is_completed)
-          }
-        >
-          {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
-            <Lock size={12} />
-          ) : task.status === 'completed' ? (
-            <Check size={12} />
-          ) : null}
-        </button>
+        {showingAssignedTasks ? (
+          <div className={styles.assigneeInfo}>
+            <MiniAvatar
+              firstName={assigneeProfile?.first_name}
+              lastName={assigneeProfile?.last_name}
+              email={assigneeEmail}
+              userId={task.assigned_to || assignee?.id}
+              avatarUrl={assigneeProfile?.avatar_url}
+              size="small"
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
+            onClick={event => handleToggleComplete(event, task)}
+            aria-label={
+              task.status === 'completed'
+                ? 'Mark task incomplete'
+                : 'Mark task complete'
+            }
+            disabled={
+              !onToggleComplete ||
+              !!(task.blocked_by_task && !task.blocked_by_task.is_completed)
+            }
+          >
+            {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+              <Lock size={12} />
+            ) : task.status === 'completed' ? (
+              <Check size={12} />
+            ) : null}
+          </button>
+        )}
         <div
           className={`${styles.taskTitleRow} ${styles.personalTaskTitleRow}`}
         >
@@ -2283,7 +2342,7 @@ export function TaskListView({
               <ClockIcon />
               <span>{formatDate(task.due_date)}</span>
             </span>
-            {onToggleStar && (
+            {!showingAssignedTasks && onToggleStar && (
               <div className={styles.taskStarAction}>
                 <StarButton
                   isStarred={task.is_starred || false}
@@ -2293,7 +2352,7 @@ export function TaskListView({
               </div>
             )}
 
-            {!isEditing && (
+            {!showingAssignedTasks && !isEditing && (
               <div className={styles.hoverActions}>
                 <button
                   type="button"
@@ -2416,6 +2475,13 @@ export function TaskListView({
 
   const renderPersonalTasksCard = () => {
     if (!showPersonalTasksCard) return null;
+    const hasAssignedPersonalTasksToggle = assignedPersonalTasks !== undefined;
+    const personalTasksCardTitle = showingAssignedTasks
+      ? 'Assigned Tasks'
+      : 'Personal Tasks';
+    const personalTasksEmptyText = showingAssignedTasks
+      ? 'No assigned tasks'
+      : 'No personal tasks';
 
     const renderMonthlyServiceRow = (task: Task) => {
       const overdue = isOverdue(task.due_date, task.status);
@@ -2501,12 +2567,34 @@ export function TaskListView({
     return (
       <>
         <InfoCard
-          title="Personal Tasks"
+          title={personalTasksCardTitle}
           isCollapsible={true}
           startExpanded={true}
+          headerRight={
+            hasAssignedPersonalTasksToggle ? (
+              <div className={styles.projectsCardHeaderToggleRow}>
+                <label className={styles.projectsCardToggle}>
+                  <input
+                    type="checkbox"
+                    checked={showingAssignedTasks}
+                    onChange={event =>
+                      setPersonalTasksMode(
+                        event.target.checked ? 'assigned' : 'personal'
+                      )
+                    }
+                    aria-label="Toggle personal tasks and assigned tasks"
+                  />
+                  <span className={styles.projectsCardToggleSlider}></span>
+                </label>
+                <span className={styles.projectsCardToggleText}>
+                  {showingAssignedTasks ? 'Assigned' : 'Personal'}
+                </span>
+              </div>
+            ) : undefined
+          }
         >
           {personalTasksList.length === 0 ? (
-            <p className={styles.emptyPersonalTasks}>No personal tasks</p>
+            <p className={styles.emptyPersonalTasks}>{personalTasksEmptyText}</p>
           ) : (
             <ul className={styles.personalTasksList}>
               {personalTasksList.map(renderPersonalTaskRow)}
