@@ -63,10 +63,34 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch proofs' }, { status: 500 });
     }
 
+    const { data: feedbackRows, error: feedbackError } = await supabase
+      .from('proof_feedback')
+      .select('proof_id, is_resolved')
+      .eq('project_id', projectId);
+
+    if (feedbackError) {
+      console.error('Failed to fetch proof feedback stats:', feedbackError);
+    }
+
+    const feedbackStatsByProof = new Map<string, { total: number; resolved: number }>();
+    for (const feedback of feedbackRows ?? []) {
+      const existing = feedbackStatsByProof.get(feedback.proof_id) ?? { total: 0, resolved: 0 };
+      existing.total += 1;
+      if (feedback.is_resolved) {
+        existing.resolved += 1;
+      }
+      feedbackStatsByProof.set(feedback.proof_id, existing);
+    }
+
     const proofsByGroup = new Map<string, any[]>();
     for (const proof of proofs ?? []) {
+      const feedbackStats = feedbackStatsByProof.get(proof.id) ?? { total: 0, resolved: 0 };
       const list = proofsByGroup.get(proof.group_id) ?? [];
-      list.push(proof);
+      list.push({
+        ...proof,
+        feedback_total: feedbackStats.total,
+        feedback_resolved: feedbackStats.resolved,
+      });
       proofsByGroup.set(proof.group_id, list);
     }
 

@@ -108,7 +108,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
 
   return (
     <>
-      {lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' || lead.lead_source === 'campaign' ? (
+      {lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>
           {/* Widget Details Section - only for widget submissions */}
           {(lead.lead_source === 'widget' || lead.lead_source === 'widget_submission') && (
@@ -196,7 +196,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             <div className={styles.transcriptSection}>
               <div className={styles.transcriptHeader}>
                 <h4 className={cardStyles.dataLabel}>
-                  Form Submission Details
+                  {lead.lead_source === 'campaign' ? 'Campaign Response Details' : 'Form Submission Details'}
                 </h4>
               </div>
               <div className={styles.transcriptContent}>

@@ -10,6 +10,8 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { inngest } from '@/lib/inngest/client';
+import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -369,14 +371,20 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     customerId = existingCustomer.id;
   }
 
+  // Check campaign attribution for existing customers only
+  const attribution = existingCustomer
+    ? await detectCampaignAttribution(supabase, customerId, companyId)
+    : null;
+
   // Always create a new lead for inbound calls
   const { data: newLead, error: leadError } = await supabase
     .from('leads')
     .insert({
       company_id: companyId,
       customer_id: customerId,
-      lead_source: 'direct',
-      lead_type: 'inbound_call',
+      lead_source: attribution ? 'campaign' : 'direct',
+      lead_type: attribution ? 'campaign_call' : 'inbound_call',
+      campaign_id: attribution?.campaignId ?? null,
       format: 'call',
       lead_status: 'new', // Will be updated based on AI qualification later
       priority: 'medium',
@@ -392,6 +400,24 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       { error: 'Failed to create lead' },
       { status: 500 }
     );
+  }
+
+  // Fire campaign response event if attributed
+  if (attribution && newLead?.id) {
+    const alreadyResponded = await hasRecentResponse(supabase, customerId, attribution.campaignId);
+    if (!alreadyResponded) {
+      await inngest.send({
+        name: 'campaign/response-detected',
+        data: {
+          leadId: newLead.id,
+          campaignId: attribution.campaignId,
+          campaignName: attribution.campaignName,
+          customerId,
+          companyId,
+          responseType: 'call',
+        },
+      });
+    }
   }
 
   // Extract data (will be mostly empty until call_analyzed event)

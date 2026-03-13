@@ -491,6 +491,8 @@ export interface ProjectProof {
   version: number;
   created_at: string;
   updated_at: string;
+  feedback_total?: number;
+  feedback_resolved?: number;
   uploaded_by_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
 }
 

@@ -1,13 +1,15 @@
 'use client';
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { CheckCircle, Download, FileText, Pencil, Trash2, Upload, X } from 'lucide-react';
+import { Check, CheckCircle, Copy, Download, Eye, EyeOff, FileText, Pencil, Trash2, Upload, X } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
+import { copyTextToClipboard, htmlToPlainText } from '@/lib/clipboard';
 import { sanitizeFileName } from '@/lib/storage-utils';
 import { Project, ProjectProof, ProofFeedback, ProofGroup } from '@/types/project';
 import dynamic from 'next/dynamic';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
+import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast/Toast';
 import styles from './ProofsTab.module.scss';
@@ -54,6 +56,45 @@ function formatFeedbackDate(dateStr: string): string {
   });
 }
 
+interface FeedbackProgress {
+  resolved: number;
+  total: number;
+  percentage: number;
+}
+
+function getFeedbackProgress(proof: ProjectProof): FeedbackProgress {
+  const total = Math.max(0, proof.feedback_total ?? 0);
+  const resolvedRaw = Math.max(0, proof.feedback_resolved ?? 0);
+  const resolved = Math.min(resolvedRaw, total);
+  const percentage = total > 0 ? Math.round((resolved / total) * 100) : 0;
+
+  return { resolved, total, percentage };
+}
+
+function FeedbackProgressInline({ progress }: { progress: FeedbackProgress }) {
+  return (
+    <div className={styles.feedbackInline}>
+      <div className={styles.feedbackTotalsRow}>
+        <span className={styles.totalTasksLabel}>Feedback:</span>
+        <span className={styles.tasksFraction}>
+          {progress.resolved}/{progress.total}
+        </span>
+      </div>
+      <div className={styles.progressBarWithPercentage}>
+        <div
+          className={styles.progressBar}
+          style={{
+            width: `${progress.percentage}%`,
+            backgroundColor: 'var(--action-500, #0080f0)',
+          }}
+        >
+          <span className={styles.percentageText}>{progress.percentage}%</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface ProofsTabProps {
   project: Project;
   user: User;
@@ -80,6 +121,17 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
   const [proofModalOpen, setProofModalOpen] = useState(false);
   const [actionInProgress, setActionInProgress] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
+  const [pendingDeleteProof, setPendingDeleteProof] = useState<{
+    proofId: string;
+    fileName: string;
+    willDeleteGroup: boolean;
+  } | null>(null);
+  const [hideFeedbackPins, setHideFeedbackPins] = useState(false);
+  const [copiedFeedbackId, setCopiedFeedbackId] = useState<string | null>(null);
+  const [editingFeedbackId, setEditingFeedbackId] = useState<string | null>(null);
+  const [editingFeedbackComment, setEditingFeedbackComment] = useState('');
+  const [isSavingFeedbackEdit, setIsSavingFeedbackEdit] = useState(false);
+  const copiedFeedbackTimeoutRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const groupFileInputRef = useRef<HTMLInputElement>(null);
   const pendingGroupIdRef = useRef<string | null>(null);
@@ -181,6 +233,14 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     }
     return () => { document.body.style.overflow = ''; };
   }, [proofModalOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (copiedFeedbackTimeoutRef.current !== null) {
+        window.clearTimeout(copiedFeedbackTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Auto-open modal when parent requests a specific proof to be shown
   useEffect(() => {
@@ -301,6 +361,39 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     }
   }, [project.id, fetchProofs, viewingProof]);
 
+  const requestDeleteProof = useCallback((proofId: string) => {
+    let matchedProof: ProjectProof | null = null;
+    let versionsInGroup = 0;
+
+    for (const group of proofGroups) {
+      const groupProofs = [
+        ...(group.currentProof ? [group.currentProof] : []),
+        ...(group.archivedProofs ?? []),
+      ];
+      const found = groupProofs.find((p) => p.id === proofId);
+      if (found) {
+        matchedProof = found;
+        versionsInGroup = groupProofs.length;
+        break;
+      }
+    }
+
+    if (!matchedProof) return;
+
+    setPendingDeleteProof({
+      proofId,
+      fileName: matchedProof.file_name,
+      willDeleteGroup: versionsInGroup <= 1,
+    });
+  }, [proofGroups]);
+
+  const confirmDeleteProof = useCallback(async () => {
+    if (!pendingDeleteProof) return;
+    const proofId = pendingDeleteProof.proofId;
+    setPendingDeleteProof(null);
+    await handleDeleteProof(proofId);
+  }, [handleDeleteProof, pendingDeleteProof]);
+
   const handleRenameGroup = useCallback(async (groupId: string, name: string) => {
     try {
       await fetch(`/api/admin/projects/${project.id}/proof-groups/${groupId}`, {
@@ -404,6 +497,47 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     }
   }, [viewingProof, project.id, activePinId]);
 
+  const handleStartEditFeedback = useCallback((feedback: ProofFeedback) => {
+    setEditingFeedbackId(feedback.id);
+    setEditingFeedbackComment(feedback.comment);
+  }, []);
+
+  const handleCancelEditFeedback = useCallback(() => {
+    setEditingFeedbackId(null);
+    setEditingFeedbackComment('');
+    setIsSavingFeedbackEdit(false);
+  }, []);
+
+  const handleSaveEditFeedback = useCallback(async () => {
+    if (!viewingProof || !editingFeedbackId || isRichTextEmpty(editingFeedbackComment)) return;
+
+    setIsSavingFeedbackEdit(true);
+    try {
+      const res = await fetch(
+        `/api/admin/projects/${project.id}/proofs/${viewingProof.id}/feedback/${editingFeedbackId}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment: editingFeedbackComment }),
+        }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setFeedbackItems((prev) => prev.map((f) => (f.id === editingFeedbackId ? data.feedback : f)));
+      handleCancelEditFeedback();
+    } catch {
+      // silent
+    } finally {
+      setIsSavingFeedbackEdit(false);
+    }
+  }, [
+    editingFeedbackComment,
+    editingFeedbackId,
+    handleCancelEditFeedback,
+    project.id,
+    viewingProof,
+  ]);
+
   const handleCloseModal = useCallback(() => {
     setProofModalOpen(false);
     setViewingProof(null);
@@ -411,6 +545,20 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     setHoveredPinId(null);
     onProofModalClosed?.();
   }, [onProofModalClosed]);
+
+  const handleCopyFeedbackText = useCallback(async (feedbackId: string, html: string) => {
+    const plainText = htmlToPlainText(html);
+    const success = await copyTextToClipboard(plainText);
+    if (!success) return;
+
+    setCopiedFeedbackId(feedbackId);
+    if (copiedFeedbackTimeoutRef.current !== null) {
+      window.clearTimeout(copiedFeedbackTimeoutRef.current);
+    }
+    copiedFeedbackTimeoutRef.current = window.setTimeout(() => {
+      setCopiedFeedbackId((prev) => (prev === feedbackId ? null : prev));
+    }, 1500);
+  }, []);
 
   const openProofModal = useCallback((proof: ProjectProof) => {
     setViewingProof(proof);
@@ -525,7 +673,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
               onOpen={openProofModal}
               onProofAction={handleProofAction}
               onDownload={handleDownloadProof}
-              onDelete={handleDeleteProof}
+              onDelete={requestDeleteProof}
               onRenameGroup={handleRenameGroup}
               onUploadNewVersion={() => {
                 pendingGroupIdRef.current = group.id;
@@ -541,6 +689,25 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
         isVisible={toastVisible}
         onClose={() => setToastVisible(false)}
         type="success"
+      />
+
+      <ConfirmationModal
+        isOpen={pendingDeleteProof !== null}
+        title="Delete proof?"
+        message={
+          pendingDeleteProof
+            ? pendingDeleteProof.willDeleteGroup
+              ? `Delete "${pendingDeleteProof.fileName}"? This is the last version in the proof group, so the proof group will also be deleted.`
+              : `Delete "${pendingDeleteProof.fileName}"? This will permanently remove this proof version.`
+            : ''
+        }
+        confirmText="Delete"
+        cancelText="Cancel"
+        confirmVariant="danger"
+        onConfirm={() => {
+          void confirmDeleteProof();
+        }}
+        onCancel={() => setPendingDeleteProof(null)}
       />
 
       {/* Proof review modal */}
@@ -571,6 +738,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                   proof={viewingProof}
                   projectId={project.id}
                   feedbackItems={feedbackItems}
+                  hideFeedbackPins={hideFeedbackPins}
                   canAddFeedback={!viewingProof.is_approved}
                   mentionUsers={mentionUsers}
                   activePinId={activePinId}
@@ -592,6 +760,16 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                       <span className={styles.unresolvedBadge}>{unresolvedCount}</span>
                     )}
                   </span>
+                  <button
+                    type="button"
+                    className={`${styles.pinsToggleButton} ${hideFeedbackPins ? styles.pinsToggleButtonActive : ''}`}
+                    onClick={() => setHideFeedbackPins((prev) => !prev)}
+                    aria-pressed={hideFeedbackPins}
+                    aria-label={hideFeedbackPins ? 'Show feedback pins' : 'Hide feedback pins'}
+                  >
+                    {hideFeedbackPins ? <Eye size={12} /> : <EyeOff size={12} />}
+                    <span>{hideFeedbackPins ? 'Show Pins' : 'Hide Pins'}</span>
+                  </button>
                 </div>
 
                 {viewingProof.is_approved && (
@@ -613,52 +791,177 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                         : 'No feedback yet. Leave a comment below or click on the proof to pin a specific spot.'}
                     </p>
                   ) : (
-                    feedbackItems.map((item) => (
-                      <button
-                        key={item.id}
-                        className={`${styles.feedbackListItem} ${activePinId === item.id ? styles.feedbackListItemActive : ''} ${item.is_resolved ? styles.feedbackListItemResolved : ''}`}
-                        onClick={() => item.x_percent !== null ? setActivePinId(activePinId === item.id ? null : item.id) : undefined}
-                        onMouseEnter={() => {
-                          if (item.x_percent !== null) {
-                            setHoveredPinId(item.id);
-                          }
-                        }}
-                        onMouseLeave={() => {
-                          setHoveredPinId((prev) => (prev === item.id ? null : prev));
-                        }}
-                        style={{ cursor: item.x_percent !== null ? 'pointer' : 'default' }}
-                      >
-                        <div className={styles.feedbackItemHeader}>
-                          <div className={styles.feedbackItemAuthor}>
-                            <MiniAvatar
-                              firstName={item.user_profile?.first_name || undefined}
-                              lastName={item.user_profile?.last_name || undefined}
-                              email=""
-                              avatarUrl={item.user_profile?.avatar_url ?? null}
-                              size="small"
-                              showTooltip={false}
-                              className={styles.feedbackAvatar}
+                    feedbackItems.map((item) => {
+                      const isEditing = editingFeedbackId === item.id;
+                      const canEditFeedback = item.user_id === user.id;
+
+                      return (
+                        <div
+                          key={item.id}
+                          className={`${styles.feedbackListItem} ${activePinId === item.id ? styles.feedbackListItemActive : ''} ${item.is_resolved ? styles.feedbackListItemResolved : ''}`}
+                          onClick={() => {
+                            if (isEditing) return;
+                            if (item.x_percent !== null) {
+                              setActivePinId(activePinId === item.id ? null : item.id);
+                            }
+                          }}
+                          onKeyDown={(e) => {
+                            if (isEditing || item.x_percent === null) return;
+                            if (e.key !== 'Enter' && e.key !== ' ') return;
+                            e.preventDefault();
+                            setActivePinId(activePinId === item.id ? null : item.id);
+                          }}
+                          onMouseEnter={() => {
+                            if (isEditing) return;
+                            if (item.x_percent !== null) {
+                              setHoveredPinId(item.id);
+                            }
+                          }}
+                          onMouseLeave={() => {
+                            setHoveredPinId((prev) => (prev === item.id ? null : prev));
+                          }}
+                          style={{ cursor: !isEditing && item.x_percent !== null ? 'pointer' : 'default' }}
+                          role={!isEditing && item.x_percent !== null ? 'button' : undefined}
+                          tabIndex={!isEditing && item.x_percent !== null ? 0 : undefined}
+                        >
+                          <div className={styles.feedbackItemHeader}>
+                            <div className={styles.feedbackItemAuthor}>
+                              <MiniAvatar
+                                firstName={item.user_profile?.first_name || undefined}
+                                lastName={item.user_profile?.last_name || undefined}
+                                email=""
+                                avatarUrl={item.user_profile?.avatar_url ?? null}
+                                size="small"
+                                showTooltip={false}
+                                className={styles.feedbackAvatar}
+                              />
+                              <span className={styles.feedbackItemAuthorName}>
+                                {item.user_id === user.id
+                                  ? 'Me'
+                                  : `${item.user_profile?.first_name || ''} ${item.user_profile?.last_name || ''}`.trim() || 'Unknown'}
+                              </span>
+                            </div>
+                            <div className={styles.feedbackItemHeaderRight}>
+                              <button
+                                type="button"
+                                className={`${styles.feedbackResolveButton} ${
+                                  item.is_resolved ? styles.feedbackResolveButtonActive : ''
+                                }`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  void handleResolvePin(item.id, !item.is_resolved);
+                                }}
+                                aria-label={item.is_resolved ? 'Mark feedback as unresolved' : 'Mark feedback as resolved'}
+                                title={item.is_resolved ? 'Mark unresolved' : 'Mark resolved'}
+                              >
+                                <Check size={11} />
+                              </button>
+                              {canEditFeedback && (
+                                <button
+                                  type="button"
+                                  className={`${styles.feedbackEditButton} ${isEditing ? styles.feedbackEditButtonActive : ''}`}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (isEditing) {
+                                      handleCancelEditFeedback();
+                                    } else {
+                                      handleStartEditFeedback(item);
+                                    }
+                                  }}
+                                  aria-label={isEditing ? 'Cancel editing feedback' : 'Edit feedback'}
+                                  title={isEditing ? 'Cancel edit' : 'Edit feedback'}
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                className={`${styles.feedbackCopyButton} ${
+                                  copiedFeedbackId === item.id ? styles.feedbackCopyButtonActive : ''
+                                }`}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  void handleCopyFeedbackText(item.id, item.comment);
+                                }}
+                                aria-label="Copy feedback text"
+                                title={copiedFeedbackId === item.id ? 'Copied' : 'Copy text'}
+                              >
+                                {copiedFeedbackId === item.id ? <Check size={11} /> : <Copy size={11} />}
+                              </button>
+                              {(item.user_id === user.id || isAdmin) && (
+                                <button
+                                  type="button"
+                                  className={styles.feedbackDeleteButton}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    void handleDeletePin(item.id);
+                                  }}
+                                  aria-label="Delete feedback"
+                                  title="Delete feedback"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
+                              )}
+                              {item.x_percent !== null && (
+                                <span className={`${styles.feedbackPinBadge} ${item.is_resolved ? styles.feedbackPinBadgeResolved : ''}`}>
+                                  {item.pin_number}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {isEditing ? (
+                            <div
+                              className={styles.feedbackInlineEditor}
+                              onClick={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            >
+                              <RichTextEditor
+                                value={editingFeedbackComment}
+                                onChange={setEditingFeedbackComment}
+                                placeholder="Edit feedback..."
+                                compact
+                                mentionUsers={mentionUsers}
+                              />
+                              <div className={styles.feedbackInlineEditorActions}>
+                                <button
+                                  type="button"
+                                  className={styles.feedbackInlineCancelButton}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleCancelEditFeedback();
+                                  }}
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  className={styles.feedbackInlineSaveButton}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    void handleSaveEditFeedback();
+                                  }}
+                                  disabled={isSavingFeedbackEdit || isRichTextEmpty(editingFeedbackComment)}
+                                >
+                                  {isSavingFeedbackEdit ? 'Saving…' : 'Save'}
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <span
+                              className={styles.feedbackItemComment}
+                              dangerouslySetInnerHTML={{ __html: item.comment }}
                             />
-                            <span className={styles.feedbackItemAuthorName}>
-                              {item.user_id === user.id
-                                ? 'Me'
-                                : `${item.user_profile?.first_name || ''} ${item.user_profile?.last_name || ''}`.trim() || 'Unknown'}
-                            </span>
-                          </div>
-                          <div className={styles.feedbackItemHeaderRight}>
-                            <span className={`${styles.feedbackPinBadge} ${item.is_resolved ? styles.feedbackPinBadgeResolved : ''} ${item.x_percent === null ? styles.feedbackPinBadgeComment : ''}`}>
-                              {item.x_percent !== null ? item.pin_number : '—'}
-                            </span>
-                            {item.is_resolved && <span className={styles.resolvedTag}>Resolved</span>}
-                          </div>
+                          )}
+                          <span className={styles.feedbackItemDate}>{formatFeedbackDate(item.created_at)}</span>
                         </div>
-                        <span
-                          className={styles.feedbackItemComment}
-                          dangerouslySetInnerHTML={{ __html: item.comment }}
-                        />
-                        <span className={styles.feedbackItemDate}>{formatFeedbackDate(item.created_at)}</span>
-                      </button>
-                    ))
+                      );
+                    })
                   )}
                 </div>
 
@@ -668,6 +971,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                       value={generalComment}
                       onChange={setGeneralComment}
                       placeholder="Leave a comment… (@mention to tag someone)"
+                      className={styles.commentEditor}
                       compact
                       mentionUsers={mentionUsers}
                     />
@@ -731,6 +1035,7 @@ function ProofGroupCard({
   const uploaderName = proof?.uploaded_by_profile
     ? `${proof.uploaded_by_profile.first_name} ${proof.uploaded_by_profile.last_name}`
     : 'Team member';
+  const feedbackProgress = proof ? getFeedbackProgress(proof) : null;
 
   const isDeleting = proof ? actionInProgress === `${proof.id}-delete` : false;
   const isActioning = proof ? (actionInProgress?.startsWith(proof.id) && !isDeleting) : false;
@@ -878,15 +1183,7 @@ function ProofGroupCard({
                 )}
               </button>
             )}
-            {proof && (
-              <button
-                className={styles.downloadButton}
-                onClick={(e) => { e.stopPropagation(); onDownload(proof); }}
-              >
-                <Download size={14} />
-                Download
-              </button>
-            )}
+            {feedbackProgress && <FeedbackProgressInline progress={feedbackProgress} />}
             {archivedCount > 0 && (
               <button
                 className={styles.groupArchivedLink}
@@ -898,17 +1195,28 @@ function ProofGroupCard({
           </div>
         </div>
 
-        {/* Delete current proof */}
-        {canEdit && proof && (
-          <button
-            className={styles.proofCardDelete}
-            data-action="true"
-            onClick={(e) => { e.stopPropagation(); onDelete(proof.id); }}
-            disabled={isDeleting}
-            aria-label="Delete proof"
-          >
-            <Trash2 size={16} />
-          </button>
+        {proof && (
+          <div className={styles.proofCardTopActions} data-action="true">
+            <button
+              className={styles.proofCardIconButton}
+              onClick={(e) => { e.stopPropagation(); onDownload(proof); }}
+              aria-label="Download proof"
+              title="Download proof"
+            >
+              <Download size={15} />
+            </button>
+            {canEdit && (
+              <button
+                className={`${styles.proofCardIconButton} ${styles.proofCardIconButtonDelete}`}
+                onClick={(e) => { e.stopPropagation(); onDelete(proof.id); }}
+                disabled={isDeleting}
+                aria-label="Delete proof"
+                title="Delete proof"
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
+          </div>
         )}
       </div>
       {archivedCount > 0 && isArchivedModalOpen && (
@@ -994,6 +1302,7 @@ function ProofCard({
   const uploaderName = proof.uploaded_by_profile
     ? `${proof.uploaded_by_profile.first_name} ${proof.uploaded_by_profile.last_name}`
     : 'Team member';
+  const feedbackProgress = getFeedbackProgress(proof);
 
   const isDeleting = actionInProgress === `${proof.id}-delete`;
   const isActioning = actionInProgress?.startsWith(proof.id) && !isDeleting;
@@ -1062,28 +1371,31 @@ function ProofCard({
               Make Current
             </button>
           )}
-          <button
-            className={styles.downloadButton}
-            onClick={(e) => { e.stopPropagation(); onDownload(); }}
-          >
-            <Download size={14} />
-            Download
-          </button>
+          <FeedbackProgressInline progress={feedbackProgress} />
         </div>
       </div>
 
-      {/* Delete */}
-      {canEdit && (
+      <div className={styles.proofCardTopActions} data-action="true">
         <button
-          className={styles.proofCardDelete}
-          data-action="true"
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          disabled={isDeleting}
-          aria-label="Delete proof"
+          className={styles.proofCardIconButton}
+          onClick={(e) => { e.stopPropagation(); onDownload(); }}
+          aria-label="Download proof"
+          title="Download proof"
         >
-          <Trash2 size={16} />
+          <Download size={15} />
         </button>
-      )}
+        {canEdit && (
+          <button
+            className={`${styles.proofCardIconButton} ${styles.proofCardIconButtonDelete}`}
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            disabled={isDeleting}
+            aria-label="Delete proof"
+            title="Delete proof"
+          >
+            <Trash2 size={15} />
+          </button>
+        )}
+      </div>
     </div>
   );
 }

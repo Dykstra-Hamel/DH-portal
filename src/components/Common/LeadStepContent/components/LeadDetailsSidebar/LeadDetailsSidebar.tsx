@@ -506,14 +506,14 @@ export function LeadDetailsSidebar({
             title={
               lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form'
                 ? 'Form Details'
-                : lead.lead_type === 'manual' || lead.lead_type === 'other' || lead.lead_source === 'campaign'
+                : lead.lead_type === 'manual' || lead.lead_type === 'other'
                 ? 'Attribution Details'
                 : 'Call Information'
             }
             icon={
               lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
                 <TextCursorInput size={20} />
-              ) : lead.lead_type === 'manual' || lead.lead_type === 'other' || lead.lead_source === 'campaign' ? (
+              ) : lead.lead_type === 'manual' || lead.lead_type === 'other' ? (
                 <ClipboardList size={20} />
               ) : (
                 <Phone size={20} />

@@ -10,6 +10,7 @@ import { Expand, X } from 'lucide-react';
 import { Project, ProjectDepartment } from '@/types/project';
 import { ProjectCard } from '@/components/Common/ProjectCard/ProjectCard';
 import { ProjectCardGrid } from '../ProjectCardGrid/ProjectCardGrid';
+import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 import { parseDateString } from '@/lib/date-utils';
 import styles from './ProjectKanbanView.module.scss';
 
@@ -92,6 +93,17 @@ export function ProjectKanbanView({
     null
   );
   const [dropToColumn, setDropToColumn] = useState<string | null>(null);
+
+  // Confirmation modals
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    project: Project;
+    newStatus: string;
+  } | null>(null);
+  const [pendingDepartmentChange, setPendingDepartmentChange] = useState<{
+    project: Project;
+    departmentId: string;
+    departmentName: string;
+  } | null>(null);
 
   // Auto-scroll state
   const autoScrollIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -314,22 +326,20 @@ export function ProjectKanbanView({
       autoScrollIntervalRef.current = null;
     }
 
-    // Handle department change when dragging between columns
-    if (
-      draggedId &&
-      dropToColumn &&
-      draggedFromColumn !== dropToColumn
-    ) {
+    // Show confirmation before changing department
+    if (draggedId && dropToColumn && draggedFromColumn !== dropToColumn) {
       const draggedProject = projects.find(p => p.id === draggedId);
-      if (draggedProject && onUpdateProject) {
-        onUpdateProject({
-          ...draggedProject,
-          current_department_id: dropToColumn,
+      const targetColumn = columns.find(c => c.id === dropToColumn);
+      if (draggedProject && targetColumn) {
+        setPendingDepartmentChange({
+          project: draggedProject,
+          departmentId: dropToColumn,
+          departmentName: targetColumn.title,
         });
       }
     }
 
-    // Reset all drag state
+    // Reset drag state (but not pending change — that awaits confirmation)
     setDraggedId(null);
     setDraggedFromColumn(null);
     setDropToColumn(null);
@@ -360,6 +370,39 @@ export function ProjectKanbanView({
 
   return (
     <div className={styles.kanbanWrapper}>
+      <ConfirmationModal
+        isOpen={!!pendingStatusChange}
+        title="Mark Project Complete?"
+        message="Are you sure you want to mark this project as complete?"
+        confirmText="Mark Complete"
+        onConfirm={() => {
+          if (pendingStatusChange) {
+            onUpdateProject({
+              ...pendingStatusChange.project,
+              status: 'complete',
+            });
+          }
+          setPendingStatusChange(null);
+        }}
+        onCancel={() => setPendingStatusChange(null)}
+      />
+
+      <ConfirmationModal
+        isOpen={!!pendingDepartmentChange}
+        title="Move to Different Department?"
+        message={pendingDepartmentChange ? `Move "${pendingDepartmentChange.project.name}" to the "${pendingDepartmentChange.departmentName}" department?` : ''}
+        confirmText="Move Project"
+        onConfirm={() => {
+          if (pendingDepartmentChange) {
+            onUpdateProject({
+              ...pendingDepartmentChange.project,
+              current_department_id: pendingDepartmentChange.departmentId,
+            });
+          }
+          setPendingDepartmentChange(null);
+        }}
+        onCancel={() => setPendingDepartmentChange(null)}
+      />
       {expandedColumn && (
         <div
           ref={expandedViewRef}
@@ -485,10 +528,14 @@ export function ProjectKanbanView({
                             onToggleStar={onToggleStar}
                             onProjectClick={onProjectClick}
                             onStatusChange={(proj, newStatus) => {
-                              onUpdateProject({
-                                ...proj,
-                                status: newStatus as Project['status'],
-                              });
+                              if (newStatus === 'complete') {
+                                setPendingStatusChange({ project: proj, newStatus });
+                              } else {
+                                onUpdateProject({
+                                  ...proj,
+                                  status: newStatus as Project['status'],
+                                });
+                              }
                             }}
                           />
                         </div>
