@@ -353,6 +353,7 @@ function TicketsDashboardContent() {
   const [showTicketModal, setShowTicketModal] = useState(false);
   const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
   const [isQualifying, setIsQualifying] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
 
   // Ref to track subscription state
   const subscriptionActiveRef = useRef(false);
@@ -1330,7 +1331,8 @@ function TicketsDashboardContent() {
   const handleQualify = useCallback(
     async (
       qualification: 'sales' | 'customer_service' | 'junk',
-      assignedTo?: string
+      assignedTo?: string,
+      customStatus?: string
     ) => {
       if (!selectedTicket) return;
 
@@ -1341,20 +1343,27 @@ function TicketsDashboardContent() {
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ qualification, assignedTo }),
+            body: JSON.stringify({ qualification, assignedTo, customStatus }),
           }
         );
 
         if (!response.ok) throw new Error('Failed to qualify ticket');
 
-        if (selectedCompany?.id) {
+        const data = await response.json();
+
+        if (data?.leadId || data?.supportCaseId) {
+          // About to navigate away — show overlay immediately and skip the
+          // stale table refresh so there's no visual flash behind the modal.
+          setIsRedirecting(true);
+        } else if (selectedCompany?.id) {
           fetchTickets(selectedCompany.id);
         }
 
-        handleModalClose();
+        return data;
       } catch (error) {
         console.error('Error qualifying ticket:', error);
         alert('Failed to qualify ticket. Please try again.');
+        handleModalClose();
       } finally {
         setIsQualifying(false);
       }
@@ -1974,6 +1983,13 @@ function TicketsDashboardContent() {
           />
         </ModalBottom>
       </Modal>
+
+      {isRedirecting && (
+        <div className={styles.redirectOverlay}>
+          <Loader2 size={32} className={styles.redirectSpinner} />
+          <span>Opening record&hellip;</span>
+        </div>
+      )}
     </div>
   );
 }
