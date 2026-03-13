@@ -451,23 +451,22 @@ export function LeadQuoteSection({
   useEffect(() => {
     if (pestOptions.length === 0) return;
 
-    // Pre-populate with quote.primary_pest if available, otherwise use lead.pest_type
     const primaryPestValue = quote?.primary_pest || lead.pest_type;
 
-    if (primaryPestValue) {
-      const matchingPest = pestOptions.find(
-        (pest: any) =>
-          pest.name.toLowerCase() === primaryPestValue?.toLowerCase() ||
-          pest.slug === primaryPestValue
-      );
-      if (matchingPest && !selectedPests.includes(matchingPest.id)) {
-        setSelectedPests([matchingPest.id]);
-      }
-    }
+    // Resolve primary pest ID from options (local variable — never reads stale state)
+    const primaryPestMatch = primaryPestValue
+      ? pestOptions.find(
+          (pest: any) =>
+            pest.name.toLowerCase() === primaryPestValue.toLowerCase() ||
+            pest.slug === primaryPestValue
+        )
+      : null;
+    const primaryPestId = primaryPestMatch?.id ?? null;
 
-    // Pre-populate additional pests from quote.additional_pests
+    // Resolve additional pest IDs
+    let additionalPestIds: string[] = [];
     if (quote?.additional_pests && quote.additional_pests.length > 0) {
-      const additionalPestIds = pestOptions
+      additionalPestIds = pestOptions
         .filter((pest: any) =>
           quote.additional_pests?.some(
             (pestName: string) =>
@@ -478,21 +477,17 @@ export function LeadQuoteSection({
         .map((pest: any) => pest.id);
 
       setAdditionalPests(additionalPestIds);
+    }
 
-      // Add to selected pests if not already included
-      const primaryPest = selectedPests[0];
-      if (primaryPest) {
-        // Filter out any duplicates and ensure primary is first
-        const uniqueAdditional = additionalPestIds.filter(
-          (id: string) => id !== primaryPest
-        );
-        setSelectedPests([primaryPest, ...uniqueAdditional]);
-      } else {
-        setSelectedPests(additionalPestIds);
-      }
+    // Build final selectedPests in one call: primary first, then additional (deduped)
+    if (primaryPestId) {
+      const uniqueAdditional = additionalPestIds.filter(id => id !== primaryPestId);
+      setSelectedPests([primaryPestId, ...uniqueAdditional]);
+    } else if (additionalPestIds.length > 0) {
+      setSelectedPests(additionalPestIds);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quote?.additional_pests, lead.pest_type, pestOptions.length]);
+  }, [quote?.primary_pest, quote?.additional_pests, lead.pest_type, pestOptions.length]);
 
   // Initialize "Had Pest Control Before" from lead
   useEffect(() => {
