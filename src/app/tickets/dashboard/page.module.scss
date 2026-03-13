@@ -324,6 +324,28 @@
   }
 }
 
+// Full-screen overlay shown while navigating to a new lead/support case
+.redirectOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(4px);
+  color: var(--gray-600, #4b5563);
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.redirectSpinner {
+  animation: spin 0.9s linear infinite;
+  color: var(--gray-400, #9ca3af);
+}
+
 // Announcements Specific Styles
 .announcementsList {
   display: flex;
