@@ -89,7 +89,7 @@
 
   &:focus-within {
     background: white;
-    border-color: var(--action-600);
+    border-color: var(--blue-600);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -196,8 +196,8 @@
   transition: all 0.2s;
 
   &:hover:not(.existing) {
-    border-color: var(--action-300);
-    background: var(--action-50);
+    border-color: var(--blue-300);
+    background: var(--blue-50);
   }
 
   &.existing {
@@ -292,7 +292,7 @@
 
 .addButton {
   padding: 0.75rem 1.5rem;
-  background: var(--action-600);
+  background: var(--blue-600);
   color: white;
   border: none;
   border-radius: 8px;
@@ -301,7 +301,7 @@
   transition: all 0.2s;
 
   &:hover:not(:disabled) {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 
   &:disabled {

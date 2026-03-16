@@ -135,8 +135,8 @@
   height: 0;
 
   &:checked + .radioCustom {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
 
     &::after {
       display: block;
@@ -210,10 +210,10 @@
 
 .confirmButton {
   border: none;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
 
   &:hover {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 }

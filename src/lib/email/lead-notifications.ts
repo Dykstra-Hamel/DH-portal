@@ -1,6 +1,7 @@
 import { EmailRecipient, LeadNotificationData } from './types';
 import { generateLeadCreatedEmailTemplate } from './templates/lead-created';
 import { generateLeadSchedulingEmailTemplate } from './templates/lead-scheduling';
+import { generateCustomerCommentEmailTemplate } from './templates/customer-comment';
 import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from './index';
 import { sendEmailRouted } from '@/lib/email/router';
 import { getNotificationRecipients } from './notification-preferences';
@@ -41,6 +42,8 @@ export async function sendLeadCreatedNotifications(
         // Generate HTML content using appropriate template
         const html = notificationType === 'lead_status_changed_scheduling'
           ? generateLeadSchedulingEmailTemplate(recipientName, leadData)
+          : notificationType === 'customer_comment_added'
+          ? generateCustomerCommentEmailTemplate(recipientName, leadData)
           : generateLeadCreatedEmailTemplate(recipientName, leadData);
 
         // Send email using AWS SES with fallback
@@ -121,6 +124,7 @@ function generateSubjectLine(
   const defaultTemplates = {
     lead_created: 'New Lead: {customerName}',
     lead_status_changed_scheduling: 'Ready to Schedule: {customerName} - {companyName}',
+    customer_comment_added: 'Customer Left a Comment - {customerName}',
   };
 
   // Use custom template or default based on notification type

@@ -7,6 +7,7 @@ interface NotesSectionProps {
   entityId: string;
   companyId: string;
   userId: string;
+  customerComment?: string | null;
 }
 
 export function NotesSection({
@@ -14,6 +15,7 @@ export function NotesSection({
   entityId,
   companyId,
   userId,
+  customerComment,
 }: NotesSectionProps) {
   const [note, setNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,6 +53,12 @@ export function NotesSection({
 
   return (
     <div className={styles.notesSection}>
+      {customerComment && (
+        <div className={styles.customerCommentBanner}>
+          <span className={styles.customerCommentLabel}>Customer Note</span>
+          <p className={styles.customerCommentText}>{customerComment}</p>
+        </div>
+      )}
       <textarea
         className={styles.textarea}
         value={note}

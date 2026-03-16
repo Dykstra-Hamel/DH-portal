@@ -130,8 +130,8 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  background-color: var(--action-500);
-  border: 1px solid var(--action-500);
+  background-color: var(--blue-500);
+  border: 1px solid var(--blue-500);
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
@@ -140,8 +140,8 @@
   transition: all 0.15s ease;
 
   &:hover {
-    background-color: var(--action-600);
-    border-color: var(--action-600);
+    background-color: var(--blue-600);
+    border-color: var(--blue-600);
   }
 }
 
@@ -169,7 +169,7 @@
     }
 
     &.Mui-focused fieldset {
-      border-color: var(--action-500);
+      border-color: var(--blue-500);
       border-width: 1px;
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     }
@@ -217,7 +217,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: var(--action-600);
+  background: var(--blue-600);
   color: white;
   border: none;
   border-radius: 6px;
@@ -227,7 +227,7 @@
   transition: background 0.15s ease;
 
   &:hover:not(:disabled) {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 
   &:disabled {
@@ -280,7 +280,7 @@
   justify-content: center;
   width: 28px;
   height: 28px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   border-radius: 50%;
   font-size: 12px;
@@ -361,7 +361,7 @@
 
 .progressFill {
   height: 100%;
-  background: var(--success-500);
+  background: var(--green-500);
   border-radius: 999px;
   transition: width 0.3s ease;
   display: flex;
@@ -435,7 +435,7 @@
   transition: all 0.15s ease;
 
   &:hover {
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 
   svg {
@@ -548,7 +548,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -619,13 +619,13 @@
 }
 
 .createButton {
-  background: var(--action-500);
-  border: 1px solid var(--action-500);
+  background: var(--blue-500);
+  border: 1px solid var(--blue-500);
   color: white;
 
   &:hover:not(:disabled) {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
   }
 
   &:disabled {
@@ -833,7 +833,7 @@
   }
 
   a {
-    color: var(--action-500);
+    color: var(--blue-500);
     text-decoration: underline;
   }
 
@@ -864,8 +864,8 @@
 
   span[data-type='mention'][data-mention-self='true'],
   .mention[data-mention-self='true'] {
-    background: var(--action-100);
-    color: var(--action-700);
+    background: var(--blue-100);
+    color: var(--blue-700);
     border-radius: 4px;
     padding: 2px 4px;
     font-weight: 600;
@@ -1128,14 +1128,14 @@
   align-items: center;
   gap: 4px;
   padding: 2px 6px;
-  background: var(--action-100);
+  background: var(--blue-100);
   border-radius: 4px;
   max-width: 150px;
 }
 
 .pendingAttachmentName {
   font-size: 11px;
-  color: var(--action-700);
+  color: var(--blue-700);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1148,12 +1148,12 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: var(--action-600);
+  color: var(--blue-600);
   cursor: pointer;
   flex-shrink: 0;
 
   &:hover {
-    color: var(--action-800);
+    color: var(--blue-800);
   }
 }
 
@@ -1180,13 +1180,13 @@
 
   &:hover {
     background: var(--gray-100);
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 }
 
 .commentSubmit {
   border: none;
-  background: var(--action-600);
+  background: var(--blue-600);
   color: var(--white);
   padding: 8px 14px;
   border-radius: 999px;
@@ -1199,7 +1199,7 @@
   margin-bottom: 4px;
 
   &:hover:not(:disabled) {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:disabled {
@@ -1228,10 +1228,10 @@
   gap: 12px;
   padding: 48px 64px;
   background: white;
-  border: 3px dashed var(--action-500);
+  border: 3px dashed var(--blue-500);
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-  color: var(--action-600);
+  color: var(--blue-600);
 }
 
 .dropZoneText {

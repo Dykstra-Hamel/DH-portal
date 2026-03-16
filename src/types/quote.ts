@@ -33,6 +33,9 @@ export interface Quote {
   signature_data?: string;
   device_data?: any;
 
+  // Customer feedback
+  customer_comments?: string;
+
   // Timestamps
   created_at: string;
   updated_at: string;

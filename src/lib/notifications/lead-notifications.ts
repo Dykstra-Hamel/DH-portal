@@ -165,6 +165,153 @@ export async function notifyLeadCreated(
 }
 
 /**
+ * Send notification when a customer leaves a comment on their quote
+ *
+ * Routes to:
+ * - Assigned user (if lead is assigned)
+ * - Sales department (if lead is unassigned)
+ *
+ * @param quoteId - Quote UUID
+ * @param commentText - The comment left by the customer
+ */
+export async function notifyCustomerCommentAdded(
+  quoteId: string,
+  commentText: string
+): Promise<{
+  success: boolean;
+  recipientCount?: number;
+  error?: string;
+}> {
+  try {
+    const supabase = createAdminClient();
+
+    // Fetch the quote to get lead_id
+    const { data: quote, error: quoteError } = await supabase
+      .from('quotes')
+      .select('id, lead_id')
+      .eq('id', quoteId)
+      .single();
+
+    if (quoteError || !quote?.lead_id) {
+      console.error('Failed to fetch quote for comment notification:', quoteError);
+      return { success: false, error: 'Quote or lead not found' };
+    }
+
+    // Fetch lead details with customer and company info
+    const { data: lead, error: leadError } = await supabase
+      .from('leads')
+      .select(`
+        id,
+        lead_status,
+        priority,
+        pest_type,
+        created_at,
+        assigned_to,
+        company_id,
+        companies:company_id (
+          name
+        ),
+        customers:customer_id (
+          first_name,
+          last_name,
+          email,
+          phone,
+          address,
+          city,
+          state,
+          zip_code
+        ),
+        service_addresses:service_address_id (
+          street_address,
+          apartment_unit,
+          city,
+          state,
+          zip_code
+        )
+      `)
+      .eq('id', quote.lead_id)
+      .single();
+
+    if (leadError || !lead) {
+      console.error('Failed to fetch lead for comment notification:', leadError);
+      return { success: false, error: 'Lead not found' };
+    }
+
+    // Build customer name
+    const customer = lead.customers as any;
+    const customerName = customer
+      ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || customer.email || 'Unknown'
+      : 'Unknown';
+
+    // Build address string
+    let address = 'Address not provided';
+    if (lead.service_addresses) {
+      const addr = lead.service_addresses as any;
+      const parts = [
+        addr.street_address,
+        addr.apartment_unit,
+        addr.city,
+        addr.state,
+        addr.zip_code,
+      ].filter(Boolean);
+      address = parts.join(', ');
+    } else if (customer) {
+      const parts = [
+        customer.address,
+        customer.city,
+        customer.state,
+        customer.zip_code,
+      ].filter(Boolean);
+      if (parts.length > 0) {
+        address = parts.join(', ');
+      }
+    }
+
+    // Generate lead URL
+    const appUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
+    const leadUrl = `${appUrl}/tickets/leads/${lead.id}`;
+
+    // Build notification data
+    const leadNotificationData: LeadNotificationData & { leadUrl?: string } = {
+      leadId: lead.id,
+      companyName: (lead.companies as any)?.name || 'Unknown Company',
+      customerName,
+      customerEmail: customer?.email || '',
+      customerPhone: customer?.phone || '',
+      pestType: lead.pest_type || 'Not specified',
+      address,
+      priority: (lead.priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
+      autoCallEnabled: false,
+      submittedAt: lead.created_at,
+      leadUrl,
+      customerComment: commentText,
+    };
+
+    // Send notification to assigned user or sales department
+    const result = await sendLeadNotificationsWithDepartmentFiltering(
+      lead.company_id,
+      leadNotificationData,
+      {
+        assignedUserId: lead.assigned_to,
+        department: 'sales',
+        notificationType: 'customer_comment_added',
+      }
+    );
+
+    return {
+      success: result.success,
+      recipientCount: result.successCount,
+    };
+  } catch (error) {
+    console.error('Error in notifyCustomerCommentAdded:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
+
+/**
  * Send notification when lead status changes to 'scheduling'
  *
  * Routes to:

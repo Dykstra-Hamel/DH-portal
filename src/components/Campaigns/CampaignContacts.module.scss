@@ -30,7 +30,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  background: var(--action-600);
+  background: var(--blue-600);
   color: var(--white);
   border: none;
   border-radius: var(--border-radius-md);
@@ -39,7 +39,7 @@
   transition: all 0.2s;
 
   &:hover {
-    background: var(--action-700);
+    background: var(--blue-700);
     transform: translateY(-1px);
   }
 }
@@ -49,7 +49,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 1rem 2rem;
-  background: var(--action-600);
+  background: var(--blue-600);
   color: var(--white);
   border: none;
   border-radius: var(--border-radius-md);
@@ -59,7 +59,7 @@
   font-size: 1rem;
 
   &:hover {
-    background: var(--action-700);
+    background: var(--blue-700);
     transform: translateY(-1px);
   }
 }
@@ -167,11 +167,11 @@
 }
 
 .iconProcessing {
-  color: var(--action-600);
+  color: var(--blue-600);
 }
 
 .iconProcessed {
-  color: var(--success-600);
+  color: var(--green-600);
 }
 
 .iconFailed {
@@ -210,7 +210,11 @@
 
 .progressFill {
   height: 100%;
-  background: linear-gradient(90deg, var(--success-500) 0%, var(--success-600) 100%);
+  background: linear-gradient(
+    90deg,
+    var(--green-500) 0%,
+    var(--green-600) 100%
+  );
   transition: width 0.3s ease;
 }
 
@@ -237,11 +241,11 @@
 }
 
 .statusProcessing {
-  color: var(--action-600);
+  color: var(--blue-600);
 }
 
 .statusProcessed {
-  color: var(--success-600);
+  color: var(--green-600);
 }
 
 .statusFailed {

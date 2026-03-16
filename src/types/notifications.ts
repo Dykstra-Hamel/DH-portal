@@ -12,7 +12,8 @@ export type NotificationType =
   | 'lead_status_changed_scheduling'      // Lead status changed to scheduling
   | 'campaign_submitted'                  // Customer redeems campaign landing page
   | 'quote_submitted'                     // Customer updates or signs quote
-  | 'quote_signed';                       // Quote signed by customer (existing)
+  | 'quote_signed'                        // Quote signed by customer (existing)
+  | 'customer_comment_added';             // Customer left a comment on their quote
 
 /**
  * User notification preference database record

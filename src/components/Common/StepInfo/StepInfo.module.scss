@@ -42,7 +42,7 @@
 
 .actionButton {
   padding: 9px 12px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   border: none;
   border-radius: var(--border-radius);
@@ -54,17 +54,17 @@
   justify-content: center;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:active {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 }
 
 .primaryActionButton {
   padding: 9px 16px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   border: none;
   border-radius: var(--border-radius);
@@ -83,22 +83,22 @@
   }
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:active {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &.successButton {
-    background: var(--success-600);
+    background: var(--green-600);
 
     &:hover {
-      background: var(--success-700);
+      background: var(--green-700);
     }
 
     &:active {
-      background: var(--success-800);
+      background: var(--green-800);
     }
   }
 }
@@ -204,7 +204,7 @@
 
 .dropdownButton {
   padding: 9px 12px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   border: none;
   border-radius: var(--border-radius);
@@ -217,11 +217,11 @@
   gap: 8px;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:active {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 }
 

@@ -82,7 +82,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -172,7 +172,7 @@
   padding: 10px 20px;
   border: none;
   border-radius: var(--border-radius);
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   font-size: 14px;
   font-weight: 500;
@@ -183,11 +183,11 @@
   gap: 8px;
 
   &:hover:not(:disabled) {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:active:not(:disabled) {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 
   &:disabled {

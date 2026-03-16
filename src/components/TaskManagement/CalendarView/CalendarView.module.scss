@@ -117,7 +117,7 @@
     background: #eff6ff;
 
     .dayNumber {
-      background: var(--action-500);
+      background: var(--blue-500);
       color: white;
     }
   }
@@ -160,7 +160,7 @@
   overflow: hidden;
 
   &:hover {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     background: #f0f9ff;
     transform: translateX(2px);
   }

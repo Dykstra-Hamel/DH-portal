@@ -62,7 +62,7 @@
   transition: all 0.2s ease;
 
   &:focus-within {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
   }
 
@@ -136,7 +136,7 @@
   }
 
   &.active {
-    background: var(--action-500);
+    background: var(--blue-500);
     color: white;
   }
 }
@@ -194,7 +194,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     background: white;
     transform: translateX(4px);
     box-shadow: 0 2px 8px rgba(0, 128, 240, 0.1);

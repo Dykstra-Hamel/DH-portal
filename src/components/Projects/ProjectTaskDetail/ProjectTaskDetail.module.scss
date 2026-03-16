@@ -1102,8 +1102,8 @@
 
   // Highlight self-mentions
   :global(span[data-type='mention'][data-mention-self='true']) {
-    background: var(--warning-50, #fffbeb);
-    color: var(--warning-700, #a16207);
+    background: var(--amber-50, #fffbeb);
+    color: var(--amber-700, #a16207);
   }
 }
 

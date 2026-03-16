@@ -81,17 +81,17 @@
   cursor: pointer;
 
   &:hover {
-    border-color: var(--action-300);
+    border-color: var(--blue-300);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   }
 
   &.today {
     background: #eff6ff;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     border-width: 2px;
 
     .dayNumber {
-      background: var(--action-500);
+      background: var(--blue-500);
       color: white;
     }
   }
@@ -175,7 +175,7 @@
     box-shadow 0.2s ease;
 
   &:hover {
-    border-color: var(--action-300);
+    border-color: var(--blue-300);
     box-shadow: 0 3px 8px rgba(15, 23, 42, 0.08);
   }
 }

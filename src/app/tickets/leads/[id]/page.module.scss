@@ -643,7 +643,7 @@
 }
 
 .actionButton {
-  background: var(--action-500);
+  background: var(--blue-500);
   border: none;
   border-radius: 8px;
   padding: 10px 16px;
@@ -654,7 +654,7 @@
   transition: all 0.2s;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:nth-child(2) {
@@ -666,10 +666,10 @@
   }
 
   &:nth-child(3) {
-    background: var(--action-500);
+    background: var(--blue-500);
 
     &:hover {
-      background: var(--action-600);
+      background: var(--blue-600);
     }
   }
 }

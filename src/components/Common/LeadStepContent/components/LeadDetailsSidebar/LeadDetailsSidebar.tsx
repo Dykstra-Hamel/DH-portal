@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
+import styles from './LeadDetailsSidebar.module.scss';
 import { CustomerInformation } from '@/components/Tickets/TicketContent';
 import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
 import { ActivityFeed } from '@/components/Common/ActivityFeed/ActivityFeed';
@@ -39,6 +40,7 @@ interface LeadDetailsSidebarProps {
   serviceLocationCardRef?: React.RefObject<HTMLDivElement | null>;
   shouldExpandServiceLocation?: boolean;
   shouldExpandActivity?: boolean;
+  customerComment?: string | null;
 }
 
 export function LeadDetailsSidebar({
@@ -52,6 +54,7 @@ export function LeadDetailsSidebar({
   serviceLocationCardRef,
   shouldExpandServiceLocation,
   shouldExpandActivity,
+  customerComment,
 }: LeadDetailsSidebarProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -641,12 +644,18 @@ export function LeadDetailsSidebar({
             forceCollapse={isForceCollapsed('notes')}
             isCompact={!isSidebarExpanded}
             inSidebar={true}
+            headerRight={
+              customerComment ? (
+                <span className={styles.customerCommentDot} title="Customer note" />
+              ) : undefined
+            }
           >
             <NotesSection
               entityType="lead"
               entityId={lead.id}
               companyId={lead.company_id}
               userId={user?.id || ''}
+              customerComment={customerComment}
             />
           </InfoCard>
     </DetailsCardsSidebar>

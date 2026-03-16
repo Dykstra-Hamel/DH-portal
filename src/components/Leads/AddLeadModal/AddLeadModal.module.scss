@@ -127,8 +127,8 @@
       cursor: pointer;
 
       &:checked + .radioCustom {
-        background: var(--action-600);
-        border-color: var(--action-600);
+        background: var(--blue-600);
+        border-color: var(--blue-600);
 
         &::after {
           display: block;

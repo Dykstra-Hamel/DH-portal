@@ -78,7 +78,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     background: #f7fafc;
   }
 
@@ -96,7 +96,7 @@
   }
 
   &:has(input:checked) {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     background: #edf2f7;
   }
 
@@ -135,7 +135,7 @@
 }
 
 .submitButton {
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   border: none;
   padding: 0.75rem 2rem;
@@ -146,7 +146,7 @@
   transition: all 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: var(--action-600);
+    background: var(--blue-600);
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
   }
@@ -186,7 +186,7 @@
 
 .spinner {
   border: 3px solid #e2e8f0;
-  border-top: 3px solid var(--action-500);
+  border-top: 3px solid var(--blue-500);
   border-radius: 50%;
   width: 40px;
   height: 40px;

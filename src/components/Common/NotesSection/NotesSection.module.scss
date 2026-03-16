@@ -1,6 +1,35 @@
 .notesSection {
   width: 100%;
   padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.customerCommentBanner {
+  background-color: var(--action-25);
+  border: 1px solid var(--blue-300);
+  border-radius: var(--border-radius);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.customerCommentLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue-600);
+}
+
+.customerCommentText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gray-900);
+  white-space: pre-wrap;
 }
 
 .textarea {

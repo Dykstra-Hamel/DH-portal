@@ -51,18 +51,18 @@
   }
 
   &.current {
-    border-bottom: 3px solid var(--action-500);
+    border-bottom: 3px solid var(--blue-500);
 
     &:hover {
       .stepLabel {
-        color: var(--action-600);
+        color: var(--blue-600);
       }
     }
   }
 
   &.completed:hover {
     .stepNumber {
-      background-color: var(--action-500);
+      background-color: var(--blue-500);
     }
 
     .editIcon {
@@ -74,10 +74,10 @@
   }
 
   &:not(.disabled):hover {
-    border-bottom: 3px solid var(--action-500);
+    border-bottom: 3px solid var(--blue-500);
 
     .stepLabel {
-      color: var(--action-600);
+      color: var(--blue-600);
     }
   }
 }
@@ -170,8 +170,8 @@
 
 .current {
   .stepNumber {
-    color: var(--action-500);
-    border-color: var(--action-500);
+    color: var(--blue-500);
+    border-color: var(--blue-500);
   }
 
   .stepLabel {
@@ -182,7 +182,7 @@
 
 .completed {
   .stepNumber {
-    background-color: var(--success-500);
+    background-color: var(--green-500);
     color: white;
     border: none;
   }
@@ -203,7 +203,7 @@
 // Editing state - when user goes back to a previously completed stage
 .editing {
   .stepNumber {
-    background-color: var(--action-500);
+    background-color: var(--blue-500);
   }
 
   .editIcon {
@@ -215,7 +215,7 @@
 
   &:hover {
     .stepLabel {
-      color: var(--action-500);
+      color: var(--blue-500);
     }
   }
 }
