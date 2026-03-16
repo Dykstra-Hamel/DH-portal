@@ -321,13 +321,13 @@
   }
 
   &.selected {
-    border-color: var(--action-500);
-    background: var(--action-50);
-    box-shadow: 0 0 0 1px var(--action-500);
+    border-color: var(--blue-500);
+    background: var(--blue-50);
+    box-shadow: 0 0 0 1px var(--blue-500);
 
     &:hover {
-      border-color: var(--action-600);
-      background: var(--action-100);
+      border-color: var(--blue-600);
+      background: var(--blue-100);
     }
   }
 }

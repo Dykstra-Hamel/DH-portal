@@ -39,10 +39,11 @@ export function ReassignModal({
   customerPhone,
   companyId,
   currentAssigneeId,
-  type
+  type,
 }: ReassignModalProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] = useState(false);
+  const [isAssignmentDropdownOpen, setIsAssignmentDropdownOpen] =
+    useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
 
   const { user } = useUser();
@@ -75,7 +76,8 @@ export function ReassignModal({
         setSelectedAssignee(currentAssigneeId);
       } else {
         // If no specific assignee, default to team assignment
-        const teamType = type === 'support_case' ? 'support_team' : 'sales_team';
+        const teamType =
+          type === 'support_case' ? 'support_team' : 'sales_team';
         setSelectedAssignee(teamType);
       }
     }
@@ -114,7 +116,9 @@ export function ReassignModal({
 
   const getTeamCount = () => {
     const department = type === 'support_case' ? 'support' : 'sales';
-    return assignableUsers.filter(companyUser => companyUser.departments.includes(department)).length;
+    return assignableUsers.filter(companyUser =>
+      companyUser.departments.includes(department)
+    ).length;
   };
 
   const getSelectedAssigneeDisplay = () => {
@@ -187,13 +191,13 @@ export function ReassignModal({
 
           {/* Assignment Section */}
           <div className={styles.assignSection}>
-            <div className={styles.sectionLabel}>
-              Assign to:
-            </div>
+            <div className={styles.sectionLabel}>Assign to:</div>
             <div className={styles.dropdown}>
               <button
                 className={styles.dropdownButton}
-                onClick={() => setIsAssignmentDropdownOpen(!isAssignmentDropdownOpen)}
+                onClick={() =>
+                  setIsAssignmentDropdownOpen(!isAssignmentDropdownOpen)
+                }
               >
                 <div className={styles.dropdownContent}>
                   <div className={styles.avatarContainer}>
@@ -219,7 +223,7 @@ export function ReassignModal({
                   <div className={styles.userInfo}>
                     <div
                       className={cardStyles.defaultText}
-                      style={{ color: 'var(--action-500)' }}
+                      style={{ color: 'var(--blue-500)' }}
                     >
                       {getSelectedAssigneeDisplay().name}
                     </div>
@@ -274,9 +278,7 @@ export function ReassignModal({
                         <TeamAvatar />
                       </div>
                       <div className={styles.userInfo}>
-                        <div className={cardStyles.defaultText}>
-                          Sales Team
-                        </div>
+                        <div className={cardStyles.defaultText}>Sales Team</div>
                         <div className={cardStyles.lightText}>
                           {getTeamCount()} members
                         </div>
@@ -322,9 +324,7 @@ export function ReassignModal({
                                 className={styles.avatar}
                               />
                             ) : (
-                              <DefaultAvatar
-                                name={companyUser.display_name}
-                              />
+                              <DefaultAvatar name={companyUser.display_name} />
                             )}
                           </div>
                           <div className={styles.userInfo}>

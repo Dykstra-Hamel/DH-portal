@@ -40,12 +40,12 @@
   z-index: 2;
 
   &:hover {
-    color: var(--action-500);
+    color: var(--blue-500);
   }
 }
 
 .iconButtonActive {
-  color: var(--action-500);
+  color: var(--blue-500);
 }
 
 .searchContainer {
@@ -94,7 +94,7 @@
   }
 
   &:focus {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -139,10 +139,10 @@
     background: transparent;
     border: none;
     box-shadow: none;
-    color: var(--action-500);
+    color: var(--blue-500);
 
     &::after {
-      background: var(--action-500);
+      background: var(--blue-500);
       transform: scaleX(1);
     }
   }

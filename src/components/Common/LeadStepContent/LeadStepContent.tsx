@@ -605,6 +605,7 @@ export function LeadStepContent({
           serviceLocationCardRef={serviceLocationCardRef}
           shouldExpandServiceLocation={shouldExpandServiceLocation}
           shouldExpandActivity={shouldExpandActivity}
+          customerComment={quote?.customer_comments}
         />
       </div>
     );

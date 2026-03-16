@@ -35,9 +35,9 @@
   }
 
   &.active {
-    background: var(--action-500);
+    background: var(--blue-500);
     color: white;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -133,7 +133,7 @@
   transform: translateY(-50%);
   height: 28px;
   min-width: 80px;
-  background: var(--action-500);
+  background: var(--blue-500);
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -247,7 +247,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 4px 12px rgba(0, 128, 240, 0.1);
     transform: translateX(4px);
   }

@@ -133,7 +133,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: none;
   }
 }
@@ -175,7 +175,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--action-500);
+  background: var(--blue-500);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -272,7 +272,7 @@
 }
 
 .assignButton {
-  background: var(--action-500);
+  background: var(--blue-500);
   border: none;
   border-radius: var(--border-radius);
   padding: 10px 16px;
@@ -284,7 +284,7 @@
   min-width: 80px;
 
   &:hover:not(:disabled) {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:disabled {

@@ -33,13 +33,13 @@
   transition: all 0.2s ease;
 
   &:hover:not(.selected) {
-    border-color: var(--action-400);
+    border-color: var(--blue-400);
     background: var(--gray-50);
   }
 
   &.selected {
-    background: var(--action-500);
-    border-color: var(--action-500);
+    background: var(--blue-500);
+    border-color: var(--blue-500);
     color: white;
     font-weight: 650;
   }

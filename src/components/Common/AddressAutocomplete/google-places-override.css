@@ -46,7 +46,7 @@
 }
 
 .pac-container .pac-item .pac-matched {
-  color: var(--action-500) !important;
+  color: var(--blue-500) !important;
   font-weight: 600 !important;
 }
 

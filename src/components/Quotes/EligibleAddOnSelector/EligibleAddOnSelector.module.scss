@@ -99,7 +99,7 @@
   width: 32px;
   height: 32px;
   border: 3px solid var(--gray-100);
-  border-top: 3px solid var(--success-500);
+  border-top: 3px solid var(--green-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -189,9 +189,9 @@
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: #ffffff;
-  border: 1px solid var(--action-500);
+  border: 1px solid var(--blue-500);
   border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
@@ -199,11 +199,11 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:focus {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 }
 
@@ -226,7 +226,7 @@
 .customQuoteLabel {
   font-size: 12px;
   font-weight: 600;
-  color: var(--warning-600, #b45309);
+  color: var(--amber-600, #b45309);
 }
 
 .customBadge {
@@ -239,9 +239,9 @@
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  background: var(--warning-500, #f59e0b);
+  background: var(--amber-500, #f59e0b);
   color: #ffffff;
-  border: 1px solid var(--warning-600, #d97706);
+  border: 1px solid var(--amber-600, #d97706);
   border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
@@ -249,7 +249,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--warning-600, #d97706);
+    background: var(--amber-600, #d97706);
   }
 }
 
@@ -257,9 +257,9 @@
   display: flex;
   align-items: center;
   padding: 4px 8px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: #ffffff;
-  border: 1px solid var(--action-500);
+  border: 1px solid var(--blue-500);
   border-radius: var(--border-radius);
   font-weight: 500;
   font-size: 12px;
@@ -267,7 +267,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 }
 
@@ -360,7 +360,7 @@
     transition: border-color 0.2s;
 
     &:focus {
-      border-color: var(--action-500);
+      border-color: var(--blue-500);
       box-shadow: 0 0 0 2px rgba(0, 105, 224, 0.15);
     }
   }
@@ -390,8 +390,8 @@
 
 .modalSaveButton {
   padding: 8px 16px;
-  background: var(--action-500);
-  border: 1px solid var(--action-500);
+  background: var(--blue-500);
+  border: 1px solid var(--blue-500);
   border-radius: 6px;
   font-size: 13px;
   font-weight: 500;
@@ -399,7 +399,7 @@
   cursor: pointer;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:disabled {

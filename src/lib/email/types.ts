@@ -36,6 +36,7 @@ export interface LeadNotificationData {
   autoCallEnabled: boolean;
   submittedAt: string;
   leadUrl?: string;
+  customerComment?: string;
 }
 
 export interface EmailNotificationConfig {

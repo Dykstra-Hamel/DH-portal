@@ -264,7 +264,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               Navigate to{' '}
               <Link
                 href="/admin/pest-pressure"
-                style={{ color: 'var(--action-500)' }}
+                style={{ color: 'var(--blue-500)' }}
               >
                 /admin/pest-pressure
               </Link>{' '}
@@ -274,7 +274,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       case 'project-settings':
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}
+          >
             <InternalDepartmentSettings />
             <InternalCategorySettings />
           </div>
@@ -339,17 +341,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           <select
             id="company-select"
             value={selectedCompanyId}
-              onChange={e => setSelectedCompanyId(e.target.value)}
-              className={styles.companySelect}
-            >
-              {companies.map(company => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+            onChange={e => setSelectedCompanyId(e.target.value)}
+            className={styles.companySelect}
+          >
+            {companies.map(company => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <main className={styles.content}>{renderSection()}</main>
     </div>

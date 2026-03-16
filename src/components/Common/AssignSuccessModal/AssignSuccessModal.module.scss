@@ -64,7 +64,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: var(--action-500);
+  background: var(--blue-500);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -113,7 +113,7 @@
   padding: 10px 20px;
   border: none;
   border-radius: 8px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   font-size: 14px;
   font-weight: 600;
@@ -121,10 +121,10 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:active {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 }

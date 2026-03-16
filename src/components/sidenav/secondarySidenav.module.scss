@@ -137,12 +137,12 @@
   }
 
   &.active {
-    background: var(--action-600);
+    background: var(--blue-600);
     color: white;
 
     .countBox {
       background: white;
-      color: var(--action-600);
+      color: var(--blue-600);
     }
 
     .navItemIcon {
@@ -210,7 +210,7 @@
   flex-shrink: 0;
 
   &.active {
-    color: var(--action-600);
+    color: var(--blue-600);
     background-color: white;
     border: 1px solid white;
   }
@@ -266,7 +266,7 @@
 
 .activeCount {
   background: white;
-  color: var(--action-600);
+  color: var(--blue-600);
 }
 
 .neutral {

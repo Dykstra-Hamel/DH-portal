@@ -369,7 +369,7 @@ export default function SettingsPage() {
                             <Link
                               href="/settings/project-management"
                               style={{
-                                color: 'var(--action-500)',
+                                color: 'var(--blue-500)',
                                 fontWeight: 600,
                               }}
                             >

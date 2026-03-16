@@ -66,7 +66,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -85,7 +85,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -96,7 +96,7 @@
 }
 
 .finalizeSaleButton {
-  background: var(--success-600);
+  background: var(--green-600);
   color: white;
   border: none;
   padding: 12px 24px;
@@ -110,7 +110,7 @@
   gap: 8px;
 
   &:hover:not(:disabled) {
-    background: var(--success-700);
+    background: var(--green-700);
   }
 
   &:disabled {

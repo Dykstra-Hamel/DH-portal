@@ -85,6 +85,56 @@ async function checkForRecentDuplicate(
   });
 }
 
+/**
+ * Normalize the Gemini-produced pest_type string to a company pest name.
+ * Gemini outputs service-style names like "Termite Control"; this function
+ * maps those to the actual pest names stored in pest_types (e.g. "Termites").
+ */
+async function normalizePestType(
+  supabase: any,
+  companyId: string,
+  geminiPestType: string | null | undefined
+): Promise<string | null> {
+  if (!geminiPestType) return null;
+
+  const { data: pestOptions } = await supabase
+    .from('company_pest_options')
+    .select('pest_types(name, slug)')
+    .eq('company_id', companyId)
+    .eq('is_active', true);
+
+  if (!pestOptions || pestOptions.length === 0) return geminiPestType;
+
+  const pests = pestOptions.map((o: any) => o.pest_types).filter(Boolean);
+  const input = geminiPestType.toLowerCase();
+
+  // 1. Exact name match
+  let match = pests.find((p: any) => p.name.toLowerCase() === input);
+  if (match) return match.name;
+
+  // 2. Exact slug match
+  match = pests.find((p: any) => p.slug === input.replace(/\s+/g, '_'));
+  if (match) return match.name;
+
+  // 3. Strip " Control" suffix and retry with startsWith / includes
+  const stripped = input.replace(/\s*control\s*$/i, '').trim();
+  match = pests.find((p: any) =>
+    p.name.toLowerCase().startsWith(stripped) ||
+    stripped.includes(p.slug.replace(/_/g, ' '))
+  );
+  if (match) return match.name;
+
+  // 4. Any pest name/slug that appears anywhere in the input
+  match = pests.find((p: any) =>
+    input.includes(p.name.toLowerCase()) ||
+    input.includes(p.slug.replace(/_/g, ' '))
+  );
+  if (match) return match.name;
+
+  // No match — return null so the field stays unset rather than storing a mismatched string
+  return null;
+}
+
 export async function OPTIONS(request: NextRequest) {
   return handleCorsPrelight(request, 'widget');
 }
@@ -434,6 +484,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Step 8.5: Normalize pest_type from Gemini output to a company pest name
+    const normalizedPestType = await normalizePestType(
+      supabase,
+      companyId,
+      geminiResult.ticket.pest_type
+    );
+
     // Step 9: Create lead (if campaign) or ticket (if not)
     let ticketId: string | null = null;
     let leadId: string | null = null;
@@ -473,6 +530,7 @@ export async function POST(request: NextRequest) {
         lead_type: 'campaign_form',
         format: 'form',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
+        pest_type: normalizedPestType || null,
         lead_status: 'new',
         comments: geminiResult.ticket.description || 'Campaign form submission',
         priority: geminiResult.ticket.priority || 'medium',
@@ -524,7 +582,7 @@ export async function POST(request: NextRequest) {
         priority: geminiResult.ticket.priority || 'medium',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
         status: 'new',
-        pest_type: geminiResult.ticket.pest_type || 'General Pest Control',
+        pest_type: normalizedPestType || null,
         form_submission_id: submissionId,
         gclid: gclid,
         fbclid: fbclid,

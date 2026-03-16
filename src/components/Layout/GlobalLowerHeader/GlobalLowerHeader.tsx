@@ -52,7 +52,6 @@ interface SupportCaseAssignmentControls {
   onStatusChange: (status: string) => void;
 }
 
-
 interface GlobalLowerHeaderProps {
   title: ReactNode;
   description: string;
@@ -88,7 +87,7 @@ const PlusIcon = () => (
 
 const TeamAvatar = () => (
   <div className={styles.teamAvatar}>
-    <Users size={20} color="var(--action-600)" />
+    <Users size={20} color="var(--blue-600)" />
   </div>
 );
 
@@ -325,8 +324,12 @@ export function GlobalLowerHeader({
       className={`${styles.globalLowerHeader} ${hasShadow ? styles.globalLowerHeaderScrolled : ''}`}
     >
       <div className={styles.headerContent}>
-        <div className={`${styles.leftSection} ${titleLeading ? styles.leftSectionWithLeading : ''}`}>
-          {titleLeading && <div className={styles.titleLeading}>{titleLeading}</div>}
+        <div
+          className={`${styles.leftSection} ${titleLeading ? styles.leftSectionWithLeading : ''}`}
+        >
+          {titleLeading && (
+            <div className={styles.titleLeading}>{titleLeading}</div>
+          )}
           {titleLogo ? (
             <div className={styles.titleWithLogoWrapper}>
               <div className={styles.titleLogoCol}>{titleLogo}</div>
@@ -868,7 +871,8 @@ export function GlobalLowerHeader({
           customActions) && (
           <div className={styles.rightSection}>
             {customActions && customActions}
-            {actionButtons && actionButtons.length > 0 && (
+            {actionButtons &&
+              actionButtons.length > 0 &&
               actionButtons.map((button, index) => (
                 <button
                   key={index}
@@ -879,8 +883,7 @@ export function GlobalLowerHeader({
                   <PlusIcon />
                   <span>{button.text}</span>
                 </button>
-              ))
-            )}
+              ))}
             {showAddButton && (
               <button
                 className={styles.addLeadButton}

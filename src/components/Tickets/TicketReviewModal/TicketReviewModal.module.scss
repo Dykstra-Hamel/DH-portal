@@ -57,7 +57,7 @@
   font-style: normal;
   font-weight: 550;
   line-height: 14px;
-  color: var(--action-500);
+  color: var(--blue-500);
 }
 
 .reviewerInfo {
@@ -183,12 +183,12 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-600);
+    border-color: var(--blue-600);
     box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.1);
   }
 
   &:hover:not(.disabled) {
-    border-color: var(--action-600);
+    border-color: var(--blue-600);
   }
 
   &.disabled {
@@ -205,12 +205,12 @@
   gap: 8px;
 
   svg path {
-    stroke: var(--action-500);
+    stroke: var(--blue-500);
   }
 
   // For Lucide icons (they use currentColor)
   svg {
-    color: var(--action-500);
+    color: var(--blue-500);
   }
 }
 
@@ -262,15 +262,15 @@
 
   &.selected {
     background: var(--primary-100, #e0f2fe);
-    color: var(--action-600);
+    color: var(--blue-600);
 
     svg path {
-      stroke: var(--action-600);
+      stroke: var(--blue-600);
     }
 
     // For Lucide icons (they use currentColor)
     svg {
-      color: var(--action-600);
+      color: var(--blue-600);
     }
   }
 
@@ -383,14 +383,14 @@
 .userName {
   font-size: 14px;
   font-weight: 600;
-  color: var(--action-600);
+  color: var(--blue-600);
   line-height: 1.2;
 }
 
 .myselfLabel {
   font-size: 12px;
   font-weight: 500;
-  color: var(--action-600);
+  color: var(--blue-600);
   line-height: 1;
 }
 
@@ -423,7 +423,7 @@
   }
 
   &:hover:not(.disabled) {
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 }
 
@@ -435,8 +435,8 @@
   height: 0;
 
   &:checked + .radioCustom {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
 
     &::after {
       display: block;
@@ -614,7 +614,7 @@
 
     &.active {
       border-right: 1px solid var(--gray-200);
-      border-bottom: 3px solid var(--action-600);
+      border-bottom: 3px solid var(--blue-600);
       margin-right: 0;
       margin-bottom: -1px;
     }

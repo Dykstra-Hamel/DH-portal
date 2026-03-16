@@ -75,8 +75,8 @@
 
 .infoBanner {
   padding: 8px 12px;
-  background-color: var(--warning-50);
-  border: 1px solid var(--warning-600);
+  background-color: var(--amber-50);
+  border: 1px solid var(--amber-600);
   border-radius: var(--border-radius);
   display: flex;
   align-items: center;
@@ -86,12 +86,12 @@
 .infoBannerIcon {
   circle,
   path {
-    stroke: var(--warning-800);
+    stroke: var(--amber-800);
   }
 }
 
 .infoBannerText {
-  color: var(--warning-800);
+  color: var(--amber-800);
   font-size: 14px;
 }
 
@@ -124,7 +124,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -148,7 +148,7 @@
   padding: 8px 16px;
   border: none;
   border-radius: var(--border-radius);
-  background-color: var(--action-600);
+  background-color: var(--blue-600);
   color: white;
   font-size: 14px;
   font-weight: 500;
@@ -156,11 +156,11 @@
   transition: all 0.2s ease;
 
   &:hover:not(:disabled) {
-    background-color: var(--action-700);
+    background-color: var(--blue-700);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--action-800);
+    background-color: var(--blue-800);
   }
 
   &:disabled {

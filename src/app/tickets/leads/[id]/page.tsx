@@ -33,6 +33,7 @@ import {
 import { StepItem } from '@/components/Common/Step/Step';
 import { LeadStepWrapper } from '@/components/Common/LeadStepWrapper/LeadStepWrapper';
 import { LeadStepContent } from '@/components/Common/LeadStepContent/LeadStepContent';
+import { LeadProgressBar } from '@/components/Common/LeadProgressBar/LeadProgressBar';
 import { ReassignModal } from '@/components/Common/ReassignModal/ReassignModal';
 import { LiveCallModal } from '@/components/Common/LiveCallModal/LiveCallModal';
 import { QuickTaskModal } from '@/components/Common/QuickTaskModal/QuickTaskModal';
@@ -1288,6 +1289,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   return (
     <>
       <div className="container">
+        <LeadProgressBar
+          leadStatus={lead.lead_status as 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost'}
+        />
         <div className={styles.content}>
           <LeadStepContent
             lead={lead}

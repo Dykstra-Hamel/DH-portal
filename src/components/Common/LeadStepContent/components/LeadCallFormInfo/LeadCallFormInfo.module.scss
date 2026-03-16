@@ -81,7 +81,7 @@
   transition: background-color 0.2s;
 
   &.active {
-    background-color: var(--action-600);
+    background-color: var(--blue-600);
   }
 
   &:hover {
@@ -111,13 +111,13 @@
 
 .campaignLink {
   font-size: 14px;
-  color: var(--action-600);
+  color: var(--blue-600);
   text-decoration: none;
   font-weight: 500;
 
   &:hover {
     text-decoration: underline;
-    color: var(--action-700);
+    color: var(--blue-700);
   }
 }
 
@@ -141,12 +141,12 @@
   border: none;
   cursor: pointer;
   font-size: 13px;
-  color: var(--action-600);
+  color: var(--blue-600);
   padding: 4px 8px;
   border-radius: 4px;
 
   &:hover {
-    background: var(--action-50);
+    background: var(--blue-50);
   }
 }
 
@@ -172,7 +172,7 @@
 
     &:focus {
       outline: none;
-      border-color: var(--action-500);
+      border-color: var(--blue-500);
     }
   }
 }
@@ -202,13 +202,13 @@
   padding: 7px 16px;
   border: none;
   border-radius: 6px;
-  background: var(--action-600);
+  background: var(--blue-600);
   color: var(--white);
   font-size: 14px;
   cursor: pointer;
 
   &:hover {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 
   &:disabled {

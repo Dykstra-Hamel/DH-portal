@@ -109,7 +109,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -172,12 +172,12 @@
   }
 
   &.selected {
-    background: var(--action-100);
-    color: var(--action-600);
+    background: var(--blue-100);
+    color: var(--blue-600);
     font-weight: 760;
 
     &:hover {
-      background: var(--action-100);
+      background: var(--blue-100);
     }
   }
 
@@ -190,7 +190,7 @@
 }
 
 .checkmark {
-  color: var(--action-600);
+  color: var(--blue-600);
   font-weight: bold;
   font-size: 12px;
   flex-shrink: 0;

@@ -2523,6 +2523,9 @@ export function LeadQuoteSection({
 
                           return (
                             <div className={styles.singlePlanPricing}>
+                              <div className={styles.lineItemHeader}>
+                                {serviceSelections[0].servicePlan?.plan_name}
+                              </div>
                               <div className={styles.pricingGrid}>
                                 <div className={styles.pricingColumn}>
                                   <div className={styles.pricingLabel}>

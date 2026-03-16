@@ -22,7 +22,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
   }
 
@@ -65,18 +65,20 @@
 
   &:focus {
     outline: none;
-    color: var(--action-500);
+    color: var(--blue-500);
   }
 }
 
 .chevron {
   color: var(--gray-400);
-  transition: transform 0.2s ease, color 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    color 0.2s ease;
   pointer-events: none;
 
   &.open {
     transform: rotate(180deg);
-    color: var(--action-500);
+    color: var(--blue-500);
   }
 }
 
@@ -90,7 +92,9 @@
   border: 1px solid var(--gray-300);
   border-top: none;
   border-radius: 0 0 var(--border-radius) var(--border-radius);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06);
   max-height: 200px;
   overflow-y: auto;
 }
@@ -139,7 +143,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid var(--gray-200);
-  border-top: 2px solid var(--action-500);
+  border-top: 2px solid var(--blue-500);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -174,7 +178,7 @@
 
 // Focus styles for accessibility
 .input:focus + .inputIcons .chevron {
-  color: var(--action-500);
+  color: var(--blue-500);
 }
 
 // Responsive adjustments
@@ -182,7 +186,7 @@
   .dropdown {
     max-height: 150px;
   }
-  
+
   .item {
     padding: 10px 12px;
   }

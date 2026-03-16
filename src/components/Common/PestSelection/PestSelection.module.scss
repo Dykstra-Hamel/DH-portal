@@ -149,8 +149,8 @@
   height: 0;
 
   &:checked + .radioCustom {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
 
     &::after {
       display: block;
@@ -208,7 +208,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 
   &::placeholder {
@@ -243,7 +243,7 @@
   padding: 8px 16px;
   border: none;
   border-radius: var(--border-radius);
-  background-color: var(--action-500);
+  background-color: var(--blue-500);
   color: white;
   font-size: 14px;
   font-weight: 500;
