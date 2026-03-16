@@ -10,6 +10,9 @@
     position: fixed;
     top: 0;
     left: -336px; /* Width of primary (80px) + secondary (256px) nav */
+    &.primaryOnly {
+      left: 0; /* Primary-only sidebar is always visible */
+    }
     width: auto;
     height: 100vh;
     z-index: 1100;

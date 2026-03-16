@@ -72,6 +72,10 @@ export interface QuoteLineItem {
   final_initial_price: number;
   final_recurring_price: number;
 
+  // Customer selection (for optional line items on the public quote page)
+  is_optional: boolean;
+  is_selected: boolean;
+
   // Display
   display_order: number;
 
@@ -88,6 +92,7 @@ export interface CreateQuoteRequest {
     discount_amount?: number;
     discount_id?: string;
     service_frequency?: string;
+    is_optional?: boolean;  // Customer can toggle this item on/off
   }>;
 }
 
@@ -110,6 +115,7 @@ export interface UpdateQuoteRequest {
     custom_initial_price?: number;
     custom_recurring_price?: number;
     is_custom_priced?: boolean;
+    is_optional?: boolean;  // Customer can toggle this item on/off
   }>;
 }
 

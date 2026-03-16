@@ -291,7 +291,8 @@ export async function POST(
             const { data: lineItems } = await supabase
               .from('quote_line_items')
               .select('final_initial_price')
-              .eq('quote_id', id);
+              .eq('quote_id', id)
+              .eq('is_selected', true);
 
             let quoteTotal = 0;
             if (lineItems && lineItems.length > 0) {

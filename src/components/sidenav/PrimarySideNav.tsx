@@ -7,6 +7,8 @@ import { Mails } from 'lucide-react';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserDepartments } from '@/hooks/useUserDepartments';
+import { createClient } from '@/lib/supabase/client';
 import styles from './PrimarySideNav.module.scss';
 
 interface PrimarySideNavProps {
@@ -16,11 +18,28 @@ interface PrimarySideNavProps {
 export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
-  const { isAdmin, isHydrating } = useCompany();
+  const { isAdmin, isHydrating, selectedCompany } = useCompany();
   const {
     hasAccess: hasProjectManagement,
     loading: featureLoading,
   } = useFeatureAccess('project_management');
+
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null);
+    });
+  }, []);
+
+  const { departments } = useUserDepartments(
+    currentUserId ?? '',
+    selectedCompany?.id ?? ''
+  );
+
+  const isTechnicianOnly =
+    departments.length > 0 && departments.every(d => d === 'technician');
 
   const menuItems: Array<{
     id: PrimaryNavItem;
@@ -189,6 +208,29 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Tracker',
     },
     {
+      id: 'tech-leads' as PrimaryNavItem,
+      href: '/tech-leads',
+      disabled: false,
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <path
+            d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      ),
+      text: 'TechLeads',
+    },
+    {
       id: 'brand' as PrimaryNavItem,
       href: '/brand',
       disabled: false,
@@ -275,6 +317,10 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   // Filter menu items based on super admin status and feature access
   // Hide super-admin-only items by default until we confirm user is admin
   const visibleMenuItems = menuItems.filter(item => {
+    // Technician-only users only see tech-leads and customers
+    if (isTechnicianOnly) {
+      return item.id === 'tech-leads' || item.id === 'customers';
+    }
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {
       return !isHydrating && isAdmin;

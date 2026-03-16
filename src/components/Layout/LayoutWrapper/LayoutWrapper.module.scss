@@ -40,6 +40,21 @@
   padding: 32px 0 0;
 }
 
+.techLeadsMainContent {
+  padding: 0;
+  overflow: hidden;
+}
+
+:global(.pageWrapper).techLeadsPageWrapper {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
 :global(.pageWrapper).projectManagementPageWrapper {
   display: flex;
   flex: 1;

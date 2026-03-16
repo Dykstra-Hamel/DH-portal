@@ -43,6 +43,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     pathname === '/project-management' ||
     pathname === '/admin/project-management';
 
+  const isTechLeadsPage = pathname.startsWith('/tech-leads');
+
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
     !isPublicPage && !isHomePage && !isQuotePage && !isCampaignLandingPage;
@@ -541,10 +543,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   return (
     <div className={styles.layoutWrapper}>
       <div className={styles.contentWrapper}>
-        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
+        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} hideSecondary={isTechLeadsPage} />
         <div className={styles.rightContent}>
-          <GlobalHeader onMenuToggle={toggleSidebar} />
-          {pageConfig && (
+          {!isTechLeadsPage && <GlobalHeader onMenuToggle={toggleSidebar} />}
+          {!isTechLeadsPage && pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
               titleLeading={
@@ -573,15 +575,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             />
           )}
           <main
-            className={`${styles.mainContent} ${
-              isProjectManagementPage ? styles.projectManagementMainContent : ''
-            }`.trim()}
+            className={[
+              styles.mainContent,
+              isProjectManagementPage ? styles.projectManagementMainContent : '',
+              isTechLeadsPage ? styles.techLeadsMainContent : '',
+            ].filter(Boolean).join(' ')}
             data-scroll-container="main"
           >
             <section
               className={`pageWrapper ${
                 isProjectManagementPage
                   ? styles.projectManagementPageWrapper
+                  : isTechLeadsPage
+                  ? styles.techLeadsPageWrapper
                   : ''
               }`}
             >
