@@ -8,6 +8,7 @@ import { SearchBar } from '../SearchBar/SearchBar';
 import { NotificationIcon } from '../NotificationIcon/NotificationIcon';
 import { UserAvatar } from '../UserAvatar/UserAvatar';
 import { GlobalCompanyDropdown } from './CompanyDropdown/GlobalCompanyDropdown';
+import { MobileCompanySwitcher } from './CompanyDropdown/MobileCompanySwitcher';
 import { useWizard } from '@/contexts/WizardContext';
 import styles from './GlobalHeader.module.scss';
 
@@ -24,8 +25,15 @@ export function GlobalHeader({
   const router = useRouter();
   const { wizardTitle } = useWizard();
   const isTechLeads = pathname.startsWith('/tech-leads');
-  const hideSearchAndCompany =
+  const hideSearch =
     isTechLeads ||
+    pathname === '/project-management' ||
+    pathname.startsWith('/project-management/') ||
+    pathname === '/admin/project-management' ||
+    pathname.startsWith('/admin/project-management/') ||
+    pathname.startsWith('/admin/monthly-services') ||
+    pathname.startsWith('/admin/content-pieces/');
+  const hideCompany =
     pathname === '/project-management' ||
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
@@ -64,15 +72,11 @@ export function GlobalHeader({
           )}
           {!hideBreadcrumbs && <Breadcrumbs />}
         </div>
-        <div className={[styles.centerSection, isTechLeads && wizardTitle ? styles.centerSectionVisible : ''].filter(Boolean).join(' ')}>
-          {isTechLeads && wizardTitle && (
-            <span className={styles.wizardTitle}>{wizardTitle}</span>
-          )}
-        </div>
+        <div className={styles.centerSection}></div>
         <div className={styles.rightSection}>
           {rightActions}
-          {!hideSearchAndCompany && <SearchBar />}
-          {!hideSearchAndCompany && <GlobalCompanyDropdown />}
+          {!hideSearch && <SearchBar />}
+          {!hideCompany && <GlobalCompanyDropdown />}
           <NotificationIcon />
           <UserAvatar />
         </div>
