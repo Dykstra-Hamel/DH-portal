@@ -2349,6 +2349,10 @@ export function NewOpportunityWizard() {
     <div className={styles.wizardContainer} ref={wizardContainerRef}>
       {/* Progress indicator — only show after type selection */}
       {stepIndex > 0 && (
+        <div className={styles.progressSection}>
+          <p className={styles.progressLeadType}>
+            {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
+          </p>
         <div className={styles.progressBar}>
           {progressSteps.map((stepId, i) => (
             <div
@@ -2361,6 +2365,7 @@ export function NewOpportunityWizard() {
               <span className={styles.progressLabel}>{STEP_ID_LABELS[stepId]}</span>
             </div>
           ))}
+        </div>
         </div>
       )}
 
