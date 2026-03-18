@@ -321,6 +321,10 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     if (isTechnicianOnly) {
       return item.id === 'tech-leads' || item.id === 'customers';
     }
+    // Tech-leads is only visible to technician users and admins
+    if (item.id === 'tech-leads') {
+      return isTechnicianOnly || (!isHydrating && isAdmin);
+    }
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {
       return !isHydrating && isAdmin;

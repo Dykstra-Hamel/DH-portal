@@ -17,6 +17,7 @@ import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
 import { ProjectActionMenu } from '../GlobalLowerHeader/ProjectActionMenu';
 import BackToTopButton from '@/components/Common/BackToTopButton/BackToTopButton';
 import { Settings, ArrowLeft } from 'lucide-react';
+import { WizardProvider } from '@/contexts/WizardContext';
 import styles from './LayoutWrapper.module.scss';
 
 interface LayoutWrapperProps {
@@ -545,7 +546,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
       <div className={styles.contentWrapper}>
         <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} hideSecondary={isTechLeadsPage} />
         <div className={styles.rightContent}>
-          {!isTechLeadsPage && <GlobalHeader onMenuToggle={toggleSidebar} />}
+          <GlobalHeader onMenuToggle={toggleSidebar} />
           {!isTechLeadsPage && pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
@@ -608,7 +609,9 @@ export function LayoutWrapper({ children }: LayoutWrapperProps) {
         <CompanyProvider>
           <NotificationProvider>
             <PageActionsProvider>
-              <LayoutContent>{children}</LayoutContent>
+              <WizardProvider>
+                <LayoutContent>{children}</LayoutContent>
+              </WizardProvider>
             </PageActionsProvider>
           </NotificationProvider>
         </CompanyProvider>

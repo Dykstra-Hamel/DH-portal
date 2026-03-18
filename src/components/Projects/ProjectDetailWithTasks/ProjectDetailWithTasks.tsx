@@ -93,12 +93,6 @@ const isDueDateOverdue = (dueDate: string | null) => {
   return due < today;
 };
 
-const isCompletionOnlyUpdate = (updates: Partial<ProjectTask>) => {
-  const keys = Object.keys(updates);
-  if (keys.length === 0) return false;
-  return keys.every((key) => key === 'is_completed' || key === 'completed_at');
-};
-
 type UploadProgressState = {
   active: boolean;
   completed: number;
@@ -1347,7 +1341,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } = formData;
 
     const assignedTo = taskPayload.assigned_to || null;
-    const memberAdded = await ensureProjectMember(assignedTo);
+    await ensureProjectMember(assignedTo);
 
     if (editingTask) {
       await updateTask(project.id, editingTask.id, taskPayload);
@@ -1363,9 +1357,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       } catch (error) {
         console.error('Error updating blocked task department:', error);
       }
-    }
-    if (memberAdded) {
-      onProjectUpdate?.();
     }
     setIsTaskFormOpen(false);
     setEditingTask(null);
@@ -1388,7 +1379,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       if (selectedTask?.id === updatedTask.id) {
         setSelectedTask((prev) => (prev ? { ...prev, ...updatedTask } : updatedTask));
       }
-      onProjectUpdate?.();
     } catch (error) {
       console.error('Error toggling task completion:', error);
       const errorMsg = error instanceof Error ? error.message : 'Failed to update task';
@@ -1406,8 +1396,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       await ensureProjectMember(updates.assigned_to);
     }
     await updateTask(project.id, taskId, updates);
-    onProjectUpdate?.();
-  }, [project?.id, updateTask, onProjectUpdate, project, ensureProjectMember]);
+  }, [project?.id, updateTask, ensureProjectMember]);
 
   // Handler for deleting a task from the list
   const handleDeleteTaskFromList = useCallback(async (taskId: string) => {
@@ -1519,7 +1508,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     ).then(res => res.json());
 
     setSelectedTask(updatedTask);
-    onProjectUpdate?.();
 
     return newComment;
   };
@@ -3391,13 +3379,10 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         onUpdate={async (taskId, updates) => {
           if (!project?.id) return;
           const hasUpdates = Object.keys(updates).length > 0;
-          const completionOnly = isCompletionOnlyUpdate(updates);
-          const isCompletingTask = updates.is_completed === true;
-          let memberAdded = false;
 
           if (hasUpdates) {
             const assignedTo = updates.assigned_to || null;
-            memberAdded = await ensureProjectMember(assignedTo);
+            await ensureProjectMember(assignedTo);
             await updateTask(project.id, taskId, updates);
           }
 
@@ -3405,12 +3390,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
           const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`);
           const updatedTask = await response.json();
           setSelectedTask(updatedTask);
-
-          // Always refresh project when completing a task (department may have changed)
-          // or when it's not a completion-only update, or when a member was added
-          if (hasUpdates && (isCompletingTask || !completionOnly || memberAdded)) {
-            onProjectUpdate?.();
-          }
         }}
         onUpdateRelatedTask={handleUpdateRelatedTask}
         onDelete={() => handleDeleteTask()}

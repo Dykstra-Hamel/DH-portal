@@ -1,13 +1,14 @@
 'use client';
 
-import { Menu } from 'lucide-react';
+import { Menu, ArrowLeft } from 'lucide-react';
 import { ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Breadcrumbs } from '../Breadcrumbs/Breadcrumbs';
 import { SearchBar } from '../SearchBar/SearchBar';
 import { NotificationIcon } from '../NotificationIcon/NotificationIcon';
 import { UserAvatar } from '../UserAvatar/UserAvatar';
 import { GlobalCompanyDropdown } from './CompanyDropdown/GlobalCompanyDropdown';
+import { useWizard } from '@/contexts/WizardContext';
 import styles from './GlobalHeader.module.scss';
 
 interface GlobalHeaderProps {
@@ -20,7 +21,11 @@ export function GlobalHeader({
   rightActions,
 }: GlobalHeaderProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { wizardTitle } = useWizard();
+  const isTechLeads = pathname.startsWith('/tech-leads');
   const hideSearchAndCompany =
+    isTechLeads ||
     pathname === '/project-management' ||
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
@@ -31,7 +36,8 @@ export function GlobalHeader({
     pathname === '/admin/project-management' ||
     pathname.startsWith('/admin/project-management/') ||
     pathname.startsWith('/admin/monthly-services') ||
-    pathname.startsWith('/admin/content-pieces/');
+    pathname.startsWith('/admin/content-pieces/') ||
+    pathname.startsWith('/tech-leads');
 
   return (
     <header className={styles.globalHeader}>
@@ -46,9 +52,23 @@ export function GlobalHeader({
               <Menu size={24} />
             </button>
           )}
+          {isTechLeads && (
+            <button
+              type="button"
+              className={styles.backButton}
+              onClick={() => router.back()}
+              aria-label="Go back"
+            >
+              <ArrowLeft size={16} />
+            </button>
+          )}
           {!hideBreadcrumbs && <Breadcrumbs />}
         </div>
-        <div className={styles.centerSection}></div>
+        <div className={[styles.centerSection, isTechLeads && wizardTitle ? styles.centerSectionVisible : ''].filter(Boolean).join(' ')}>
+          {isTechLeads && wizardTitle && (
+            <span className={styles.wizardTitle}>{wizardTitle}</span>
+          )}
+        </div>
         <div className={styles.rightSection}>
           {rightActions}
           {!hideSearchAndCompany && <SearchBar />}

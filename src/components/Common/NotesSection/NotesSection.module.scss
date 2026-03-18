@@ -6,6 +6,64 @@
   gap: 12px;
 }
 
+.notesList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.noteCard {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius);
+  background: var(--white);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.noteMeta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.noteAuthor {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-900);
+}
+
+.noteAuthorWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.noteDate {
+  font-size: 11px;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+.noteText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gray-800);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.noteState {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
 .customerCommentBanner {
   background-color: var(--action-25);
   border: 1px solid var(--blue-300);

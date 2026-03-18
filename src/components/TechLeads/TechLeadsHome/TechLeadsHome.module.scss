@@ -77,45 +77,33 @@
   line-height: 1;
 }
 
-.infoCards {
+.statsRow {
   display: flex;
-  flex-direction: column;
   gap: 12px;
   padding-top: 8px;
 }
 
-.infoCard {
-  display: flex;
-  align-items: flex-start;
-  gap: 16px;
-  padding: 16px;
+.statCard {
+  flex: 1;
   background: var(--white);
-  border-radius: var(--border-radius-lg);
   border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-50);
+  border-radius: var(--border-radius-lg);
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
 }
 
-.infoCardIcon {
+.statNumber {
   font-size: 28px;
-  flex-shrink: 0;
-  line-height: 1;
-  margin-top: 2px;
+  font-weight: 700;
+  color: var(--blue-500);
+  font-family: var(--font-satoshi);
 }
 
-.infoCardContent {
-  h3 {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--gray-800);
-    margin: 0 0 4px;
-    font-family: var(--font-satoshi);
-  }
-
-  p {
-    font-size: 13px;
-    color: var(--gray-500);
-    margin: 0;
-    line-height: 1.4;
-    font-family: var(--font-satoshi);
-  }
+.statLabel {
+  font-size: 13px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
 }

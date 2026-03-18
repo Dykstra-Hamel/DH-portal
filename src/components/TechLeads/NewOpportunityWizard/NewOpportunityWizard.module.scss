@@ -14,8 +14,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 14px 16px 10px;
+  gap: 8px;
+  padding: 16px 16px 12px;
   background: var(--white);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
@@ -25,17 +25,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   flex: 1;
   position: relative;
 
   &::before {
     content: '';
     position: absolute;
-    top: 6px;
+    top: 17px;
     right: -50%;
     width: 100%;
-    height: 2px;
+    height: 3px;
     background: var(--gray-200);
     z-index: 0;
   }
@@ -46,26 +46,42 @@
 }
 
 .progressDot {
-  width: 12px;
-  height: 12px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
-  background: var(--gray-200);
-  transition: background 0.2s;
+  border: 2px solid var(--gray-300);
+  background: var(--white);
+  color: var(--gray-500);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
   position: relative;
   z-index: 1;
 }
 
 .progressStepActive .progressDot {
   background: var(--blue-500);
-  box-shadow: 0 0 0 3px var(--blue-100);
+  border-color: var(--blue-500);
+  color: var(--white);
+  box-shadow: 0 0 0 4px var(--blue-100);
 }
 
 .progressStepDone .progressDot {
   background: var(--green-500);
+  border-color: var(--green-500);
+  color: var(--white);
+}
+
+.progressStepDone::before {
+  background: var(--green-500);
 }
 
 .progressLabel {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--gray-400);
   white-space: nowrap;
   font-family: var(--font-satoshi);
@@ -144,8 +160,54 @@
   }
 }
 
+.typeCardDisabled {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 24px 16px;
+  min-height: 120px;
+  background: var(--gray-50);
+  border: 2px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  text-align: center;
+  cursor: not-allowed;
+  position: relative;
+  color: var(--gray-400);
+
+  .typeCardLabel {
+    color: var(--gray-400);
+  }
+
+  .typeCardIcon {
+    color: var(--gray-400);
+  }
+}
+
+.typeCardComingSoon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  background: var(--blue-500);
+  padding: 3px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-family: var(--font-satoshi);
+  transform: rotate(-8deg);
+  transform-origin: center;
+  white-space: nowrap;
+}
+
 .typeCardIcon {
-  font-size: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--blue-500);
 }
 
 .typeCardLabel {
@@ -202,58 +264,74 @@
   justify-content: center;
 }
 
-.addPhotoCard {
+.photoPlaceholder {
+  aspect-ratio: 1;
+  border-radius: var(--border-radius-md);
+  border: 2px dashed var(--gray-300);
+  background: var(--gray-50);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  aspect-ratio: 1;
-  background: var(--gray-50);
-  border: 2px dashed var(--gray-300);
-  border-radius: var(--border-radius-md);
   cursor: pointer;
+  color: var(--gray-400);
   font-size: 12px;
-  color: var(--gray-500);
-  transition: border-color 0.15s, background 0.15s;
   font-family: var(--font-satoshi);
+  transition: border-color 0.15s, background 0.15s;
 
   &:hover {
     border-color: var(--blue-500);
     background: var(--blue-50);
+    color: var(--blue-500);
   }
 }
 
-.cameraIcon {
-  font-size: 28px;
+.photoActions {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.photoActionBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+  font-family: var(--font-satoshi);
+  transition: background 0.15s, border-color 0.15s;
+
+  svg {
+    color: var(--blue-500);
+    flex-shrink: 0;
+  }
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--blue-500);
+  }
+
+  &:active {
+    background: var(--gray-100);
+  }
 }
 
 .analyzeBtn {
+  @extend .nextBtn;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
-  width: 100%;
-  min-height: 52px;
-  margin-top: 8px;
-  background: var(--blue-500);
-  color: var(--white);
-  border: none;
-  border-radius: var(--border-radius-md);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s, opacity 0.15s;
-  font-family: var(--font-satoshi);
-
-  &:disabled {
-    opacity: 0.7;
-    cursor: not-allowed;
-  }
-
-  &:not(:disabled):hover {
-    background: var(--blue-600);
-  }
 }
 
 .analyzeError {
@@ -282,6 +360,11 @@
   font-family: var(--font-satoshi);
 }
 
+.fieldRequired {
+  color: var(--color-error, #dc2626);
+  margin-left: 2px;
+}
+
 .fieldInput {
   width: 100%;
   padding: 12px 14px;
@@ -307,17 +390,56 @@
   line-height: 1.5;
 }
 
-.notesHeader {
+.fieldTextareaAuto {
+  resize: none;
+  overflow: hidden;
+}
+
+.selectWrapper {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+}
+
+.fieldSelect {
+  @extend .fieldInput;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 36px;
+  cursor: pointer;
+
+  &:disabled {
+    background: var(--gray-100);
+    color: var(--gray-500);
+    cursor: not-allowed;
+  }
+}
+
+.selectChevron {
+  position: absolute;
+  right: 12px;
+  color: var(--gray-500);
+  pointer-events: none;
+  flex-shrink: 0;
+}
+
+.fieldHint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
 }
 
 .dictateBtn {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 12px;
+  justify-content: center;
+  gap: 6px;
+  margin: 8px auto 0;
+  width: 100%;
+  max-width: 300px;
+  padding: 8px 14px;
   background: var(--gray-100);
   border: 1px solid var(--border-color);
   border-radius: 20px;
@@ -370,32 +492,25 @@
 
 // ─── Site Selection ───────────────────────────────────────────────────────────
 
-.tabs {
-  display: flex;
-  gap: 0;
-  background: var(--gray-100);
-  border-radius: var(--border-radius-md);
-  padding: 3px;
-}
-
-.tab {
-  flex: 1;
-  padding: 8px;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  font-size: 14px;
-  font-weight: 500;
+.nearbyNotice {
+  font-size: 12px;
   color: var(--gray-500);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  background: var(--gray-50);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+  padding: 8px 12px;
+  margin: 0;
   font-family: var(--font-satoshi);
 }
 
-.tabActive {
-  background: var(--white);
-  color: var(--gray-900);
-  box-shadow: var(--shadow-50);
+.listLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+  font-family: var(--font-satoshi);
 }
 
 .searchInputWrapper {
@@ -422,8 +537,7 @@
 .searchSpinner {
   position: absolute;
   right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  top: calc(50% - 8px);
   width: 16px;
   height: 16px;
   border: 2px solid var(--gray-200);
@@ -473,6 +587,15 @@
 .customerCardAddr {
   font-size: 13px;
   color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+.customerCardContact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--gray-600);
   font-family: var(--font-satoshi);
 }
 
@@ -538,6 +661,14 @@
   font-family: var(--font-satoshi);
 }
 
+.reviewPlanPrice {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 4px 0 0;
+  font-family: var(--font-satoshi);
+}
+
 .reviewRow {
   font-size: 14px;
   color: var(--gray-800);
@@ -546,16 +677,17 @@
 }
 
 .reviewPhotoRow {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
 }
 
 .reviewThumb {
-  width: 56px;
-  height: 56px;
+  width: 100%;
+  aspect-ratio: 1;
   object-fit: cover;
-  border-radius: var(--border-radius-sm);
+  border-radius: var(--border-radius-md);
+  border: 1px solid var(--border-color);
 }
 
 .flagRow {
@@ -783,5 +915,495 @@
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+// ─── Draft Banner ─────────────────────────────────────────────────────────────
+
+.draftBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 16px;
+  background: var(--amber-50, #fffbeb);
+  border-bottom: 1px solid var(--amber-200, #fde68a);
+  font-size: 13px;
+  color: var(--amber-800, #92400e);
+  font-family: var(--font-satoshi);
+  flex-shrink: 0;
+}
+
+.draftBannerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.draftDiscardBtn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--amber-700, #b45309);
+  background: none;
+  border: 1px solid var(--amber-300, #fcd34d);
+  border-radius: 6px;
+  padding: 3px 10px;
+  cursor: pointer;
+  font-family: var(--font-satoshi);
+
+  &:hover {
+    background: var(--amber-100, #fef3c7);
+  }
+}
+
+.draftDismissBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  padding: 2px;
+  cursor: pointer;
+  color: var(--amber-700);
+  border-radius: 4px;
+
+  &:hover {
+    background: var(--amber-100);
+  }
+}
+
+// ─── Review Actions (Upsell) ─────────────────────────────────────────────────
+
+.reviewActions {
+  display: flex;
+  gap: 10px;
+  flex: 1;
+}
+
+.scheduleBtn {
+  @extend .nextBtn;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--blue-500);
+
+  &:not(:disabled):hover {
+    background: var(--blue-600);
+  }
+}
+
+.serviceTodayBtn {
+  @extend .nextBtn;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: var(--green-600);
+
+  &:not(:disabled):hover {
+    background: var(--green-700);
+  }
+}
+
+// ─── New Customer Step ────────────────────────────────────────────────────────
+
+.newCustomerRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+// ─── Service Details Step ─────────────────────────────────────────────────────
+
+.spinnerDark {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  flex-shrink: 0;
+}
+
+.serviceSection {
+  background: var(--gray-50);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-lg);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.serviceSectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  margin: 0;
+  font-family: var(--font-satoshi);
+}
+
+.serviceHint {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0;
+  font-family: var(--font-satoshi);
+}
+
+.serviceUnavailable {
+  font-size: 14px;
+  color: var(--amber-800);
+  background: var(--amber-50);
+  border: 1px solid var(--amber-400);
+  border-radius: var(--border-radius-md);
+  padding: 14px 16px;
+  margin: 0;
+  font-family: var(--font-satoshi);
+  text-align: center;
+}
+
+.serviceEmpty {
+  font-size: 13px;
+  color: var(--gray-400);
+  margin: 0;
+  font-style: italic;
+  font-family: var(--font-satoshi);
+}
+
+.serviceList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.serviceRow {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 12px;
+  background: var(--white);
+  border: 1px solid var(--border-color);
+  border-radius: var(--border-radius-md);
+}
+
+.serviceRowHighlighted {
+  border-color: var(--blue-300);
+  background: var(--blue-50);
+}
+
+.serviceRowMain {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.serviceRowName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  font-family: var(--font-satoshi);
+}
+
+.serviceRowBadge {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--blue-100);
+  color: var(--blue-700);
+  border-radius: 20px;
+  font-family: var(--font-satoshi);
+  white-space: nowrap;
+}
+
+.serviceRowStatus {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: var(--gray-100);
+  color: var(--gray-600);
+  border-radius: 20px;
+  font-family: var(--font-satoshi);
+  text-transform: capitalize;
+}
+
+.serviceRowMeta {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+.serviceRowDesc {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+// ─── Service Plan Select ──────────────────────────────────────────────────────
+
+.planCardList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+
+.planCard {
+  width: 100%;
+  background: var(--white);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: var(--font-satoshi);
+
+  &:hover {
+    border-color: var(--blue-500);
+    box-shadow: 0 2px 8px rgba(0, 117, 222, 0.12);
+  }
+}
+
+.planCardSelected {
+  border-color: var(--blue-500);
+  background: color-mix(in srgb, var(--blue-500) 6%, var(--white));
+}
+
+.planCardHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.planCardNameRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.planCardName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.planCardBadge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--blue-500);
+  background: color-mix(in srgb, var(--blue-500) 12%, transparent);
+  border-radius: 20px;
+  padding: 2px 10px;
+  width: fit-content;
+}
+
+.planCardPrice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.planCardPriceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+}
+
+.planCardPriceAmount {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+}
+
+.planCardPriceFreq {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.planCardInitial {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.planCardDesc {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin: 0 0 10px;
+  line-height: 1.5;
+}
+
+.planCardFeatures {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.planCardFeatureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+.planCardFeatureCheck {
+  color: var(--blue-500);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.planCardCheck {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--blue-500);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+// ─── Service Today Confirm ────────────────────────────────────────────────────
+
+.confirmSection {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border-color);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.confirmSectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--gray-500);
+  margin: 0 0 8px;
+}
+
+.confirmValue {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 4px;
+}
+
+.confirmValueMuted {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin: 0 0 2px;
+}
+
+.confirmFeatureList {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.confirmFeatureItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+
+.confirmFeatureCheck {
+  color: var(--blue-500);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.confirmTerms {
+  font-size: 12px;
+  color: var(--gray-600);
+  line-height: 1.6;
+  margin: 0 0 8px;
+
+  h1, h2, h3, h4 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--gray-700);
+    margin: 10px 0 4px;
+  }
+
+  p {
+    margin: 0 0 4px;
+  }
+
+  ul, ol {
+    padding-left: 16px;
+    margin: 0 0 6px;
+  }
+
+  li {
+    margin-bottom: 2px;
+  }
+
+  strong {
+    font-weight: 600;
+    color: var(--gray-700);
+  }
+}
+
+.confirmDisclaimer {
+  font-size: 11px;
+  color: var(--gray-500);
+  line-height: 1.5;
+  font-style: italic;
+  margin: 0;
+}
+
+.signatureWrapper {
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 10px 0 8px;
+  background: #fafafa;
+  width: 100%;
+  touch-action: none;
+}
+
+.signatureCanvas {
+  display: block;
+  width: 100% !important;
+  height: 150px;
+}
+
+.signatureClearBtn {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 13px;
+  color: var(--gray-600);
+  cursor: pointer;
+  font-family: var(--font-satoshi);
+
+  &:hover {
+    background: var(--gray-50);
   }
 }
