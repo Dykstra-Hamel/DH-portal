@@ -8,9 +8,10 @@ interface SidebarProps {
   collapsed?: boolean;
   isActive?: boolean;
   onLinkClick?: () => void;
+  hideSecondary?: boolean;
 }
 
-export function Sidebar({ collapsed = false, isActive = false, onLinkClick }: SidebarProps) {
+export function Sidebar({ collapsed = false, isActive = false, onLinkClick, hideSecondary = false }: SidebarProps) {
   const handleOverlayClick = (e: React.MouseEvent) => {
     // Close sidebar when clicking on the overlay (outside the nav elements)
     if (e.target === e.currentTarget && onLinkClick) {
@@ -19,16 +20,18 @@ export function Sidebar({ collapsed = false, isActive = false, onLinkClick }: Si
   };
 
   return (
-    <div 
-      className={`${styles.sidebarContainer} ${isActive ? styles.active : ''}`}
+    <div
+      className={`${styles.sidebarContainer} ${isActive ? styles.active : ''} ${hideSecondary ? styles.primaryOnly : ''}`}
       onClick={handleOverlayClick}
     >
       <PrimarySideNav />
-      <SecondarySideNav 
-        collapsed={collapsed} 
-        isActive={isActive} 
-        onLinkClick={onLinkClick} 
-      />
+      {!hideSecondary && (
+        <SecondarySideNav
+          collapsed={collapsed}
+          isActive={isActive}
+          onLinkClick={onLinkClick}
+        />
+      )}
     </div>
   );
 }

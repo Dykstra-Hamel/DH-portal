@@ -9,6 +9,7 @@ export type LeadSource =
   | 'direct'
   | 'campaign'
   | 'widget'
+  | 'technician'
   | 'other'
   // Legacy values (existing records only — do not use for new records)
   | 'organic'
@@ -67,6 +68,7 @@ export interface Lead {
   comments?: string;
   assigned_to?: string;
   assigned_scheduler?: string;
+  submitted_by?: string;
   last_contacted_at?: string;
   next_follow_up_at?: string;
   estimated_value?: number;
@@ -95,6 +97,7 @@ export interface Lead {
   requested_time?: string;
   selected_plan_id?: string;
   recommended_plan_name?: string;
+  photo_urls?: string[];
   had_pest_control_before?: string | null;
   attribution_data?: {
     page_url?: string;
@@ -143,6 +146,13 @@ export interface Lead {
     departments?: string[];
   };
   scheduler_user?: {
+    id: string;
+    email: string;
+    first_name?: string;
+    last_name?: string;
+    avatar_url?: string | null;
+  };
+  submitted_user?: {
     id: string;
     email: string;
     first_name?: string;

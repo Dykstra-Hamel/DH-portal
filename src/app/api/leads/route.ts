@@ -9,6 +9,7 @@ import {
 } from '@/lib/api-utils';
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
+import { logCreation } from '@/lib/activity-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -188,7 +189,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json([]);
     }
 
-    // Get all unique user IDs from leads (assigned_to and assigned_scheduler fields)
+    // Get all unique user IDs from leads (assigned_to, assigned_scheduler, submitted_by fields)
     const userIds = new Set<string>();
     leads.forEach((lead: Lead) => {
       if (lead.assigned_to) {
@@ -196,6 +197,9 @@ export async function GET(request: NextRequest) {
       }
       if (lead.assigned_scheduler) {
         userIds.add(lead.assigned_scheduler);
+      }
+      if (lead.submitted_by) {
+        userIds.add(lead.submitted_by);
       }
     });
 
@@ -281,6 +285,9 @@ export async function GET(request: NextRequest) {
         scheduler_user: lead.assigned_scheduler
           ? profileMap.get(lead.assigned_scheduler) || null
           : null,
+        submitted_user: lead.submitted_by
+          ? profileMap.get(lead.submitted_by) || null
+          : null,
         primary_service_address: customerId
           ? primaryServiceAddressMap.get(customerId) || null
           : null,
@@ -337,14 +344,26 @@ export async function POST(request: NextRequest) {
       zip,
       pestType,
       comments,
+      notes,
       leadSource,
       leadFormat,
       leadType,
+      leadStatus,
       priority,
       estimatedValue,
       serviceType,
       assignedTo,
+      scheduledDate,
+      scheduledTime,
+      selectedPlanId,
+      recommendedPlanName,
+      photoUrls,
     } = body;
+
+    const normalizedLeadNotes = typeof notes === 'string' ? notes.trim() : '';
+
+    // Auto-set submitted_by to the authenticated user for technician leads
+    const submittedBy = leadSource === 'technician' ? user.id : (body.submittedBy ?? null);
 
     // Validate required fields
     if (!companyId) {
@@ -498,13 +517,19 @@ export async function POST(request: NextRequest) {
           format: leadFormat || undefined,
           lead_type: leadType || 'manual',
           lead_source: leadSource || 'direct',
-          lead_status: assignedTo ? 'in_process' : 'new',
+          lead_status: leadStatus || (assignedTo ? 'in_process' : 'new'),
+          scheduled_date: scheduledDate || null,
+          scheduled_time: scheduledTime || null,
+          selected_plan_id: selectedPlanId || null,
+          recommended_plan_name: recommendedPlanName || null,
+          photo_urls: Array.isArray(photoUrls) && photoUrls.length > 0 ? photoUrls : null,
           priority: priority || 'medium',
           pest_type: pestType,
           comments,
           service_type: serviceType,
           estimated_value: estimatedValue,
           assigned_to: assignedTo || null,
+          submitted_by: submittedBy,
           created_at: new Date().toISOString(),
         },
       ])
@@ -517,6 +542,35 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       );
+    }
+
+    // Log lead creation activity
+    await logCreation({
+      entityType: 'lead',
+      entityId: newLead.id,
+      companyId,
+      userId: submittedBy ?? user.id,
+    });
+
+    // Capture initial technician notes in the lead Notes activity feed
+    if (normalizedLeadNotes) {
+      const { error: noteError } = await supabase
+        .from('activity_log')
+        .insert({
+          company_id: companyId,
+          entity_type: 'lead',
+          entity_id: newLead.id,
+          activity_type: 'note_added',
+          user_id: user.id,
+          notes: normalizedLeadNotes,
+          metadata: {
+            source: 'techleads',
+          },
+        });
+
+      if (noteError) {
+        console.error('Error creating initial lead note activity:', noteError);
+      }
     }
 
     // Auto-link service address to quote if customer has one and lead doesn't

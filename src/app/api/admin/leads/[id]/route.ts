@@ -122,6 +122,20 @@ export async function GET(
       }
     }
 
+    // Get submitted_by user profile if lead has one
+    let submittedUser = null;
+    if (lead.submitted_by) {
+      const { data: submittedProfileData, error: submittedProfileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.submitted_by)
+        .single();
+
+      if (!submittedProfileError && submittedProfileData) {
+        submittedUser = submittedProfileData;
+      }
+    }
+
     // Get call record separately using lead_id foreign key
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
@@ -135,6 +149,7 @@ export async function GET(
       call_record: callRecord || null,
       assigned_user: assignedUser,
       scheduler_user: schedulerUser,
+      submitted_user: submittedUser,
       primary_service_address: primaryServiceAddress,
     };
 
@@ -357,6 +372,20 @@ export async function PUT(
       }
     }
 
+    // Get submitted_by user profile if lead has one
+    let submittedUser = null;
+    if (lead.submitted_by) {
+      const { data: submittedProfileData, error: submittedProfileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.submitted_by)
+        .single();
+
+      if (!submittedProfileError && submittedProfileData) {
+        submittedUser = submittedProfileData;
+      }
+    }
+
     // Get call record separately using lead_id foreign key
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
@@ -370,6 +399,7 @@ export async function PUT(
       call_record: callRecord || null,
       assigned_user: assignedUser,
       scheduler_user: schedulerUser,
+      submitted_user: submittedUser,
       primary_service_address: primaryServiceAddress,
     };
 

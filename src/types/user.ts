@@ -1,4 +1,4 @@
-export type Department = 'sales' | 'support' | 'scheduling';
+export type Department = 'sales' | 'support' | 'scheduling' | 'technician';
 
 export type ProfileRole = 'admin' | 'super_admin' | 'user' | 'customer';
 
@@ -54,6 +54,7 @@ export interface DepartmentStats {
   sales: number;
   support: number;
   scheduling: number;
+  technician: number;
   total: number;
 }
 
@@ -76,6 +77,12 @@ export const DEPARTMENT_CONFIG = {
     description: 'Manage appointments and service scheduling',
     color: '#f59e0b', // amber-500
     icon: '📅'
+  },
+  technician: {
+    label: 'Technician',
+    description: 'Field technician for on-site service and upsell capture',
+    color: '#6366f1', // indigo-500
+    icon: '🔧'
   }
 } as const;
 
@@ -116,7 +123,7 @@ export const validateDepartments = (departments: Department[]): {
     errors.push('Cannot assign more than 3 departments');
   }
 
-  const validDepartments: Department[] = ['sales', 'support', 'scheduling'];
+  const validDepartments: Department[] = ['sales', 'support', 'scheduling', 'technician'];
   const invalidDepartments = departments.filter(dept => !validDepartments.includes(dept));
 
   if (invalidDepartments.length > 0) {

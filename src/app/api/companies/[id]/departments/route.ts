@@ -63,6 +63,7 @@ export async function GET(
       sales: 0,
       support: 0,
       scheduling: 0,
+      technician: 0,
       total: 0
     };
 
@@ -70,21 +71,26 @@ export async function GET(
     const uniqueUsersPerDepartment = {
       sales: new Set<string>(),
       support: new Set<string>(),
-      scheduling: new Set<string>()
+      scheduling: new Set<string>(),
+      technician: new Set<string>()
     };
 
     userDepartments?.forEach(ud => {
       const dept = ud.department as Department;
-      uniqueUsersPerDepartment[dept].add(ud.user_id);
+      if (uniqueUsersPerDepartment[dept]) {
+        uniqueUsersPerDepartment[dept].add(ud.user_id);
+      }
     });
 
     stats.sales = uniqueUsersPerDepartment.sales.size;
     stats.support = uniqueUsersPerDepartment.support.size;
     stats.scheduling = uniqueUsersPerDepartment.scheduling.size;
+    stats.technician = uniqueUsersPerDepartment.technician.size;
     stats.total = new Set([
       ...uniqueUsersPerDepartment.sales,
       ...uniqueUsersPerDepartment.support,
-      ...uniqueUsersPerDepartment.scheduling
+      ...uniqueUsersPerDepartment.scheduling,
+      ...uniqueUsersPerDepartment.technician
     ]).size;
 
     // Group departments by user

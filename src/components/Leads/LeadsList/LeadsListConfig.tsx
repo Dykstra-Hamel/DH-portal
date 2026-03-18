@@ -58,6 +58,7 @@ const getLeadSourceLabel = (source: string | null): string => {
     direct: 'Direct',
     campaign: 'Campaign',
     widget: 'Widget',
+    technician: 'Tech',
     other: 'Other',
     // Legacy
     organic: 'Google Organic',
@@ -74,6 +75,15 @@ const getLeadSourceLabel = (source: string | null): string => {
 };
 
 const getFormatIcon = (lead: Lead) => {
+  // Technician lead — use wrench icon
+  if (lead.lead_source === 'technician') {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0088CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+    );
+  }
+
   const format = lead.format || (
     (lead.lead_type === 'phone_call' || lead.lead_type === 'inbound_call' || lead.lead_type === 'outbound_call') ? 'call' :
     (lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' || lead.lead_type === 'campaign_form') ? 'form' :

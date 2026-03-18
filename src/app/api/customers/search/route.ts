@@ -38,13 +38,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get('q');
     const companyId = searchParams.get('companyId');
-    
-    if (!query || query.trim().length < 2) {
+    const limitParam = searchParams.get('limit');
+    const browseAll = searchParams.get('browseAll') === 'true';
+    const pageLimit = limitParam ? Math.min(parseInt(limitParam, 10), 100) : 20;
+
+    const searchTerm = query?.trim() ?? '';
+    const isSearchQuery = searchTerm.length >= 2;
+
+    // Allow empty/short queries only when browseAll=true (used by nearby feature)
+    if (!isSearchQuery && !browseAll) {
       return NextResponse.json({ customers: [] });
     }
 
-    const searchTerm = query.trim();
-    
     let customersQuery = supabase
       .from('customers')
       .select(`
@@ -78,16 +83,21 @@ export async function GET(request: NextRequest) {
         )
       `)
       .eq('customer_status', 'active')
-      .limit(20);
+      .limit(pageLimit);
+
+    // Skip text filtering for browse-all requests; just return recent customers
+    if (browseAll) {
+      customersQuery = customersQuery.order('created_at', { ascending: false });
+    }
 
     // Handle different search patterns
-    const searchWords = searchTerm.split(/\s+/).filter(word => word.length > 0);
+    const searchWords = isSearchQuery ? searchTerm.split(/\s+/).filter(word => word.length > 0) : [];
 
     // Escape special PostgREST characters in search terms
     const escapedSearchTerm = escapePostgrestFilter(searchTerm);
     const escapedSearchWords = searchWords.map(word => escapePostgrestFilter(word));
 
-    if (escapedSearchWords.length > 1) {
+    if (isSearchQuery && escapedSearchWords.length > 1) {
       // Multi-word search - likely a full name
       // Try to match combinations of words against first_name and last_name
       const nameSearchConditions = [];
@@ -135,7 +145,7 @@ export async function GET(request: NextRequest) {
       ].filter(Boolean).join(',');
 
       customersQuery = customersQuery.or(allConditions);
-    } else {
+    } else if (isSearchQuery) {
       // Single word search - use original logic
       customersQuery = customersQuery.or(
         `first_name.ilike.%${escapedSearchTerm}%,` +
