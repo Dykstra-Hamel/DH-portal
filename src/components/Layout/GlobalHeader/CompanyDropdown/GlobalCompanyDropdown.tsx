@@ -136,18 +136,7 @@ export function GlobalCompanyDropdown() {
         aria-label={displayText}
         title={displayText}
       >
-        {iconLogo ? (
-          <Image
-            src={iconLogo}
-            alt={selectedCompany?.name || ''}
-            width={28}
-            height={28}
-            className={styles.iconLogo}
-            style={{ objectFit: 'contain' }}
-          />
-        ) : (
-          <Building2 size={20} />
-        )}
+        <Building2 size={20} />
       </button>
 
       {isOpen && (

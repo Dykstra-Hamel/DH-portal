@@ -40,6 +40,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
 
   const isTechnicianOnly =
     departments.length > 0 && departments.every(d => d === 'technician');
+  const isTechnician = departments.includes('technician');
 
   const menuItems: Array<{
     id: PrimaryNavItem;
@@ -323,7 +324,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     }
     // Tech-leads is only visible to technician users and admins
     if (item.id === 'tech-leads') {
-      return isTechnicianOnly || (!isHydrating && isAdmin);
+      return isTechnician || (!isHydrating && isAdmin);
     }
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {

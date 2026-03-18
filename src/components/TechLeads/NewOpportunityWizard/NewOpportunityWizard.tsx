@@ -2144,10 +2144,14 @@ export function NewOpportunityWizard() {
 
         for (let i = 0; i < photos.length; i++) {
           const photo = photos[i];
-          // Convert base64 dataUrl to Blob
-          const dataRes = await fetch(photo.dataUrl);
-          const blob = await dataRes.blob();
-          const ext = blob.type === 'image/png' ? 'png' : blob.type === 'image/webp' ? 'webp' : 'jpg';
+          // Convert base64 directly to Blob (avoids fetch(dataUrl) failing on mobile/PWA)
+          const byteString = atob(photo.base64);
+          const ab = new ArrayBuffer(byteString.length);
+          const ia = new Uint8Array(ab);
+          for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j);
+          const mimeType = photo.mimeType || 'image/jpeg';
+          const blob = new Blob([ab], { type: mimeType });
+          const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
           const path = `${companyId}/${user?.id ?? 'unknown'}/${Date.now()}-${i}.${ext}`;
 
           const { data: uploadData, error: uploadError } = await supabase.storage
