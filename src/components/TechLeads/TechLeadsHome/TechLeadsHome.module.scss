@@ -24,6 +24,13 @@
   border-radius: var(--border-radius-lg);
   color: var(--white);
   margin-bottom: 16px;
+
+  &.headerIconPlain {
+    background: transparent;
+    border-radius: 0;
+    width: 96px;
+    height: 96px;
+  }
 }
 
 .title {
