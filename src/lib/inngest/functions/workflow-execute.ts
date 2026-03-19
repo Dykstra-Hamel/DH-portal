@@ -33,10 +33,19 @@ async function logWorkflowActivity(
   supabase: ReturnType<typeof createAdminClient>,
   leadId: string | null | undefined,
   companyId: string,
-  stepType: string
+  stepType: string,
+  smsConversationId?: string | null
 ): Promise<void> {
   const contactType = WORKFLOW_ACTION_TO_CONTACT_TYPE[stepType];
   if (!leadId || !contactType) return;
+  const metadata: Record<string, string> = {
+    contact_type: contactType,
+    contact_outcome: 'automation_sent',
+    source: 'workflow_automation',
+  };
+  if (smsConversationId) {
+    metadata.sms_conversation_id = smsConversationId;
+  }
   await supabase.from('activity_log').insert({
     company_id: companyId,
     entity_type: 'lead',
@@ -44,11 +53,7 @@ async function logWorkflowActivity(
     activity_type: 'contact_made',
     user_id: null,
     notes: null,
-    metadata: {
-      contact_type: contactType,
-      contact_outcome: 'automation_sent',
-      source: 'workflow_automation',
-    },
+    metadata,
   });
 }
 
@@ -476,7 +481,9 @@ export const workflowExecuteHandler = inngest.createFunction(
                   customerId,
                   attribution,
                   partialLeadData,
-                  executionId
+                  executionId,
+                  execution?.execution_data?.campaignId,
+                  workflowId
                 );
                 break;
               case 'make_call':
@@ -514,7 +521,13 @@ export const workflowExecuteHandler = inngest.createFunction(
 
             // Log to communication log for lead-linked action steps
             if (result?.success !== false) {
-              await logWorkflowActivity(supabase, leadId, companyId, currentStep.type);
+              await logWorkflowActivity(
+                supabase,
+                leadId,
+                companyId,
+                currentStep.type,
+                currentStep.type === 'send_sms' ? (result as { conversationId?: string })?.conversationId : undefined
+              );
             }
 
             const stepData = {
@@ -716,7 +729,7 @@ export const workflowExecuteHandler = inngest.createFunction(
                   result = await executeEmailStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
                   break;
                 case 'send_sms':
-                  result = await executeSMSStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
+                  result = await executeSMSStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
                   break;
                 case 'make_call':
                   result = await executeMakeCallStep(branchStep, leadData, companyId, leadId, customerId, executionId);
@@ -732,7 +745,13 @@ export const workflowExecuteHandler = inngest.createFunction(
                   return { success: true, skipped: true };
               }
               if (result?.success !== false) {
-                await logWorkflowActivity(supabase, leadId, companyId, branchStep.type);
+                await logWorkflowActivity(
+                  supabase,
+                  leadId,
+                  companyId,
+                  branchStep.type,
+                  branchStep.type === 'send_sms' ? result?.conversationId : undefined
+                );
               }
               return result;
             }
@@ -916,7 +935,9 @@ export const workflowExecuteHandler = inngest.createFunction(
                     customerId,
                     attribution,
                     partialLeadData,
-                    executionId
+                    executionId,
+                    execution?.execution_data?.campaignId,
+                    workflowId
                   );
                   break;
                 case 'make_call':
@@ -948,7 +969,13 @@ export const workflowExecuteHandler = inngest.createFunction(
                   return { success: true, skipped: true };
               }
               if (result?.success !== false) {
-                await logWorkflowActivity(supabase, leadId, companyId, branchStep.type);
+                await logWorkflowActivity(
+                  supabase,
+                  leadId,
+                  companyId,
+                  branchStep.type,
+                  branchStep.type === 'send_sms' ? result?.conversationId : undefined
+                );
               }
               return result;
             }
@@ -1842,7 +1869,9 @@ async function executeSMSStep(
   customerId: string,
   attribution: any,
   partialLeadData: any = null,
-  executionId: string
+  executionId: string,
+  campaignId?: string,
+  workflowId?: string
 ) {
   try {
     // Get SMS agent ID
@@ -1934,6 +1963,45 @@ async function executeSMSStep(
 
     // Get full lead data with customer and service address details
     const supabase = createAdminClient();
+
+    // Get company slug (needed for campaign URL generation)
+    const { data: company } = await supabase
+      .from('companies')
+      .select('slug')
+      .eq('id', companyId)
+      .single();
+    const companySlug = company?.slug || '';
+
+    // Get the lead's most recent sent/accepted/draft quote (if any)
+    let quoteFullUrl = '';
+    if (leadId) {
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('quote_url, quote_token')
+        .eq('lead_id', leadId)
+        .in('quote_status', ['sent', 'accepted', 'draft'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (quote?.quote_url && quote?.quote_token) {
+        const { getFullQuoteUrl } = await import('@/lib/quote-utils');
+        const basePath = getFullQuoteUrl(quote.quote_url);
+        const separator = quote.quote_url.includes('?') ? '&' : '?';
+        quoteFullUrl = `${basePath}${separator}token=${quote.quote_token}`;
+      }
+    }
+
+    // Get campaign data if campaignId is present
+    let campaign: any = null;
+    if (campaignId) {
+      const { data: campaignData } = await supabase
+        .from('campaigns')
+        .select('id, campaign_id, name')
+        .eq('id', campaignId)
+        .single();
+      campaign = campaignData;
+    }
 
     const { data: fullLeadData } = await supabase
       .from('leads')
@@ -2073,7 +2141,7 @@ async function executeSMSStep(
         '',
 
       // Service details
-      pestType: leadData.pestType || leadData.pest_type || '',
+      pestType: fullLeadData?.pest_type || leadData.pestType || leadData.pest_type || '',
       urgency: leadData.urgency || '',
       leadSource: leadData.leadSource || leadData.lead_source || '',
 
@@ -2092,6 +2160,21 @@ async function executeSMSStep(
       selectedPlanRecurringPrice: formatPrice(
         planData?.recurring_price || leadData.selectedPlan?.recurring_price
       ),
+
+      // Quote URL — link to the customer's quote page
+      quoteUrl: quoteFullUrl,
+
+      // Campaign URL — link to the campaign landing page (if campaign-triggered)
+      campaignLandingUrl:
+        campaignId && customerId && companySlug
+          ? generateCampaignLandingUrl(
+              companySlug,
+              campaign?.campaign_id || campaignId,
+              customerId,
+              true
+            )
+          : '',
+      campaignName: campaign?.name || '',
     };
 
     // Debug logging for SMS variables before replacement
@@ -2143,6 +2226,7 @@ async function executeSMSStep(
           companyId: companyId,
           customerNumber: e164Phone, // Use E.164 formatted phone number
           agentId: agentId,
+          forceNew: true,
           dynamicVariables: {
             initialMessage: personalizedMessage,
             ...emailVariables, // Include all variables for additional personalization

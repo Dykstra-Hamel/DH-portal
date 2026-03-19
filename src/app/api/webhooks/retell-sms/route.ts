@@ -25,6 +25,12 @@ interface RetellSMSWebhookPayload {
     end_reason?: string;
   };
   metadata?: Record<string, any>;
+  chat_analysis?: {
+    user_sentiment?: 'positive' | 'negative' | 'neutral';
+    chat_summary?: string;
+    custom_analysis_data?: Record<string, any>;
+  };
+  retell_llm_dynamic_variables?: Record<string, any>;
 }
 
 export async function POST(request: NextRequest) {
@@ -159,7 +165,11 @@ export async function POST(request: NextRequest) {
       case 'message_delivery_status':
         await handleDeliveryStatus(supabase, conversation, payload);
         break;
-      
+
+      case 'chat_analyzed':
+        await handleChatAnalyzed(supabase, conversation, payload);
+        break;
+
       default:
         console.log('Unknown SMS event type:', payload.event);
     }
@@ -372,6 +382,80 @@ async function handleInboundMessage(
 
   } catch (error) {
     console.error('Error handling inbound message:', error);
+  }
+}
+
+async function handleChatAnalyzed(
+  supabase: any,
+  conversation: any,
+  payload: RetellSMSWebhookPayload
+) {
+  try {
+    const chatAnalysis = payload.chat_analysis;
+    const dynamicVariables = payload.retell_llm_dynamic_variables;
+
+    const sentiment = chatAnalysis?.user_sentiment?.toLowerCase() || 'neutral';
+    const summary = chatAnalysis?.chat_summary || '';
+
+    // Store analysis in sms_conversations.metadata
+    await supabase
+      .from('sms_conversations')
+      .update({
+        status: 'completed',
+        metadata: {
+          ...conversation.metadata,
+          chat_analysis: chatAnalysis || null,
+          sentiment,
+          summary,
+          retell_variables: dynamicVariables || null,
+          analyzed_at: new Date().toISOString(),
+        },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', conversation.id);
+
+    // Update lead record if conversation is linked to a lead
+    if (conversation.lead_id) {
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('id, comments, lead_status')
+        .eq('id', conversation.lead_id)
+        .single();
+
+      if (lead) {
+        const isQualified = dynamicVariables?.is_qualified;
+        const updateData: any = {
+          comments: lead.comments || '',
+          updated_at: new Date().toISOString(),
+        };
+
+        if (summary) {
+          updateData.comments =
+            `${updateData.comments}\n\n💬 SMS Analysis: ${summary}`.trim();
+        }
+
+        if (isQualified === 'true' || isQualified === true) {
+          updateData.lead_status = 'new';
+          updateData.comments =
+            `${updateData.comments}\n\n✅ AI Qualification: QUALIFIED - Ready for follow-up`.trim();
+        } else if (isQualified === 'false' || isQualified === false) {
+          updateData.lead_status = 'unqualified';
+          updateData.comments =
+            `${updateData.comments}\n\n❌ AI Qualification: UNQUALIFIED - Not a sales opportunity`.trim();
+        }
+
+        await supabase.from('leads').update(updateData).eq('id', lead.id);
+      }
+    }
+
+    console.log('SMS chat analyzed:', {
+      conversation_id: conversation.id,
+      sentiment,
+      has_summary: !!summary,
+      has_qualification: !!dynamicVariables?.is_qualified,
+    });
+  } catch (error) {
+    console.error('Error handling chat analyzed:', error);
   }
 }
 
