@@ -1,42 +1,124 @@
 .cardContent {
   display: flex;
   flex-direction: column;
-  gap: 20px;
-  padding: 18px;
-
-  p {
-    margin: 0;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-}
-
-.twoColumnGrid {
-  display: grid;
-  grid-template-columns: 215px 1fr;
-  gap: 20px;
-
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.leftColumn {
-  display: flex;
-  flex-direction: column;
   gap: 16px;
 }
 
-.rightColumn {
+// ── New + unassigned: take or assign ─────────────────────────────────────────
+
+.assignSection {
   display: flex;
-  flex-direction: column;
-  gap: 12px;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.formGroup {
+.takeLeadButton {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--border-radius);
+  background-color: var(--blue-500);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s;
+
+  &:hover:not(:disabled) {
+    background-color: var(--blue-600);
+  }
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+.assignRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+}
+
+.assignOrText {
+  font-size: 14px;
+  color: var(--gray-500);
+  white-space: nowrap;
+}
+
+.assignSelect {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  background-color: white;
+  color: var(--gray-700);
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// ── State A: No cadence ──────────────────────────────────────────────────────
+
+.cadenceStartRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.cadenceSelect {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  font-size: 14px;
+  background-color: white;
+  color: var(--gray-700);
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+  }
+}
+
+.startCadenceButton {
+  padding: 8px 16px;
+  border: none;
+  border-radius: var(--border-radius);
+  background-color: var(--blue-500);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    background-color: var(--blue-600);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.fallbackSection {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .fieldLabel {
@@ -45,73 +127,41 @@
   color: var(--gray-900);
 }
 
-.commentSection {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  flex: 1;
-}
+// ── State B: Next step card ───────────────────────────────────────────────────
 
-.buttonGroup {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  align-items: center;
-}
-
-.fullWidthSection {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-}
-
-.nextActionSection {
-  flex-grow: 1;
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-
-.infoBanner {
-  padding: 8px 12px;
-  background-color: var(--amber-50);
-  border: 1px solid var(--amber-600);
-  border-radius: var(--border-radius);
+.nextStepHeader {
   display: flex;
   align-items: center;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
-.infoBannerIcon {
-  circle,
-  path {
-    stroke: var(--amber-800);
-  }
+.nextStepLabel {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--blue-500);
+  letter-spacing: 0.04em;
 }
 
-.infoBannerText {
-  color: var(--amber-800);
-  font-size: 14px;
+.nextStepName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gray-800);
 }
 
-.textareaLabel {
-  display: block;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--gray-900);
-  margin-bottom: 8px;
-}
-
-.optionalLabel {
-  font-size: 14px;
+.nextStepDay {
+  font-size: 12px;
   color: var(--gray-500);
-  font-weight: 400;
+  background-color: var(--gray-100);
+  border-radius: 4px;
+  padding: 2px 7px;
 }
 
-.activityTextarea {
+// ── Shared textarea ───────────────────────────────────────────────────────────
+
+.notesTextarea {
   width: 100%;
-  min-height: 120px;
+  min-height: 100px;
   padding: 10px 12px;
   border: 1px solid var(--gray-300);
   border-radius: var(--border-radius);
@@ -119,7 +169,7 @@
   font-family: inherit;
   resize: vertical;
   background-color: white;
-  flex-grow: 1;
+  box-sizing: border-box;
   transition: border-color 0.2s;
 
   &:focus {
@@ -133,34 +183,171 @@
   }
 }
 
-.viewHistoryButton {
+// ── Quick-fill checkboxes ─────────────────────────────────────────────────────
+
+.quickActions {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.quickActionLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--gray-700);
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.quickActionCheckbox {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: white;
+  cursor: pointer;
+  position: relative;
+  transition:
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+
+  &:checked {
+    background-color: #fff;
+
+    &::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
+      background: var(--blue-500);
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  &:hover:not(:checked) {
+    border-color: var(--blue-500);
+  }
+}
+
+// ── Single context-aware action row ──────────────────────────────────────────
+
+.actionRow {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.submitButton {
+  padding: 8px 16px;
+  background-color: var(--blue-500);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+
+  &:hover:not(:disabled) {
+    background-color: var(--blue-600);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+// ── Quoting action button ─────────────────────────────────────────────────────
+
+.startQuotingButton {
   padding: 8px 16px;
   border: none;
+  border-radius: 4px;
+  background-color: var(--green-400);
+  color: white;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background-color: var(--green-500);
+  }
+
+  &:active {
+    background-color: var(--green-600);
+  }
+}
+
+.submitQuoteButton {
+  padding: 8px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
   background-color: white;
   color: var(--gray-700);
   font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+
+  &:hover {
+    background-color: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+}
+
+// ── Log row ───────────────────────────────────────────────────────────────────
+
+.logRow {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewHistoryButton {
+  padding: 8px 16px;
+  border: none;
+  background-color: transparent;
+  color: var(--gray-600);
+  font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--gray-900);
+  }
 }
 
 .logActivityButton {
   padding: 8px 16px;
   border: none;
   border-radius: var(--border-radius);
-  background-color: var(--blue-600);
+  background-color: var(--blue-500);
   color: white;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background-color 0.2s;
 
   &:hover:not(:disabled) {
-    background-color: var(--blue-700);
+    background-color: var(--blue-600);
   }
 
   &:active:not(:disabled) {
-    background-color: var(--blue-800);
+    background-color: var(--blue-700);
   }
 
   &:disabled {
@@ -169,43 +356,134 @@
   }
 }
 
-.nextRecommendedHeader {
-  color: var(--UI-Gray-900);
+// ── Status / info cards ───────────────────────────────────────────────────────
+
+.statusCard {
+  padding: 12px 16px;
+  background-color: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius);
+}
+
+.statusText {
   font-size: 14px;
-  font-weight: 550;
-  line-height: 170%;
-}
-
-.dataLabel {
-  font-size: 12px;
-  line-height: 14px;
-  font-weight: 500;
   color: var(--gray-500);
-  display: inline-flex;
+}
+
+.completedCard {
+  padding: 12px 16px;
+  background-color: var(--green-50, #f0fdf4);
+  border: 1px solid var(--green-200, #bbf7d0);
+  border-radius: var(--border-radius);
+  display: flex;
   align-items: center;
+  gap: 8px;
 }
 
-[data-sidebar-expanded='true'] {
-  .nextActionSection {
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: flex-start;
-  }
+.completedText {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--green-700, #15803d);
+}
 
-  .dataLabel {
-    grid-column-start: 1;
+// ── State D: Workflow in progress (redesigned) ────────────────────────────────
+
+.workflowProgressHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.workflowProgressTitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.workflowProgressBlue {
+  color: var(--blue-500);
+}
+
+.workflowProgressSub {
+  color: var(--gray-900);
+}
+
+.workflowStepCount {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--blue-500);
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  .totalCount {
+    color: var(--gray-600);
   }
 }
 
-.sectionWrapper {
-  transition: all 0.2s ease;
+.workflowStepsList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  background: var(--gray-25);
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
+  padding: 16px;
+}
 
-  &.active {
-    box-shadow:
-      0 0 0 4px rgba(0, 105, 224, 0.16),
-      0 2px 5px 0 rgba(0, 105, 224, 0.08),
-      0 0 0 1px rgba(0, 105, 224, 0.64),
-      0 1px 1px 0 rgba(0, 105, 224, 0.12);
+.workflowStepRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border: 1px solid var(--blue-100);
+  border-radius: var(--border-radius);
+  background-color: var(--gray-25);
+}
+
+.workflowStepRowCompleted {
+  background-color: var(--blue-50);
+
+  .workflowStepLabel {
+    font-weight: 700;
   }
+}
+
+.workflowStepInfo {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  flex: 1;
+}
+
+.workflowStepDate {
+  min-width: 130px;
+  font-size: 12px;
+  color: var(--blue-400);
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.workflowStepLabel {
+  font-size: 14px;
+  color: var(--blue-400);
+  font-weight: 500;
+}
+
+.workflowStepCheck {
+  color: var(--blue-400);
+  flex-shrink: 0;
+}
+
+.workflowComingUpLabel {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-700);
+  padding: 4px 0 2px;
+}
+
+.workflowActions {
+  display: flex;
+  justify-content: flex-end;
 }

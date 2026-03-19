@@ -1,0 +1,81 @@
+.wrapper {
+  background: var(--gray-25);
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+}
+
+.wrapperExpanded {
+  border-radius: 8px 8px 0 0;
+  border-bottom: none;
+}
+
+.tilesRow {
+  display: flex;
+  align-items: center;
+  padding: 16px 24px;
+  height: 90px;
+}
+
+.tile {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 0 30px;
+  min-width: 0;
+
+  &:first-child {
+    padding-left: 0;
+  }
+}
+
+.tileLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tileValue {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.divider {
+  width: 1px;
+  height: 60px;
+  background: var(--gray-300);
+  flex-shrink: 0;
+}
+
+.chevronBtn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-400);
+  padding: 4px;
+  margin-left: 12px;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+
+  &:hover {
+    color: var(--gray-600);
+  }
+
+  svg {
+    transition: transform 0.2s ease;
+  }
+}
+
+.rotated {
+  transform: rotate(180deg);
+}

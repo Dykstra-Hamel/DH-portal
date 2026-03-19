@@ -52,6 +52,9 @@ export default function TicketForm({
     Partial<Record<keyof TicketFormData, string>>
   >({});
 
+  const [pestOptions, setPestOptions] = useState<Array<{ id: string; name: string; custom_label: string }>>([]);
+  const [loadingPestOptions, setLoadingPestOptions] = useState(false);
+
   const [customers, setCustomers] = useState<SearchableDropdownItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] =
     useState<SearchableDropdownItem | null>(null);
@@ -235,6 +238,16 @@ export default function TicketForm({
     }
     return Object.keys(newErrors).length === 0;
   };
+
+  useEffect(() => {
+    if (!companyId) return;
+    setLoadingPestOptions(true);
+    fetch(`/api/pest-options/${companyId}`)
+      .then(res => res.json())
+      .then(data => setPestOptions(data.data || []))
+      .catch(() => setPestOptions([]))
+      .finally(() => setLoadingPestOptions(false));
+  }, [companyId]);
 
   useEffect(() => {
     if (onFormDataChange) {
@@ -591,14 +604,20 @@ export default function TicketForm({
           <label htmlFor="pest_type" className={styles.label}>
             Pest Type
           </label>
-          <input
-            type="text"
+          <select
             name="pest_type"
             value={formData.pest_type || ''}
             onChange={handleInputChange}
-            className={styles.input}
-            placeholder="e.g., Ants, Rodents, Spiders"
-          />
+            className={styles.select}
+            disabled={loadingPestOptions}
+          >
+            <option value="">Select pest type</option>
+            {pestOptions.map(pest => (
+              <option key={pest.id} value={pest.custom_label}>
+                {pest.custom_label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

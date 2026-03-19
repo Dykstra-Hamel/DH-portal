@@ -15,17 +15,24 @@ import {
   removeTaskChannel,
   subscribeToTaskUpdates,
 } from '@/lib/realtime/task-channel';
+import {
+  subscribeToAutomationExecutions,
+  removeAutomationExecutionChannel,
+} from '@/lib/realtime/automation-execution-channel';
 import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
 import styles from './LeadStepContent.module.scss';
 import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
 import { LeadSchedulingSection } from './components/LeadSchedulingSection';
 import { LeadContactSection } from './components/LeadContactSection';
 import { LeadQuoteSection } from './components/LeadQuoteSection';
+import { LeadQuickInfo } from '@/components/Common/LeadQuickInfo/LeadQuickInfo';
+import { CommunicationLog } from '@/components/Common/CommunicationLog/CommunicationLog';
 
 interface LeadStepContentProps {
   lead: Lead;
   isAdmin: boolean;
   onLeadUpdate?: (updatedLead?: Lead) => void;
+  onLeadFieldUpdate?: (fields: Partial<Lead>) => void;
   onShowToast?: (message: string, type: 'success' | 'error') => void;
   onRequestUndo?: (undoHandler: () => Promise<void>) => void;
   onEmailQuote?: () => void;
@@ -38,6 +45,7 @@ export function LeadStepContent({
   lead,
   isAdmin,
   onLeadUpdate,
+  onLeadFieldUpdate,
   onShowToast,
   onRequestUndo,
   onEmailQuote,
@@ -46,12 +54,15 @@ export function LeadStepContent({
   onReadyToSchedule,
 }: LeadStepContentProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
+  const [isCommunicationExpanded, setIsCommunicationExpanded] = useState(true);
   const [shouldExpandActivity, setShouldExpandActivity] = useState(false);
   const [showCompleteTaskModal, setShowCompleteTaskModal] = useState(false);
   const [pendingActivity, setPendingActivity] = useState<{
     type: string;
     notes: string;
+    outcome?: string | null;
+    isLastStep?: boolean;
   } | null>(null);
 
   // Scheduling state
@@ -66,7 +77,12 @@ export function LeadStepContent({
   // Refs
   const customerChannelRef = useRef<any>(null);
   const taskChannelRef = useRef<any>(null);
+  const executionChannelRef = useRef<any>(null);
   const serviceLocationCardRef = useRef<HTMLDivElement | null>(null);
+  const quotingSectionRef = useRef<HTMLDivElement>(null);
+  const schedulingSectionRef = useRef<HTMLDivElement>(null);
+  const leadRef = useRef(lead);
+  const onLeadUpdateRef = useRef(onLeadUpdate);
 
   const [homeSize, setHomeSize] = useState<number | ''>('');
   const [yardSize, setYardSize] = useState<number | ''>('');
@@ -84,14 +100,18 @@ export function LeadStepContent({
   const [preferredTime, setPreferredTime] = useState<string>('');
 
   // Contact Log activity state
-  const [selectedActionType, setSelectedActionType] = useState<string>('');
   const [activityNotes, setActivityNotes] = useState<string>('');
   const [isLoggingActivity, setIsLoggingActivity] = useState(false);
   const [nextTask, setNextTask] = useState<any | null>(null);
+  const [afterNextActionType, setAfterNextActionType] = useState<string | null>(null);
+  const [cadenceSteps, setCadenceSteps] = useState<any[]>([]);
+  const [cadenceStartedAt, setCadenceStartedAt] = useState<string | null>(null);
   const [loadingNextTask, setLoadingNextTask] = useState(false);
   const [hasActiveCadence, setHasActiveCadence] = useState<boolean | null>(
     null
   );
+  const [activeWorkflowExecution, setActiveWorkflowExecution] = useState<any | null>(null);
+  const [availableCadences, setAvailableCadences] = useState<{ id: string; name: string }[]>([]);
   const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(
     null
   );
@@ -111,8 +131,10 @@ export function LeadStepContent({
     leadId: lead.id,
     userId: user?.id,
     enabled: true,
-    onQuoteUpdate: (updatedQuote) => {
-      console.log('[LeadStepContent] Quote updated via realtime, refreshing lead data');
+    onQuoteUpdate: updatedQuote => {
+      console.log(
+        '[LeadStepContent] Quote updated via realtime, refreshing lead data'
+      );
       // When quote updates, refresh the lead to get updated service_address
       if (onLeadUpdate) {
         onLeadUpdate();
@@ -129,6 +151,14 @@ export function LeadStepContent({
 
   // Function to load cadence data and next task - made reusable for refresh after completion
   const loadCadenceData = useCallback(async () => {
+    // Terminal leads have no active cadences or tasks — skip the API fetch entirely
+    if (lead.lead_status === 'won' || lead.lead_status === 'lost') {
+      setHasActiveCadence(false);
+      setNextTask(null);
+      setLoadingNextTask(false);
+      return;
+    }
+
     try {
       setLoadingNextTask(true);
 
@@ -137,18 +167,37 @@ export function LeadStepContent({
         `/api/leads/${lead.id}/cadence`
       );
       const hasActiveCadence =
-        cadenceResult.data !== null &&
-        cadenceResult.data.completed_at === null;
+        cadenceResult.data !== null && cadenceResult.data.completed_at === null;
       setHasActiveCadence(hasActiveCadence);
 
       // Only fetch next task if cadence exists
       if (hasActiveCadence) {
+        // Extract the action_type of the step after the current one (N+1 lookahead)
+        const allSteps: any[] = cadenceResult.data?.cadence?.steps || [];
+        const incompleteSteps = allSteps.filter((s: any) => !s.is_completed);
+        setAfterNextActionType(incompleteSteps[1]?.action_type ?? null);
+        setCadenceSteps(allSteps);
+        setCadenceStartedAt(cadenceResult.data?.started_at ?? null);
+
         const taskResult = await authenticatedFetch(
           `/api/leads/${lead.id}/next-task`
         );
         setNextTask(taskResult.data);
+
+        if (taskResult.data?.action_type === 'trigger_workflow') {
+          try {
+            const execResult = await authenticatedFetch(`/api/leads/${lead.id}/active-execution`);
+            setActiveWorkflowExecution(execResult.data ?? null);
+          } catch {
+            setActiveWorkflowExecution(null);
+          }
+        } else {
+          setActiveWorkflowExecution(null);
+        }
       } else {
         setNextTask(null);
+        setAfterNextActionType(null);
+        setActiveWorkflowExecution(null);
       }
     } catch (error) {
       console.error('Error loading cadence data:', error);
@@ -158,12 +207,36 @@ export function LeadStepContent({
     } finally {
       setLoadingNextTask(false);
     }
-  }, [lead.id]);
+  }, [lead.id, lead.lead_status, lead.assigned_scheduler]);
+
+  // Reset cadence state immediately when status changes so we show loading
+  // instead of the stale "no cadence" UI during the re-check
+  useEffect(() => {
+    setHasActiveCadence(null);
+    setNextTask(null);
+    setAfterNextActionType(null);
+    setCadenceSteps([]);
+    setCadenceStartedAt(null);
+    setActiveWorkflowExecution(null);
+  }, [lead.lead_status]);
 
   // Load next recommended task from cadence and check if cadence exists
   useEffect(() => {
     loadCadenceData();
   }, [loadCadenceData]);
+
+  // Fetch available cadences in parallel (non-fatal, used for inline selector)
+  useEffect(() => {
+    authenticatedFetch(`/api/companies/${lead.company_id}/sales-cadences`)
+      .then(result => setAvailableCadences((result.data || []).filter((c: any) => c.is_active)))
+      .catch(() => {});
+  }, [lead.company_id]);
+
+  // Keep refs in sync with latest props so subscription callbacks never go stale
+  useEffect(() => {
+    leadRef.current = lead;
+    onLeadUpdateRef.current = onLeadUpdate;
+  });
 
   // Set up customer realtime channel for broadcasting updates
   useEffect(() => {
@@ -181,8 +254,19 @@ export function LeadStepContent({
     customerChannelRef.current = channel;
 
     // Must subscribe to the channel before we can broadcast on it
-    subscribeToCustomerUpdates(channel, () => {
-      // Empty callback - channel subscription required for broadcasting
+    subscribeToCustomerUpdates(channel, payload => {
+      const currentLead = leadRef.current;
+      if (!currentLead.customer) return;
+      onLeadUpdateRef.current?.({
+        ...currentLead,
+        customer: {
+          ...currentLead.customer,
+          ...(payload.first_name !== undefined && { first_name: payload.first_name }),
+          ...(payload.last_name !== undefined && { last_name: payload.last_name }),
+          ...(payload.email !== undefined && { email: payload.email }),
+          ...(payload.phone !== undefined && { phone: payload.phone }),
+        },
+      });
     });
 
     // Cleanup on unmount or when customer ID changes
@@ -210,7 +294,7 @@ export function LeadStepContent({
     taskChannelRef.current = channel;
 
     // Subscribe to task updates
-    subscribeToTaskUpdates(channel, async (payload) => {
+    subscribeToTaskUpdates(channel, async payload => {
       // Check if this task is related to our lead by fetching task details
       // This prevents unnecessary reloads for tasks unrelated to this lead
       try {
@@ -221,7 +305,9 @@ export function LeadStepContent({
         }
 
         // For INSERT/UPDATE, fetch the task to check if it's for this lead
-        const taskResponse = await authenticatedFetch(`/api/tasks/${payload.task_id}`);
+        const taskResponse = await authenticatedFetch(
+          `/api/tasks/${payload.task_id}`
+        );
 
         if (taskResponse.data?.lead_id === lead.id) {
           await loadCadenceData();
@@ -242,6 +328,47 @@ export function LeadStepContent({
     };
   }, [lead.company_id, lead.id, loadCadenceData]);
 
+  // Subscribe to automation execution updates when a trigger_workflow step is active.
+  // Fires on every step progress update and on terminal status changes so the UI
+  // stays current without a manual refresh.
+  useEffect(() => {
+    const isWorkflowActive =
+      hasActiveCadence === true && nextTask?.action_type === 'trigger_workflow';
+
+    // Tear down any existing channel first
+    if (executionChannelRef.current) {
+      removeAutomationExecutionChannel(executionChannelRef.current);
+      executionChannelRef.current = null;
+    }
+
+    if (!isWorkflowActive) return;
+
+    const channel = subscribeToAutomationExecutions(lead.id, ({ executionStatus, executionData }) => {
+      if (
+        executionStatus === 'completed' ||
+        executionStatus === 'cancelled' ||
+        executionStatus === 'failed'
+      ) {
+        // Workflow finished — reload cadence data to advance the UI
+        loadCadenceData();
+      } else {
+        // Step progress update — patch execution_data in place so the timeline refreshes
+        setActiveWorkflowExecution((prev: any) =>
+          prev ? { ...prev, execution_data: executionData } : prev
+        );
+      }
+    });
+
+    executionChannelRef.current = channel;
+
+    return () => {
+      if (executionChannelRef.current) {
+        removeAutomationExecutionChannel(executionChannelRef.current);
+        executionChannelRef.current = null;
+      }
+    };
+  }, [lead.id, hasActiveCadence, nextTask?.action_type, loadCadenceData]);
+
   // Pre-fill preferred date and time from lead data
   useEffect(() => {
     // Update if lead has value AND it differs from current state
@@ -255,28 +382,33 @@ export function LeadStepContent({
   }, [lead.requested_date, lead.requested_time]);
   // Removed preferredDate and preferredTime from dependencies to prevent re-run loops
 
-  const handlePreferredDateChange = useCallback(async (date: string) => {
-    setPreferredDate(date);
-    try {
-      await adminAPI.updateLead(lead.id, { requested_date: date });
-      onShowToast?.('Preferred date saved', 'success');
-    } catch (error) {
-      console.error('Error saving preferred date:', error);
-      onShowToast?.('Failed to save preferred date', 'error');
-    }
-  }, [lead.id, onShowToast]);
+  const handlePreferredDateChange = useCallback(
+    async (date: string) => {
+      setPreferredDate(date);
+      try {
+        await adminAPI.updateLead(lead.id, { requested_date: date });
+        onShowToast?.('Preferred date saved', 'success');
+      } catch (error) {
+        console.error('Error saving preferred date:', error);
+        onShowToast?.('Failed to save preferred date', 'error');
+      }
+    },
+    [lead.id, onShowToast]
+  );
 
-  const handlePreferredTimeChange = useCallback(async (time: string) => {
-    setPreferredTime(time);
-    try {
-      await adminAPI.updateLead(lead.id, { requested_time: time });
-      onShowToast?.('Preferred time saved', 'success');
-    } catch (error) {
-      console.error('Error saving preferred time:', error);
-      onShowToast?.('Failed to save preferred time', 'error');
-    }
-  }, [lead.id, onShowToast]);
-
+  const handlePreferredTimeChange = useCallback(
+    async (time: string) => {
+      setPreferredTime(time);
+      try {
+        await adminAPI.updateLead(lead.id, { requested_time: time });
+        onShowToast?.('Preferred time saved', 'success');
+      } catch (error) {
+        console.error('Error saving preferred time:', error);
+        onShowToast?.('Failed to save preferred time', 'error');
+      }
+    },
+    [lead.id, onShowToast]
+  );
 
   const currentUser = user
     ? {
@@ -292,6 +424,7 @@ export function LeadStepContent({
   const handleCompleteTaskConfirm = async () => {
     if (!pendingActivity) return;
 
+    const isLastStep = pendingActivity.isLastStep ?? false;
     setIsLoggingActivity(true);
     setShowCompleteTaskModal(false);
 
@@ -303,6 +436,7 @@ export function LeadStepContent({
         body: JSON.stringify({
           activity_type: pendingActivity.type,
           notes: pendingActivity.notes || null,
+          outcome: pendingActivity.outcome ?? null,
         }),
       });
 
@@ -312,11 +446,14 @@ export function LeadStepContent({
 
       // 2. Complete the task if it exists
       if (nextTask?.task_id) {
-        const taskResponse = await fetch(`/api/tasks/${nextTask.task_id}/complete`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}), // Empty body - actual_hours is optional
-        });
+        const taskResponse = await fetch(
+          `/api/tasks/${nextTask.task_id}/complete`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}), // Empty body - actual_hours is optional
+          }
+        );
 
         if (!taskResponse.ok) {
           console.error('Failed to complete task, but activity was logged');
@@ -324,10 +461,32 @@ export function LeadStepContent({
         }
       }
 
-      onShowToast?.('Activity logged and task marked complete', 'success');
+      // 3. If this was the final cadence step, mark lead as lost
+      if (isLastStep) {
+        try {
+          await fetch(`/api/leads/${lead.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lead_status: 'lost' }),
+          });
+        } catch (err) {
+          console.error('Error marking lead as lost:', err);
+        }
+      }
+
+      onShowToast?.(
+        isLastStep
+          ? 'Activity logged and lead marked as lost'
+          : 'Activity logged and task marked complete',
+        'success'
+      );
       setActivityNotes('');
-      setSelectedActionType('');
       setPendingActivity(null);
+
+      if (isLastStep) {
+        window.location.href = '/tickets/dashboard';
+        return;
+      }
 
       // Refresh lead and next task data
       onLeadUpdate?.();
@@ -365,7 +524,6 @@ export function LeadStepContent({
 
       onShowToast?.('Activity logged successfully', 'success');
       setActivityNotes('');
-      setSelectedActionType('');
       setPendingActivity(null);
       onLeadUpdate?.();
     } catch (error) {
@@ -381,27 +539,25 @@ export function LeadStepContent({
     setPendingActivity(null);
   };
 
-  const handleLogActivityFromSection = async (
-    type: string,
-    notes: string,
-    matchesTask: boolean
-  ) => {
-    if (matchesTask) {
-      // Show modal to ask if they want to mark task complete
-      setPendingActivity({ type, notes });
+  const handleLogActivity = async (outcome?: string | null) => {
+    if (hasActiveCadence && nextTask) {
+      // Cadence active — show modal to confirm completing this step
+      const activityType = nextTask.action_type || 'outbound_call';
+      setPendingActivity({ type: activityType, notes: activityNotes, outcome: outcome ?? null, isLastStep: afterNextActionType === null });
       setShowCompleteTaskModal(true);
       return;
     }
 
-    // If doesn't match, just log the activity without asking
+    // No active cadence — log a generic activity directly
     setIsLoggingActivity(true);
     try {
       const response = await fetch(`/api/leads/${lead.id}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          activity_type: type,
-          notes: notes || null,
+          activity_type: 'outbound_call',
+          notes: activityNotes || null,
+          outcome: outcome ?? null,
         }),
       });
 
@@ -411,7 +567,6 @@ export function LeadStepContent({
 
       onShowToast?.('Activity logged successfully', 'success');
       setActivityNotes('');
-      setSelectedActionType('');
       onLeadUpdate?.();
     } catch (error) {
       console.error('Error logging activity:', error);
@@ -502,19 +657,34 @@ export function LeadStepContent({
     }, 300);
   };
 
-  // Handle view log history button click - expand sidebar and open Activity section
-  const handleViewLogHistory = () => {
-    // Expand sidebar if collapsed
-    setIsSidebarExpanded(true);
-
-    // Set flag to expand Activity card
-    setShouldExpandActivity(true);
-
-    // Reset the flag after expansion
+  // Collapse communication panel and scroll to scheduling section
+  const handleScheduleService = useCallback(() => {
+    setIsCommunicationExpanded(false);
     setTimeout(() => {
-      setShouldExpandActivity(false);
-    }, 500);
-  };
+      schedulingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, []);
+
+  // Collapse communication panel and scroll to quoting section, logging a "connected" activity
+  const handleStartQuoting = useCallback(async () => {
+    try {
+      await authenticatedFetch(`/api/leads/${lead.id}/activities`, {
+        method: 'POST',
+        body: JSON.stringify({
+          activity_type: nextTask?.action_type || 'outbound_call',
+          notes: activityNotes || null,
+          outcome: 'connected',
+        }),
+      });
+      setActivityNotes('');
+    } catch (err) {
+      console.error('Error logging activity before quoting:', err);
+    }
+    setIsCommunicationExpanded(false);
+    setTimeout(() => {
+      quotingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  }, [activityNotes, lead.id, nextTask?.action_type]);
 
   // Render content based on lead status
   const renderContent = () => {
@@ -524,89 +694,119 @@ export function LeadStepContent({
         className={styles.leadContentWrapper}
         data-sidebar-expanded={isSidebarExpanded}
       >
-        <div className={styles.contentLeft}>
-          <LeadContactSection
+        {/* Full-width communication section */}
+        <LeadQuickInfo
+          lead={lead}
+          isExpanded={isCommunicationExpanded}
+          onToggle={() => setIsCommunicationExpanded(p => !p)}
+        />
+        {isCommunicationExpanded && (
+          <div className={styles.communicationBody}>
+            <div className={styles.communicationBodyInner}>
+              <div className={styles.communicationLeft}>
+                <LeadContactSection
+                  lead={lead}
+                  nextTask={nextTask}
+                  afterNextActionType={afterNextActionType}
+                  loadingNextTask={loadingNextTask}
+                  hasActiveCadence={hasActiveCadence}
+                  activityNotes={activityNotes}
+                  isLoggingActivity={isLoggingActivity}
+                  selectedCadenceId={selectedCadenceId}
+                  availableCadences={availableCadences}
+                  cadenceSteps={cadenceSteps}
+                  cadenceStartedAt={cadenceStartedAt}
+                  activeWorkflowExecution={activeWorkflowExecution}
+                  onNotesChange={setActivityNotes}
+                  onLogActivity={handleLogActivity}
+                  onCadenceSelect={id => {
+                    setSelectedCadenceId(id);
+                    loadCadenceData();
+                  }}
+                  onStartQuoting={handleStartQuoting}
+                  onScheduleService={handleScheduleService}
+                  onShowToast={onShowToast}
+                  onLeadUpdate={onLeadUpdate}
+                  isSidebarExpanded={isSidebarExpanded}
+                />
+              </div>
+              <div className={styles.communicationRight}>
+                <CommunicationLog
+                  entityId={lead.id}
+                  companyId={lead.company_id}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Two-column ticket details */}
+        <div className={styles.ticketDetailsSection} ref={quotingSectionRef}>
+          <div className={styles.contentLeft}>
+            <LeadQuoteSection
+              lead={lead}
+              quote={quote}
+              isQuoteUpdating={isQuoteUpdating}
+              pricingSettings={pricingSettings}
+              selectedPests={selectedPests}
+              additionalPests={additionalPests}
+              homeSize={homeSize}
+              yardSize={yardSize}
+              linearFeet={linearFeet}
+              selectedHomeSizeOption={selectedHomeSizeOption}
+              selectedYardSizeOption={selectedYardSizeOption}
+              preferredDate={preferredDate}
+              preferredTime={preferredTime}
+              onEmailQuote={handleEmailQuote}
+              onEditAddress={handleEditAddress}
+              onShowToast={onShowToast}
+              onRequestUndo={onRequestUndo}
+              onLeadFieldUpdate={onLeadFieldUpdate}
+              broadcastQuoteUpdate={broadcastQuoteUpdate}
+              setSelectedPests={setSelectedPests}
+              setAdditionalPests={setAdditionalPests}
+              setHomeSize={setHomeSize}
+              setYardSize={setYardSize}
+              setLinearFeet={setLinearFeet}
+              setSelectedHomeSizeOption={setSelectedHomeSizeOption}
+              setSelectedYardSizeOption={setSelectedYardSizeOption}
+              onPreferredDateChange={handlePreferredDateChange}
+              onPreferredTimeChange={handlePreferredTimeChange}
+              onNotInterested={onNotInterested || (() => {})}
+              onReadyToSchedule={onReadyToSchedule || (() => {})}
+              isSidebarExpanded={isSidebarExpanded}
+            />
+            <div ref={schedulingSectionRef}>
+              <LeadSchedulingSection
+                lead={lead}
+                quote={quote}
+                isQuoteUpdating={isQuoteUpdating}
+                scheduledDate={scheduledDate}
+                scheduledTime={scheduledTime}
+                confirmationNote={confirmationNote}
+                onScheduledDateChange={setScheduledDate}
+                onScheduledTimeChange={setScheduledTime}
+                onConfirmationNoteChange={setConfirmationNote}
+                onFinalizeSale={handleFinalizeSale}
+                onEmailQuote={handleEmailQuote}
+                isSidebarExpanded={isSidebarExpanded}
+              />
+            </div>
+          </div>
+          <LeadDetailsSidebar
             lead={lead}
-            nextTask={nextTask}
-            loadingNextTask={loadingNextTask}
-            hasActiveCadence={hasActiveCadence}
-            selectedActionType={selectedActionType}
-            activityNotes={activityNotes}
-            isLoggingActivity={isLoggingActivity}
-            selectedCadenceId={selectedCadenceId}
-            onActionTypeChange={setSelectedActionType}
-            onActivityNotesChange={setActivityNotes}
-            onLogActivity={handleLogActivityFromSection}
-            onCadenceSelect={(id) => {
-              setSelectedCadenceId(id);
-              // Immediately reload cadence data when cadence is selected/changed
-              loadCadenceData();
-            }}
             onShowToast={onShowToast}
             onLeadUpdate={onLeadUpdate}
-            onViewLogHistory={handleViewLogHistory}
-            isSidebarExpanded={isSidebarExpanded}
-          />
-          <LeadQuoteSection
-            lead={lead}
-            quote={quote}
-            isQuoteUpdating={isQuoteUpdating}
-            pricingSettings={pricingSettings}
-            selectedPests={selectedPests}
-            additionalPests={additionalPests}
-            homeSize={homeSize}
-            yardSize={yardSize}
-            linearFeet={linearFeet}
-            selectedHomeSizeOption={selectedHomeSizeOption}
-            selectedYardSizeOption={selectedYardSizeOption}
-            preferredDate={preferredDate}
-            preferredTime={preferredTime}
-            onEmailQuote={handleEmailQuote}
-            onEditAddress={handleEditAddress}
-            onShowToast={onShowToast}
             onRequestUndo={onRequestUndo}
-            broadcastQuoteUpdate={broadcastQuoteUpdate}
-            setSelectedPests={setSelectedPests}
-            setAdditionalPests={setAdditionalPests}
-            setHomeSize={setHomeSize}
-            setYardSize={setYardSize}
-            setLinearFeet={setLinearFeet}
-            setSelectedHomeSizeOption={setSelectedHomeSizeOption}
-            setSelectedYardSizeOption={setSelectedYardSizeOption}
-            onPreferredDateChange={handlePreferredDateChange}
-            onPreferredTimeChange={handlePreferredTimeChange}
-            onNotInterested={onNotInterested || (() => {})}
-            onReadyToSchedule={onReadyToSchedule || (() => {})}
+            customerChannelRef={customerChannelRef}
             isSidebarExpanded={isSidebarExpanded}
-          />
-          <LeadSchedulingSection
-            lead={lead}
-            quote={quote}
-            isQuoteUpdating={isQuoteUpdating}
-            scheduledDate={scheduledDate}
-            scheduledTime={scheduledTime}
-            confirmationNote={confirmationNote}
-            onScheduledDateChange={setScheduledDate}
-            onScheduledTimeChange={setScheduledTime}
-            onConfirmationNoteChange={setConfirmationNote}
-            onFinalizeSale={handleFinalizeSale}
-            onEmailQuote={handleEmailQuote}
-            isSidebarExpanded={isSidebarExpanded}
+            setIsSidebarExpanded={setIsSidebarExpanded}
+            serviceLocationCardRef={serviceLocationCardRef}
+            shouldExpandServiceLocation={shouldExpandServiceLocation}
+            shouldExpandActivity={shouldExpandActivity}
+            customerComment={quote?.customer_comments}
           />
         </div>
-        <LeadDetailsSidebar
-          lead={lead}
-          onShowToast={onShowToast}
-          onLeadUpdate={onLeadUpdate}
-          onRequestUndo={onRequestUndo}
-          customerChannelRef={customerChannelRef}
-          isSidebarExpanded={isSidebarExpanded}
-          setIsSidebarExpanded={setIsSidebarExpanded}
-          serviceLocationCardRef={serviceLocationCardRef}
-          shouldExpandServiceLocation={shouldExpandServiceLocation}
-          shouldExpandActivity={shouldExpandActivity}
-          customerComment={quote?.customer_comments}
-        />
       </div>
     );
   };

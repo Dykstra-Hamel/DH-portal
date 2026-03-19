@@ -5,6 +5,7 @@ import { sendQuoteSignedNotification } from '@/lib/email/quote-notifications';
 import { QuoteSignedEmailData } from '@/lib/email/types';
 import { logActivity } from '@/lib/activity-logger';
 import { inngest } from '@/lib/inngest/client';
+import { stopActiveCadence } from '@/lib/leads/stop-active-cadence';
 
 interface AcceptQuoteRequest {
   signature_data: string;
@@ -200,6 +201,14 @@ export async function POST(
       if (updateLeadError) {
         console.error('Error updating lead status:', updateLeadError);
         // Don't fail the request if lead update fails - quote is already accepted
+      } else {
+        // Stop any active cadence, tasks, and workflows now that lead is scheduling
+        try {
+          await stopActiveCadence(quote.lead_id);
+        } catch (cadenceError) {
+          console.error('Error stopping active cadence on quote acceptance:', cadenceError);
+          // Non-fatal: don't fail the quote acceptance
+        }
       }
 
       // Trigger status-changed event for scheduling notifications

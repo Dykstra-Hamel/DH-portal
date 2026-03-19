@@ -725,7 +725,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-900, #111827);
-  border: 1px solid var(--action-500, #0ea5e9);
+  border: 1px solid var(--blue-500);
   border-radius: 4px;
   padding: 4px 8px;
   outline: none;
@@ -904,7 +904,7 @@
 }
 
 .selected {
-  background: var(--action-500, #0ea5e9);
+  background: var(--blue-500);
   color: var(--white);
   font-weight: 700;
 }

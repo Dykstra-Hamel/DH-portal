@@ -18,7 +18,7 @@
 
   // Card with unread mentions - blue border
   &.hasMentionBorder {
-    border-color: var(--action-500, #0080f0);
+    border-color: var(--blue-500);
     border-width: 2px;
   }
 }

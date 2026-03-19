@@ -54,7 +54,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: var(--action-500, #0ea5e9);
+    background: var(--blue-500);
     z-index: 10;
   }
 
@@ -65,7 +65,7 @@
     left: 0;
     right: 0;
     height: 2px;
-    background: var(--action-500, #0ea5e9);
+    background: var(--blue-500);
     z-index: 10;
   }
 }
@@ -184,7 +184,9 @@
   pointer-events: none;
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s ease-in-out, visibility 0.2s ease-in-out;
+  transition:
+    opacity 0.2s ease-in-out,
+    visibility 0.2s ease-in-out;
 }
 
 .blockedTooltipArrow {
@@ -303,7 +305,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-900, #111827);
-  border: 1px solid var(--action-500, #0ea5e9);
+  border: 1px solid var(--blue-500);
   border-radius: 4px;
   padding: 4px 8px;
   outline: none;
@@ -572,7 +574,7 @@
   }
 
   &:focus-visible {
-    outline: 2px solid var(--action-500, #0ea5e9);
+    outline: 2px solid var(--blue-500);
     outline-offset: 2px;
   }
 }

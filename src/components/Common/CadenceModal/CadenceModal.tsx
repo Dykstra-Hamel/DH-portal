@@ -1,16 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus, Save, X, Trash2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Save, X, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   SalesCadenceWithSteps,
   CadenceFormData,
   CadenceStepFormData,
   ACTION_TYPE_LABELS,
-  TIME_OF_DAY_LABELS,
   PRIORITY_LABELS,
   ActionType,
-  TimeOfDay,
   Priority,
 } from '@/types/sales-cadence';
 import styles from './CadenceModal.module.scss';
@@ -22,6 +20,16 @@ interface CadenceModalProps {
   onSuccess: (newCadenceId?: string) => void;
 }
 
+// Local step form data that extends the shared type with workflow_id
+interface StepFormData extends CadenceStepFormData {
+  workflow_id?: string;
+}
+
+interface WorkflowOption {
+  id: string;
+  name: string;
+}
+
 export default function CadenceModal({ cadence, companyId, onClose, onSuccess }: CadenceModalProps) {
   const [formData, setFormData] = useState<CadenceFormData>({
     name: cadence?.name || '',
@@ -29,17 +37,40 @@ export default function CadenceModal({ cadence, companyId, onClose, onSuccess }:
     is_active: cadence?.is_active !== undefined ? cadence.is_active : true,
     is_default: cadence?.is_default || false,
   });
-  const [steps, setSteps] = useState<CadenceStepFormData[]>(
+  const [steps, setSteps] = useState<StepFormData[]>(
     cadence?.steps?.map(step => ({
       day_number: step.day_number,
       time_of_day: step.time_of_day,
       action_type: step.action_type,
       priority: step.priority,
       description: step.description || '',
+      workflow_id: step.workflow_id || undefined,
     })) || []
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableWorkflows, setAvailableWorkflows] = useState<WorkflowOption[]>([]);
+
+  // Fetch available workflows for the company
+  useEffect(() => {
+    const fetchWorkflows = async () => {
+      try {
+        const response = await fetch(`/api/companies/${companyId}/workflows`);
+        if (response.ok) {
+          const result = await response.json();
+          const workflows = (result.data || result.workflows || []).filter(
+            (w: any) => w.is_active !== false
+          );
+          setAvailableWorkflows(
+            workflows.map((w: any) => ({ id: w.id, name: w.name }))
+          );
+        }
+      } catch {
+        // Silently fail — workflow dropdown will be empty but form still works
+      }
+    };
+    fetchWorkflows();
+  }, [companyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,7 +104,6 @@ export default function CadenceModal({ cadence, companyId, onClose, onSuccess }:
 
       // If editing, delete existing steps and recreate
       if (cadence) {
-        // Delete all existing steps
         for (const step of cadence.steps || []) {
           await fetch(
             `/api/companies/${companyId}/sales-cadences/${cadence.id}/steps?step_id=${step.id}`,
@@ -82,15 +112,17 @@ export default function CadenceModal({ cadence, companyId, onClose, onSuccess }:
         }
       }
 
-      // Create new steps with proper order (use sorted steps)
-      const sortedSteps = getSortedSteps();
-      for (let i = 0; i < sortedSteps.length; i++) {
+      // Create steps in state order — day_number is always null for sequential cadences
+      for (let i = 0; i < steps.length; i++) {
         await fetch(`/api/companies/${companyId}/sales-cadences/${savedCadence.id}/steps`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...sortedSteps[i],
+            ...steps[i],
+            day_number: null,
+            time_of_day: 'morning',
             display_order: i,
+            workflow_id: steps[i].workflow_id || null,
           }),
         });
       }
@@ -104,66 +136,45 @@ export default function CadenceModal({ cadence, companyId, onClose, onSuccess }:
     }
   };
 
-  // Auto-sort steps by day and time
-  const getSortedSteps = () => {
-    return [...steps].sort((a, b) => {
-      // First sort by day number
-      if (a.day_number !== b.day_number) {
-        return a.day_number - b.day_number;
-      }
-      // Then sort by time of day (morning before afternoon)
-      if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon') return -1;
-      if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning') return 1;
-      return 0;
-    });
-  };
-
-  // Group steps by day number
-  const getStepsByDay = () => {
-    const sortedSteps = getSortedSteps();
-    const grouped: { [key: number]: CadenceStepFormData[] } = {};
-
-    sortedSteps.forEach((step) => {
-      if (!grouped[step.day_number]) {
-        grouped[step.day_number] = [];
-      }
-      grouped[step.day_number].push(step);
-    });
-
-    return grouped;
-  };
-
-  // Get the highest day number currently in use
-  const getMaxDayNumber = () => {
-    if (steps.length === 0) return 0;
-    return Math.max(...steps.map(s => s.day_number));
-  };
-
-  const addStepToDay = (dayNumber: number) => {
+  const addStep = () => {
     setSteps([
       ...steps,
       {
-        day_number: dayNumber,
+        day_number: 1,
         time_of_day: 'morning',
         action_type: 'outbound_call',
         priority: 'medium',
         description: '',
+        workflow_id: undefined,
       },
     ]);
   };
 
-  const addNewDay = () => {
-    const nextDay = getMaxDayNumber() + 1;
-    addStepToDay(nextDay);
+  const moveStepUp = (index: number) => {
+    if (index === 0) return;
+    const newSteps = [...steps];
+    [newSteps[index - 1], newSteps[index]] = [newSteps[index], newSteps[index - 1]];
+    setSteps(newSteps);
+  };
+
+  const moveStepDown = (index: number) => {
+    if (index === steps.length - 1) return;
+    const newSteps = [...steps];
+    [newSteps[index], newSteps[index + 1]] = [newSteps[index + 1], newSteps[index]];
+    setSteps(newSteps);
   };
 
   const removeStep = (index: number) => {
     setSteps(steps.filter((_, i) => i !== index));
   };
 
-  const updateStep = (index: number, field: keyof CadenceStepFormData, value: any) => {
+  const updateStep = (index: number, field: keyof StepFormData, value: any) => {
     const updatedSteps = [...steps];
     updatedSteps[index] = { ...updatedSteps[index], [field]: value };
+    // Clear workflow_id when switching away from trigger_workflow
+    if (field === 'action_type' && value !== 'trigger_workflow') {
+      updatedSteps[index].workflow_id = undefined;
+    }
     setSteps(updatedSteps);
   };
 
@@ -186,7 +197,7 @@ export default function CadenceModal({ cadence, companyId, onClose, onSuccess }:
               type="text"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="e.g., 3-Day Standard Cadence"
+              placeholder="e.g., 3-Step Standard Cadence"
               required
               disabled={saving}
             />
@@ -231,140 +242,128 @@ export default function CadenceModal({ cadence, companyId, onClose, onSuccess }:
           <div className={styles.stepsSection}>
             <div className={styles.stepsSectionHeader}>
               <h4>Cadence Steps</h4>
-              <button type="button" onClick={addNewDay} className={styles.addStepButton} disabled={saving}>
+              <button type="button" onClick={addStep} className={styles.addStepButton} disabled={saving}>
                 <Plus size={16} />
-                Add New Day
+                Add Step
               </button>
             </div>
 
             {steps.length === 0 ? (
               <div className={styles.emptySteps}>
-                <p>No steps added yet. Click &quot;Add New Day&quot; to begin.</p>
+                <p>No steps added yet. Click &quot;Add Step&quot; to begin.</p>
               </div>
             ) : (
-              <div className={styles.daysList}>
-                {Object.entries(getStepsByDay())
-                  .sort(([dayA], [dayB]) => parseInt(dayA) - parseInt(dayB))
-                  .map(([dayNumber, daySteps]) => (
-                    <div key={dayNumber} className={styles.dayGroup}>
-                      <div className={styles.dayHeader}>
-                        <h5>Day {dayNumber}</h5>
-                        <div className={styles.dayActions}>
-                          <span className={styles.stepCount}>{daySteps.length} step{daySteps.length !== 1 ? 's' : ''}</span>
+              <div className={styles.stepsList}>
+                {steps.map((step, index) => {
+                  const isTriggerWorkflow = step.action_type === 'trigger_workflow';
+
+                  return (
+                    <div key={index} className={styles.stepFormItem}>
+                      <div className={styles.stepFormHeader}>
+                        <span className={styles.stepLabel}>
+                          {isTriggerWorkflow ? '⚡ Auto Step' : `Step ${index + 1}`}
+                        </span>
+                        <div className={styles.stepOrderControls}>
                           <button
                             type="button"
-                            onClick={() => addStepToDay(parseInt(dayNumber))}
-                            className={styles.addStepToDay}
-                            disabled={saving}
+                            onClick={() => moveStepUp(index)}
+                            disabled={saving || index === 0}
+                            className={styles.moveButton}
+                            title="Move up"
                           >
-                            <Plus size={14} />
-                            Add Step
+                            <ChevronUp size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveStepDown(index)}
+                            disabled={saving || index === steps.length - 1}
+                            className={styles.moveButton}
+                            title="Move down"
+                          >
+                            <ChevronDown size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => removeStep(index)}
+                            disabled={saving}
+                            className={styles.removeButton}
+                            title="Delete step"
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </div>
 
-                      <div className={styles.daySteps}>
-                        {daySteps.map((step, dayStepIndex) => {
-                          // Find the actual index in the steps array
-                          const actualIndex = steps.findIndex(s =>
-                            s.day_number === step.day_number &&
-                            s.time_of_day === step.time_of_day &&
-                            s.action_type === step.action_type &&
-                            s.priority === step.priority
-                          );
+                      <div className={styles.stepFormGrid}>
+                        <div className={styles.formGroup}>
+                          <label>Action Type</label>
+                          <select
+                            value={step.action_type}
+                            onChange={(e) => updateStep(index, 'action_type', e.target.value as ActionType)}
+                            disabled={saving}
+                          >
+                            {Object.entries(ACTION_TYPE_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
 
-                          return (
-                            <div key={dayStepIndex} className={styles.stepFormItem}>
-                              <div className={styles.stepFormHeader}>
-                                <div className={styles.stepOrder}>
-                                  <span className={styles.timeIndicator}>
-                                    {step.time_of_day === 'morning' ? '🌅' : '🌆'} {step.time_of_day === 'morning' ? 'Morning' : 'Afternoon'}
-                                  </span>
-                                </div>
-                                <div className={styles.stepOrderControls}>
-                                  <button
-                                    type="button"
-                                    onClick={() => removeStep(actualIndex)}
-                                    disabled={saving}
-                                    className={styles.removeButton}
-                                    title="Delete step"
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </div>
-                              </div>
+                        {!isTriggerWorkflow && (
+                          <div className={styles.formGroup}>
+                            <label>Priority</label>
+                            <select
+                              value={step.priority}
+                              onChange={(e) => updateStep(index, 'priority', e.target.value as Priority)}
+                              disabled={saving}
+                            >
+                              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
 
-                              <div className={styles.stepFormGrid}>
-                                <div className={styles.formGroup}>
-                                  <label>Day #</label>
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    value={step.day_number}
-                                    onChange={(e) => updateStep(actualIndex, 'day_number', parseInt(e.target.value))}
-                                    disabled={saving}
-                                  />
-                                </div>
+                        {isTriggerWorkflow && (
+                          <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                            <label>Linked Workflow</label>
+                            <select
+                              value={step.workflow_id || ''}
+                              onChange={(e) => updateStep(index, 'workflow_id', e.target.value || undefined)}
+                              disabled={saving}
+                            >
+                              <option value="">— Select a workflow —</option>
+                              {availableWorkflows.map(w => (
+                                <option key={w.id} value={w.id}>
+                                  {w.name}
+                                </option>
+                              ))}
+                            </select>
+                            {availableWorkflows.length === 0 && (
+                              <p className={styles.workflowNote}>
+                                No active workflows found. Create a workflow first.
+                              </p>
+                            )}
+                          </div>
+                        )}
 
-                                <div className={styles.formGroup}>
-                                  <label>Time of Day</label>
-                                  <select
-                                    value={step.time_of_day}
-                                    onChange={(e) => updateStep(actualIndex, 'time_of_day', e.target.value as TimeOfDay)}
-                                    disabled={saving}
-                                  >
-                                    <option value="morning">Morning</option>
-                                    <option value="afternoon">Afternoon</option>
-                                  </select>
-                                </div>
-
-                                <div className={styles.formGroup}>
-                                  <label>Action Type</label>
-                                  <select
-                                    value={step.action_type}
-                                    onChange={(e) => updateStep(actualIndex, 'action_type', e.target.value as ActionType)}
-                                    disabled={saving}
-                                  >
-                                    {Object.entries(ACTION_TYPE_LABELS).map(([value, label]) => (
-                                      <option key={value} value={value}>
-                                        {label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className={styles.formGroup}>
-                                  <label>Priority</label>
-                                  <select
-                                    value={step.priority}
-                                    onChange={(e) => updateStep(actualIndex, 'priority', e.target.value as Priority)}
-                                    disabled={saving}
-                                  >
-                                    {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
-                                      <option key={value} value={value}>
-                                        {label}
-                                      </option>
-                                    ))}
-                                  </select>
-                                </div>
-
-                                <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
-                                  <label>Description (Optional)</label>
-                                  <input
-                                    type="text"
-                                    value={step.description}
-                                    onChange={(e) => updateStep(actualIndex, 'description', e.target.value)}
-                                    placeholder="Add notes about this step..."
-                                    disabled={saving}
-                                  />
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                        <div className={styles.formGroup} style={{ gridColumn: '1 / -1' }}>
+                          <label>Description (Optional)</label>
+                          <input
+                            type="text"
+                            value={step.description}
+                            onChange={(e) => updateStep(index, 'description', e.target.value)}
+                            placeholder="Add notes about this step..."
+                            disabled={saving}
+                          />
+                        </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                })}
               </div>
             )}
           </div>

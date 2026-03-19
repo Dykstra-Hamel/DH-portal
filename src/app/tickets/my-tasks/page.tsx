@@ -1,16 +1,13 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
+import { Search, Phone, MessageSquare, Mail, Zap } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
-import { DataTable } from '@/components/Common/DataTable';
-import {
-  getTaskColumns,
-  getTaskTabs,
-} from '@/components/Tasks/TasksList/TasksListConfig';
-import { Task, TaskFormData } from '@/types/task';
+import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
+import { getTaskColumns } from '@/components/Tasks/TasksList/TasksListConfig';
+import { Task, TaskFormData, isTaskOverdue } from '@/types/task';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import TaskForm from '@/components/Tasks/TaskForm/TaskForm';
 import {
@@ -21,109 +18,161 @@ import {
 } from '@/components/Common/Modal/Modal';
 import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import { usePageActions } from '@/contexts/PageActionsContext';
-import {
-  MetricsCard,
-  styles as metricsStyles,
-} from '@/components/Common/MetricsCard';
-import { isTaskOverdue } from '@/types/task';
 import { createClient } from '@/lib/supabase/client';
 import {
   createTaskChannel,
   subscribeToTaskUpdates,
   TaskUpdatePayload,
 } from '@/lib/realtime/task-channel';
-import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
+import pageStyles from './page.module.scss';
+import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
+
+type ActionsTab = 'due_today' | 'upcoming' | 'in_the_past';
+type TasksTab = 'all' | 'new' | 'pending' | 'in_progress' | 'overdue';
+
+interface LeadData {
+  id: string;
+  lead_status: string;
+  customer: { first_name: string | null; last_name: string | null } | null;
+  service_address: { city: string | null; state: string | null; zip_code: string | null } | null;
+}
+
+const ACTIONS_TABS: { key: ActionsTab; label: string }[] = [
+  { key: 'due_today', label: 'Due Today' },
+  { key: 'upcoming', label: 'Upcoming' },
+  { key: 'in_the_past', label: 'In The Past' },
+];
+
+const TASKS_TABS: { key: TasksTab; label: string }[] = [
+  { key: 'all', label: 'All Tasks' },
+  { key: 'new', label: 'New' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'overdue', label: 'Overdue' },
+];
+
+const getLeadStatusProgress = (status: string): number => {
+  const map: Record<string, number> = {
+    new: 25,
+    in_process: 50,
+    quoted: 75,
+    scheduling: 100,
+    won: 100,
+    lost: 100,
+  };
+  return map[status] ?? 0;
+};
+
+const getLeadStatusLabel = (status: string): string => {
+  const map: Record<string, string> = {
+    new: 'New',
+    in_process: 'Working',
+    quoted: 'Quoting',
+    scheduling: 'Scheduling',
+    won: 'Won',
+    lost: 'Lost',
+  };
+  return map[status] ?? status;
+};
+
+const getOverdueDays = (dueDate: string): number => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(dueDate + 'T00:00:00');
+  return Math.max(0, Math.floor((today.getTime() - due.getTime()) / 86400000));
+};
+
+const getTodayStr = () => new Date().toISOString().split('T')[0];
+
+type ActionIconType = 'phone' | 'text' | 'email' | 'other';
+
+const parseActionInfo = (
+  title: string
+): { label: string; iconType: ActionIconType } => {
+  const lower = title.toLowerCase();
+
+  let time = '';
+  if (lower.includes('morning')) time = 'Morning';
+  else if (lower.includes('afternoon')) time = 'Afternoon';
+  else if (lower.includes('evening')) time = 'Evening';
+  else if (lower.includes('night')) time = 'Night';
+
+  let type = '';
+  let iconType: ActionIconType = 'other';
+  if (lower.includes('call') || lower.includes('phone')) {
+    type = 'Call';
+    iconType = 'phone';
+  } else if (lower.includes('text') || lower.includes('sms')) {
+    type = 'Text';
+    iconType = 'text';
+  } else if (lower.includes('email')) {
+    type = 'Email';
+    iconType = 'email';
+  }
+
+  const label = [time, type].filter(Boolean).join(' ') || title;
+  return { label, iconType };
+};
+
+const ACTION_ICONS: Record<ActionIconType, React.ElementType> = {
+  phone: Phone,
+  text: MessageSquare,
+  email: Mail,
+  other: Zap,
+};
 
 export default function MyTasksPage() {
   const router = useRouter();
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [actions, setActions] = useState<Task[]>([]);
+  const [regularTasks, setRegularTasks] = useState<Task[]>([]);
+  const [leadDataMap, setLeadDataMap] = useState<Record<string, LeadData>>({});
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<TaskFormData | null>(null);
-  const [activeTab, setActiveTab] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [actionsTab, setActionsTab] = useState<ActionsTab>('due_today');
+  const [tasksTab, setTasksTab] = useState<TasksTab>('all');
+  const [tasksSearchQuery, setTasksSearchQuery] = useState('');
   const { user } = useUser();
   const { selectedCompany } = useCompany();
-
-  // Register page actions for global header
   const { registerPageAction, unregisterPageAction } = usePageActions();
 
-  // Get assignable users for the company (all departments for tasks)
   const { users: assignableUsers } = useAssignableUsers({
     companyId: selectedCompany?.id,
     departmentType: 'all',
   });
 
-  // Get tabs configuration
-  const tabs = useMemo(() => {
-    const baseTabs = getTaskTabs(true);
+  const fetchLeadData = useCallback(async (actionTasks: Task[]) => {
+    const leadIds = actionTasks
+      .filter(t => t.related_entity_type === 'leads' && t.related_entity_id)
+      .map(t => t.related_entity_id!);
 
-    return baseTabs.map(tab => {
-      if (tab.key !== 'all') return tab;
+    if (leadIds.length === 0) {
+      setLeadDataMap({});
+      return;
+    }
 
-      return {
-        ...tab,
-        filter: (tasks: Task[]) =>
-          tasks.filter(
-            task => !task.archived && task.status !== 'completed'
-          ),
-        getCount: (tasks: Task[]) =>
-          tasks.filter(
-            task => !task.archived && task.status !== 'completed'
-          ).length,
-      };
-    });
+    try {
+      const supabase = createClient();
+      const { data: leads } = await supabase
+        .from('leads')
+        .select('id, lead_status, customer:customers(first_name, last_name), service_address:service_addresses(city, state, zip_code)')
+        .in('id', leadIds);
+
+      if (leads) {
+        const map: Record<string, LeadData> = {};
+        (leads as unknown as LeadData[]).forEach(lead => {
+          map[lead.id] = lead;
+        });
+        setLeadDataMap(map);
+      }
+    } catch (error) {
+      console.error('Error fetching lead data for actions:', error);
+    }
   }, []);
 
-  // Handle tab change
-  const handleTabChange = useCallback((newTab: string) => {
-    setActiveTab(newTab);
-  }, []);
-
-  // Handle search change
-  const handleSearchChange = useCallback((newQuery: string) => {
-    setSearchQuery(newQuery);
-  }, []);
-
-  // Filter data based on active tab
-  const filteredByTab = useMemo(() => {
-    if (!tabs || tabs.length === 0) return tasks;
-    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
-    if (!activeTabConfig) return tasks;
-    return activeTabConfig.filter(tasks);
-  }, [tasks, activeTab, tabs]);
-
-  // Apply search filter
-  const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return filteredByTab;
-
-    const query = searchQuery.toLowerCase();
-    return filteredByTab.filter(task => {
-      if (task.title?.toLowerCase().includes(query)) return true;
-      if (task.description?.toLowerCase().includes(query)) return true;
-      if (task.status?.toLowerCase().includes(query)) return true;
-      if (task.priority?.toLowerCase().includes(query)) return true;
-      return false;
-    });
-  }, [filteredByTab, searchQuery]);
-
-  // Calculate task metrics from current tasks array
-  const calculateTaskMetrics = () => {
-    return {
-      total: tasks.length,
-      pending: tasks.filter(t => t.status === 'pending').length,
-      inProgress: tasks.filter(t => t.status === 'in_progress').length,
-      completed: tasks.filter(t => t.status === 'completed').length,
-      overdue: tasks.filter(isTaskOverdue).length,
-    };
-  };
-
-  const metrics = calculateTaskMetrics();
-
-  // Fetch tasks assigned to current user
-  const fetchMyTasks = async () => {
+  const fetchMyTasks = useCallback(async () => {
     if (!user?.id || !selectedCompany?.id) {
       setLoading(false);
       return;
@@ -131,30 +180,33 @@ export default function MyTasksPage() {
 
     try {
       setLoading(true);
-
       const params = new URLSearchParams({
         companyId: selectedCompany.id,
-        assignedTo: user.id, // Filter by current user
+        assignedTo: user.id,
         includeArchived: 'false',
       });
 
       const response = await fetch(`/api/tasks?${params.toString()}`);
-      if (!response.ok) {
-        throw new Error('Failed to fetch tasks');
-      }
+      if (!response.ok) throw new Error('Failed to fetch tasks');
 
       const data = await response.json();
-      setTasks(Array.isArray(data.tasks) ? data.tasks : []);
+      const allTasks: Task[] = Array.isArray(data.tasks) ? data.tasks : [];
+      const actionTasks = allTasks.filter(t => t.cadence_step_id && t.status !== 'completed');
+      const taskItems = allTasks.filter(t => !t.cadence_step_id && t.status !== 'completed');
+
+      setActions(actionTasks);
+      setRegularTasks(taskItems);
+      await fetchLeadData(actionTasks);
     } catch (err) {
       console.error('Error fetching my tasks:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id, selectedCompany?.id, fetchLeadData]);
 
   useEffect(() => {
     fetchMyTasks();
-  }, [user?.id, selectedCompany?.id]);
+  }, [fetchMyTasks]);
 
   // Real-time subscription for task updates
   useEffect(() => {
@@ -164,91 +216,68 @@ export default function MyTasksPage() {
 
     subscribeToTaskUpdates(channel, async (payload: TaskUpdatePayload) => {
       const { company_id, action, record_id } = payload;
-
-      // Verify this is for our selected company
       if (company_id !== selectedCompany.id) return;
 
-      if (action === 'INSERT') {
-        // Fetch full task data - only add if assigned to current user
+      if (action === 'INSERT' || action === 'UPDATE') {
         try {
           const supabase = createClient();
           const { data: fullTask } = await supabase
             .from('tasks')
             .select(`
               *,
-              company:companies(
-                id,
-                name
-              ),
+              company:companies(id, name),
               assigned_user:profiles!tasks_assigned_to_fkey(
-                id,
-                first_name,
-                last_name,
-                email
-              )
-            `)
-            .eq('id', record_id)
-            .eq('assigned_to', user.id) // Filter by current user
-            .single();
-
-          if (fullTask) {
-            setTasks(prev => {
-              const exists = prev.some(task => task.id === fullTask.id);
-              if (!exists) {
-                return [fullTask, ...prev];
-              }
-              return prev;
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching new task:', error);
-        }
-      } else if (action === 'UPDATE') {
-        // Fetch updated task data
-        try {
-          const supabase = createClient();
-          const { data: updatedTask } = await supabase
-            .from('tasks')
-            .select(`
-              *,
-              company:companies(
-                id,
-                name
-              ),
-              assigned_user:profiles!tasks_assigned_to_fkey(
-                id,
-                first_name,
-                last_name,
-                email
+                id, first_name, last_name, email
               )
             `)
             .eq('id', record_id)
             .single();
 
-          if (updatedTask) {
-            // Check if it&apos;s still assigned to this user
-            if (updatedTask.assigned_to === user.id) {
-              setTasks(prev => {
-                const exists = prev.some(task => task.id === updatedTask.id);
-                if (exists) {
-                  return prev.map(task =>
-                    task.id === updatedTask.id ? updatedTask : task
-                  );
-                } else {
-                  // Task was reassigned to this user
-                  return [updatedTask, ...prev];
-                }
+          if (!fullTask) return;
+
+          const isAssignedToMe = fullTask.assigned_to === user.id;
+          const isCompleted = fullTask.status === 'completed';
+          const isAction = Boolean(fullTask.cadence_step_id);
+
+          if (isAssignedToMe && !isCompleted) {
+            if (isAction) {
+              setActions(prev => {
+                const exists = prev.some(t => t.id === fullTask.id);
+                return exists
+                  ? prev.map(t => (t.id === fullTask.id ? fullTask : t))
+                  : [fullTask, ...prev];
               });
+              setRegularTasks(prev => prev.filter(t => t.id !== fullTask.id));
+              // Fetch lead data for this action if lead-linked
+              if (fullTask.related_entity_type === 'leads' && fullTask.related_entity_id) {
+                const { data: lead } = await supabase
+                  .from('leads')
+                  .select('id, lead_status, customer:customers(first_name, last_name), service_address:service_addresses(city, state, zip_code)')
+                  .eq('id', fullTask.related_entity_id)
+                  .single();
+                if (lead) {
+                  setLeadDataMap(prev => ({ ...prev, [(lead as unknown as LeadData).id]: lead as unknown as LeadData }));
+                }
+              }
             } else {
-              // Remove if no longer assigned to this user
-              setTasks(prev => prev.filter(task => task.id !== record_id));
+              setRegularTasks(prev => {
+                const exists = prev.some(t => t.id === fullTask.id);
+                return exists
+                  ? prev.map(t => (t.id === fullTask.id ? fullTask : t))
+                  : [fullTask, ...prev];
+              });
+              setActions(prev => prev.filter(t => t.id !== fullTask.id));
             }
+          } else {
+            setActions(prev => prev.filter(t => t.id !== record_id));
+            setRegularTasks(prev => prev.filter(t => t.id !== record_id));
           }
         } catch (error) {
-          console.error('Error fetching updated task:', error);
+          console.error('Error handling task realtime update:', error);
         }
       } else if (action === 'DELETE') {
-        setTasks(prev => prev.filter(task => task.id !== record_id));
+        setActions(prev => prev.filter(t => t.id !== record_id));
+        setRegularTasks(prev => prev.filter(t => t.id !== record_id));
       }
     });
 
@@ -257,28 +286,201 @@ export default function MyTasksPage() {
     };
   }, [selectedCompany?.id, user?.id]);
 
-  // Register the add action for the global header button
   useEffect(() => {
     registerPageAction('add', () => setShowCreateForm(true));
     return () => unregisterPageAction('add');
   }, [registerPageAction, unregisterPageAction]);
 
-  const handleCreateTask = async (formData: TaskFormData) => {
-    if (!selectedCompany?.id) return;
+  // Actions tab counts
+  const actionTabCounts = useMemo(() => {
+    const today = getTodayStr();
+    return {
+      due_today: actions.filter(a => a.due_date === today).length,
+      upcoming: actions.filter(a => !a.due_date || a.due_date > today).length,
+      in_the_past: actions.filter(a => !!a.due_date && a.due_date < today).length,
+    };
+  }, [actions]);
 
+  // Filtered actions by tab
+  const filteredActions = useMemo(() => {
+    const today = getTodayStr();
+    return actions.filter(action => {
+      if (!action.due_date) return actionsTab === 'upcoming';
+      if (actionsTab === 'due_today') return action.due_date === today;
+      if (actionsTab === 'upcoming') return action.due_date > today;
+      return action.due_date < today;
+    });
+  }, [actions, actionsTab]);
+
+  // Tasks tab counts
+  const taskTabCounts = useMemo(() => {
+    const active = regularTasks.filter(t => !t.archived && t.status !== 'completed');
+    return {
+      all: active.length,
+      new: active.filter(t => t.status === 'new').length,
+      pending: active.filter(t => t.status === 'pending').length,
+      in_progress: active.filter(t => t.status === 'in_progress').length,
+      overdue: active.filter(isTaskOverdue).length,
+    };
+  }, [regularTasks]);
+
+  // Filtered regular tasks by tab + search
+  const filteredRegularTasks = useMemo(() => {
+    let result = regularTasks.filter(t => !t.archived && t.status !== 'completed');
+    if (tasksTab === 'new') result = result.filter(t => t.status === 'new');
+    else if (tasksTab === 'pending') result = result.filter(t => t.status === 'pending');
+    else if (tasksTab === 'in_progress') result = result.filter(t => t.status === 'in_progress');
+    else if (tasksTab === 'overdue') result = result.filter(isTaskOverdue);
+
+    if (!tasksSearchQuery.trim()) return result;
+    const q = tasksSearchQuery.toLowerCase();
+    return result.filter(
+      t =>
+        t.title?.toLowerCase().includes(q) ||
+        t.description?.toLowerCase().includes(q) ||
+        t.status?.toLowerCase().includes(q)
+    );
+  }, [regularTasks, tasksTab, tasksSearchQuery]);
+
+  const handleActionRowClick = useCallback(
+    (task: Task) => {
+      if (task.related_entity_type === 'leads' && task.related_entity_id) {
+        router.push(`/tickets/leads/${task.related_entity_id}`);
+      } else {
+        router.push(`/tickets/tasks/${task.id}`);
+      }
+    },
+    [router]
+  );
+
+  // Column definitions for the actions DataTable
+  const actionsColumns = useMemo<ColumnDefinition<Task>[]>(
+    () => [
+      {
+        key: 'customer',
+        title: 'Customer',
+        render: (action: Task) => {
+          const leadData = action.related_entity_id
+            ? leadDataMap[action.related_entity_id]
+            : null;
+          const customer = leadData?.customer;
+          const customerName = customer
+            ? `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
+            : '';
+          const addr = leadData?.service_address;
+          const addressLine = addr
+            ? [addr.city, addr.state, addr.zip_code].filter(Boolean).join(', ')
+            : '';
+          return (
+            <div className={pageStyles.customerCell}>
+              {customerName && (
+                <span className={pageStyles.customerName}>{customerName}</span>
+              )}
+              {addressLine && (
+                <span className={pageStyles.customerAddress}>{addressLine}</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'current_action',
+        title: 'Current Action',
+        render: (action: Task, onAction) => {
+          const today = getTodayStr();
+          const isOverdue = action.due_date ? action.due_date < today : false;
+          const overdueDays =
+            action.due_date && isOverdue ? getOverdueDays(action.due_date) : 0;
+          const { label: actionLabel, iconType } = parseActionInfo(action.title);
+          const ActionIcon = ACTION_ICONS[iconType];
+          return (
+            <div className={pageStyles.leadCell}>
+              <button
+                className={`${pageStyles.actionBtn} ${isOverdue ? pageStyles.actionBtnOverdue : ''}`}
+                onClick={e => {
+                  e.stopPropagation();
+                  onAction?.('navigate', action);
+                }}
+              >
+                <ActionIcon size={13} />
+                {actionLabel}
+              </button>
+              {isOverdue && overdueDays > 0 && (
+                <span className={pageStyles.overdueLabel}>
+                  <span className={pageStyles.overdueCircle} />
+                  Overdue {overdueDays} {overdueDays === 1 ? 'day' : 'days'}
+                </span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'progress',
+        title: 'Progress',
+        render: (action: Task) => {
+          const leadData = action.related_entity_id
+            ? leadDataMap[action.related_entity_id]
+            : null;
+          const leadStatus = leadData?.lead_status ?? action.related_entity?.status ?? '';
+          if (!leadStatus) return null;
+          const today = getTodayStr();
+          const isOverdue = action.due_date ? action.due_date < today : false;
+          const progress = getLeadStatusProgress(leadStatus);
+          return (
+            <div className={pageStyles.progressCell}>
+              <span
+                className={`${pageStyles.progressLabel} ${isOverdue ? pageStyles.progressLabelOverdue : ''}`}
+              >
+                {getLeadStatusLabel(leadStatus)}
+              </span>
+              <div className={pageStyles.progressTrack}>
+                <div
+                  className={`${pageStyles.progressFill} ${isOverdue ? pageStyles.progressFillOverdue : ''}`}
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
+            </div>
+          );
+        },
+      },
+    ],
+    [leadDataMap]
+  );
+
+  const handleActionItemAction = useCallback(
+    (action: string, task: Task) => {
+      if (action === 'navigate') handleActionRowClick(task);
+    },
+    [handleActionRowClick]
+  );
+
+  const regularTaskColumns = useMemo(() => {
+    const cols = getTaskColumns(false, true);
+    const dueDateIdx = cols.findIndex(c => c.key === 'due_date');
+    if (dueDateIdx > 0) {
+      const [dueDate] = cols.splice(dueDateIdx, 1);
+      cols.unshift(dueDate);
+    }
+    return cols;
+  }, []);
+
+  const actionsEmptyMessage =
+    actionsTab === 'due_today'
+      ? 'No actions due today.'
+      : actionsTab === 'upcoming'
+        ? 'No upcoming actions.'
+        : 'No past actions.';
+
+  const handleCreateTask = async (taskFormData: TaskFormData) => {
+    if (!selectedCompany?.id) return;
     setSubmitting(true);
     try {
-      const taskData = {
-        ...formData,
-        company_id: selectedCompany.id,
-      };
-
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(taskData),
+        body: JSON.stringify({ ...taskFormData, company_id: selectedCompany.id }),
       });
-
       if (response.ok) {
         setShowCreateForm(false);
         await fetchMyTasks();
@@ -294,17 +496,15 @@ export default function MyTasksPage() {
     }
   };
 
-  const handleEditTask = async (formData: TaskFormData) => {
+  const handleEditTask = async (taskFormData: TaskFormData) => {
     if (!editingTask) return;
-
     setSubmitting(true);
     try {
       const response = await fetch(`/api/tasks/${editingTask.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(taskFormData),
       });
-
       if (response.ok) {
         setEditingTask(null);
         await fetchMyTasks();
@@ -320,16 +520,14 @@ export default function MyTasksPage() {
     }
   };
 
-  const handleCompleteTask = async (taskId: string, actualHours?: number) => {
+  const handleCompleteTask = async (taskId: string) => {
     try {
       const response = await fetch(`/api/tasks/${taskId}/complete`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ actual_hours: actualHours }),
+        body: JSON.stringify({}),
       });
-
       if (response.ok) {
-        // Refresh the tasks list
         fetchMyTasks();
       } else {
         throw new Error('Failed to complete task');
@@ -341,13 +539,9 @@ export default function MyTasksPage() {
   };
 
   const handleTaskAction = (action: string, task: Task) => {
-    if (action === 'edit') {
-      setEditingTask(task);
-    } else if (action === 'view') {
-      router.push(`/tickets/tasks/${task.id}`);
-    } else if (action === 'complete') {
-      handleCompleteTask(task.id);
-    }
+    if (action === 'edit') setEditingTask(task);
+    else if (action === 'view') router.push(`/tickets/tasks/${task.id}`);
+    else if (action === 'complete') handleCompleteTask(task.id);
   };
 
   const handleCancelForm = () => {
@@ -358,7 +552,7 @@ export default function MyTasksPage() {
 
   if (!user || !selectedCompany) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
+      <div style={{ padding: '40px', textAlign: 'center' }}>
         <p>Please select a company to view your tasks.</p>
       </div>
     );
@@ -367,73 +561,7 @@ export default function MyTasksPage() {
   const isFormOpen = showCreateForm || !!editingTask;
 
   return (
-    <div style={{ width: '100%' }}>
-      {/* Metrics Cards */}
-      <div className={metricsStyles.metricsCardWrapper}>
-        {!loading ? (
-          <>
-            <MetricsCard
-              title="Total Tasks"
-              value={metrics.total}
-              showComparison={false}
-            />
-            <MetricsCard
-              title="Pending"
-              value={metrics.pending}
-              showComparison={false}
-            />
-            <MetricsCard
-              title="In Progress"
-              value={metrics.inProgress}
-              showComparison={false}
-            />
-            <MetricsCard
-              title="Completed"
-              value={metrics.completed}
-              showComparison={false}
-            />
-            <MetricsCard
-              title="Overdue"
-              value={metrics.overdue}
-              showComparison={false}
-            />
-          </>
-        ) : (
-          <>
-            <MetricsCard
-              title="Total Tasks"
-              value="--"
-              showComparison={false}
-              isLoading={true}
-            />
-            <MetricsCard
-              title="Pending"
-              value="--"
-              showComparison={false}
-              isLoading={true}
-            />
-            <MetricsCard
-              title="In Progress"
-              value="--"
-              showComparison={false}
-              isLoading={true}
-            />
-            <MetricsCard
-              title="Completed"
-              value="--"
-              showComparison={false}
-              isLoading={true}
-            />
-            <MetricsCard
-              title="Overdue"
-              value="--"
-              showComparison={false}
-              isLoading={true}
-            />
-          </>
-        )}
-      </div>
-
+    <div className={pageStyles.page}>
       <Modal isOpen={isFormOpen} onClose={handleCancelForm}>
         <ModalTop
           title={editingTask ? 'Edit Task' : 'Create New Task'}
@@ -446,6 +574,8 @@ export default function MyTasksPage() {
             assignableUsers={assignableUsers}
             onFormDataChange={setFormData}
             loading={submitting}
+            defaultAssignedTo={!editingTask ? user.id : undefined}
+            requireAssignedTo={!editingTask}
           />
         </ModalMiddle>
         <ModalBottom>
@@ -455,11 +585,8 @@ export default function MyTasksPage() {
             isFirstStep={true}
             onPrimaryAction={async () => {
               if (formData) {
-                if (editingTask) {
-                  await handleEditTask(formData);
-                } else {
-                  await handleCreateTask(formData);
-                }
+                if (editingTask) await handleEditTask(formData);
+                else await handleCreateTask(formData);
               }
             }}
             primaryButtonText={editingTask ? 'Update Task' : 'Create Task'}
@@ -470,48 +597,85 @@ export default function MyTasksPage() {
         </ModalBottom>
       </Modal>
 
-      {/* Tabs and Search Row */}
-      {tabs && tabs.length > 0 && (
-        <div className={styles.tabsRow}>
-          <div className={styles.tabsSection}>
-            {tabs.map(tab => (
-              <button
-                key={tab.key}
-                className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
-                onClick={() => handleTabChange(tab.key)}
-              >
-                {tab.label}
-                {tab.getCount && (
-                  <span className={styles.tabCount}>
-                    {tab.getCount(tasks)}
-                  </span>
-                )}
-              </button>
-            ))}
+      <div className={pageStyles.layout}>
+        {/* Left: Actions Panel */}
+        <div className={pageStyles.panel}>
+          <div className={pageStyles.panelHeader}>
+            <p className={pageStyles.panelTitle}>My Actions (Sales Only)</p>
           </div>
-          <div className={styles.searchSection}>
-            <input
-              type="text"
-              className={styles.searchInput}
-              placeholder="Search"
-              value={searchQuery}
-              onChange={e => handleSearchChange(e.target.value)}
-            />
-            <Search size={18} className={styles.searchIcon} />
-          </div>
-        </div>
-      )}
 
-      <DataTable<Task>
-        data={filteredData}
-        title="My Tasks"
-        columns={getTaskColumns(false, true)}
-        loading={loading}
-        emptyStateMessage="No tasks assigned to you yet."
-        onItemAction={handleTaskAction}
-        customColumnWidths="minmax(340px, 2fr) 1fr 1fr 1.1fr 1.4fr"
-        searchEnabled={false}
-      />
+          <div className={tabStyles.tabsRow}>
+            <div className={tabStyles.tabsSection}>
+              {ACTIONS_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  className={`${tabStyles.tab} ${actionsTab === tab.key ? tabStyles.active : ''}`}
+                  onClick={() => setActionsTab(tab.key)}
+                >
+                  {tab.label}
+                  <span className={tabStyles.tabCount}>{actionTabCounts[tab.key]}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <DataTable<Task>
+            data={filteredActions}
+            title=""
+            columns={actionsColumns}
+            loading={loading}
+            emptyStateMessage={actionsEmptyMessage}
+            onItemAction={handleActionItemAction}
+            customColumnWidths="1fr 1fr 1.4fr"
+            searchEnabled={false}
+            tableType="tasks"
+          />
+        </div>
+
+        {/* Right: Additional Tasks Panel */}
+        <div className={pageStyles.panel}>
+          <div className={pageStyles.panelHeader}>
+            <p className={pageStyles.panelTitle}>Your Additional Tasks</p>
+          </div>
+
+          <div className={tabStyles.tabsRow}>
+            <div className={tabStyles.tabsSection}>
+              {TASKS_TABS.map(tab => (
+                <button
+                  key={tab.key}
+                  className={`${tabStyles.tab} ${tasksTab === tab.key ? tabStyles.active : ''}`}
+                  onClick={() => setTasksTab(tab.key)}
+                >
+                  {tab.label}
+                  <span className={tabStyles.tabCount}>{taskTabCounts[tab.key]}</span>
+                </button>
+              ))}
+            </div>
+            <div className={tabStyles.searchSection}>
+              <Search size={16} className={tabStyles.searchIcon} />
+              <input
+                type="text"
+                className={tabStyles.searchInput}
+                placeholder="Search"
+                value={tasksSearchQuery}
+                onChange={e => setTasksSearchQuery(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <DataTable<Task>
+            data={filteredRegularTasks}
+            title=""
+            columns={regularTaskColumns}
+            loading={loading}
+            emptyStateMessage="No additional tasks assigned to you."
+            onItemAction={handleTaskAction}
+            customColumnWidths="1fr minmax(160px, 2fr) 1fr 1fr 1.4fr"
+            searchEnabled={false}
+            tableType="tasks"
+          />
+        </div>
+      </div>
     </div>
   );
 }

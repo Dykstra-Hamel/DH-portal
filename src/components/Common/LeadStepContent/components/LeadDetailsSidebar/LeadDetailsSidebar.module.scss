@@ -139,13 +139,34 @@
   overflow: auto;
 }
 
+@keyframes customerCommentPing {
+  0% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  100% {
+    transform: scale(2.5);
+    opacity: 0;
+  }
+}
+
 .customerCommentDot {
   display: inline-block;
+  position: relative;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background-color: var(--error-600);
   flex-shrink: 0;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background-color: var(--error-600);
+    animation: customerCommentPing 1.5s ease-out infinite;
+  }
 }
 
 .sidebar.active {

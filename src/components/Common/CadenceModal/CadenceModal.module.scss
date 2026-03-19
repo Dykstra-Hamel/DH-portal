@@ -192,76 +192,10 @@
         }
       }
 
-      .daysList {
+      .stepsList {
         display: flex;
         flex-direction: column;
-        gap: 24px;
-
-        .dayGroup {
-          border: 1px solid #d1d5db;
-          border-radius: 8px;
-          overflow: hidden;
-
-          .dayHeader {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px 16px;
-            background-color: #f3f4f6;
-            border-bottom: 1px solid #d1d5db;
-
-            h5 {
-              font-size: 16px;
-              font-weight: 600;
-              color: #171717;
-              margin: 0;
-            }
-
-            .dayActions {
-              display: flex;
-              align-items: center;
-              gap: 12px;
-
-              .stepCount {
-                font-size: 13px;
-                color: #6A7282;
-                font-weight: 500;
-              }
-
-              .addStepToDay {
-                display: flex;
-                align-items: center;
-                gap: 4px;
-                padding: 6px 10px;
-                background-color: white;
-                border: 1px solid #d1d5db;
-                border-radius: var(--border-radius);
-                font-size: 12px;
-                font-weight: 500;
-                color: #171717;
-                cursor: pointer;
-                transition: all 0.2s;
-
-                &:hover:not(:disabled) {
-                  background-color: #e5e7eb;
-                }
-
-                &:disabled {
-                  opacity: 0.5;
-                  cursor: not-allowed;
-                }
-              }
-            }
-          }
-
-          .daySteps {
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            background-color: white;
-          }
-        }
+        gap: 12px;
 
         .stepFormItem {
           padding: 16px;
@@ -275,24 +209,39 @@
             align-items: center;
             margin-bottom: 16px;
 
-            .stepOrder {
-              display: flex;
-              align-items: center;
-              gap: 8px;
-
-              .timeIndicator {
-                font-size: 14px;
-                font-weight: 600;
-                color: #171717;
-                display: flex;
-                align-items: center;
-                gap: 6px;
-              }
+            .stepLabel {
+              font-size: 14px;
+              font-weight: 600;
+              color: #171717;
             }
 
             .stepOrderControls {
               display: flex;
               gap: 4px;
+
+              .moveButton {
+                width: 28px;
+                height: 28px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background-color: white;
+                border: 1px solid #d1d5db;
+                border-radius: 4px;
+                cursor: pointer;
+                color: #6A7282;
+                transition: all 0.2s;
+
+                &:hover:not(:disabled) {
+                  background-color: #f3f4f6;
+                  color: #171717;
+                }
+
+                &:disabled {
+                  opacity: 0.3;
+                  cursor: not-allowed;
+                }
+              }
 
               .removeButton {
                 width: 28px;
@@ -378,4 +327,11 @@
       }
     }
   }
+}
+
+.workflowNote {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 4px;
+  font-style: italic;
 }

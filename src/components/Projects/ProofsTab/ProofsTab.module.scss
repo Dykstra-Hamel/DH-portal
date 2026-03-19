@@ -41,7 +41,7 @@
   font-weight: 600;
   border: none;
   border-radius: 8px;
-  background: var(--action-500, #0080f0);
+  background: var(--blue-500);
   color: white;
   cursor: pointer;
   transition: background 0.15s;
@@ -113,7 +113,7 @@
   width: 24px;
   height: 24px;
   border: 2px solid var(--gray-300, #d1d5db);
-  border-top-color: var(--action-500, #0080f0);
+  border-top-color: var(--blue-500);
   border-radius: 999px;
   animation: spin 0.7s linear infinite;
 }
@@ -122,7 +122,7 @@
   width: 16px;
   height: 16px;
   border: 2px solid var(--gray-300, #d1d5db);
-  border-top-color: var(--action-500, #0080f0);
+  border-top-color: var(--blue-500);
   border-radius: 999px;
   animation: spin 0.7s linear infinite;
 }
@@ -143,7 +143,9 @@
   border-radius: 10px;
   background: white;
   overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
   position: relative;
 
   &:hover {
@@ -153,11 +155,11 @@
 }
 
 .proofCardApproved {
-  border: 2px solid #05B62E;
+  border: 2px solid #05b62e;
   background: #f0fdf4;
 
   &:hover {
-    border-color: #05B62E;
+    border-color: #05b62e;
     box-shadow: 0 2px 8px rgba(5, 182, 46, 0.12);
   }
 }
@@ -247,7 +249,7 @@
   font-weight: 600;
   border: none;
   border-radius: 6px;
-  background: #05B62E;
+  background: #05b62e;
   color: white;
   cursor: pointer;
   transition: background 0.15s;
@@ -274,7 +276,9 @@
   background: white;
   color: var(--gray-600, #4b5563);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 
   &:hover:not(:disabled) {
     background: var(--gray-50, #f9fafb);
@@ -361,7 +365,7 @@
   font-size: 11px;
   font-weight: 700;
   border-radius: 20px;
-  background: #05B62E;
+  background: #05b62e;
   color: white;
   white-space: nowrap;
   flex-shrink: 0;
@@ -442,7 +446,9 @@
   color: var(--gray-400, #9ca3af);
   cursor: pointer;
   border-radius: 3px;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
   opacity: 0;
 
   .groupNameRow:hover & {
@@ -598,8 +604,12 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .proofModalBackdrop {
@@ -671,7 +681,9 @@
   color: var(--gray-500, #6b7280);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 
   &:hover {
     background: var(--gray-100, #f3f4f6);
@@ -726,7 +738,7 @@
   min-width: 18px;
   height: 18px;
   padding: 0 5px;
-  background: var(--action-500, #0080f0);
+  background: var(--blue-500);
   color: white;
   font-size: 10px;
   font-weight: 700;
@@ -781,7 +793,9 @@
   border-radius: 6px;
   background: white;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
 
   &:hover {
     background: var(--gray-50, #f9fafb);
@@ -842,7 +856,7 @@
   height: 20px;
   min-width: 20px;
   border-radius: 50%;
-  background: var(--action-500, #0080f0);
+  background: var(--blue-500);
   color: white;
   font-size: 10px;
   font-weight: 700;
@@ -922,7 +936,7 @@
   font-weight: 600;
   border: none;
   border-radius: 5px;
-  background: var(--action-500, #0080f0);
+  background: var(--blue-500);
   color: white;
   cursor: pointer;
   transition: background 0.15s;
@@ -938,6 +952,10 @@
 }
 
 @keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }

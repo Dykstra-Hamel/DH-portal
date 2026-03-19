@@ -14,30 +14,34 @@ export const leadStatusChangedHandler = inngest.createFunction(
     
     console.log(`Processing lead status change: ${fromStatus} → ${toStatus} for lead ${leadId}`);
 
-    // Step 1: Check for auto-cancellation scenarios
+    // Step 1: Cancel active workflow executions.
+    // For terminal statuses (won/lost) all executions are cancelled unconditionally.
+    // For other statuses, only cancel executions for workflows with auto_cancel_on_status = true.
     const cancellationResult = await step.run('check-auto-cancellation', async () => {
       const supabase = createAdminClient();
-      
-      // Get all workflows with auto-cancellation enabled that match this lead's status change
-      const { data: workflows, error: workflowError } = await supabase
-        .from('automation_workflows')
-        .select('id, name, auto_cancel_on_status, cancel_on_statuses')
-        .eq('company_id', companyId)
-        .eq('auto_cancel_on_status', true);
-      
-      if (workflowError || !workflows?.length) {
-        return { shouldCancel: false, reason: 'No workflows with auto-cancellation found' };
+      const isTerminalStatus = toStatus === 'won' || toStatus === 'lost';
+
+      // For non-terminal statuses, check whether any workflow opts into auto-cancellation
+      if (!isTerminalStatus) {
+        const { data: workflows, error: workflowError } = await supabase
+          .from('automation_workflows')
+          .select('id, name, auto_cancel_on_status, cancel_on_statuses')
+          .eq('company_id', companyId)
+          .eq('auto_cancel_on_status', true);
+
+        if (workflowError || !workflows?.length) {
+          return { shouldCancel: false, reason: 'No workflows with auto-cancellation found' };
+        }
+
+        const workflowsToCancel = workflows.filter(workflow =>
+          workflow.cancel_on_statuses?.includes(toStatus.toLowerCase())
+        );
+
+        if (workflowsToCancel.length === 0) {
+          return { shouldCancel: false, reason: 'Status not in any workflow cancellation list' };
+        }
       }
-      
-      // Check if any workflow should trigger cancellation for this status
-      const workflowsToCancel = workflows.filter(workflow => 
-        workflow.cancel_on_statuses?.includes(toStatus.toLowerCase())
-      );
-      
-      if (workflowsToCancel.length === 0) {
-        return { shouldCancel: false, reason: 'Status not in any workflow cancellation list' };
-      }
-      
+
       // Find all pending/running executions for this lead
       const { data: activeExecutions, error } = await supabase
         .from('automation_executions')
@@ -56,14 +60,14 @@ export const leadStatusChangedHandler = inngest.createFunction(
         .eq('lead_id', leadId)
         .eq('company_id', companyId)
         .in('execution_status', ['pending', 'running']);
-      
+
       if (error || !activeExecutions?.length) {
         return { shouldCancel: false, reason: 'No active executions found' };
       }
-      
+
       // Cancel all active executions for this lead
       const cancellationResults = [];
-      
+
       for (const execution of activeExecutions) {
         try {
           const { error: updateError } = await supabase
@@ -79,27 +83,27 @@ export const leadStatusChangedHandler = inngest.createFunction(
                 cancelledAt: new Date().toISOString(),
                 originalFromStatus: fromStatus,
                 cancellationTriggerStatus: toStatus,
-                autoCancellation: true
+                autoCancellation: true,
               },
               updated_at: new Date().toISOString(),
             })
             .eq('id', execution.id);
-          
+
           if (updateError) {
             console.error(`Error cancelling execution ${execution.id}:`, updateError);
             cancellationResults.push({
               executionId: execution.id,
               workflowName: (execution.workflow as any)?.name || 'Unknown',
               success: false,
-              error: updateError.message
+              error: updateError.message,
             });
           } else {
             const workflowName = (execution.workflow as any)?.name || 'Unknown';
             console.log(`Auto-cancelled execution ${execution.id} for workflow "${workflowName}" due to lead status change to ${toStatus}`);
             cancellationResults.push({
               executionId: execution.id,
-              workflowName: workflowName,
-              success: true
+              workflowName,
+              success: true,
             });
           }
         } catch (err) {
@@ -108,18 +112,20 @@ export const leadStatusChangedHandler = inngest.createFunction(
             executionId: execution.id,
             workflowName: (execution.workflow as any)?.name || 'Unknown',
             success: false,
-            error: err instanceof Error ? err.message : 'Unknown error'
+            error: err instanceof Error ? err.message : 'Unknown error',
           });
         }
       }
-      
+
       return {
         shouldCancel: true,
-        reason: `Lead status changed to terminal status: ${toStatus}`,
+        reason: isTerminalStatus
+          ? `Lead status changed to terminal status: ${toStatus}`
+          : `Auto-cancellation triggered by status change to: ${toStatus}`,
         activeExecutions: activeExecutions.length,
         cancellationResults,
         successfulCancellations: cancellationResults.filter(r => r.success).length,
-        failedCancellations: cancellationResults.filter(r => !r.success).length
+        failedCancellations: cancellationResults.filter(r => !r.success).length,
       };
     });
 
@@ -160,7 +166,7 @@ export const leadStatusChangedHandler = inngest.createFunction(
       }
 
       // Filter workflows based on status conditions
-      return workflows.filter(workflow => {
+      const conditionFiltered = workflows.filter(workflow => {
         const conditions = workflow.trigger_conditions || {};
 
         // Check "to_status" condition (required)
@@ -175,6 +181,30 @@ export const leadStatusChangedHandler = inngest.createFunction(
 
         return true;
       });
+
+      // Don't fire workflows configured as trigger_workflow cadence steps in the lead's
+      // active cadence — the cadence mechanism fires them when that step is reached.
+      const { data: activeAssignment } = await supabase
+        .from('lead_cadence_assignments')
+        .select('cadence_id')
+        .eq('lead_id', leadId)
+        .is('completed_at', null)
+        .maybeSingle();
+
+      let cadenceStepWorkflowIds = new Set<string>();
+      if (activeAssignment?.cadence_id) {
+        const { data: triggerSteps } = await supabase
+          .from('sales_cadence_steps')
+          .select('workflow_id')
+          .eq('cadence_id', activeAssignment.cadence_id)
+          .eq('action_type', 'trigger_workflow')
+          .not('workflow_id', 'is', null);
+        cadenceStepWorkflowIds = new Set(
+          (triggerSteps || []).map(s => s.workflow_id as string).filter(Boolean)
+        );
+      }
+
+      return conditionFiltered.filter(w => !cadenceStepWorkflowIds.has(w.id));
     });
 
     if (matchingWorkflows.length === 0) {

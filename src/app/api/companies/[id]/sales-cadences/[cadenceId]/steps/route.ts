@@ -11,10 +11,10 @@ export async function POST(
     const supabase = await createClient();
     const body = await request.json();
 
-    const { day_number, time_of_day, action_type, priority, description, display_order } = body;
+    const { day_number, time_of_day, action_type, priority, description, display_order, workflow_id } = body;
 
-    // Validate required fields
-    if (!day_number || !time_of_day || !action_type || display_order === undefined) {
+    // Validate required fields (day_number and time_of_day are optional for sequential cadences)
+    if (!action_type || display_order === undefined) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -41,12 +41,13 @@ export async function POST(
       .from('sales_cadence_steps')
       .insert({
         cadence_id: cadenceId,
-        day_number,
-        time_of_day,
+        day_number: day_number ?? null,
+        time_of_day: time_of_day ?? 'morning',
         action_type,
         priority: priority || 'medium',
         description: description || null,
         display_order,
+        workflow_id: workflow_id || null,
       })
       .select()
       .single();
@@ -79,7 +80,7 @@ export async function PUT(
     const supabase = await createClient();
     const body = await request.json();
 
-    const { step_id, day_number, time_of_day, action_type, priority, description, display_order } = body;
+    const { step_id, day_number, time_of_day, action_type, priority, description, display_order, workflow_id } = body;
 
     // Validate required fields
     if (!step_id) {
@@ -112,6 +113,7 @@ export async function PUT(
     if (priority) updateData.priority = priority;
     if (description !== undefined) updateData.description = description || null;
     if (display_order !== undefined) updateData.display_order = display_order;
+    if (workflow_id !== undefined) updateData.workflow_id = workflow_id || null;
 
     const { data: updatedStep, error: updateError } = await supabase
       .from('sales_cadence_steps')

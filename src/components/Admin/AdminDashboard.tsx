@@ -17,6 +17,7 @@ import PartialLeadsManager from './PartialLeadsManager';
 import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
 import TemplateLibraryManager from './TemplateLibraryManager';
+import CadenceLibraryManager from './CadenceLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
 import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
@@ -43,7 +44,7 @@ type AnalyticsSubsection =
   | 'call-records'
   | 'partial-leads'
   | 'pest-pressure';
-type AutomationSubsection = 'templates' | 'executions';
+type AutomationSubsection = 'templates' | 'executions' | 'cadence-library';
 type SystemSubsection =
   | 'widgets'
   | 'pest-management'
@@ -73,6 +74,7 @@ type AdminSection =
   | 'form-analytics'
   | 'pest-management'
   | 'template-library'
+  | 'cadence-library'
   | 'workflow-executions'
   | 'sms-testing'
   | 'admin-pest-pressure';
@@ -163,6 +165,11 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
         label: 'Workflow Executions',
         legacySection: 'workflow-executions',
       },
+      {
+        id: 'cadence-library',
+        label: 'Cadence Library',
+        legacySection: 'cadence-library',
+      },
     ],
   },
   {
@@ -249,6 +256,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <FormAnalytics />;
       case 'templates':
         return <TemplateLibraryManager />;
+      case 'cadence-library':
+        return <CadenceLibraryManager />;
       case 'executions':
         return selectedCompanyId ? (
           <ExecutionManager companyId={selectedCompanyId} />

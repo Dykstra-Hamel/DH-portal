@@ -22,7 +22,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500, #0080f0);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(0, 128, 240, 0.1);
   }
 
@@ -90,7 +90,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500, #0080f0);
+    border-color: var(--blue-500);
   }
 
   &::placeholder {
@@ -174,4 +174,3 @@
   font-family: var(--font-satoshi);
   font-size: 14px;
 }
-

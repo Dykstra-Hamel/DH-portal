@@ -15,6 +15,8 @@ interface TaskFormProps {
     id: string;
     name?: string;
   };
+  defaultAssignedTo?: string;
+  requireAssignedTo?: boolean;
 }
 
 export default function TaskForm({
@@ -24,6 +26,8 @@ export default function TaskForm({
   onFormDataChange,
   loading = false,
   relatedEntity,
+  defaultAssignedTo,
+  requireAssignedTo = false,
 }: TaskFormProps) {
   const [formData, setFormData] = useState<TaskFormData>({
     title: task?.title || '',
@@ -31,7 +35,7 @@ export default function TaskForm({
     notes: task?.notes || '',
     status: task?.status || 'new',
     priority: task?.priority || 'medium',
-    assigned_to: task?.assigned_to || undefined,
+    assigned_to: task?.assigned_to || defaultAssignedTo || undefined,
     due_date: task?.due_date || '',
     due_time: task?.due_time || '',
     related_entity_type: task?.related_entity_type || relatedEntity?.type || undefined,
@@ -112,6 +116,9 @@ export default function TaskForm({
       newErrors.title = 'Title is required';
     }
 
+    if (requireAssignedTo && !formData.assigned_to) {
+      newErrors.assigned_to = 'Assigned To is required';
+    }
 
     if (formData.related_entity_type && !formData.related_entity_id) {
       newErrors.related_entity_id = 'Please select a related entity';
@@ -232,23 +239,24 @@ export default function TaskForm({
 
         <div className={styles.formGroup}>
           <label htmlFor="assigned_to" className={styles.label}>
-            Assigned To
+            Assigned To {requireAssignedTo && '*'}
           </label>
           <select
             id="assigned_to"
             name="assigned_to"
             value={formData.assigned_to || ''}
             onChange={handleInputChange}
-            className={styles.select}
+            className={`${styles.select} ${errors.assigned_to ? styles.inputError : ''}`}
             disabled={loading}
           >
-            <option value="">Unassigned</option>
+            {!requireAssignedTo && <option value="">Unassigned</option>}
             {assignableUsers.map(user => (
               <option key={user.id} value={user.id}>
                 {user.first_name} {user.last_name} ({user.email})
               </option>
             ))}
           </select>
+          {errors.assigned_to && <span className={styles.errorText}>{errors.assigned_to}</span>}
         </div>
 
         <div className={styles.formRow}>
