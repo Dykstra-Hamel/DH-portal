@@ -8,11 +8,12 @@
 import styles from './quotecontent.module.scss';
 
 interface QuoteTotalPricingProps {
-  quote: {
-    total_initial_price: number;
-    total_recurring_price: number;
-  };
-  lineItems: any[];
+  regularLineItems: any[];
+  availableAddons: any[];
+  selectedAddonIds: string[];
+  onToggleAddon: (id: string) => void;
+  selectedPlanIds: string[];
+  onTogglePlan: (id: string) => void;
 }
 
 // Format for currency
@@ -39,13 +40,58 @@ const abbreviateFrequency = (frequency: string) => {
 };
 
 export default function QuoteTotalPricing({
-  quote,
-  lineItems,
+  regularLineItems,
+  availableAddons,
+  selectedAddonIds,
+  onToggleAddon,
+  selectedPlanIds,
+  onTogglePlan,
 }: QuoteTotalPricingProps) {
-  // Determine billing frequency from first non-addon plan
+  const selectedPlans = regularLineItems.filter(item =>
+    selectedPlanIds.includes(item.id)
+  );
+  const selectedAddons = availableAddons.filter(addon =>
+    selectedAddonIds.includes(addon.id)
+  );
+  const isOnlyOnePlan = regularLineItems.length > 1 && selectedPlanIds.length === 1;
+
+  const totalInitial =
+    selectedPlans.reduce(
+      (s, i) => s + (i.final_initial_price || i.initial_price || 0),
+      0
+    ) + selectedAddons.reduce((s, a) => s + (a.initial_price || 0), 0);
+
+  const totalRecurring =
+    selectedPlans.reduce(
+      (s, i) => s + (i.final_recurring_price || i.recurring_price || 0),
+      0
+    ) + selectedAddons.reduce((s, a) => s + (a.recurring_price || 0), 0);
+
+  // Billing frequency from first selected regular plan
   const billingFrequency =
-    lineItems.find((item: any) => !item.addon_service_id)?.billing_frequency ||
-    'monthly';
+    selectedPlans.find((item: any) => item.billing_frequency)
+      ?.billing_frequency || 'monthly';
+
+  const renderItemPrice = (item: any, isAddon = false) => {
+    const recurring = isAddon ? item.recurring_price : (item.final_recurring_price || item.recurring_price);
+    const initial = isAddon ? item.initial_price : (item.final_initial_price || item.initial_price);
+    const freq = item.billing_frequency;
+    return (
+      <>
+        {recurring && (
+          <span className={styles.totalItemPriceRecurring}>
+            ${formatCurrency(recurring)}/{abbreviateFrequency(freq)}
+          </span>
+        )}
+        {initial && (
+          <span className={styles.totalItemPriceInitial}>
+            ${formatCurrency(initial)} initial
+          </span>
+        )}
+      </>
+    );
+  };
+
   return (
     <div className={styles.totalPricing}>
       <h3>Customized Quote Total</h3>
@@ -53,38 +99,66 @@ export default function QuoteTotalPricing({
         <div>Total Initial Cost:</div>
         <strong>
           <sup>$</sup>
-          {formatCurrency(quote.total_initial_price)}
+          {formatCurrency(totalInitial)}
         </strong>
         <div className={styles.totalListWrapper}>
-          {/* List of items contributing to initial cost */}
           <ul className={styles.totalItemsList}>
-            {lineItems
-              .filter(
-                item =>
-                  (item.final_initial_price || item.initial_price || 0) > 0
-              )
-              .map((item, idx) => (
-                <li key={idx} className={styles.totalItem}>
-                  <span className={styles.totalItemCheckmark}>
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="13"
-                      height="11"
-                      viewBox="0 0 13 11"
-                      fill="none"
-                    >
-                      <path
-                        d="M1 7.04907L3.5 9.64154L11.8333 1"
-                        stroke="#0072DA"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
+            {/* Services sub-section */}
+            <li className={styles.totalSectionLabel}>Services</li>
+            {regularLineItems.map((item, idx) => {
+              const isSelected = selectedPlanIds.includes(item.id);
+              const isOnly = isOnlyOnePlan && isSelected;
+              return (
+                <li key={idx} className={`${styles.totalItem} ${!isSelected ? styles.totalItemUnselected : ''}`}>
+                  <span className={styles.totalItemLeft}>
+                    {regularLineItems.length > 1 ? (
+                      <label
+                        className={`${styles.addonCheckbox} ${isOnly ? styles.addonCheckboxLastPlan : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => onTogglePlan(item.id)}
+                          disabled={isOnly}
+                        />
+                        <span className={`${styles.addonCheckboxCustom} ${isOnly ? styles.addonCheckboxDisabled : ''}`} />
+                      </label>
+                    ) : (
+                      <span className={styles.totalItemCheckmark}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="11" viewBox="0 0 13 11" fill="none">
+                          <path d="M1 7.04907L3.5 9.64154L11.8333 1" stroke="#0072DA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    )}
+                    {item.plan_name}
                   </span>
-                  {item.plan_name}
+                  <span className={styles.totalItemPrice}>{renderItemPrice(item)}</span>
                 </li>
-              ))}
+              );
+            })}
+            {/* Add-Ons sub-section */}
+            {availableAddons.length > 0 && (
+              <li className={styles.totalSectionLabel}>Add-Ons</li>
+            )}
+            {availableAddons.map((addon, idx) => {
+              const isSelected = selectedAddonIds.includes(addon.id);
+              return (
+                <li key={`addon-${idx}`} className={`${styles.totalItem} ${!isSelected ? styles.totalItemUnselected : ''}`}>
+                  <span className={styles.totalItemLeft}>
+                    <label className={styles.addonCheckbox}>
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onToggleAddon(addon.id)}
+                      />
+                      <span className={styles.addonCheckboxCustom} />
+                    </label>
+                    {addon.addon_name}
+                  </span>
+                  <span className={styles.totalItemPrice}>{renderItemPrice(addon, true)}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       </div>
@@ -93,7 +167,7 @@ export default function QuoteTotalPricing({
         <span>
           <strong>
             <sup>$</sup>
-            {formatCurrency(quote.total_recurring_price)}
+            {formatCurrency(totalRecurring)}
           </strong>
           /{abbreviateFrequency(billingFrequency)}
         </span>

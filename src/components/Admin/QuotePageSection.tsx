@@ -13,7 +13,7 @@ import styles from './CompanyManagement.module.scss';
 
 interface QuotePageSectionProps {
   companyId: string;
-  onSave: (data: { quote_terms: string; quote_thanks_content: string }) => void;
+  onSave: (data: { quote_terms: string; quote_thanks_content: string; wisetack_enabled: boolean; wisetack_url: string }) => void;
   saving: boolean;
 }
 
@@ -24,6 +24,8 @@ export default function QuotePageSection({
 }: QuotePageSectionProps) {
   const [quoteTerms, setQuoteTerms] = useState('');
   const [quoteThanksContent, setQuoteThanksContent] = useState('');
+  const [wisetackEnabled, setWisetackEnabled] = useState(false);
+  const [wisetackUrl, setWisetackUrl] = useState('');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -38,6 +40,8 @@ export default function QuotePageSection({
         const { settings } = await response.json();
         setQuoteTerms(settings.quote_terms?.value || '');
         setQuoteThanksContent(settings.quote_thanks_content?.value || '');
+        setWisetackEnabled(settings.wisetack_enabled?.value === 'true');
+        setWisetackUrl(settings.wisetack_url?.value || '');
       }
     } catch (error) {
       console.error('Error loading quote page settings:', error);
@@ -50,6 +54,8 @@ export default function QuotePageSection({
     onSave({
       quote_terms: quoteTerms,
       quote_thanks_content: quoteThanksContent,
+      wisetack_enabled: wisetackEnabled,
+      wisetack_url: wisetackUrl,
     });
   };
 
@@ -85,6 +91,35 @@ export default function QuotePageSection({
           This content will be displayed to customers after they successfully
           sign and submit the quote.
         </p>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Wisetack Financing</label>
+        <div className={styles.toggleRow}>
+          <input
+            type="checkbox"
+            id="wisetack-enabled"
+            checked={wisetackEnabled}
+            onChange={e => setWisetackEnabled(e.target.checked)}
+          />
+          <label htmlFor="wisetack-enabled">Enable Wisetack financing section on quote page</label>
+        </div>
+        {wisetackEnabled && (
+          <div style={{ marginTop: '12px' }}>
+            <label htmlFor="wisetack-url">Wisetack URL</label>
+            <input
+              type="url"
+              id="wisetack-url"
+              value={wisetackUrl}
+              onChange={e => setWisetackUrl(e.target.value)}
+              placeholder="https://apply.wisetack.com/..."
+              className={styles.textInput}
+            />
+            <p className={styles.fieldDescription}>
+              The pre-qualification link provided by Wisetack. Customers will be sent to this URL when they click &quot;Pre-Qualify By Clicking Here.&quot;
+            </p>
+          </div>
+        )}
       </div>
 
       <div className={styles.actions}>

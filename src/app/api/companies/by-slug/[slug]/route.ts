@@ -38,7 +38,7 @@ export async function GET(
     const { data: brandData, error: brandError } = await supabase
       .from('brands')
       .select(
-        'logo_url, icon_logo_url, primary_color_hex, secondary_color_hex, alternative_colors, font_primary_name, font_primary_url, font_secondary_name, font_secondary_url, primary_hero_image_url'
+        'logo_url, icon_logo_url, primary_color_hex, secondary_color_hex, alternative_colors, font_color_hex, font_primary_name, font_primary_url, font_secondary_name, font_secondary_url, primary_hero_image_url'
       )
       .eq('company_id', company.id)
       .single();
@@ -57,6 +57,8 @@ export async function GET(
         'terms_conditions_url',
         'quote_terms',
         'quote_thanks_content',
+        'wisetack_enabled',
+        'wisetack_url',
       ]);
 
     // Parse settings into usable format
@@ -91,6 +93,8 @@ export async function GET(
         terms_conditions_url: companySettings.terms_conditions_url,
         quote_terms: companySettings.quote_terms,
         quote_thanks_content: companySettings.quote_thanks_content,
+        wisetack_enabled: companySettings.wisetack_enabled === 'true',
+        wisetack_url: companySettings.wisetack_url || '',
       },
       branding: {
         logo_url: brandData?.logo_url || null,
@@ -98,6 +102,7 @@ export async function GET(
         primary_color: brandData?.primary_color_hex || null,
         secondary_color: brandData?.secondary_color_hex || null,
         alternative_colors: brandData?.alternative_colors || null,
+        font_color: brandData?.font_color_hex || null,
         font_primary_name: brandData?.font_primary_name || null,
         font_primary_url: brandData?.font_primary_url || null,
         font_secondary_name: brandData?.font_secondary_name || null,

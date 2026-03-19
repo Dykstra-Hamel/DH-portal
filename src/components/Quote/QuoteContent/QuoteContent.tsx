@@ -26,6 +26,7 @@ interface Branding {
   alternative_colors: AlternativeColor[];
   logo_url: string;
   icon_logo_url: string;
+  font_color?: string | null;
   font_primary_name?: string;
   font_secondary_name?: string;
   primary_hero_image_url?: string | null;
@@ -42,6 +43,8 @@ interface Company {
   terms_conditions_url: string;
   quote_terms: string;
   quote_thanks_content: string;
+  wisetack_enabled?: boolean;
+  wisetack_url?: string;
 }
 
 interface Quote {
@@ -51,6 +54,7 @@ interface Quote {
   total_initial_price: number;
   total_recurring_price: number;
   line_items: any[];
+  available_addons?: any[];
   signed_at: string | null;
   home_size_range: string | null;
   yard_size_range: string | null;
@@ -111,6 +115,7 @@ export default function QuoteContent({
     '/images/quote-hero-placeholder.svg'
   );
   const [expandedPlanIndexes, setExpandedPlanIndexes] = useState<number[]>([0]);
+  const [interestedInFinancing, setInterestedInFinancing] = useState(false);
   const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
   const [customerComment, setCustomerComment] = useState(
     quote.customer_comments || ''
@@ -244,13 +249,44 @@ export default function QuoteContent({
     return 0; // Keep original order if both same type
   });
 
+  const regularLineItems = sortedLineItems.filter(item => !item.addon_service_id);
+  const availableAddons = quote.available_addons || [];
+
+  // Pre-select any addons already saved as line items on the quote
+  const preSelectedAddonIds = sortedLineItems
+    .filter(item => item.addon_service_id)
+    .map(item => item.addon_service_id)
+    .filter((id: string) => availableAddons.some((a: any) => a.id === id));
+
+  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(preSelectedAddonIds);
+  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>(
+    regularLineItems.map(item => item.id)
+  );
+  const [expandedAddonIndexes, setExpandedAddonIndexes] = useState<number[]>([]);
+
+  const toggleAddon = (id: string) =>
+    setSelectedAddonIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+
+  const togglePlan = (id: string) =>
+    setSelectedPlanIds(prev => {
+      if (prev.includes(id)) {
+        // Enforce at least one plan must remain selected
+        if (prev.length <= 1) return prev;
+        return prev.filter(x => x !== id);
+      }
+      return [...prev, id];
+    });
+
   // Apply branding colors and font via CSS variables
   const brandingStyle = {
     '--brand-primary': branding?.primary_color,
     '--brand-secondary': branding?.secondary_color,
     '--accent-color': branding?.alternative_colors[0].hex,
+    '--color-text': branding?.font_color || undefined,
     '--primary-font': branding?.font_primary_name,
-    '--secondary-font': branding?.font_secondary_name,
+    '--secondary-font': branding?.font_secondary_name || branding?.font_primary_name,
   } as React.CSSProperties;
 
   // Handle step navigation
@@ -303,6 +339,9 @@ export default function QuoteContent({
           token: token,
           preferred_date: preferredDate,
           preferred_time: preferredTime,
+          selected_addon_ids: selectedAddonIds,
+          selected_plan_ids: selectedPlanIds,
+          interested_in_financing: interestedInFinancing,
           client_device_data: clientDeviceData,
         }),
       });
@@ -380,11 +419,17 @@ export default function QuoteContent({
           <div className={styles.quoteStep}>
             <div className={styles.contentArea}>
               <PlanDetails
-                quote={quote}
                 expandedPlanIndexes={expandedPlanIndexes}
                 setExpandedPlanIndexes={setExpandedPlanIndexes}
                 onContinue={handleNext}
-                sortedLineItems={sortedLineItems}
+                regularLineItems={regularLineItems}
+                availableAddons={availableAddons}
+                expandedAddonIndexes={expandedAddonIndexes}
+                setExpandedAddonIndexes={setExpandedAddonIndexes}
+                selectedAddonIds={selectedAddonIds}
+                onToggleAddon={toggleAddon}
+                selectedPlanIds={selectedPlanIds}
+                onTogglePlan={togglePlan}
               />
             </div>
           </div>
@@ -534,6 +579,46 @@ export default function QuoteContent({
                   </div>
                 </div>
               </div>
+              {company.wisetack_enabled && company.wisetack_url && (
+                <div className={styles.wisetackSection}>
+                  <div className={styles.wisetackBody}>
+                    <div>
+                      <h3 className={styles.wisetackTitle}>We Offer Financing</h3>
+                      <p className={styles.wisetackText}>
+                        Prefer to pay over time rather than all at once? We have the perfect solution.{' '}
+                        <a
+                          href={company.wisetack_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.wisetackLink}
+                        >
+                          Pre-Qualify By Clicking Here.
+                        </a>
+                      </p>
+                      <label className={styles.wisetackCheckboxLabel}>
+                        <span className={`${styles.wisetackCheckboxCustom} ${interestedInFinancing ? styles.wisetackCheckboxChecked : ''}`} />
+                        <input
+                          type="checkbox"
+                          checked={interestedInFinancing}
+                          onChange={e => setInterestedInFinancing(e.target.checked)}
+                          className={styles.wisetackCheckboxInput}
+                        />
+                        I am interested in Financing
+                      </label>
+                    </div>
+                    <div className={styles.wisetackLogoWrapper}>
+                      <Image
+                        src="/wisetack-financing-logo-white.png"
+                        alt="Wisetack"
+                        width={140}
+                        height={32}
+                        style={{ objectFit: 'contain' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className={styles.bottomButtonsWrapper}>
                 <button
                   type="button"
@@ -558,7 +643,14 @@ export default function QuoteContent({
           <div className={styles.quoteStepContent}>
             <div className={styles.contentArea}>
               <h2 className={styles.stepHeading}>Review and Sign Agreement</h2>
-              <QuoteTotalPricing quote={quote} lineItems={sortedLineItems} />
+              <QuoteTotalPricing
+                regularLineItems={regularLineItems}
+                availableAddons={availableAddons}
+                selectedAddonIds={selectedAddonIds}
+                onToggleAddon={toggleAddon}
+                selectedPlanIds={selectedPlanIds}
+                onTogglePlan={togglePlan}
+              />
 
               <div className={styles.reviewInfoSection}>
                 <div className={styles.reviewInfoContent}>
@@ -628,6 +720,28 @@ export default function QuoteContent({
                   />
                 </div>
               </div>
+
+              {company.wisetack_enabled && (
+                <div className={styles.wisetackFinancingRow}>
+                  <label className={styles.wisetackFinancingLabel}>
+                    <span className={`${styles.wisetackFinancingCheckbox} ${interestedInFinancing ? styles.wisetackFinancingCheckboxChecked : ''}`} />
+                    <input
+                      type="checkbox"
+                      checked={interestedInFinancing}
+                      onChange={e => setInterestedInFinancing(e.target.checked)}
+                      className={styles.wisetackCheckboxInput}
+                    />
+                    I&apos;m Interested In Financing
+                  </label>
+                  <Image
+                    src="/wisetack-financing-logo.png"
+                    alt="Wisetack"
+                    width={130}
+                    height={30}
+                    style={{ objectFit: 'contain' }}
+                  />
+                </div>
+              )}
 
               <div className={styles.termsSection}>
                 <h3>Terms and Conditions</h3>
@@ -788,12 +902,12 @@ export default function QuoteContent({
                 ))
               }
 
-              {quote.line_items
-                .filter((item: any) => item.addon_service?.addon_terms)
-                .map((item: any, i: number) => (
+              {availableAddons
+                .filter(addon => selectedAddonIds.includes(addon.id) && addon.addon_terms)
+                .map((addon: any, i: number) => (
                   <div key={`addon-terms-${i}`} className={styles.specificTermsBlock}>
-                    <h4>{item.addon_service.addon_name} &mdash; Terms and Conditions</h4>
-                    <div dangerouslySetInnerHTML={{ __html: item.addon_service.addon_terms }} />
+                    <h4>{addon.addon_name} &mdash; Terms and Conditions</h4>
+                    <div dangerouslySetInnerHTML={{ __html: addon.addon_terms }} />
                   </div>
                 ))
               }

@@ -331,6 +331,16 @@ export default function CompanyManagement({
                 type: 'string',
                 description: 'Content displayed on the quote thank you page',
               },
+              wisetack_enabled: {
+                value: String(updatedData.wisetack_enabled || false),
+                type: 'boolean',
+                description: 'Whether to show the Wisetack financing section on the quote page',
+              },
+              wisetack_url: {
+                value: updatedData.wisetack_url || '',
+                type: 'string',
+                description: 'Wisetack pre-qualification URL',
+              },
             },
           }),
         });
