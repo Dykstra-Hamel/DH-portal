@@ -177,8 +177,8 @@ function getOptionKeywords(option: PestOption): Set<string> {
       .filter(Boolean)
   );
 
-  if (tokens.has('rodent') || tokens.has('rodents')) {
-    ['rat', 'rats', 'mouse', 'mice'].forEach(token => tokens.add(token));
+  if (tokens.has('rodent') || tokens.has('rodents') || tokens.has('rat') || tokens.has('rats') || tokens.has('mouse') || tokens.has('mice')) {
+    ['rodent', 'rodents', 'rat', 'rats', 'mouse', 'mice'].forEach(token => tokens.add(token));
   }
 
   if (tokens.has('cockroach') || tokens.has('cockroaches') || tokens.has('roaches')) {
@@ -236,7 +236,18 @@ function findBestPestMatch(aiResult: AIResult, pestOptions: PestOption[]): PestO
 
   if (!candidateText) return null;
 
-  const candidateTokens = new Set(candidateText.split(' ').filter(Boolean));
+  const rawTokens = new Set(candidateText.split(' ').filter(Boolean));
+
+  // Expand rodent-family synonyms in both directions so "rodents" matches "Mice & Rats" options
+  if (rawTokens.has('rodent') || rawTokens.has('rodents') || rawTokens.has('rat') || rawTokens.has('rats') || rawTokens.has('mouse') || rawTokens.has('mice')) {
+    ['rodent', 'rodents', 'rat', 'rats', 'mouse', 'mice'].forEach(t => rawTokens.add(t));
+  }
+  // Expand cockroach synonyms
+  if (rawTokens.has('roach') || rawTokens.has('roaches') || rawTokens.has('cockroach') || rawTokens.has('cockroaches')) {
+    ['roach', 'roaches', 'cockroach', 'cockroaches'].forEach(t => rawTokens.add(t));
+  }
+
+  const candidateTokens = rawTokens;
   let bestMatch: { option: PestOption; score: number } | null = null;
 
   pestOptions.forEach(option => {
@@ -1773,7 +1784,7 @@ function StepReview({
 export function NewOpportunityWizard() {
   const router = useRouter();
   const { selectedCompany } = useCompany();
-  const { setWizardTitle } = useWizard();
+  const { setWizardTitle, setBackInterceptor } = useWizard();
 
   const wizardContainerRef = useRef<HTMLDivElement>(null);
   const [stepIndex, setStepIndex] = useState(0);
@@ -1787,9 +1798,22 @@ export function NewOpportunityWizard() {
   useEffect(() => {
     return () => { setWizardTitle(null); };
   }, [setWizardTitle]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(false);
+  const [submitMode, setSubmitMode] = useState<'default' | 'schedule' | 'service-today'>('default');
+  const [showExitPrompt, setShowExitPrompt] = useState(false);
+
+  // Register a back interceptor when the wizard has progress; clear it when at step 0 or done
+  useEffect(() => {
+    if (stepIndex > 0 && !isDone) {
+      setBackInterceptor(() => setShowExitPrompt(true));
+    } else {
+      setBackInterceptor(null);
+    }
+    return () => { setBackInterceptor(null); };
+  }, [stepIndex, isDone, setBackInterceptor]);
   const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -1905,6 +1929,7 @@ export function NewOpportunityWizard() {
         leadType, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
         selectedPestValue, otherPest, hasManualPestSelection,
         selectedCustomer, selectedPestPacClient, selectedServicePlan,
+        savedAt: new Date().toISOString(),
         newCustomerForm: {
           firstName: newCustomerForm.firstName,
           lastName: newCustomerForm.lastName,
@@ -2051,11 +2076,12 @@ export function NewOpportunityWizard() {
       const data = await res.json();
       setAIResult(data);
 
-      // Auto-select pest option using AI's matched name
-      if (data.matched_pest_option && !hasManualPestSelection) {
-        const match = pestOptions.find(
-          p => p.name.toLowerCase() === data.matched_pest_option.toLowerCase()
-        );
+      // Auto-select pest option: try exact name match first, then fuzzy fallback
+      if (!hasManualPestSelection) {
+        const exactMatch = data.matched_pest_option
+          ? pestOptions.find(p => p.name.toLowerCase() === data.matched_pest_option!.toLowerCase())
+          : null;
+        const match = exactMatch ?? findBestPestMatch(data, pestOptions);
         if (match) setSelectedPestValue(match.id);
       }
 
@@ -2197,6 +2223,7 @@ export function NewOpportunityWizard() {
       }
 
       clearDraft();
+      setSubmitMode(mode);
       setIsDone(true);
     } catch (err: any) {
       setSubmitError(err.message ?? 'Failed to create lead. Please try again.');
@@ -2207,11 +2234,54 @@ export function NewOpportunityWizard() {
 
   // Thank You screen
   if (isDone) {
+    const customerFirstName = selectedCustomer?.first_name ?? null;
+    const customerFullName = [selectedCustomer?.first_name, selectedCustomer?.last_name].filter(Boolean).join(' ') || null;
+    const companyPhone = selectedCompany?.phone ?? null;
+    const isSchedule = submitMode === 'schedule';
+
     return (
       <div className={styles.thankYouScreen}>
-        <div className={styles.thankYouIcon}>✅</div>
-        <h2 className={styles.thankYouTitle}>Opportunity Submitted!</h2>
-        <p className={styles.thankYouDesc}>The lead has been created successfully.</p>
+        <div className={styles.thankYouIcon}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 20 20" fill="none">
+            <g clipPath="url(#clip0_thankyou_check)">
+              <path
+                d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              />
+              <path
+                d="M7.5 9.16671L10 11.6667L18.3333 3.33337"
+                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              />
+            </g>
+            <defs>
+              <clipPath id="clip0_thankyou_check">
+                <rect width="20" height="20" fill="white" />
+              </clipPath>
+            </defs>
+          </svg>
+        </div>
+        <h2 className={styles.thankYouTitle}>
+          {isSchedule ? 'Time to Schedule!' : 'Opportunity Submitted!'}
+        </h2>
+        {isSchedule ? (
+          <div className={styles.scheduleCallout}>
+            <p className={styles.scheduleCalloutText}>
+              Let&apos;s get{customerFirstName ? ` ${customerFirstName}` : ''} on the books.
+            </p>
+            {companyPhone ? (
+              <>
+                <a href={`tel:${companyPhone}`} className={styles.scheduleCallBtn}>
+                  Call the office now
+                </a>
+                <p className={styles.schedulePhoneDisplay}>{companyPhone}</p>
+              </>
+            ) : (
+              <p className={styles.thankYouDesc}>Call the office to get{customerFullName ? ` ${customerFullName}` : ' this customer'} scheduled.</p>
+            )}
+          </div>
+        ) : (
+          <p className={styles.thankYouDesc}>The lead has been created successfully.</p>
+        )}
         <div className={styles.thankYouActions}>
           <button className={styles.primaryBtn} onClick={resetWizard}>
             Start Another
@@ -2620,6 +2690,44 @@ export function NewOpportunityWizard() {
 
       {syncError && <p className={styles.submitError}>{syncError}</p>}
       {submitError && <p className={styles.submitError}>{submitError}</p>}
+
+      {/* Exit prompt modal */}
+      {showExitPrompt && (
+        <div className={styles.exitPromptOverlay} onClick={() => setShowExitPrompt(false)}>
+          <div className={styles.exitPromptSheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.exitPromptTitle}>Leave opportunity?</p>
+            <p className={styles.exitPromptBody}>Your progress has been saved as a draft. You can restore it from My Opportunities.</p>
+            <button
+              type="button"
+              className={styles.exitSaveDraftBtn}
+              onClick={() => {
+                setShowExitPrompt(false);
+                router.back();
+              }}
+            >
+              Save as Draft
+            </button>
+            <button
+              type="button"
+              className={styles.exitDiscardBtn}
+              onClick={() => {
+                setShowExitPrompt(false);
+                clearDraft();
+                router.back();
+              }}
+            >
+              Discard
+            </button>
+            <button
+              type="button"
+              className={styles.exitCancelBtn}
+              onClick={() => setShowExitPrompt(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

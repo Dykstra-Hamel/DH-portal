@@ -10,14 +10,25 @@ export async function getHomeRoute(
   userId: string
 ): Promise<string> {
   try {
-    // Get user's primary company role
-    const { data: userCompany } = await supabase
+    // Prefer the primary company; fall back to any company the user belongs to
+    let { data: userCompany } = await supabase
       .from('user_companies')
       .select('role, company_id')
       .eq('user_id', userId)
       .eq('is_primary', true)
-      .single();
+      .maybeSingle();
 
+    if (!userCompany) {
+      const { data: anyCompany } = await supabase
+        .from('user_companies')
+        .select('role, company_id')
+        .eq('user_id', userId)
+        .limit(1)
+        .maybeSingle();
+      userCompany = anyCompany;
+    }
+
+    // Non-members (company_admin, company_manager) and missing records go to dashboard
     if (!userCompany || userCompany.role !== 'member') {
       return '/tickets/dashboard';
     }
@@ -31,6 +42,7 @@ export async function getHomeRoute(
 
     const departments = (depts ?? []).map((d: { department: string }) => d.department);
 
+    // Only redirect to /tech-leads if the ONLY department is technician
     if (
       departments.length > 0 &&
       departments.every((d: string) => d === 'technician')

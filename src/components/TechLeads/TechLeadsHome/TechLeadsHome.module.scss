@@ -85,7 +85,8 @@
 }
 
 .statsRow {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
   padding-top: 8px;
 }
@@ -105,8 +106,20 @@
 .statNumber {
   font-size: 28px;
   font-weight: 700;
-  color: var(--blue-500);
+  color: var(--slate-700);
   font-family: var(--font-satoshi);
+}
+
+.statNumberWon {
+  color: var(--green-500);
+}
+
+.statNumberScheduled {
+  color: var(--blue-500);
+}
+
+.statNumberLost {
+  color: var(--error-600);
 }
 
 .statLabel {

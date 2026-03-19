@@ -45,7 +45,38 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
     }
 
-    return NextResponse.json({ submitted: submitted ?? 0, won: won ?? 0 });
+    const { count: lost, error: lostError } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_source', 'technician')
+      .eq('submitted_by', user.id)
+      .eq('company_id', companyId)
+      .eq('lead_status', 'lost');
+
+    if (lostError) {
+      console.error('Error fetching lost count:', lostError);
+      return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
+    }
+
+    const { count: scheduled, error: scheduledError } = await supabase
+      .from('leads')
+      .select('id', { count: 'exact', head: true })
+      .eq('lead_source', 'technician')
+      .eq('submitted_by', user.id)
+      .eq('company_id', companyId)
+      .eq('lead_status', 'scheduling');
+
+    if (scheduledError) {
+      console.error('Error fetching scheduled count:', scheduledError);
+      return NextResponse.json({ error: 'Failed to fetch stats' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      submitted: submitted ?? 0,
+      won: won ?? 0,
+      lost: lost ?? 0,
+      scheduled: scheduled ?? 0,
+    });
   } catch (error) {
     console.error('Unexpected error in tech-leads stats:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

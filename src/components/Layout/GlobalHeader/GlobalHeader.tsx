@@ -23,7 +23,7 @@ export function GlobalHeader({
 }: GlobalHeaderProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const { wizardTitle } = useWizard();
+  const { wizardTitle, backInterceptor } = useWizard();
   const isTechLeads = pathname.startsWith('/tech-leads');
   const hideSearch =
     isTechLeads ||
@@ -64,7 +64,13 @@ export function GlobalHeader({
             <button
               type="button"
               className={styles.backButton}
-              onClick={() => router.back()}
+              onClick={() => {
+                if (backInterceptor) {
+                  backInterceptor();
+                } else {
+                  router.back();
+                }
+              }}
               aria-label="Go back"
             >
               <ArrowLeft size={16} />

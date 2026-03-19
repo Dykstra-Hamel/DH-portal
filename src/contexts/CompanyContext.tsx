@@ -19,6 +19,7 @@ import { getCached, setCached, clearCache, clearCacheByPrefix, CACHE_KEYS } from
 export interface Company {
   id: string;
   name: string;
+  phone?: string | null;
   branding?: BrandData | null;
 }
 
@@ -215,7 +216,8 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
             *,
             companies (
               id,
-              name
+              name,
+              phone
             )
           `
             )
