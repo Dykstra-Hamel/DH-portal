@@ -526,7 +526,7 @@ export const workflowExecuteHandler = inngest.createFunction(
                 leadId,
                 companyId,
                 currentStep.type,
-                currentStep.type === 'send_sms' ? result?.conversationId : undefined
+                currentStep.type === 'send_sms' ? (result as { conversationId?: string })?.conversationId : undefined
               );
             }
 
