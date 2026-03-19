@@ -458,6 +458,7 @@ export function LeadQuoteSection({
       ? pestOptions.find(
           (pest: any) =>
             pest.name.toLowerCase() === primaryPestValue.toLowerCase() ||
+            pest.custom_label?.toLowerCase() === primaryPestValue.toLowerCase() ||
             pest.slug === primaryPestValue
         )
       : null;

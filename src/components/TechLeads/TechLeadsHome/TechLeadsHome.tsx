@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Truck } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import { TechLeadsNav } from '@/components/TechLeads/TechLeadsNav/TechLeadsNav';
 import styles from './TechLeadsHome.module.scss';
@@ -10,12 +11,52 @@ import styles from './TechLeadsHome.module.scss';
 interface Stats {
   submitted: number;
   won: number;
+  lost: number;
+  scheduled: number;
+}
+
+function useCountUp(target: number, duration = 800): number {
+  const [display, setDisplay] = useState(0);
+  const rafRef = useRef<number | null>(null);
+  const startRef = useRef<number | null>(null);
+  const fromRef = useRef(0);
+
+  useEffect(() => {
+    if (target === 0) {
+      setDisplay(0);
+      return;
+    }
+    fromRef.current = 0;
+    startRef.current = null;
+
+    const animate = (timestamp: number) => {
+      if (startRef.current === null) startRef.current = timestamp;
+      const elapsed = timestamp - startRef.current;
+      const progress = Math.min(elapsed / duration, 1);
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(fromRef.current + (target - fromRef.current) * eased));
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+    return () => { if (rafRef.current !== null) cancelAnimationFrame(rafRef.current); };
+  }, [target, duration]);
+
+  return display;
 }
 
 export function TechLeadsHome() {
   const router = useRouter();
   const { selectedCompany } = useCompany();
-  const [stats, setStats] = useState<Stats>({ submitted: 0, won: 0 });
+  const [stats, setStats] = useState<Stats>({ submitted: 0, won: 0, lost: 0, scheduled: 0 });
+
+  const submittedDisplay = useCountUp(stats.submitted);
+  const wonDisplay = useCountUp(stats.won);
+  const scheduledDisplay = useCountUp(stats.scheduled);
+  const lostDisplay = useCountUp(stats.lost);
 
   useEffect(() => {
     if (!selectedCompany?.id) return;
@@ -49,21 +90,7 @@ export function TechLeadsHome() {
                 style={{ objectFit: 'contain' }}
               />
             ) : (
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="32"
-                height="32"
-                viewBox="0 0 24 24"
-                fill="none"
-              >
-                <path
-                  d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <Truck size={32} />
             )}
           </div>
           <h1 className={styles.title}>TechLeads</h1>
@@ -82,12 +109,20 @@ export function TechLeadsHome() {
 
         <div className={styles.statsRow}>
           <div className={styles.statCard}>
-            <span className={styles.statNumber}>{stats.submitted}</span>
+            <span className={styles.statNumber}>{submittedDisplay}</span>
             <span className={styles.statLabel}>Submitted</span>
           </div>
           <div className={styles.statCard}>
-            <span className={styles.statNumber}>{stats.won}</span>
+            <span className={`${styles.statNumber} ${styles.statNumberWon}`}>{wonDisplay}</span>
             <span className={styles.statLabel}>Won</span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={`${styles.statNumber} ${styles.statNumberScheduled}`}>{scheduledDisplay}</span>
+            <span className={styles.statLabel}>Scheduled</span>
+          </div>
+          <div className={styles.statCard}>
+            <span className={`${styles.statNumber} ${styles.statNumberLost}`}>{lostDisplay}</span>
+            <span className={styles.statLabel}>Lost</span>
           </div>
         </div>
       </div>

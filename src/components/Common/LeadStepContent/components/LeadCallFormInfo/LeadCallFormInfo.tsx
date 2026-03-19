@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Pencil, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, X, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
 import { Lead, LeadSource } from '@/types/lead';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
@@ -168,9 +168,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             <div className={styles.callDetailItem}>
               <span className={cardStyles.dataLabel}>Source</span>
               <span className={cardStyles.dataText} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
-                </svg>
+                <Truck size={16} strokeWidth={1.5} />
                 Tech
               </span>
             </div>
