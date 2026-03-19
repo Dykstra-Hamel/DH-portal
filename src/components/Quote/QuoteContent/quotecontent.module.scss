@@ -307,7 +307,6 @@
   border: none;
   border-radius: 0;
   margin-bottom: 24px;
-  overflow: hidden;
   transition: all 0.3s ease;
 
   &.collapsible {
@@ -374,7 +373,7 @@
 .planHeaderRecurring {
   font-size: 24px;
   font-weight: 700;
-  color: var(--brand-primary, #000);
+  color: var(--gray-700);
 
   sup {
     font-size: 16px;
@@ -548,7 +547,7 @@
   position: relative;
   font-size: 64px;
   font-weight: 700;
-  color: var(--brand-primary);
+  color: var(--gray-700);
   line-height: 105%;
 
   sup {
@@ -598,27 +597,25 @@
 }
 
 .priceInitial {
-  color: var(--brand-primary);
+  color: var(--gray-700);
   font-size: 24px;
   font-weight: 500;
-  line-height: 18px; /* 75% */
   display: flex;
-  align-items: baseline;
-  gap: 5px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  line-height: normal;
 
   @media (max-width: 640px) {
     font-size: 20px;
   }
+}
 
-  .priceDollar {
-    font-size: 24px;
-    margin-right: 2px;
-    margin-top: 0;
-
-    @media (max-width: 640px) {
-      font-size: 15px;
-    }
-  }
+.initialLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--color-text-gray);
 }
 
 .priceNumber {
@@ -958,13 +955,12 @@
   span {
     font-size: 18px;
     font-weight: 600;
-    color: var(--brand-primary);
   }
 
   strong {
     font-size: 26px;
     font-weight: 700;
-    color: var(--brand-primary);
+    color: var(--gray-700);
 
     sup {
       font-size: 16px;
@@ -974,33 +970,94 @@
 
 .totalListWrapper {
   width: 100%;
+  border-top: 1px solid var(--gray-300);
+  padding-top: 10px;
+  margin-top: 10px;
 }
 
 .totalItemsList {
   list-style: none;
-  margin: 8px auto 8px 0;
-  gap: 10px 40px;
-  width: 50%;
-  display: grid;
-  grid-template-columns: auto auto;
+  margin: 8px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
 
-  li {
-    min-width: 245px;
-  }
+.totalSectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--color-text-gray);
+  margin-top: 4px;
 
-  @media (width < 768px) {
-    grid-template-columns: 1fr;
+  &:first-child {
+    margin-top: 0;
   }
 }
 
 .totalItem {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  line-height: 1;
-  font-weight: 400;
-  color: var(--color-text-gray);
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 16px;
+  line-height: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.totalItemUnselected {
+  color: #9ca3af;
+}
+
+.totalItemLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.totalItemPrice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 0;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+  }
+}
+
+.totalItemPriceRecurring {
+  font-size: 14px;
+  font-weight: 700;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.totalItemPriceInitial {
+  font-size: 14px;
+  font-weight: 700;
+  color: #9ca3af;
+  white-space: nowrap;
+
+  &::before {
+    content: '/ ';
+    margin-left: 4px;
+
+    @media (max-width: 768px) {
+      display: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    font-size: 12px;
+    font-weight: 500;
+  }
 }
 
 .totalItemCheckmark {
@@ -2510,5 +2567,277 @@
 
   &:hover {
     background: #374151;
+  }
+}
+
+// ========================================
+// WISETACK FINANCING SECTION
+// ========================================
+
+.wisetackSection {
+  width: 1080px;
+  max-width: 100%;
+  margin: 24px auto 0;
+  border-radius: 12px;
+  background: #053b84;
+  overflow: hidden;
+}
+
+.wisetackBody {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 24px 28px;
+  gap: 16px;
+
+  @media (max-width: 600px) {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
+.wisetackTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #fff !important;
+  margin-bottom: 10px;
+  font-family: var(--primary-font), serif;
+}
+
+.wisetackText {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 16px;
+  line-height: 1.5;
+}
+
+.wisetackLink {
+  color: #fff;
+  font-weight: 700;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.wisetackCheckboxLabel {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 500;
+  color: #fff;
+  user-select: none;
+}
+
+.wisetackCheckboxInput {
+  display: none;
+}
+
+.wisetackCheckboxCustom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid #fff;
+  border-radius: 4px;
+  background: #fff;
+  flex-shrink: 0;
+}
+
+.wisetackCheckboxChecked {
+  &::after {
+    content: '';
+    display: block;
+    width: 12px;
+    height: 10px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1' stroke='%23053B84' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+}
+
+// Light bordered financing row on step 3
+.wisetackFinancingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border: 1px solid var(--gray-300);
+  border-radius: 12px;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.wisetackFinancingLabel {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 44px;
+  letter-spacing: -0.48px;
+  color: var(--brand-primary);
+  user-select: none;
+}
+
+.wisetackFinancingCheckbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--brand-primary);
+  border-radius: 4px;
+  background: #fff;
+  flex-shrink: 0;
+  transition: background 0.2s;
+}
+
+.wisetackFinancingCheckboxChecked {
+  background: var(--brand-primary);
+
+  &::after {
+    content: '';
+    display: block;
+    width: 16px;
+    height: 13px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+  }
+}
+
+.wisetackLogoWrapper {
+  flex-shrink: 0;
+
+  @media (max-width: 600px) {
+    align-self: flex-end;
+  }
+}
+
+// ========================================
+// ADD-ON SERVICES SECTION
+// ========================================
+
+.addonsSection {
+  margin-bottom: 40px;
+
+  h2 {
+    margin-bottom: 32px;
+  }
+}
+
+// Custom checkbox used in addon plan headers and total section
+.addonCheckbox {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  input[type='checkbox'] {
+    display: none;
+  }
+}
+
+.addonCheckboxCustom {
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--gray-300);
+  border-radius: 4px;
+  background: white;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s;
+  flex-shrink: 0;
+}
+
+.addonCheckboxDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+// Label wrapper for the last-remaining-plan checkbox — shows tooltip on hover
+.addonCheckboxLastPlan {
+  position: relative;
+
+  &::after {
+    content: 'At least one service must be selected';
+    position: absolute;
+    bottom: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #1f2937;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    white-space: nowrap;
+    padding: 6px 10px;
+    border-radius: 6px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 20;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    bottom: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: #1f2937;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    z-index: 20;
+  }
+
+  &:hover::after,
+  &:hover::before {
+    opacity: 1;
+  }
+}
+
+.addonCheckbox:has(input:checked) .addonCheckboxCustom {
+  border-color: var(--brand-primary);
+  background-color: var(--brand-primary);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='13' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 16px 13px;
+}
+
+// Deselected addon card — visually dimmed
+.addonDeselected {
+  opacity: 0.55;
+}
+
+// Terms & Conditions block inside expanded addon card
+.addonTerms {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid var(--gray-300);
+
+  h4 {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--color-text-gray);
+  }
+
+  div {
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--color-text-gray);
   }
 }
