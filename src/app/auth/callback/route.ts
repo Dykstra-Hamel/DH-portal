@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { getHomeRoute } from '@/lib/supabase/get-home-route';
 
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
   const token_hash = searchParams.get('token_hash');
   const type = searchParams.get('type');
-  const next = searchParams.get('next') ?? '/tickets/dashboard';
+  const next = searchParams.get('next') ?? null;
 
   const supabase = await createClient();
 
@@ -31,8 +32,10 @@ export async function GET(request: NextRequest) {
             .eq('id', user.id)
             .is('avatar_url', null);
         }
+        const destination = next ?? await getHomeRoute(supabase, user.id);
+        return NextResponse.redirect(`${origin}${destination}`);
       }
-      return NextResponse.redirect(`${origin}${next}`);
+      return NextResponse.redirect(`${origin}/tickets/dashboard`);
     }
   }
 
@@ -43,7 +46,9 @@ export async function GET(request: NextRequest) {
       token_hash,
     });
     if (!error) {
-      return NextResponse.redirect(`${origin}${next}`);
+      const { data: { user } } = await supabase.auth.getUser();
+      const destination = next ?? (user ? await getHomeRoute(supabase, user.id) : '/tickets/dashboard');
+      return NextResponse.redirect(`${origin}${destination}`);
     }
   }
 

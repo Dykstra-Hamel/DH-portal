@@ -23,6 +23,7 @@ import {
   FileCheck,
   CheckSquare,
   Brain,
+  Puzzle,
 } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
@@ -35,6 +36,7 @@ import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
+import PestPacSettingsManager from './PestPacSettingsManager';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './CompanyManagement.module.scss';
@@ -96,7 +98,8 @@ type ActiveSection =
   | 'discounts'
   | 'email-domain'
   | 'quote-page'
-  | 'ai-content';
+  | 'ai-content'
+  | 'integrations';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -576,6 +579,7 @@ export default function CompanyManagement({
     { id: 'email-domain', label: 'Email Domain', icon: Mail },
     { id: 'quote-page', label: 'Quote Page', icon: FileCheck },
     { id: 'ai-content', label: 'AI Content', icon: Brain },
+    { id: 'integrations', label: 'Integrations', icon: Puzzle },
   ] as const;
 
   return (
@@ -712,6 +716,9 @@ export default function CompanyManagement({
               onSave={data => handleSave('quote-page', data)}
               saving={saving}
             />
+          )}
+          {activeSection === 'integrations' && (
+            <PestPacSettingsManager companyId={companyId} />
           )}
         </div>
       </div>

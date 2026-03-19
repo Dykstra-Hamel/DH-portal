@@ -1334,6 +1334,8 @@ export async function PUT(
               final_initial_price: finalInitialPrice,
               final_recurring_price: finalRecurringPrice,
               display_order: lineItem.display_order || 0,
+              is_optional: (lineItem as any).is_optional ?? false,
+              is_selected: true,
             };
 
             await supabase
@@ -1374,6 +1376,8 @@ export async function PUT(
               is_custom_priced: isCustomPriced,
               custom_initial_price: isCustomPriced ? customInitialPrice : null,
               custom_recurring_price: isCustomPriced ? customRecurringPrice : null,
+              is_optional: (lineItem as any).is_optional ?? false,
+              is_selected: true,
             };
 
             if (lineItem.id) {
@@ -1753,6 +1757,8 @@ export async function PUT(
               discount_percentage: 0,
               discount_amount: 0,
               is_custom_priced: false,
+              is_optional: (lineItem as any).is_optional ?? false,
+              is_selected: true,
             };
 
             if (lineItem.id) {
@@ -1774,11 +1780,12 @@ export async function PUT(
         }
       }
 
-      // Recalculate quote totals
+      // Recalculate quote totals — only count selected items
       const { data: lineItems } = await supabase
         .from('quote_line_items')
         .select('final_initial_price, final_recurring_price')
-        .eq('quote_id', id);
+        .eq('quote_id', id)
+        .eq('is_selected', true);
 
       if (lineItems) {
         const totalInitialPrice = lineItems.reduce((sum, item) => sum + (item.final_initial_price || 0), 0);

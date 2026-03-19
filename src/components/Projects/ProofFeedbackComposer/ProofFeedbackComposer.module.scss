@@ -1,12 +1,11 @@
 .composer {
-  position: absolute;
-  z-index: 50;
   width: min(280px, calc(100vw - 24px));
   background: white;
   border: 1px solid var(--gray-200, #e5e7eb);
   border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
   padding: 12px;
+  cursor: pointer;
 }
 
 .editor {

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useStarredItems } from '@/hooks/useStarredItems';
+import { useLocalStorageFilter } from '@/hooks/useLocalStorageFilter';
 import ProjectForm from '@/components/Projects/ProjectForm/ProjectForm';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { ProjectKanbanView } from '@/components/ProjectManagement/ProjectKanbanView/ProjectKanbanView';
@@ -64,8 +65,8 @@ export default function AdminProjectManagementDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTasksLoading, setIsTasksLoading] = useState(false);
 
-  // Category filtering state
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  // Category filtering state (persisted to localStorage)
+  const [selectedCategoryId, setSelectedCategoryId] = useLocalStorageFilter('pm.selectedCategoryId');
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
 
   // Department state
@@ -74,11 +75,11 @@ export default function AdminProjectManagementDashboard() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Project filter state
-  const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
-  const [filterAssignedTo, setFilterAssignedTo] = useState<string | null>(null);
-  const [filterMemberId, setFilterMemberId] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  // Project filter state (persisted to localStorage)
+  const [filterCompanyId, setFilterCompanyId] = useLocalStorageFilter('pm.filterCompanyId');
+  const [filterAssignedTo, setFilterAssignedTo] = useLocalStorageFilter('pm.filterAssignedTo');
+  const [filterMemberId, setFilterMemberId] = useLocalStorageFilter('pm.filterMemberId');
+  const [filterStatus, setFilterStatus] = useLocalStorageFilter('pm.filterStatus');
 
   // Realtime subscription refs
   const subscriptionActiveRef = useRef(false);

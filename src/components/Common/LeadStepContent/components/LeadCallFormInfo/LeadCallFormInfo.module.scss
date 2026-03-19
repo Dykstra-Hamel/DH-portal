@@ -25,6 +25,12 @@
   gap: 4px;
 }
 
+.submittedByValue {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .callDetailsSection {
   margin-top: 24px;
 }
@@ -62,6 +68,14 @@
   border-radius: 8px;
   max-height: 300px;
   overflow-y: auto;
+}
+
+.summaryPlainContent {
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  max-height: none;
+  overflow: visible;
 }
 
 .toggleContainer {
@@ -221,4 +235,116 @@
   .callInsightsGrid {
     grid-template-columns: 1fr;
   }
+}
+
+.techPhotoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.techPhotoThumb {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid var(--border-color);
+  transition: opacity 0.15s, transform 0.15s;
+
+  &:hover {
+    opacity: 0.85;
+  }
+}
+
+.techPhotoBtn {
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 6px;
+  overflow: hidden;
+  display: block;
+
+  &:hover .techPhotoThumb {
+    opacity: 0.85;
+    transform: scale(1.03);
+  }
+}
+
+// Lightbox
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.88);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  z-index: 1;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.lightboxNav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.15);
+  border: none;
+  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  cursor: pointer;
+  z-index: 1;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.25);
+  }
+}
+
+.lightboxNavPrev { left: 16px; }
+.lightboxNavNext { right: 16px; }
+
+.lightboxImgWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.lightboxImg {
+  max-width: 90vw;
+  max-height: 82vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.lightboxCounter {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  margin-top: 12px;
 }

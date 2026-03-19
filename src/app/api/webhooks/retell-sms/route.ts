@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { inngest } from '@/lib/inngest/client';
+import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
 
 interface RetellSMSWebhookPayload {
   event: string;
@@ -326,22 +328,47 @@ async function handleDeliveryStatus(
 }
 
 async function handleInboundMessage(
-  supabase: any, 
-  conversation: any, 
+  supabase: any,
+  conversation: any,
   message: any
 ) {
   try {
-    // Future: Implement inbound message handling logic
-    // This could include:
-    // - Notifying team members
-    // - Analyzing message content for keywords
-    // - Triggering follow-up automations
-    
     console.log('Processing inbound SMS message:', {
       conversation_id: conversation.id,
       customer_number: conversation.customer_number,
       content_preview: message.content.substring(0, 50) + '...'
     });
+
+    // Campaign attribution check for inbound SMS
+    if (conversation.customer_id && conversation.company_id) {
+      const attribution = await detectCampaignAttribution(
+        supabase,
+        conversation.customer_id,
+        conversation.company_id
+      );
+
+      if (attribution) {
+        const alreadyResponded = await hasRecentResponse(
+          supabase,
+          conversation.customer_id,
+          attribution.campaignId
+        );
+
+        if (!alreadyResponded) {
+          await inngest.send({
+            name: 'campaign/response-detected',
+            data: {
+              conversationId: conversation.id,
+              campaignId: attribution.campaignId,
+              campaignName: attribution.campaignName,
+              customerId: conversation.customer_id,
+              companyId: conversation.company_id,
+              responseType: 'sms',
+            },
+          });
+        }
+      }
+    }
 
   } catch (error) {
     console.error('Error handling inbound message:', error);

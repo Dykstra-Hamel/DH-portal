@@ -11,6 +11,7 @@ import type { FilterOption } from '@/components/Common/FilterPanel/FilterPanel';
 import { Modal, ModalTop, ModalMiddle, ModalBottom } from '@/components/Common/Modal/Modal';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
 import { useStarredItems } from '@/hooks/useStarredItems';
+import { useLocalStorageFilter } from '@/hooks/useLocalStorageFilter';
 import { ProjectTask } from '@/types/project';
 import {
   createAdminContentPieceChannel,
@@ -123,9 +124,9 @@ export function ContentCalendar() {
   const [editTopic, setEditTopic] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
-  const [filterContentType, setFilterContentType] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  const [filterCompanyId, setFilterCompanyId] = useLocalStorageFilter('contentCalendar.filterCompanyId');
+  const [filterContentType, setFilterContentType] = useLocalStorageFilter('contentCalendar.filterContentType');
+  const [filterStatus, setFilterStatus] = useLocalStorageFilter('contentCalendar.filterStatus');
 
   const [selectedTask, setSelectedTask] = useState<ProjectTask | null>(null);
   const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);

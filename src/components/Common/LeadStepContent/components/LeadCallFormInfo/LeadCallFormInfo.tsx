@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Pencil } from 'lucide-react';
+import { Pencil, X, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
 import { Lead, LeadSource } from '@/types/lead';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { authenticatedFetch } from '@/lib/api-client';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
@@ -15,6 +17,32 @@ interface LeadCallFormInfoProps {
 
 export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
   const [showCallSummary, setShowCallSummary] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [portalContainer, setPortalContainer] = useState<Element | null>(null);
+
+  useEffect(() => {
+    setPortalContainer(document.querySelector('[data-scroll-container="main"]'));
+  }, []);
+
+  const photoUrls = lead.photo_urls ?? [];
+
+  const thumbUrl = (url: string) => url;
+
+  const openLightbox = (i: number) => setLightboxIndex(i);
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  const prevPhoto = useCallback(() => setLightboxIndex(i => (i !== null ? (i - 1 + photoUrls.length) % photoUrls.length : null)), [photoUrls.length]);
+  const nextPhoto = useCallback(() => setLightboxIndex(i => (i !== null ? (i + 1) % photoUrls.length : null)), [photoUrls.length]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+      if (e.key === 'ArrowLeft') prevPhoto();
+      if (e.key === 'ArrowRight') nextPhoto();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxIndex, closeLightbox, prevPhoto, nextPhoto]);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editData, setEditData] = useState({
@@ -92,6 +120,32 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
     });
   };
 
+  const renderSubmittedBy = () => {
+    if (!lead.submitted_user) return null;
+
+    const submittedName =
+      [lead.submitted_user.first_name, lead.submitted_user.last_name]
+        .filter(Boolean)
+        .join(' ') || lead.submitted_user.email;
+
+    return (
+      <div className={styles.callDetailItem}>
+        <span className={cardStyles.dataLabel}>Submitted By</span>
+        <span className={`${cardStyles.dataText} ${styles.submittedByValue}`}>
+          <MiniAvatar
+            firstName={lead.submitted_user.first_name || undefined}
+            lastName={lead.submitted_user.last_name || undefined}
+            email={lead.submitted_user.email}
+            avatarUrl={lead.submitted_user.avatar_url || null}
+            size="small"
+            showTooltip={true}
+          />
+          {submittedName}
+        </span>
+      </div>
+    );
+  };
+
   const handleSaveAttribution = async () => {
     setIsSaving(true);
     try {
@@ -108,7 +162,89 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
 
   return (
     <>
-      {lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' || lead.lead_source === 'campaign' ? (
+      {lead.lead_source === 'technician' ? (
+        <div className={styles.cardContent}>
+          <div className={styles.callInsightsGrid}>
+            <div className={styles.callDetailItem}>
+              <span className={cardStyles.dataLabel}>Source</span>
+              <span className={cardStyles.dataText} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Truck size={16} strokeWidth={1.5} />
+                Tech
+              </span>
+            </div>
+            {renderSubmittedBy()}
+          </div>
+          {lead.comments && (
+            <div className={styles.transcriptSection}>
+              <div className={styles.transcriptHeader}>
+                <h4 className={cardStyles.dataLabel}>AI Summary</h4>
+              </div>
+              <div className={styles.summaryPlainContent}>
+                <span className={cardStyles.transcriptText}>{lead.comments}</span>
+              </div>
+            </div>
+          )}
+          {photoUrls.length > 0 && (
+            <div className={styles.transcriptSection}>
+              <div className={styles.transcriptHeader}>
+                <h4 className={cardStyles.dataLabel}>Field Photos</h4>
+              </div>
+              <div className={styles.techPhotoGrid}>
+                {photoUrls.map((url, i) => (
+                  <button key={i} className={styles.techPhotoBtn} onClick={() => openLightbox(i)}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={thumbUrl(url)}
+                      alt={`Field photo ${i + 1}`}
+                      className={styles.techPhotoThumb}
+                      loading="lazy"
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Lightbox */}
+          {lightboxIndex !== null && createPortal(
+            <div className={styles.lightboxOverlay} onClick={closeLightbox}>
+              <button className={styles.lightboxClose} onClick={closeLightbox} aria-label="Close">
+                <X size={24} />
+              </button>
+              {photoUrls.length > 1 && (
+                <>
+                  <button
+                    className={`${styles.lightboxNav} ${styles.lightboxNavPrev}`}
+                    onClick={e => { e.stopPropagation(); prevPhoto(); }}
+                    aria-label="Previous photo"
+                  >
+                    <ChevronLeft size={32} />
+                  </button>
+                  <button
+                    className={`${styles.lightboxNav} ${styles.lightboxNavNext}`}
+                    onClick={e => { e.stopPropagation(); nextPhoto(); }}
+                    aria-label="Next photo"
+                  >
+                    <ChevronRight size={32} />
+                  </button>
+                </>
+              )}
+              <div className={styles.lightboxImgWrapper} onClick={e => e.stopPropagation()}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoUrls[lightboxIndex]}
+                  alt={`Field photo ${lightboxIndex + 1}`}
+                  className={styles.lightboxImg}
+                />
+                {photoUrls.length > 1 && (
+                  <p className={styles.lightboxCounter}>{lightboxIndex + 1} / {photoUrls.length}</p>
+                )}
+              </div>
+            </div>,
+            portalContainer ?? document.body
+          )}
+        </div>
+      ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>
           {/* Widget Details Section - only for widget submissions */}
           {(lead.lead_source === 'widget' || lead.lead_source === 'widget_submission') && (
@@ -188,6 +324,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                   </span>
                 </div>
               )}
+              {renderSubmittedBy()}
             </div>
           </div>
 
@@ -196,7 +333,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             <div className={styles.transcriptSection}>
               <div className={styles.transcriptHeader}>
                 <h4 className={cardStyles.dataLabel}>
-                  Form Submission Details
+                  {lead.lead_source === 'campaign' ? 'Campaign Response Details' : 'Form Submission Details'}
                 </h4>
               </div>
               <div className={styles.transcriptContent}>
@@ -216,7 +353,6 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
       ) : lead.lead_type === 'manual' || lead.lead_type === 'other' ? (
         <div className={styles.cardContent}>
           <div className={styles.callInsightsSection}>
-            <h4 className={cardStyles.defaultText}>Attribution Details:</h4>
             {!isEditing && (
               <button
                 className={styles.editButton}
@@ -331,6 +467,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                   <span className={cardStyles.dataText}>Not yet recorded</span>
                 </div>
               )}
+              {renderSubmittedBy()}
             </div>
           )}
         </div>

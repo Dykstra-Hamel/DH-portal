@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
+import { Building2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
 import styles from './GlobalCompanyDropdown.module.scss';
@@ -100,28 +101,42 @@ export function GlobalCompanyDropdown() {
 
   return (
     <div className={styles.companyDropdown} ref={dropdownRef}>
-      {iconLogo && (
-        <div className={styles.iconLogoWrapper}>
-          <Image
-            src={iconLogo}
-            alt={selectedCompany?.name || ''}
-            width={32}
-            height={32}
-            className={styles.iconLogo}
-            style={{ objectFit: 'contain' }}
-          />
-        </div>
-      )}
+      {/* Desktop: icon + name trigger */}
+      <div className={styles.desktopTrigger}>
+        {iconLogo && (
+          <div className={styles.iconLogoWrapper}>
+            <Image
+              src={iconLogo}
+              alt={selectedCompany?.name || ''}
+              width={32}
+              height={32}
+              className={styles.iconLogo}
+              style={{ objectFit: 'contain' }}
+            />
+          </div>
+        )}
+        <button
+          className={styles.trigger}
+          onClick={() => setIsOpen(!isOpen)}
+          type="button"
+          title={displayText}
+        >
+          <span className={styles.text}>{truncatedDisplayText}</span>
+          <div className={`${styles.chevron} ${isOpen ? styles.open : ''}`}>
+            <ChevronDownIcon />
+          </div>
+        </button>
+      </div>
+
+      {/* Mobile: icon-only trigger */}
       <button
-        className={styles.trigger}
+        className={styles.mobileTrigger}
         onClick={() => setIsOpen(!isOpen)}
         type="button"
+        aria-label={displayText}
         title={displayText}
       >
-        <span className={styles.text}>{truncatedDisplayText}</span>
-        <div className={`${styles.chevron} ${isOpen ? styles.open : ''}`}>
-          <ChevronDownIcon />
-        </div>
+        <Building2 size={20} />
       </button>
 
       {isOpen && (

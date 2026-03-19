@@ -5,6 +5,7 @@ import { usePageActions } from '@/contexts/PageActionsContext';
 import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
+import { useLocalStorageFilter } from '@/hooks/useLocalStorageFilter';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
@@ -110,10 +111,10 @@ export default function AdminTasksPage() {
   const [projectsCardPreferenceLoaded, setProjectsCardPreferenceLoaded] =
     useState(false);
 
-  // Filter state (lifted from TaskListView)
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [dueDateFilter, setDueDateFilter] = useState('all');
+  // Filter state (lifted from TaskListView, persisted to localStorage)
+  const [statusFilter, setStatusFilter] = useLocalStorageFilter('tasks.statusFilter', 'all');
+  const [companyFilter, setCompanyFilter] = useLocalStorageFilter('tasks.companyFilter', 'all');
+  const [dueDateFilter, setDueDateFilter] = useLocalStorageFilter('tasks.dueDateFilter', 'all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -144,6 +145,7 @@ export default function AdminTasksPage() {
     priority: (projectTask.priority as Task['priority']) || 'medium',
     project_id: projectTask.project_id || undefined,
     assigned_to: projectTask.assigned_to || undefined,
+    created_by: projectTask.created_by,
     due_date: projectTask.due_date || '',
     recurring_frequency: (projectTask.recurring_frequency as Task['recurring_frequency']) || undefined,
     recurring_end_date: projectTask.recurring_end_date || undefined,
@@ -156,15 +158,30 @@ export default function AdminTasksPage() {
     monthly_service_id: projectTask.monthly_service_id || null,
   }), [isStarred]);
 
+  const convertedTasks = useMemo(
+    () => tasks.map(convertToTask),
+    [tasks, convertToTask]
+  );
+
   // Filter tasks - always show only tasks assigned to current user
   const filteredTasks = useMemo(() => {
-    const convertedTasks = tasks.map(convertToTask);
     // Always filter to current user's tasks (removed toggle)
     if (user?.id) {
       return convertedTasks.filter(task => task.assigned_to === user.id);
     }
     return convertedTasks;
-  }, [tasks, user?.id, convertToTask]);
+  }, [convertedTasks, user?.id]);
+
+  const assignedOutTasks = useMemo(() => {
+    if (!user?.id) return [];
+
+    return convertedTasks.filter(
+      (task) =>
+        task.created_by === user.id &&
+        !!task.assigned_to &&
+        task.assigned_to !== user.id
+    );
+  }, [convertedTasks, user?.id]);
 
   const monthlyServiceMetaByTaskId = useMemo<Record<string, MonthlyServiceTaskMeta>>(() => {
     const meta: Record<string, MonthlyServiceTaskMeta> = {};
@@ -937,6 +954,18 @@ export default function AdminTasksPage() {
       !task.project_id &&
       !(task as TaskWithMonthlyServiceMeta).monthly_service_id
   );
+  const assignedOutPersonalTasks = assignedOutTasks.filter(
+    (task) =>
+      task.status !== 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
+  const completedAssignedOutPersonalTasks = assignedOutTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
   const completedMonthlyServices = filteredTasks.filter(
     (task) =>
       task.status === 'completed' &&
@@ -968,13 +997,15 @@ export default function AdminTasksPage() {
                   onToggleComplete={handleToggleTaskComplete}
                   onUpdateTask={handleInlineTaskUpdate}
                   currentUserId={user?.id}
+                  users={users}
                   groupTasksByProject
-                  statusFilter={statusFilter}
-                  companyFilter={companyFilter}
-                  dueDateFilter={dueDateFilter}
+                  statusFilter={statusFilter ?? undefined}
+                  companyFilter={companyFilter ?? undefined}
+                  dueDateFilter={dueDateFilter ?? undefined}
                   searchQuery={searchQuery}
                   onSearchQueryChange={setSearchQuery}
                   personalTasks={personalTasks}
+                  assignedPersonalTasks={assignedOutPersonalTasks}
                   monthlyServices={monthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
                   mentions={mentions}
@@ -1018,11 +1049,13 @@ export default function AdminTasksPage() {
                   onToggleComplete={handleToggleTaskComplete}
                   onUpdateTask={handleInlineTaskUpdate}
                   currentUserId={user?.id}
+                  users={users}
                   groupTasksByProject
-                  companyFilter={companyFilter}
+                  companyFilter={companyFilter ?? undefined}
                   searchQuery={searchQuery}
                   onSearchQueryChange={setSearchQuery}
                   personalTasks={completedPersonalTasks}
+                  assignedPersonalTasks={completedAssignedOutPersonalTasks}
                   monthlyServices={completedMonthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
                   mentions={mentions}

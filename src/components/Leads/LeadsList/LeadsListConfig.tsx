@@ -3,7 +3,7 @@
 import React from 'react';
 import { Lead, leadStatusOptions } from '@/types/lead';
 import { ColumnDefinition, TabDefinition } from '@/components/Common/DataTable';
-import { ChevronRight, Mail, MailQuestionMark, MessageSquare, Phone } from 'lucide-react';
+import { ChevronRight, Mail, MailQuestionMark, MessageSquare, Phone, Truck } from 'lucide-react';
 import { formatDateWithOrdinal } from '@/lib/date-utils';
 import { getTimeAgo } from '@/lib/time-utils';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
@@ -58,6 +58,7 @@ const getLeadSourceLabel = (source: string | null): string => {
     direct: 'Direct',
     campaign: 'Campaign',
     widget: 'Widget',
+    technician: 'Tech',
     other: 'Other',
     // Legacy
     organic: 'Google Organic',
@@ -74,6 +75,11 @@ const getLeadSourceLabel = (source: string | null): string => {
 };
 
 const getFormatIcon = (lead: Lead) => {
+  // Technician lead — use truck icon
+  if (lead.lead_source === 'technician') {
+    return <Truck size={18} color="#0088CC" strokeWidth={1.5} />;
+  }
+
   const format = lead.format || (
     (lead.lead_type === 'phone_call' || lead.lead_type === 'inbound_call' || lead.lead_type === 'outbound_call') ? 'call' :
     (lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' || lead.lead_type === 'campaign_form') ? 'form' :

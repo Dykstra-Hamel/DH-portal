@@ -27,6 +27,8 @@ import {
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
 import { deriveSource } from '@/lib/taxonomy/derive-source';
+import { inngest } from '@/lib/inngest/client';
+import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
 
 /**
  * Check for recent duplicate form submissions
@@ -391,6 +393,7 @@ export async function POST(request: NextRequest) {
 
     // Step 7: Lookup or create customer
     let customerId: string | null = null;
+    let isExistingCustomer = false;
 
     // Try to find existing customer by email first, then phone
     if (normalized.email) {
@@ -403,6 +406,7 @@ export async function POST(request: NextRequest) {
 
       if (existingCustomer) {
         customerId = existingCustomer.id;
+        isExistingCustomer = true;
       }
     }
 
@@ -417,6 +421,7 @@ export async function POST(request: NextRequest) {
 
       if (existingCustomer) {
         customerId = existingCustomer.id;
+        isExistingCustomer = true;
       }
     }
 
@@ -650,6 +655,34 @@ export async function POST(request: NextRequest) {
       }
 
       ticketId = ticket.id;
+    }
+
+    // Campaign attribution: fire response event for existing customers with lead
+    if (customerId && leadId && isExistingCustomer) {
+      const attribution = await detectCampaignAttribution(supabase, customerId, companyId!);
+      if (attribution) {
+        const alreadyResponded = await hasRecentResponse(supabase, customerId, attribution.campaignId);
+        if (!alreadyResponded) {
+          // Update lead with attribution from campaign executions
+          await supabase.from('leads').update({
+            campaign_id: attribution.campaignId,
+            lead_source: 'campaign',
+            lead_type: 'campaign_form',
+          }).eq('id', leadId);
+
+          await inngest.send({
+            name: 'campaign/response-detected',
+            data: {
+              leadId,
+              campaignId: attribution.campaignId,
+              campaignName: attribution.campaignName,
+              customerId,
+              companyId,
+              responseType: 'form',
+            },
+          });
+        }
+      }
     }
 
     // Step 10: Link ticket/lead and customer to form submission

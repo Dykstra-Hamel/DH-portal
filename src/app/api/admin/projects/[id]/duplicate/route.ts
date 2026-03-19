@@ -60,12 +60,6 @@ export async function POST(
       software: 'SFT',
     };
 
-    const today = new Date().toISOString().split('T')[0];
-    const baseDueDate = sourceProject.due_date || sourceProject.start_date || today;
-    const dueDate =
-      sourceProject.start_date && baseDueDate < sourceProject.start_date
-        ? sourceProject.start_date
-        : baseDueDate;
     const isCompanyChanged = sourceProject.company_id !== companyId;
     const normalizeName = (value: string) => value.trim().toLowerCase();
     const resolvedTypeCode =
@@ -300,7 +294,7 @@ export async function POST(
         assigned_to: sourceProject.assigned_to,
         status: 'new',
         priority: sourceProject.priority || 'medium',
-        due_date: dueDate,
+        due_date: null,
         start_date: sourceProject.start_date,
         is_billable: !!sourceProject.is_billable,
         quoted_price: sourceProject.quoted_price,
@@ -370,12 +364,12 @@ export async function POST(
           description: sourceTask.description,
           notes: sourceTask.notes,
           priority: sourceTask.priority,
-          due_date: sourceTask.due_date,
+          due_date: null,
           start_date: sourceTask.start_date,
           assigned_to: sourceTask.assigned_to,
           department_id: isCompanyChanged ? null : sourceTask.department_id,
           created_by: user.id,
-          is_completed: sourceTask.is_completed,
+          is_completed: false,
           display_order: sourceTask.display_order,
           blocks_task_id: null,
           blocked_by_task_id: null,

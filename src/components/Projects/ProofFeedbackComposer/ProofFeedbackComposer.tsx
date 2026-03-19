@@ -10,7 +10,6 @@ const isRichTextEmpty = (html: string) => {
 };
 
 interface ProofFeedbackComposerProps {
-  position: { x: number; y: number };
   mentionUsers?: Array<{
     id: string;
     first_name: string | null;
@@ -23,7 +22,6 @@ interface ProofFeedbackComposerProps {
 }
 
 export default function ProofFeedbackComposer({
-  position,
   mentionUsers,
   onSubmit,
   onCancel,
@@ -57,15 +55,10 @@ export default function ProofFeedbackComposer({
     }
   };
 
-  // Position the composer near the click, nudging away from edges
-  const left = Math.min(position.x * 100 + 3, 65);
-  const top = Math.min(position.y * 100 + 3, 65);
-
   return (
     <div
       ref={composerRef}
       className={styles.composer}
-      style={{ left: `${left}%`, top: `${top}%` }}
       onClick={(e) => e.stopPropagation()}
       onKeyDownCapture={handleKeyDown}
     >

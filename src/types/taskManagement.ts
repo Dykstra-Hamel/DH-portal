@@ -36,6 +36,7 @@ export interface Task {
   project_id?: string;
   client_id?: string;
   assigned_to?: string;
+  created_by?: string;
   estimated_hours: number;
   due_date: string;
   completed_date?: string;

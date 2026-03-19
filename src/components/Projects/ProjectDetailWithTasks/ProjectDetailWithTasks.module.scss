@@ -594,9 +594,50 @@
   align-items: stretch;
 }
 
+.loadOlderCommentsRow {
+  display: flex;
+  justify-content: center;
+}
+
+.loadOlderCommentsButton {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--action-500, #0080f0);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.18s ease;
+  }
+
+  &:hover {
+    background: transparent !important;
+    color: var(--action-700, #0369a1);
+
+    svg {
+      transform: translateY(-2px);
+    }
+  }
+
+  &:focus-visible {
+    background: transparent !important;
+    color: var(--action-700, #0369a1);
+  }
+}
+
 .commentsFeed {
-  max-height: min(460px, 60vh);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   padding: 2px 10px 10px;
@@ -1460,10 +1501,6 @@
   .projectContentWrapper {
     flex-direction: column;
     padding: 0 1rem 2rem;
-  }
-
-  .commentsFeed {
-    max-height: 52vh;
   }
 
   .commentItem {
