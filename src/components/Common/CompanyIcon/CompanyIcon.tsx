@@ -21,7 +21,6 @@ const BuildingIcon = () => (
     strokeWidth="2"
     strokeLinecap="round"
     strokeLinejoin="round"
-    style={{ width: '100%', height: '100%' }}
   >
     <rect x="4" y="2" width="16" height="20" rx="2" ry="2" />
     <path d="M9 22v-4h6v4" />

@@ -1,5 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { triggerWorkflowForCadenceStep } from '@/lib/cadence/trigger-workflow-step';
 import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
 import {
   fetchCompanyBusinessHours,
@@ -20,6 +21,35 @@ interface StepResult {
   completedAt: string;
   result: any;
   success: boolean;
+}
+
+const WORKFLOW_ACTION_TO_CONTACT_TYPE: Record<string, string> = {
+  send_email: 'email',
+  send_sms: 'text_message',
+  make_call: 'outbound_call',
+};
+
+async function logWorkflowActivity(
+  supabase: ReturnType<typeof createAdminClient>,
+  leadId: string | null | undefined,
+  companyId: string,
+  stepType: string
+): Promise<void> {
+  const contactType = WORKFLOW_ACTION_TO_CONTACT_TYPE[stepType];
+  if (!leadId || !contactType) return;
+  await supabase.from('activity_log').insert({
+    company_id: companyId,
+    entity_type: 'lead',
+    entity_id: leadId,
+    activity_type: 'contact_made',
+    user_id: null,
+    notes: null,
+    metadata: {
+      contact_type: contactType,
+      contact_outcome: 'automation_sent',
+      source: 'workflow_automation',
+    },
+  });
 }
 
 export const workflowExecuteHandler = inngest.createFunction(
@@ -273,6 +303,146 @@ export const workflowExecuteHandler = inngest.createFunction(
         };
       }
 
+      // Apply delay BEFORE executing the step (so "send email after 5 min" waits first)
+      const preStepDelayMinutes = currentStep.delay_minutes || 0;
+      if (preStepDelayMinutes > 0) {
+        // Check if this is a campaign execution and if it should respect business hours
+        const shouldRespectBusinessHours = await step.run(
+          `check-business-hours-requirement-${stepIndex}`,
+          async () => {
+            if (
+              triggerType === 'campaign' &&
+              execution.execution_data?.campaignId
+            ) {
+              const supabase = createAdminClient();
+              const { data: campaign } = await supabase
+                .from('campaigns')
+                .select('respect_business_hours')
+                .eq('id', execution.execution_data.campaignId)
+                .single();
+
+              return campaign?.respect_business_hours ?? false;
+            }
+            return false;
+          }
+        );
+
+        // Calculate when the delay will end
+        const delayEndTime = new Date(
+          Date.now() + preStepDelayMinutes * 60 * 1000
+        );
+
+        if (shouldRespectBusinessHours) {
+          const businessHours = await fetchCompanyBusinessHours(companyId);
+
+          if (!isBusinessHours(delayEndTime, businessHours)) {
+            console.log(
+              `Workflow ${executionId} step ${stepIndex}: Delay would end outside business hours`,
+              {
+                originalDelayEnd: delayEndTime.toISOString(),
+                delayMinutes: preStepDelayMinutes,
+              }
+            );
+
+            const nextBusinessSlot = getNextBusinessHourSlot(
+              new Date(),
+              businessHours
+            );
+            const adjustedDelayMs = nextBusinessSlot.getTime() - Date.now();
+            const adjustedDelayMinutes = Math.ceil(adjustedDelayMs / 60000);
+
+            console.log(
+              `Workflow ${executionId} step ${stepIndex}: Adjusted delay to respect business hours`,
+              {
+                originalDelayMinutes: preStepDelayMinutes,
+                adjustedDelayMinutes,
+                nextBusinessSlot: nextBusinessSlot.toISOString(),
+              }
+            );
+
+            await step.sleep(
+              `delay-before-step-${stepIndex}`,
+              `${adjustedDelayMinutes}m`
+            );
+          } else {
+            await step.sleep(
+              `delay-before-step-${stepIndex}`,
+              `${preStepDelayMinutes}m`
+            );
+          }
+        } else {
+          await step.sleep(
+            `delay-before-step-${stepIndex}`,
+            `${preStepDelayMinutes}m`
+          );
+        }
+
+        // Check for cancellation after sleep
+        const postSleepCheck = await step.run(
+          `check-cancellation-after-sleep-${stepIndex}`,
+          async () => {
+            const supabase = createAdminClient();
+            const { data: currentExecution } = await supabase
+              .from('automation_executions')
+              .select('execution_status, execution_data')
+              .eq('id', executionId)
+              .single();
+
+            const isCancelled =
+              currentExecution?.execution_status === 'cancelled' ||
+              currentExecution?.execution_data?.cancellationProcessed === true;
+
+            return {
+              status: currentExecution?.execution_status,
+              shouldContinue: !isCancelled,
+              cancellationReason: isCancelled
+                ? 'Database status or cancellation flag'
+                : null,
+            };
+          }
+        );
+
+        if (!postSleepCheck.shouldContinue) {
+          await step.run(
+            `save-steps-after-delay-cancellation-${stepIndex}`,
+            async () => {
+              const supabase = createAdminClient();
+              const { data: currentExecution } = await supabase
+                .from('automation_executions')
+                .select('execution_data')
+                .eq('id', executionId)
+                .single();
+
+              await supabase
+                .from('automation_executions')
+                .update({
+                  execution_data: {
+                    ...currentExecution?.execution_data,
+                    stepResults: stepResults,
+                    completedSteps: stepResults.length,
+                    cancelledAtStep: stepIndex,
+                    cancelledAfterDelay: true,
+                  },
+                })
+                .eq('id', executionId);
+
+              return { stepsSaved: stepResults.length };
+            }
+          );
+
+          return {
+            success: true,
+            cancelled: true,
+            cancelledAt: stepIndex,
+            cancelledAfter: 'delay',
+            totalSteps: workflowSteps.length,
+            completedSteps: stepResults.length,
+            message:
+              'Workflow execution stopped due to cancellation after delay',
+          };
+        }
+      }
+
       // Execute the step
       const stepResult = await step.run(
         `execute-step-${stepIndex}`,
@@ -340,6 +510,11 @@ export const workflowExecuteHandler = inngest.createFunction(
                 break;
               default:
                 throw new Error(`Unsupported step type: ${currentStep.type}`);
+            }
+
+            // Log to communication log for lead-linked action steps
+            if (result?.success !== false) {
+              await logWorkflowActivity(supabase, leadId, companyId, currentStep.type);
             }
 
             const stepData = {
@@ -534,13 +709,18 @@ export const workflowExecuteHandler = inngest.createFunction(
           const branchResult = await step.run(
             `execute-step-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
             async () => {
+              const supabase = createAdminClient();
+              let result: any;
               switch (branchStep.type) {
                 case 'send_email':
-                  return await executeEmailStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
+                  result = await executeEmailStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
+                  break;
                 case 'send_sms':
-                  return await executeSMSStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
+                  result = await executeSMSStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId);
+                  break;
                 case 'make_call':
-                  return await executeMakeCallStep(branchStep, leadData, companyId, leadId, customerId, executionId);
+                  result = await executeMakeCallStep(branchStep, leadData, companyId, leadId, customerId, executionId);
+                  break;
                 case 'wait':
                 case 'delay':
                   return await executeDelayStep(branchStep);
@@ -551,6 +731,10 @@ export const workflowExecuteHandler = inngest.createFunction(
                 default:
                   return { success: true, skipped: true };
               }
+              if (result?.success !== false) {
+                await logWorkflowActivity(supabase, leadId, companyId, branchStep.type);
+              }
+              return result;
             }
           );
 
@@ -706,9 +890,11 @@ export const workflowExecuteHandler = inngest.createFunction(
           const branchResult = await step.run(
             `execute-step-${stepIndex}-${branchPath}-branch-${branchIdx}`,
             async () => {
+              const supabase = createAdminClient();
+              let result: any;
               switch (branchStep.type) {
                 case 'send_email':
-                  return await executeEmailStep(
+                  result = await executeEmailStep(
                     branchStep,
                     leadData,
                     companyId,
@@ -720,8 +906,9 @@ export const workflowExecuteHandler = inngest.createFunction(
                     execution?.execution_data?.campaignId,
                     workflowId
                   );
+                  break;
                 case 'send_sms':
-                  return await executeSMSStep(
+                  result = await executeSMSStep(
                     branchStep,
                     leadData,
                     companyId,
@@ -731,8 +918,9 @@ export const workflowExecuteHandler = inngest.createFunction(
                     partialLeadData,
                     executionId
                   );
+                  break;
                 case 'make_call':
-                  return await executeMakeCallStep(
+                  result = await executeMakeCallStep(
                     branchStep,
                     leadData,
                     companyId,
@@ -740,6 +928,7 @@ export const workflowExecuteHandler = inngest.createFunction(
                     customerId,
                     executionId
                   );
+                  break;
                 case 'wait':
                 case 'delay':
                   return await executeDelayStep(branchStep);
@@ -758,6 +947,10 @@ export const workflowExecuteHandler = inngest.createFunction(
                 default:
                   return { success: true, skipped: true };
               }
+              if (result?.success !== false) {
+                await logWorkflowActivity(supabase, leadId, companyId, branchStep.type);
+              }
+              return result;
             }
           );
 
@@ -807,158 +1000,6 @@ export const workflowExecuteHandler = inngest.createFunction(
       }
 
       if (branchCancellation) return branchCancellation;
-
-      // Handle delay if this step requires it
-      const stepDelayMinutes =
-        (stepResult && 'delayMinutes' in stepResult
-          ? (stepResult.delayMinutes as number)
-          : null) ||
-        currentStep.delay_minutes ||
-        0;
-      const shouldDelay =
-        (stepResult && 'requiresDelay' in stepResult
-          ? (stepResult.requiresDelay as boolean)
-          : false) ||
-        currentStep.type === 'wait' ||
-        currentStep.type === 'delay' ||
-        (currentStep.delay_minutes && currentStep.delay_minutes > 0);
-
-      if (shouldDelay && stepDelayMinutes > 0) {
-        // Check if this is a campaign execution and if it should respect business hours
-        const shouldRespectBusinessHours = await step.run(
-          `check-business-hours-requirement-${stepIndex}`,
-          async () => {
-            // Check if this execution is from a campaign
-            if (
-              triggerType === 'campaign' &&
-              execution.execution_data?.campaignId
-            ) {
-              const supabase = createAdminClient();
-              const { data: campaign } = await supabase
-                .from('campaigns')
-                .select('respect_business_hours')
-                .eq('id', execution.execution_data.campaignId)
-                .single();
-
-              return campaign?.respect_business_hours ?? false;
-            }
-            return false;
-          }
-        );
-
-        // Calculate when the delay will end
-        const delayEndTime = new Date(
-          Date.now() + stepDelayMinutes * 60 * 1000
-        );
-
-        // If we need to respect business hours and the delay would end outside business hours
-        if (shouldRespectBusinessHours) {
-          const businessHours = await fetchCompanyBusinessHours(companyId);
-
-          // Check if delay end time falls outside business hours
-          if (!isBusinessHours(delayEndTime, businessHours)) {
-            console.log(
-              `Workflow ${executionId} step ${stepIndex}: Delay would end outside business hours`,
-              {
-                originalDelayEnd: delayEndTime.toISOString(),
-                delayMinutes: stepDelayMinutes,
-              }
-            );
-
-            // Calculate next business hour slot
-            const nextBusinessSlot = getNextBusinessHourSlot(
-              new Date(),
-              businessHours
-            );
-            const adjustedDelayMs = nextBusinessSlot.getTime() - Date.now();
-            const adjustedDelayMinutes = Math.ceil(adjustedDelayMs / 60000);
-
-            console.log(
-              `Workflow ${executionId} step ${stepIndex}: Adjusted delay to respect business hours`,
-              {
-                originalDelayMinutes: stepDelayMinutes,
-                adjustedDelayMinutes,
-                nextBusinessSlot: nextBusinessSlot.toISOString(),
-              }
-            );
-
-            await step.sleep('delay-step', `${adjustedDelayMinutes}m`);
-          } else {
-            // Normal delay - within business hours
-            await step.sleep('delay-step', `${stepDelayMinutes}m`);
-          }
-        } else {
-          // No business hours restriction
-          await step.sleep('delay-step', `${stepDelayMinutes}m`);
-        }
-
-        // Check for cancellation after sleep (common cancellation point)
-        const postSleepCheck = await step.run(
-          `check-cancellation-after-sleep-${stepIndex}`,
-          async () => {
-            const supabase = createAdminClient();
-            const { data: currentExecution } = await supabase
-              .from('automation_executions')
-              .select('execution_status, execution_data')
-              .eq('id', executionId)
-              .single();
-
-            // Check both database status and cancellation flags
-            const isCancelled =
-              currentExecution?.execution_status === 'cancelled' ||
-              currentExecution?.execution_data?.cancellationProcessed === true;
-
-            return {
-              status: currentExecution?.execution_status,
-              shouldContinue: !isCancelled,
-              cancellationReason: isCancelled
-                ? 'Database status or cancellation flag'
-                : null,
-            };
-          }
-        );
-
-        if (!postSleepCheck.shouldContinue) {
-          // Save completed steps to database before returning
-          await step.run('save-steps-after-delay-cancellation', async () => {
-            const supabase = createAdminClient();
-
-            // Get current execution data to preserve existing fields
-            const { data: currentExecution } = await supabase
-              .from('automation_executions')
-              .select('execution_data')
-              .eq('id', executionId)
-              .single();
-
-            // Update with completed steps
-            await supabase
-              .from('automation_executions')
-              .update({
-                execution_data: {
-                  ...currentExecution?.execution_data,
-                  stepResults: stepResults,
-                  completedSteps: stepResults.length,
-                  cancelledAtStep: stepIndex,
-                  cancelledAfterDelay: true,
-                },
-              })
-              .eq('id', executionId);
-
-            return { stepsSaved: stepResults.length };
-          });
-
-          return {
-            success: true,
-            cancelled: true,
-            cancelledAt: stepIndex,
-            cancelledAfter: 'delay',
-            totalSteps: workflowSteps.length,
-            completedSteps: stepResults.length,
-            message:
-              'Workflow execution stopped due to cancellation after delay',
-          };
-        }
-      }
     }
 
     // Mark workflow as completed (but don't overwrite if already cancelled)
@@ -968,7 +1009,7 @@ export const workflowExecuteHandler = inngest.createFunction(
       // Final check to prevent overwriting cancelled status
       const { data: finalCheck } = await supabase
         .from('automation_executions')
-        .select('execution_status')
+        .select('execution_status, cadence_step_id, cadence_lead_id')
         .eq('id', executionId)
         .single();
 
@@ -1009,6 +1050,106 @@ export const workflowExecuteHandler = inngest.createFunction(
           })
           .eq('automation_execution_id', executionId)
           .neq('execution_status', 'cancelled');
+      }
+
+      // If this workflow was triggered by a cadence step, mark that step complete
+      // and advance the cadence to the next step.
+      if (finalCheck?.cadence_step_id && finalCheck?.cadence_lead_id) {
+        try {
+          // 1. Mark the trigger_workflow cadence step as complete in lead_cadence_progress
+          await supabase
+            .from('lead_cadence_progress')
+            .upsert(
+              {
+                lead_id: finalCheck.cadence_lead_id,
+                cadence_step_id: finalCheck.cadence_step_id,
+                completed_at: new Date().toISOString(),
+              },
+              { onConflict: 'lead_id,cadence_step_id' }
+            );
+
+          // 2. Get the next incomplete cadence step
+          try {
+            const { data: nextStepRows } = await supabase.rpc(
+              'get_next_incomplete_cadence_step',
+              { p_lead_id: finalCheck.cadence_lead_id }
+            );
+            const nextCadenceStep = nextStepRows?.[0];
+
+            if (nextCadenceStep?.step_id) {
+              // workflow_id may not be returned by the RPC — fetch directly if needed
+              if (nextCadenceStep.action_type === 'trigger_workflow' && !nextCadenceStep.workflow_id) {
+                const { data: stepRow } = await supabase
+                  .from('sales_cadence_steps')
+                  .select('workflow_id')
+                  .eq('id', nextCadenceStep.step_id)
+                  .single();
+                nextCadenceStep.workflow_id = stepRow?.workflow_id || null;
+              }
+
+              if (nextCadenceStep.action_type === 'trigger_workflow' && nextCadenceStep.workflow_id) {
+                // Next step is also a trigger_workflow — fire it directly
+                const { data: leadForWorkflow } = await supabase
+                  .from('leads')
+                  .select('company_id, customer_id')
+                  .eq('id', finalCheck.cadence_lead_id)
+                  .single();
+
+                await triggerWorkflowForCadenceStep({
+                  leadId: finalCheck.cadence_lead_id,
+                  companyId: leadForWorkflow?.company_id ?? companyId,
+                  customerId: leadForWorkflow?.customer_id ?? customerId ?? null,
+                  cadenceStepId: nextCadenceStep.step_id,
+                  workflowId: nextCadenceStep.workflow_id,
+                  cadenceId: nextCadenceStep.cadence_id,
+                });
+              } else {
+                // Next step requires user action — create its task
+                const { data: leadForTask } = await supabase
+                  .from('leads')
+                  .select('assigned_to, company_id, customer:customers(first_name, last_name)')
+                  .eq('id', finalCheck.cadence_lead_id)
+                  .single();
+                const { data: assignment } = await supabase
+                  .from('lead_cadence_assignments')
+                  .select('started_at')
+                  .eq('lead_id', finalCheck.cadence_lead_id)
+                  .is('completed_at', null)
+                  .maybeSingle();
+                if (leadForTask?.assigned_to && assignment?.started_at) {
+                  const customerData = leadForTask.customer as { first_name?: string; last_name?: string } | null;
+                  const customerName =
+                    `${customerData?.first_name || ''} ${customerData?.last_name || ''}`.trim() ||
+                    'Unknown Customer';
+                  await supabase.rpc('create_task_for_cadence_step', {
+                    p_lead_id: finalCheck.cadence_lead_id,
+                    p_cadence_step_id: nextCadenceStep.step_id,
+                    p_assigned_to: leadForTask.assigned_to,
+                    p_company_id: leadForTask.company_id,
+                    p_customer_name: customerName,
+                    p_started_at: assignment.started_at,
+                  });
+                }
+              }
+            } else {
+              // No next step — cadence is complete
+              await supabase
+                .from('lead_cadence_assignments')
+                .update({ completed_at: new Date().toISOString() })
+                .eq('lead_id', finalCheck.cadence_lead_id)
+                .is('completed_at', null);
+            }
+          } catch (advanceError) {
+            console.error('Error advancing cadence after workflow completion:', advanceError);
+            // Don't throw — workflow completed successfully
+          }
+        } catch (cadenceError) {
+          console.error(
+            'Error advancing cadence after workflow completion:',
+            cadenceError
+          );
+          // Don't throw — workflow completed successfully even if cadence advancement fails
+        }
       }
 
       // Send workflow completion event for campaign tracking

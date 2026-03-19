@@ -458,15 +458,6 @@ export function LeadDetailsSidebar({
 
   // Accordion: track which single card is expanded
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
-  const [autoExpandCallForm, setAutoExpandCallForm] = useState(false);
-
-  // Auto-expand Call/Form Details card only once on initial mount
-  useEffect(() => {
-    setAutoExpandCallForm(true);
-    const timer = setTimeout(() => setAutoExpandCallForm(false), 200);
-    return () => clearTimeout(timer);
-  }, []);
-
   // When activity is force-expanded externally, sync accordion state
   useEffect(() => {
     if (shouldExpandActivity) {
@@ -526,7 +517,6 @@ export function LeadDetailsSidebar({
             onExpand={() => handleCardExpand('callFormDetails')}
             onCollapse={() => handleCardCollapse('callFormDetails')}
             forceCollapse={isForceCollapsed('callFormDetails')}
-            forceExpand={autoExpandCallForm}
             isCompact={!isSidebarExpanded}
             inSidebar={true}
           >

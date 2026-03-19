@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import DL from 'damerau-levenshtein';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { normalizePhoneNumber } from '@/lib/utils';
 import {
@@ -87,53 +88,90 @@ async function checkForRecentDuplicate(
   });
 }
 
-/**
- * Normalize the Gemini-produced pest_type string to a company pest name.
- * Gemini outputs service-style names like "Termite Control"; this function
- * maps those to the actual pest names stored in pest_types (e.g. "Termites").
- */
-async function normalizePestType(
-  supabase: any,
-  companyId: string,
-  geminiPestType: string | null | undefined
-): Promise<string | null> {
-  if (!geminiPestType) return null;
+type CompanyPestOption = { name: string; slug: string; customLabel: string };
 
-  const { data: pestOptions } = await supabase
+/**
+ * Fetch active pest options for a company, resolving custom_label.
+ */
+async function fetchCompanyPestOptions(
+  supabase: any,
+  companyId: string
+): Promise<CompanyPestOption[]> {
+  const { data } = await supabase
     .from('company_pest_options')
-    .select('pest_types(name, slug)')
+    .select('custom_label, pest_types(name, slug)')
     .eq('company_id', companyId)
     .eq('is_active', true);
 
-  if (!pestOptions || pestOptions.length === 0) return geminiPestType;
+  if (!data || data.length === 0) return [];
 
-  const pests = pestOptions.map((o: any) => o.pest_types).filter(Boolean);
-  const input = geminiPestType.toLowerCase();
+  return data
+    .filter((o: any) => o.pest_types)
+    .map((o: any) => ({
+      name: o.pest_types.name,
+      slug: o.pest_types.slug,
+      customLabel: o.custom_label || o.pest_types.name,
+    }));
+}
 
-  // 1. Exact name match
-  let match = pests.find((p: any) => p.name.toLowerCase() === input);
-  if (match) return match.name;
+/**
+ * Match a free-text pest description against a company's configured pest options.
+ * Tries six tiers in order and returns customLabel on the first match.
+ */
+function matchPestOption(
+  pests: CompanyPestOption[],
+  input: string | null | undefined
+): string | null {
+  if (!input || pests.length === 0) return null;
+  const lower = input.toLowerCase();
 
-  // 2. Exact slug match
-  match = pests.find((p: any) => p.slug === input.replace(/\s+/g, '_'));
-  if (match) return match.name;
+  // Tier 1: Exact custom_label match
+  let hit = pests.find(p => p.customLabel.toLowerCase() === lower);
+  if (hit) return hit.customLabel;
 
-  // 3. Strip " Control" suffix and retry with startsWith / includes
-  const stripped = input.replace(/\s*control\s*$/i, '').trim();
-  match = pests.find((p: any) =>
+  // Tier 2: Exact name match
+  hit = pests.find(p => p.name.toLowerCase() === lower);
+  if (hit) return hit.customLabel;
+
+  // Tier 3: Exact slug match
+  hit = pests.find(p => p.slug === lower.replace(/\s+/g, '_'));
+  if (hit) return hit.customLabel;
+
+  // Tier 4: Strip " Control" suffix, then startsWith / includes
+  const stripped = lower.replace(/\s*control\s*$/i, '').trim();
+  hit = pests.find(p =>
     p.name.toLowerCase().startsWith(stripped) ||
+    p.customLabel.toLowerCase().startsWith(stripped) ||
     stripped.includes(p.slug.replace(/_/g, ' '))
   );
-  if (match) return match.name;
+  if (hit) return hit.customLabel;
 
-  // 4. Any pest name/slug that appears anywhere in the input
-  match = pests.find((p: any) =>
-    input.includes(p.name.toLowerCase()) ||
-    input.includes(p.slug.replace(/_/g, ' '))
+  // Tier 5: Any substring match (name, slug, or custom_label appears in input)
+  hit = pests.find(p =>
+    lower.includes(p.name.toLowerCase()) ||
+    lower.includes(p.slug.replace(/_/g, ' ')) ||
+    lower.includes(p.customLabel.toLowerCase())
   );
-  if (match) return match.name;
+  if (hit) return hit.customLabel;
 
-  // No match — return null so the field stays unset rather than storing a mismatched string
+  // Tier 6: Damerau-Levenshtein distance — nearest match within threshold
+  let bestMatch: CompanyPestOption | null = null;
+  let bestDistance = Infinity;
+  for (const p of pests) {
+    const d = Math.min(
+      DL(lower, p.name.toLowerCase()).steps,
+      DL(lower, p.customLabel.toLowerCase()).steps
+    );
+    if (d < bestDistance) {
+      bestDistance = d;
+      bestMatch = p;
+    }
+  }
+  if (bestMatch) {
+    const threshold = Math.max(2, Math.floor(Math.min(lower.length, bestMatch.name.length) * 0.4));
+    if (bestDistance <= threshold) return bestMatch.customLabel;
+  }
+
   return null;
 }
 
@@ -489,12 +527,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Step 8.5: Normalize pest_type from Gemini output to a company pest name
-    const normalizedPestType = await normalizePestType(
-      supabase,
-      companyId,
-      geminiResult.ticket.pest_type
-    );
+    // Step 8.5: Normalize pest_type from Gemini output to a company pest name.
+    // Fetches options once, then tries ticket.pest_type first, then pest_issue as a fallback.
+    const pestOptions = await fetchCompanyPestOptions(supabase, companyId);
+    const normalizedPestType =
+      matchPestOption(pestOptions, geminiResult.ticket.pest_type) ||
+      matchPestOption(pestOptions, geminiResult.normalized.pest_issue) ||
+      null;
 
     // Step 9: Create lead (if campaign) or ticket (if not)
     let ticketId: string | null = null;

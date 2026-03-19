@@ -30,6 +30,11 @@ import {
   subscribeToTicketReviewUpdates,
   TicketReviewPayload,
 } from '@/lib/realtime/ticket-review-channel';
+import {
+  createTaskChannel,
+  subscribeToTaskUpdates,
+  TaskUpdatePayload,
+} from '@/lib/realtime/task-channel';
 import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import {
@@ -42,6 +47,7 @@ import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import TicketForm from '@/components/Tickets/TicketForm/TicketForm';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { AnnouncementsModal } from '@/components/Common/AnnouncementsModal/AnnouncementsModal';
+import ActionsTasksQuickView from '@/components/Common/ActionsTasksQuickView/ActionsTasksQuickView';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils';
 import { ChevronRight, Search, Loader2 } from 'lucide-react';
@@ -362,6 +368,7 @@ function TicketsDashboardContent() {
   const queueFullFetchEnabledRef = useRef(false);
   const pendingFullTicketFetchRef = useRef(false);
   const reviewChannelRef = useRef<RealtimeChannel | null>(null);
+  const taskChannelRef = useRef<RealtimeChannel | null>(null);
 
   // Company ref for realtime updates
   const selectedCompanyRef = useRef(selectedCompany);
@@ -1221,6 +1228,78 @@ function TicketsDashboardContent() {
     };
   }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchTotalCounts]);
 
+  // Realtime subscription for tasks assigned to the current user
+  useEffect(() => {
+    if (!selectedCompany?.id || !user?.id) return;
+
+    if (taskChannelRef.current) return;
+
+    const channel = createTaskChannel(selectedCompany.id);
+    taskChannelRef.current = channel;
+
+    subscribeToTaskUpdates(channel, async (payload: TaskUpdatePayload) => {
+      const { company_id, action, record_id } = payload;
+      if (company_id !== selectedCompany.id) return;
+
+      const supabase = createClient();
+      const currentUserId = userIdRef.current;
+      if (!currentUserId) return;
+
+      if (action === 'INSERT' || action === 'UPDATE') {
+        try {
+          const { data: task } = await supabase
+            .from('tasks')
+            .select('*')
+            .eq('id', record_id)
+            .single();
+
+          if (!task) return;
+
+          const isAssignedToMe = task.assigned_to === currentUserId;
+          const isCompleted = task.status === 'completed';
+          const isAction = Boolean(task.cadence_step_id);
+
+          if (isAssignedToMe && !isCompleted) {
+            // Upsert into the correct list
+            if (isAction) {
+              setMyActions(prev => {
+                const exists = prev.some(t => t.id === task.id);
+                return exists
+                  ? prev.map(t => (t.id === task.id ? task : t))
+                  : [...prev, task];
+              });
+              setMyTasks(prev => prev.filter(t => t.id !== task.id));
+            } else {
+              setMyTasks(prev => {
+                const exists = prev.some(t => t.id === task.id);
+                return exists
+                  ? prev.map(t => (t.id === task.id ? task : t))
+                  : [...prev, task];
+              });
+              setMyActions(prev => prev.filter(t => t.id !== task.id));
+            }
+          } else {
+            // No longer assigned to me or now completed — remove from both lists
+            setMyActions(prev => prev.filter(t => t.id !== record_id));
+            setMyTasks(prev => prev.filter(t => t.id !== record_id));
+          }
+        } catch (err) {
+          console.error('Error handling task realtime update on dashboard:', err);
+        }
+      } else if (action === 'DELETE') {
+        setMyActions(prev => prev.filter(t => t.id !== record_id));
+        setMyTasks(prev => prev.filter(t => t.id !== record_id));
+      }
+    });
+
+    return () => {
+      if (taskChannelRef.current) {
+        createClient().removeChannel(taskChannelRef.current);
+        taskChannelRef.current = null;
+      }
+    };
+  }, [selectedCompany?.id, user?.id]);
+
   // Handle create ticket
   const handleCreateTicket = useCallback(
     async (ticketFormData: TicketFormData & { newCustomerData?: any }) => {
@@ -1378,6 +1457,18 @@ function TicketsDashboardContent() {
 
   const handleTasksClick = useCallback(() => {
     router.push('/tickets/tasks');
+  }, [router]);
+
+  const handleActionItemClick = useCallback((task: Task) => {
+    if (task.related_entity_type === 'leads' && task.related_entity_id) {
+      router.push(`/tickets/leads/${task.related_entity_id}`);
+    } else {
+      router.push('/tickets/tasks?filter=actions');
+    }
+  }, [router]);
+
+  const handleTaskItemClick = useCallback((task: Task) => {
+    router.push(`/tickets/tasks/${task.id}`);
   }, [router]);
 
   const handleAnnouncementsOpen = useCallback(() => {
@@ -1856,6 +1947,17 @@ function TicketsDashboardContent() {
           </div>
         </div>
       </section>
+
+      {/* Quick View Panel - Actions & Tasks */}
+      <ActionsTasksQuickView
+        loading={loadingMyData}
+        actions={myActions}
+        tasks={myTasks}
+        onActionItemClick={handleActionItemClick}
+        onTaskItemClick={handleTaskItemClick}
+        onViewAllActions={handleActionsClick}
+        onViewAllTasks={handleTasksClick}
+      />
 
       {/* Tickets Table Section */}
       <section className={`${styles.section} ${styles.sectionNoGap}`}>

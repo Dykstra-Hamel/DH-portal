@@ -1,0 +1,116 @@
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.header {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  margin-bottom: 16px;
+  height: 24px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.loading {
+  color: var(--gray-400);
+  font-size: 13px;
+  text-align: center;
+  padding: 24px 0;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-25);
+  border: 1px solid var(--gray-300);
+  padding: 16px;
+  border-radius: 8px;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--blue-400) transparent;
+}
+
+.dateGroup {
+  font-size: 14px;
+  line-height: 20px;
+  font-weight: 700;
+  color: var(--gray-600);
+  padding-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--gray-300);
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.entryIcon {
+  flex-shrink: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconCall {
+  color: var(--error-500);
+}
+
+.iconText {
+  color: var(--blue-500);
+}
+
+.iconEmail {
+  color: var(--green-400);
+}
+
+.iconVoicemail {
+  color: var(--error-500);
+}
+
+.iconMissed {
+  color: var(--error-500);
+}
+
+.iconConnected {
+  color: var(--green-400);
+}
+
+.entryBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.entryText {
+  font-size: 14px;
+  color: var(--gray-800);
+  line-height: 1.5;
+}
+
+.viewChatLink {
+  color: var(--blue-500);
+  font-size: 14px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.empty {
+  color: var(--gray-400);
+  font-size: 13px;
+  font-style: italic;
+  text-align: center;
+  padding: 24px 0;
+}

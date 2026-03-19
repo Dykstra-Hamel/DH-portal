@@ -209,6 +209,33 @@ export async function POST(
           }
         }
 
+        // Auto-start default cadence if lead is now in_process and assigned, and has no active cadence
+        const existingLeadStatus = customStatus || (assignedTo ? 'in_process' : 'new');
+        if (existingLeadStatus === 'in_process' && assignedTo) {
+          try {
+            const { startDefaultCadenceForStage } = await import('@/lib/cadence/start-default-cadence');
+            const { createAdminClient: getAdminClient } = await import('@/lib/supabase/server-admin');
+            const adminSupabase = getAdminClient();
+            const { data: existingCadence } = await adminSupabase
+              .from('lead_cadence_assignments')
+              .select('id')
+              .eq('lead_id', ticket.converted_to_lead_id)
+              .is('completed_at', null)
+              .maybeSingle();
+            if (!existingCadence) {
+              await startDefaultCadenceForStage(
+                ticket.converted_to_lead_id,
+                ticket.company_id,
+                'default_initial_contact_cadence_id',
+                assignedTo
+              );
+            }
+          } catch (cadenceError) {
+            console.error('Error auto-starting cadence on existing lead re-qualification:', cadenceError);
+            // Non-fatal — lead was updated successfully
+          }
+        }
+
         return NextResponse.json({
           message: 'Existing lead updated successfully',
           qualification: 'sales',
@@ -493,6 +520,24 @@ export async function POST(
             callRecordUpdateError
           );
           // Don't fail the request - the lead was created successfully
+        }
+      }
+
+      // Auto-start default initial-contact cadence when lead is assigned and in_process
+      const effectiveStatus = customStatus || (assignedTo || ticket.assigned_to ? 'in_process' : 'new');
+      const effectiveAssignedTo = assignedTo || ticket.assigned_to;
+      if (effectiveStatus === 'in_process' && effectiveAssignedTo) {
+        try {
+          const { startDefaultCadenceForStage } = await import('@/lib/cadence/start-default-cadence');
+          await startDefaultCadenceForStage(
+            newLead.id,
+            ticket.company_id,
+            'default_initial_contact_cadence_id',
+            effectiveAssignedTo
+          );
+        } catch (cadenceError) {
+          console.error('Error auto-starting cadence after ticket qualification:', cadenceError);
+          // Non-fatal — lead was created successfully
         }
       }
 

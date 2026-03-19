@@ -2,7 +2,7 @@
 
 export type TimeOfDay = 'morning' | 'afternoon';
 
-export type ActionType = 'live_call' | 'outbound_call' | 'text_message' | 'ai_call' | 'email';
+export type ActionType = 'live_call' | 'outbound_call' | 'text_message' | 'ai_call' | 'email' | 'trigger_workflow';
 
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 
@@ -26,6 +26,7 @@ export interface SalesCadenceStep {
   priority: Priority;
   display_order: number;
   description: string | null;
+  workflow_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -81,6 +82,36 @@ export interface LeadActivityWithUser extends LeadActivity {
   };
 }
 
+// System cadence types (global, not tied to a company)
+export interface SystemSalesCadenceStep {
+  id: string;
+  cadence_id: string;
+  day_number: number;
+  time_of_day: TimeOfDay;
+  action_type: ActionType;
+  priority: Priority;
+  display_order: number;
+  description: string | null;
+  workflow_id?: string | null;
+  created_at: string;
+}
+
+export interface SystemSalesCadence {
+  id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  is_featured: boolean;
+  usage_count: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SystemSalesCadenceWithSteps extends SystemSalesCadence {
+  steps: SystemSalesCadenceStep[];
+}
+
 // Helper types for forms and UI
 export interface CadenceFormData {
   name: string;
@@ -104,6 +135,7 @@ export const ACTION_TYPE_LABELS: Record<ActionType, string> = {
   text_message: 'Text Message',
   ai_call: 'AI Call',
   email: 'Email',
+  trigger_workflow: 'Trigger Workflow',
 };
 
 export const TIME_OF_DAY_LABELS: Record<TimeOfDay, string> = {

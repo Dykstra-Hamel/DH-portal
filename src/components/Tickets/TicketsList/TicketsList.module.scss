@@ -128,10 +128,10 @@
     background: transparent;
     border: none;
     box-shadow: none;
-    color: var(--action-500, #0088cc);
+    color: var(--blue-500);
 
     &::after {
-      background: var(--action-500, #0088cc);
+      background: var(--blue-500);
       transform: scaleX(1);
     }
   }

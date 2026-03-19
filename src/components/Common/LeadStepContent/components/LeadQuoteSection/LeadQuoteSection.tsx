@@ -51,6 +51,7 @@ export function LeadQuoteSection({
   onEditAddress,
   onShowToast,
   onRequestUndo,
+  onLeadFieldUpdate,
   broadcastQuoteUpdate,
   setSelectedPests,
   setAdditionalPests,
@@ -1031,6 +1032,7 @@ export function LeadQuoteSection({
       if (!pestId) {
         try {
           await adminAPI.updateLead(lead.id, { pest_type: null });
+          onLeadFieldUpdate?.({ pest_type: undefined });
         } catch (err) {
           console.error('Failed to clear lead pest_type', err);
         }
@@ -1105,15 +1107,18 @@ export function LeadQuoteSection({
       const data = await response.json();
 
       if (data.success && data.data) {
-        // Broadcast will trigger real-time update
-        await broadcastQuoteUpdate(data.data);
-
-        // Keep lead pest_type in sync with quote primary_pest
+        // Update lead pest_type then patch local state directly.
+        // The broadcast uses self:false so the local client won't receive its own
+        // event — patching state here avoids a full API refetch.
         try {
           await adminAPI.updateLead(lead.id, { pest_type: pestName });
+          onLeadFieldUpdate?.({ pest_type: pestName });
         } catch (err) {
           console.error('Failed to sync lead pest_type', err);
         }
+
+        // Broadcast for other connected clients
+        await broadcastQuoteUpdate(data.data);
 
         onShowToast?.('Primary pest updated', 'success');
       }

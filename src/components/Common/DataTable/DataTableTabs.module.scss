@@ -100,7 +100,12 @@
   white-space: nowrap;
 
   &:hover {
-    color: var(--gray-800, #262626);
+    color: var(--gray-800);
+
+    &::after {
+      background: var(--blue-400);
+      transform: scaleX(1);
+    }
   }
 
   &::after {
@@ -122,17 +127,17 @@
     background: transparent;
     border: none;
     box-shadow: none;
-    color: var(--action-500, #0088cc);
+    color: var(--gray-800);
 
     &::after {
-      background: var(--action-500, #0088cc);
+      background: var(--blue-400);
       transform: scaleX(1);
     }
   }
 }
 
 .tabCount {
-  color: var(--blue-600);
+  color: var(--blue-400);
   font-family: var(--font-satoshi);
   font-size: 14px;
   font-style: normal;

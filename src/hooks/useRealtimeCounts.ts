@@ -15,7 +15,7 @@ interface Counts {
   scheduling: number; // Won leads count
   my_leads: number; // Leads assigned to current user
   my_cases: number; // Support cases assigned to current user
-  my_tasks: number; // Tasks assigned to current user (excluding completed, no cadence_step_id)
+  my_tasks: number; // Tasks assigned to current user (excluding completed, all task types)
   my_actions: number; // Actions assigned to current user (tasks with cadence_step_id)
 }
 
@@ -444,7 +444,7 @@ export function useRealtimeCounts() {
         // Separate actions (tasks with cadence_step_id) from regular tasks
         const actions = activeTasks.filter((task: any) => task.cadence_step_id);
         const regularTasks = activeTasks.filter((task: any) => !task.cadence_step_id);
-        newCounts.my_tasks = regularTasks.length;
+        newCounts.my_tasks = activeTasks.length;
         newCounts.my_actions = actions.length;
       }
 
@@ -721,7 +721,7 @@ export function useRealtimeCounts() {
                   // Separate actions (tasks with cadence_step_id) from regular tasks
                   const actions = activeTasks.filter((task: any) => task.cadence_step_id);
                   const regularTasks = activeTasks.filter((task: any) => !task.cadence_step_id);
-                  updateCount('my_tasks', regularTasks.length);
+                  updateCount('my_tasks', activeTasks.length);
                   updateCount('my_actions', actions.length);
                 }
                 break;

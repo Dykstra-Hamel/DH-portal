@@ -10,6 +10,7 @@ import {
   PRIORITY_COLORS,
 } from '@/types/sales-cadence';
 import CadenceModal from '@/components/Common/CadenceModal/CadenceModal';
+import CadenceLibraryBrowser from '@/components/Automation/CadenceLibraryBrowser/CadenceLibraryBrowser';
 import styles from './SalesConfigManager.module.scss';
 
 interface SalesConfigManagerProps {
@@ -23,12 +24,74 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [showCadenceModal, setShowCadenceModal] = useState(false);
+  const [showLibraryBrowser, setShowLibraryBrowser] = useState(false);
   const [editingCadence, setEditingCadence] = useState<SalesCadenceWithSteps | null>(null);
   const [expandedCadence, setExpandedCadence] = useState<string | null>(null);
+  const [defaultCadences, setDefaultCadences] = useState({
+    default_initial_contact_cadence_id: '',
+    default_quote_followup_cadence_id: '',
+    default_scheduling_followup_cadence_id: '',
+  });
+  const [savingDefaults, setSavingDefaults] = useState(false);
 
   useEffect(() => {
     loadCadences();
+    loadDefaultCadences();
   }, [companyId]);
+
+  const loadDefaultCadences = async () => {
+    try {
+      const response = await fetch(`/api/companies/${companyId}/settings`);
+      if (!response.ok) return;
+      const { settings } = await response.json();
+      setDefaultCadences({
+        default_initial_contact_cadence_id: settings?.default_initial_contact_cadence_id?.value ?? '',
+        default_quote_followup_cadence_id: settings?.default_quote_followup_cadence_id?.value ?? '',
+        default_scheduling_followup_cadence_id: settings?.default_scheduling_followup_cadence_id?.value ?? '',
+      });
+    } catch {
+      // Non-critical — silently ignore
+    }
+  };
+
+  const handleSaveDefaults = async () => {
+    try {
+      setSavingDefaults(true);
+      setError(null);
+
+      const response = await fetch(`/api/companies/${companyId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            default_initial_contact_cadence_id: {
+              value: defaultCadences.default_initial_contact_cadence_id,
+              type: 'string',
+            },
+            default_quote_followup_cadence_id: {
+              value: defaultCadences.default_quote_followup_cadence_id,
+              type: 'string',
+            },
+            default_scheduling_followup_cadence_id: {
+              value: defaultCadences.default_scheduling_followup_cadence_id,
+              type: 'string',
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const { error: errorMsg } = await response.json();
+        throw new Error(errorMsg || 'Failed to save default cadences');
+      }
+
+      setSuccess('Default cadences saved successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save default cadences');
+    } finally {
+      setSavingDefaults(false);
+    }
+  };
 
   const loadCadences = async () => {
     try {
@@ -96,14 +159,88 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
     return <div className={styles.loading}>Loading sales cadences...</div>;
   }
 
+  const activeCadences = cadences.filter((c) => c.is_active);
+
+  const DEFAULT_CADENCE_ROWS = [
+    {
+      key: 'default_initial_contact_cadence_id' as const,
+      label: 'Initial Lead Contacting',
+      description: 'Applied when a new lead enters the pipeline',
+    },
+    {
+      key: 'default_quote_followup_cadence_id' as const,
+      label: 'Quote Follow-up',
+      description: 'Applied after a quote has been sent',
+    },
+    {
+      key: 'default_scheduling_followup_cadence_id' as const,
+      label: 'Scheduling Follow-up',
+      description: 'Applied after scheduling a service',
+    },
+  ];
+
   return (
     <div className={styles.salesConfigManager}>
+      <div className={styles.defaultCadencesCard}>
+        <div className={styles.defaultCadencesHeader}>
+          <h3>Automation Default Cadences</h3>
+          <p>Select which cadence is automatically assigned for each automation workflow.</p>
+        </div>
+
+        {DEFAULT_CADENCE_ROWS.map((row, index) => (
+          <div
+            key={row.key}
+            className={styles.defaultCadenceRow}
+            data-last={index === DEFAULT_CADENCE_ROWS.length - 1 ? 'true' : undefined}
+          >
+            <div className={styles.defaultCadenceLabel}>
+              <span className={styles.defaultCadenceName}>{row.label}</span>
+              <span className={styles.defaultCadenceDesc}>{row.description}</span>
+            </div>
+            <select
+              value={defaultCadences[row.key]}
+              onChange={(e) =>
+                setDefaultCadences((prev) => ({ ...prev, [row.key]: e.target.value }))
+              }
+              disabled={loading || savingDefaults}
+              className={styles.defaultCadenceSelect}
+            >
+              <option value="">— No default —</option>
+              {activeCadences.map((cadence) => (
+                <option key={cadence.id} value={cadence.id}>
+                  {cadence.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+
+        <div className={styles.defaultCadencesFooter}>
+          <button
+            onClick={handleSaveDefaults}
+            className={styles.saveButton}
+            disabled={loading || savingDefaults}
+          >
+            {savingDefaults ? 'Saving...' : 'Save Defaults'}
+          </button>
+        </div>
+      </div>
+
       <div className={styles.header}>
         <h2>Sales Cadence Configuration</h2>
-        <button onClick={handleCreateCadence} className={styles.createButton} disabled={saving}>
-          <Plus size={16} />
-          Create Cadence
-        </button>
+        <div className={styles.headerActions}>
+          <button
+            onClick={() => setShowLibraryBrowser(true)}
+            className={styles.importButton}
+            disabled={saving}
+          >
+            Import from Library
+          </button>
+          <button onClick={handleCreateCadence} className={styles.createButton} disabled={saving}>
+            <Plus size={16} />
+            Create Cadence
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -229,6 +366,16 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
             setSuccess(editingCadence ? 'Cadence updated successfully' : 'Cadence created successfully');
             loadCadences();
           }}
+        />
+      )}
+
+      {showLibraryBrowser && (
+        <CadenceLibraryBrowser
+          companyId={companyId}
+          onCadenceImported={() => {
+            loadCadences();
+          }}
+          onClose={() => setShowLibraryBrowser(false)}
         />
       )}
     </div>
