@@ -17,6 +17,7 @@ import {
   removeActivityChannel,
   type ActivityUpdatePayload,
 } from '@/lib/realtime/activity-channel';
+import { SMSTranscriptModal } from '@/components/Common/SMSTranscriptModal/SMSTranscriptModal';
 import styles from './CommunicationLog.module.scss';
 
 interface CommunicationLogProps {
@@ -138,6 +139,7 @@ export function CommunicationLog({
 }: CommunicationLogProps) {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
+  const [transcriptModalId, setTranscriptModalId] = useState<string | null>(null);
 
   const loadActivities = useCallback(async () => {
     try {
@@ -235,17 +237,19 @@ export function CommunicationLog({
                     <div className={styles.entryBody}>
                       <div className={styles.entryText}>
                         {activity.notes || formatActivityDescription(activity)}
-                        {activity.metadata?.chat_url && (
+                        {activity.metadata?.sms_conversation_id && (
                           <>
                             {' - '}
-                            <a
-                              href={activity.metadata.chat_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                            <button
                               className={styles.viewChatLink}
+                              onClick={() =>
+                                setTranscriptModalId(
+                                  activity.metadata!.sms_conversation_id
+                                )
+                              }
                             >
                               View Chat
-                            </a>
+                            </button>
                           </>
                         )}
                       </div>
@@ -256,6 +260,13 @@ export function CommunicationLog({
             </div>
           ))}
         </div>
+      )}
+      {transcriptModalId && (
+        <SMSTranscriptModal
+          conversationId={transcriptModalId}
+          isOpen={!!transcriptModalId}
+          onClose={() => setTranscriptModalId(null)}
+        />
       )}
     </div>
   );

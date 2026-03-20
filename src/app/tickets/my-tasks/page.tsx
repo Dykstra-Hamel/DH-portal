@@ -27,14 +27,126 @@ import {
 import pageStyles from './page.module.scss';
 import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
+type LeftPanelView = 'actions' | 'automations';
 type ActionsTab = 'due_today' | 'upcoming' | 'in_the_past';
 type TasksTab = 'all' | 'new' | 'pending' | 'in_progress' | 'overdue';
+type AutomationsTab = 'all' | 'in_process' | 'quoted' | 'scheduling';
+
+const AUTOMATIONS_TABS: { key: AutomationsTab; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'in_process', label: 'Working' },
+  { key: 'quoted', label: 'Quoted' },
+  { key: 'scheduling', label: 'Scheduling' },
+];
+
+type AutomatedActionType = 'email' | 'text_message' | 'ai_call';
+
+// Cadence step types that should appear in the Automations tab (includes trigger_workflow for filtering)
+const AUTOMATED_STEP_TYPES_ALL = ['email', 'text_message', 'ai_call', 'trigger_workflow'];
+
+const CADENCE_STEP_LABELS: Record<AutomatedActionType, string> = {
+  email: 'Send Email',
+  text_message: 'Send Text',
+  ai_call: 'AI Call',
+};
+
+const WORKFLOW_STEP_LABELS: Record<string, string> = {
+  send_email: 'Email Customer',
+  send_sms: 'Text Customer',
+  make_call: 'Call Customer',
+  conditional: 'Decision',
+  update_lead_status: 'Update Status',
+};
+
+const WORKFLOW_ACTION_TYPES = new Set(['send_email', 'send_sms', 'make_call', 'conditional', 'update_lead_status']);
+const WORKFLOW_DELAY_TYPES = new Set(['delay', 'wait']);
+
+interface WorkflowTimelineEntry {
+  step: { type: string; delay_minutes?: number; [key: string]: unknown };
+  estimatedAt: Date;
+  isCompleted: boolean;
+}
+
+function buildWorkflowStepTimeline(
+  steps: WorkflowTimelineEntry['step'][],
+  stepResults: { stepIndex: number; completedAt: string }[],
+  startedAt: string
+): WorkflowTimelineEntry[] {
+  const base = new Date(startedAt);
+  let accumulatedMs = 0;
+  const result: WorkflowTimelineEntry[] = [];
+  steps.forEach((step, index) => {
+    if (WORKFLOW_DELAY_TYPES.has(step.type)) {
+      const mins = (step.delay_minutes as number) || (step.delay as number) || 0;
+      accumulatedMs += mins * 60 * 1000;
+    } else if (WORKFLOW_ACTION_TYPES.has(step.type)) {
+      accumulatedMs += (step.delay_minutes || 0) * 60 * 1000;
+      const completedResult = stepResults.find(r => r.stepIndex === index);
+      result.push({
+        step,
+        estimatedAt: new Date(base.getTime() + accumulatedMs),
+        isCompleted: !!completedResult,
+      });
+    }
+  });
+  return result;
+}
+
+function formatWorkflowDate(date: Date): string {
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  const year = String(date.getFullYear()).slice(2);
+  const hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'pm' : 'am';
+  const h = hours % 12 || 12;
+  return `${month}/${day}/${year} - ${h}:${minutes}${ampm}`;
+}
+
+interface CadenceStep {
+  id: string;
+  action_type: string;
+  display_order: number;
+  description: string | null;
+}
+
+interface ActiveExecution {
+  id: string;
+  execution_status: string;
+  execution_data: { stepResults?: { stepIndex: number; completedAt: string }[] } | null;
+  started_at: string;
+  workflow: { id: string; name: string; workflow_steps: WorkflowTimelineEntry['step'][] } | null;
+}
+
+interface LeadWithCadence {
+  id: string;
+  lead_status: string;
+  customer: { first_name: string | null; last_name: string | null } | null;
+  service_address: { city: string | null; state: string | null; zip_code: string | null } | null;
+  cadence_assignment: {
+    id: string;
+    started_at: string;
+    paused_at: string | null;
+    completed_at: string | null;
+    cadence: {
+      id: string;
+      name: string;
+      steps: CadenceStep[];
+    } | null;
+  }[];
+  cadence_progress: { id: string; cadence_step_id: string }[];
+  active_execution: ActiveExecution[];
+}
 
 interface LeadData {
   id: string;
   lead_status: string;
   customer: { first_name: string | null; last_name: string | null } | null;
-  service_address: { city: string | null; state: string | null; zip_code: string | null } | null;
+  service_address: {
+    city: string | null;
+    state: string | null;
+    zip_code: string | null;
+  } | null;
 }
 
 const ACTIONS_TABS: { key: ActionsTab; label: string }[] = [
@@ -121,6 +233,56 @@ const ACTION_ICONS: Record<ActionIconType, React.ElementType> = {
   other: Zap,
 };
 
+const toArray = <T,>(val: T | T[] | null | undefined): T[] => {
+  if (!val) return [];
+  return Array.isArray(val) ? val : [val];
+};
+
+interface NextAutomatedAction {
+  label: string;
+  subtitle: string | null;
+}
+
+const getActiveExecution = (lead: LeadWithCadence) =>
+  toArray(lead.active_execution).find(
+    e => e.execution_status === 'pending' || e.execution_status === 'running'
+  ) ?? null;
+
+const getNextAutomatedAction = (lead: LeadWithCadence): NextAutomatedAction | null => {
+  // If a workflow execution is actively running, always show it regardless of cadence step state
+  const activeExec = getActiveExecution(lead);
+  if (activeExec) {
+    if (!activeExec.workflow?.workflow_steps?.length) {
+      return { label: 'Automation Running', subtitle: null };
+    }
+    const stepResults = activeExec.execution_data?.stepResults ?? [];
+    const timeline = buildWorkflowStepTimeline(activeExec.workflow.workflow_steps, stepResults, activeExec.started_at);
+    const nextWorkflowStep = timeline.find(t => !t.isCompleted);
+    if (!nextWorkflowStep) return { label: 'Automation Running', subtitle: null };
+    return {
+      label: WORKFLOW_STEP_LABELS[nextWorkflowStep.step.type] ?? nextWorkflowStep.step.type,
+      subtitle: formatWorkflowDate(nextWorkflowStep.estimatedAt),
+    };
+  }
+
+  // Otherwise find the next pending direct automated cadence step (never show trigger_workflow without a running execution)
+  const assignments = toArray(lead.cadence_assignment);
+  const activeAssignment = assignments.find(ca => ca.completed_at === null);
+  if (!activeAssignment?.cadence) return null;
+
+  const completedIds = new Set(toArray(lead.cadence_progress).map(p => p.cadence_step_id));
+  const nextCadenceStep = activeAssignment.cadence.steps
+    .filter(s => !completedIds.has(s.id) && (s.action_type === 'email' || s.action_type === 'text_message' || s.action_type === 'ai_call'))
+    .sort((a, b) => a.display_order - b.display_order)[0] ?? null;
+
+  if (!nextCadenceStep) return null;
+
+  return {
+    label: CADENCE_STEP_LABELS[nextCadenceStep.action_type as AutomatedActionType],
+    subtitle: nextCadenceStep.description,
+  };
+};
+
 export default function MyTasksPage() {
   const router = useRouter();
   const [actions, setActions] = useState<Task[]>([]);
@@ -131,6 +293,10 @@ export default function MyTasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<TaskFormData | null>(null);
+  const [leftPanelView, setLeftPanelView] = useState<LeftPanelView>('actions');
+  const [automationExecutions, setAutomationExecutions] = useState<LeadWithCadence[]>([]);
+  const [automationsLoading, setAutomationsLoading] = useState(false);
+  const [automationsTab, setAutomationsTab] = useState<AutomationsTab>('all');
   const [actionsTab, setActionsTab] = useState<ActionsTab>('due_today');
   const [tasksTab, setTasksTab] = useState<TasksTab>('all');
   const [tasksSearchQuery, setTasksSearchQuery] = useState('');
@@ -157,7 +323,9 @@ export default function MyTasksPage() {
       const supabase = createClient();
       const { data: leads } = await supabase
         .from('leads')
-        .select('id, lead_status, customer:customers(first_name, last_name), service_address:service_addresses(city, state, zip_code)')
+        .select(
+          'id, lead_status, customer:customers(first_name, last_name), service_address:service_addresses(city, state, zip_code)'
+        )
         .in('id', leadIds);
 
       if (leads) {
@@ -171,6 +339,46 @@ export default function MyTasksPage() {
       console.error('Error fetching lead data for actions:', error);
     }
   }, []);
+
+  const fetchAutomations = useCallback(async () => {
+    if (!user?.id || !selectedCompany?.id) return;
+
+    try {
+      setAutomationsLoading(true);
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('leads')
+        .select(`
+          id,
+          lead_status,
+          customer:customers(first_name, last_name),
+          service_address:service_addresses(city, state, zip_code),
+          cadence_assignment:lead_cadence_assignments(
+            id, started_at, paused_at, completed_at,
+            cadence:sales_cadences(id, name, steps:sales_cadence_steps(id, action_type, display_order, description))
+          ),
+          cadence_progress:lead_cadence_progress(id, cadence_step_id),
+          active_execution:automation_executions!automation_executions_lead_id_fkey(
+            id, execution_status, execution_data, started_at,
+            workflow:automation_workflows(id, name, workflow_steps)
+          )
+        `)
+        .eq('company_id', selectedCompany.id)
+        .eq('assigned_to', user.id)
+        .not('lead_status', 'in', '("won","lost")');
+
+      if (data) {
+        const filtered = (data as unknown as LeadWithCadence[]).filter(lead =>
+          getNextAutomatedAction(lead) !== null
+        );
+        setAutomationExecutions(filtered);
+      }
+    } catch (err) {
+      console.error('Error fetching automations:', err);
+    } finally {
+      setAutomationsLoading(false);
+    }
+  }, [user?.id, selectedCompany?.id]);
 
   const fetchMyTasks = useCallback(async () => {
     if (!user?.id || !selectedCompany?.id) {
@@ -191,8 +399,12 @@ export default function MyTasksPage() {
 
       const data = await response.json();
       const allTasks: Task[] = Array.isArray(data.tasks) ? data.tasks : [];
-      const actionTasks = allTasks.filter(t => t.cadence_step_id && t.status !== 'completed');
-      const taskItems = allTasks.filter(t => !t.cadence_step_id && t.status !== 'completed');
+      const actionTasks = allTasks.filter(
+        t => t.cadence_step_id && t.status !== 'completed'
+      );
+      const taskItems = allTasks.filter(
+        t => !t.cadence_step_id && t.status !== 'completed'
+      );
 
       setActions(actionTasks);
       setRegularTasks(taskItems);
@@ -207,6 +419,10 @@ export default function MyTasksPage() {
   useEffect(() => {
     fetchMyTasks();
   }, [fetchMyTasks]);
+
+  useEffect(() => {
+    fetchAutomations();
+  }, [fetchAutomations]);
 
   // Real-time subscription for task updates
   useEffect(() => {
@@ -223,13 +439,15 @@ export default function MyTasksPage() {
           const supabase = createClient();
           const { data: fullTask } = await supabase
             .from('tasks')
-            .select(`
+            .select(
+              `
               *,
               company:companies(id, name),
               assigned_user:profiles!tasks_assigned_to_fkey(
                 id, first_name, last_name, email
               )
-            `)
+            `
+            )
             .eq('id', record_id)
             .single();
 
@@ -249,14 +467,23 @@ export default function MyTasksPage() {
               });
               setRegularTasks(prev => prev.filter(t => t.id !== fullTask.id));
               // Fetch lead data for this action if lead-linked
-              if (fullTask.related_entity_type === 'leads' && fullTask.related_entity_id) {
+              if (
+                fullTask.related_entity_type === 'leads' &&
+                fullTask.related_entity_id
+              ) {
                 const { data: lead } = await supabase
                   .from('leads')
-                  .select('id, lead_status, customer:customers(first_name, last_name), service_address:service_addresses(city, state, zip_code)')
+                  .select(
+                    'id, lead_status, customer:customers(first_name, last_name), service_address:service_addresses(city, state, zip_code)'
+                  )
                   .eq('id', fullTask.related_entity_id)
                   .single();
                 if (lead) {
-                  setLeadDataMap(prev => ({ ...prev, [(lead as unknown as LeadData).id]: lead as unknown as LeadData }));
+                  setLeadDataMap(prev => ({
+                    ...prev,
+                    [(lead as unknown as LeadData).id]:
+                      lead as unknown as LeadData,
+                  }));
                 }
               }
             } else {
@@ -291,13 +518,29 @@ export default function MyTasksPage() {
     return () => unregisterPageAction('add');
   }, [registerPageAction, unregisterPageAction]);
 
+  // Automations tab counts + filtered list
+  const automationsTabCounts = useMemo(() => ({
+    all: automationExecutions.length,
+    in_process: automationExecutions.filter(l => l.lead_status === 'in_process').length,
+    quoted: automationExecutions.filter(l => l.lead_status === 'quoted').length,
+    scheduling: automationExecutions.filter(l => l.lead_status === 'scheduling').length,
+  }), [automationExecutions]);
+
+  const filteredAutomations = useMemo(() =>
+    automationsTab === 'all'
+      ? automationExecutions
+      : automationExecutions.filter(l => l.lead_status === automationsTab),
+    [automationExecutions, automationsTab]
+  );
+
   // Actions tab counts
   const actionTabCounts = useMemo(() => {
     const today = getTodayStr();
     return {
       due_today: actions.filter(a => a.due_date === today).length,
       upcoming: actions.filter(a => !a.due_date || a.due_date > today).length,
-      in_the_past: actions.filter(a => !!a.due_date && a.due_date < today).length,
+      in_the_past: actions.filter(a => !!a.due_date && a.due_date < today)
+        .length,
     };
   }, [actions]);
 
@@ -314,7 +557,9 @@ export default function MyTasksPage() {
 
   // Tasks tab counts
   const taskTabCounts = useMemo(() => {
-    const active = regularTasks.filter(t => !t.archived && t.status !== 'completed');
+    const active = regularTasks.filter(
+      t => !t.archived && t.status !== 'completed'
+    );
     return {
       all: active.length,
       new: active.filter(t => t.status === 'new').length,
@@ -326,10 +571,14 @@ export default function MyTasksPage() {
 
   // Filtered regular tasks by tab + search
   const filteredRegularTasks = useMemo(() => {
-    let result = regularTasks.filter(t => !t.archived && t.status !== 'completed');
+    let result = regularTasks.filter(
+      t => !t.archived && t.status !== 'completed'
+    );
     if (tasksTab === 'new') result = result.filter(t => t.status === 'new');
-    else if (tasksTab === 'pending') result = result.filter(t => t.status === 'pending');
-    else if (tasksTab === 'in_progress') result = result.filter(t => t.status === 'in_progress');
+    else if (tasksTab === 'pending')
+      result = result.filter(t => t.status === 'pending');
+    else if (tasksTab === 'in_progress')
+      result = result.filter(t => t.status === 'in_progress');
     else if (tasksTab === 'overdue') result = result.filter(isTaskOverdue);
 
     if (!tasksSearchQuery.trim()) return result;
@@ -377,7 +626,9 @@ export default function MyTasksPage() {
                 <span className={pageStyles.customerName}>{customerName}</span>
               )}
               {addressLine && (
-                <span className={pageStyles.customerAddress}>{addressLine}</span>
+                <span className={pageStyles.customerAddress}>
+                  {addressLine}
+                </span>
               )}
             </div>
           );
@@ -391,7 +642,9 @@ export default function MyTasksPage() {
           const isOverdue = action.due_date ? action.due_date < today : false;
           const overdueDays =
             action.due_date && isOverdue ? getOverdueDays(action.due_date) : 0;
-          const { label: actionLabel, iconType } = parseActionInfo(action.title);
+          const { label: actionLabel, iconType } = parseActionInfo(
+            action.title
+          );
           const ActionIcon = ACTION_ICONS[iconType];
           return (
             <div className={pageStyles.leadCell}>
@@ -422,7 +675,8 @@ export default function MyTasksPage() {
           const leadData = action.related_entity_id
             ? leadDataMap[action.related_entity_id]
             : null;
-          const leadStatus = leadData?.lead_status ?? action.related_entity?.status ?? '';
+          const leadStatus =
+            leadData?.lead_status ?? action.related_entity?.status ?? '';
           if (!leadStatus) return null;
           const today = getTodayStr();
           const isOverdue = action.due_date ? action.due_date < today : false;
@@ -465,6 +719,109 @@ export default function MyTasksPage() {
     return cols;
   }, []);
 
+  const automationColumns = useMemo<ColumnDefinition<LeadWithCadence>[]>(
+    () => [
+      {
+        key: 'customer',
+        title: 'Customer',
+        render: (lead: LeadWithCadence) => {
+          const customer = lead.customer;
+          const customerName = customer
+            ? `${customer.first_name ?? ''} ${customer.last_name ?? ''}`.trim()
+            : '';
+          const addr = lead.service_address;
+          const addressLine = addr
+            ? [addr.city, addr.state, addr.zip_code].filter(Boolean).join(', ')
+            : '';
+          return (
+            <div className={pageStyles.customerCell}>
+              {customerName && (
+                <span className={pageStyles.customerName}>{customerName}</span>
+              )}
+              {addressLine && (
+                <span className={pageStyles.customerAddress}>{addressLine}</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'next_action',
+        title: 'Next Action',
+        render: (lead: LeadWithCadence) => {
+          const next = getNextAutomatedAction(lead);
+          if (!next) return <span>—</span>;
+          return (
+            <div className={pageStyles.leadCell}>
+              <span>{next.label}</span>
+              {next.subtitle && (
+                <span className={pageStyles.customerAddress}>{next.subtitle}</span>
+              )}
+            </div>
+          );
+        },
+      },
+      {
+        key: 'progress',
+        title: 'Progress',
+        render: (lead: LeadWithCadence) => {
+          // If a workflow is actively running, show its step progress
+          const activeExec = getActiveExecution(lead);
+          if (activeExec?.workflow?.workflow_steps?.length) {
+            const stepResults = activeExec.execution_data?.stepResults ?? [];
+            const timeline = buildWorkflowStepTimeline(activeExec.workflow.workflow_steps, stepResults, activeExec.started_at);
+            const total = timeline.length;
+            const completed = timeline.filter(t => t.isCompleted).length;
+            const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+            return (
+              <div className={pageStyles.progressCell}>
+                <span className={pageStyles.progressLabel}>{completed}/{total} Steps</span>
+                <div className={pageStyles.progressTrack}>
+                  <div className={pageStyles.progressFill} style={{ width: `${pct}%` }} />
+                </div>
+              </div>
+            );
+          }
+
+          // Otherwise show automated cadence step progress
+          const assignments = toArray(lead.cadence_assignment);
+          const activeAssignment = assignments.find(ca => ca.completed_at === null);
+          const allSteps = activeAssignment?.cadence?.steps ?? [];
+          const completedIds = new Set(toArray(lead.cadence_progress).map(p => p.cadence_step_id));
+          const automatedSteps = allSteps.filter(s => AUTOMATED_STEP_TYPES_ALL.includes(s.action_type));
+          const completedAutomated = automatedSteps.filter(s => completedIds.has(s.id)).length;
+          const totalAutomated = automatedSteps.length;
+          const pct = totalAutomated > 0 ? Math.round((completedAutomated / totalAutomated) * 100) : 0;
+          return (
+            <div className={pageStyles.progressCell}>
+              <span className={pageStyles.progressLabel}>
+                {completedAutomated}/{totalAutomated} Steps
+              </span>
+              <div className={pageStyles.progressTrack}>
+                <div className={pageStyles.progressFill} style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          );
+        },
+      },
+    ],
+    []
+  );
+
+  const handleAutomationRowClick = useCallback(
+    (lead: LeadWithCadence) => {
+      router.push(`/tickets/leads/${lead.id}`);
+    },
+    [router]
+  );
+
+  const handleAutomationItemAction = useCallback(
+    (action: string, lead: LeadWithCadence) => {
+      if (action === 'navigate') handleAutomationRowClick(lead);
+    },
+    [handleAutomationRowClick]
+  );
+
   const actionsEmptyMessage =
     actionsTab === 'due_today'
       ? 'No actions due today.'
@@ -479,7 +836,10 @@ export default function MyTasksPage() {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...taskFormData, company_id: selectedCompany.id }),
+        body: JSON.stringify({
+          ...taskFormData,
+          company_id: selectedCompany.id,
+        }),
       });
       if (response.ok) {
         setShowCreateForm(false);
@@ -598,38 +958,88 @@ export default function MyTasksPage() {
       </Modal>
 
       <div className={pageStyles.layout}>
-        {/* Left: Actions Panel */}
+        {/* Left: Actions / Automations Panel */}
         <div className={pageStyles.panel}>
+          {/* Panel-level view switcher */}
           <div className={pageStyles.panelHeader}>
-            <p className={pageStyles.panelTitle}>My Actions (Sales Only)</p>
-          </div>
-
-          <div className={tabStyles.tabsRow}>
-            <div className={tabStyles.tabsSection}>
-              {ACTIONS_TABS.map(tab => (
-                <button
-                  key={tab.key}
-                  className={`${tabStyles.tab} ${actionsTab === tab.key ? tabStyles.active : ''}`}
-                  onClick={() => setActionsTab(tab.key)}
-                >
-                  {tab.label}
-                  <span className={tabStyles.tabCount}>{actionTabCounts[tab.key]}</span>
-                </button>
-              ))}
+            <div className={pageStyles.panelViewSwitcher}>
+              <button
+                className={`${pageStyles.panelViewTitle} ${leftPanelView === 'actions' ? pageStyles.panelViewTitleActive : ''}`}
+                onClick={() => setLeftPanelView('actions')}
+              >
+                My Actions
+              </button>
+              <button
+                className={`${pageStyles.panelViewTitle} ${leftPanelView === 'automations' ? pageStyles.panelViewTitleActive : ''}`}
+                onClick={() => setLeftPanelView('automations')}
+              >
+                Automations
+              </button>
             </div>
           </div>
 
-          <DataTable<Task>
-            data={filteredActions}
-            title=""
-            columns={actionsColumns}
-            loading={loading}
-            emptyStateMessage={actionsEmptyMessage}
-            onItemAction={handleActionItemAction}
-            customColumnWidths="1fr 1fr 1.4fr"
-            searchEnabled={false}
-            tableType="tasks"
-          />
+          {leftPanelView === 'actions' ? (
+            <>
+              <div className={tabStyles.tabsRow}>
+                <div className={tabStyles.tabsSection}>
+                  {ACTIONS_TABS.map(tab => (
+                    <button
+                      key={tab.key}
+                      className={`${tabStyles.tab} ${actionsTab === tab.key ? tabStyles.active : ''}`}
+                      onClick={() => setActionsTab(tab.key)}
+                    >
+                      {tab.label}
+                      <span className={tabStyles.tabCount}>
+                        {actionTabCounts[tab.key]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <DataTable<Task>
+                data={filteredActions}
+                title=""
+                columns={actionsColumns}
+                loading={loading}
+                emptyStateMessage={actionsEmptyMessage}
+                onItemAction={handleActionItemAction}
+                customColumnWidths="1fr 1fr 1.4fr"
+                searchEnabled={false}
+                tableType="tasks"
+              />
+            </>
+          ) : (
+            <>
+              <div className={tabStyles.tabsRow}>
+                <div className={tabStyles.tabsSection}>
+                  {AUTOMATIONS_TABS.map(tab => (
+                    <button
+                      key={tab.key}
+                      className={`${tabStyles.tab} ${automationsTab === tab.key ? tabStyles.active : ''}`}
+                      onClick={() => setAutomationsTab(tab.key)}
+                    >
+                      {tab.label}
+                      <span className={tabStyles.tabCount}>
+                        {automationsTabCounts[tab.key]}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <DataTable<LeadWithCadence>
+                data={filteredAutomations}
+                title=""
+                columns={automationColumns}
+                loading={automationsLoading}
+                emptyStateMessage="No leads with active automations assigned to you."
+                onItemAction={handleAutomationItemAction}
+                customColumnWidths="1fr 1fr 1fr"
+                searchEnabled={false}
+                tableType="tasks"
+              />
+            </>
+          )}
         </div>
 
         {/* Right: Additional Tasks Panel */}
@@ -647,7 +1057,9 @@ export default function MyTasksPage() {
                   onClick={() => setTasksTab(tab.key)}
                 >
                   {tab.label}
-                  <span className={tabStyles.tabCount}>{taskTabCounts[tab.key]}</span>
+                  <span className={tabStyles.tabCount}>
+                    {taskTabCounts[tab.key]}
+                  </span>
                 </button>
               ))}
             </div>
