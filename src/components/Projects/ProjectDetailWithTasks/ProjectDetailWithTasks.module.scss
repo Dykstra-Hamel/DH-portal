@@ -1,3 +1,11 @@
+.headerCompanyLogo {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
 .container {
   display: flex;
   flex-direction: column;
@@ -25,7 +33,7 @@
   gap: 12px;
   padding: 48px 64px;
   background: white;
-  border: 3px dashed var(--action-500, #0284c7);
+  border: 3px dashed var(--blue-500);
   border-radius: 16px;
   box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
   color: var(--action-600, #0284c7);
@@ -197,7 +205,7 @@
   &:focus-visible {
     opacity: 1;
     color: var(--gray-600, #4b5563);
-    outline: 2px solid var(--action-500, #0284c7);
+    outline: 2px solid var(--blue-500);
     outline-offset: 1px;
   }
 }
@@ -320,7 +328,8 @@
       transform: scale(1.05);
     }
 
-    .deleteImageButton {
+    .deleteImageButton,
+    .downloadImageButton {
       opacity: 1;
     }
   }
@@ -344,7 +353,8 @@
     background: var(--gray-100, #f3f4f6);
     border-color: var(--gray-300, #d1d5db);
 
-    .deleteImageButton {
+    .deleteImageButton,
+    .downloadImageButton {
       opacity: 1;
     }
   }
@@ -378,7 +388,7 @@
 
   &.addNewBoxActive .addNewContent {
     background: var(--action-100, #e0f2fe);
-    border-color: var(--action-500, #0ea5e9);
+    border-color: var(--blue-500);
     color: var(--action-700, #0369a1);
   }
 }
@@ -409,6 +419,20 @@
   font-weight: 500;
 }
 
+.uploadProgressBarCompact {
+  width: 110px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gray-200, #e5e7eb);
+  overflow: hidden;
+}
+
+.uploadProgressCompactLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-700, #374151);
+}
+
 .deleteImageButton {
   position: absolute;
   top: 8px;
@@ -429,6 +453,34 @@
 
   &:hover {
     background: rgba(220, 38, 38, 0.9);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.downloadImageButton {
+  position: absolute;
+  top: 8px;
+  right: 44px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  border: none;
+  border-radius: var(--border-radius);
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 105, 224, 0.9);
   }
 
   svg {
@@ -539,18 +591,141 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  align-items: stretch;
+}
+
+.loadOlderCommentsRow {
+  display: flex;
+  justify-content: center;
+}
+
+.loadOlderCommentsButton {
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--action-500, #0080f0);
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+
+  svg {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.18s ease;
+  }
+
+  &:hover {
+    background: transparent !important;
+    color: var(--action-700, #0369a1);
+
+    svg {
+      transform: translateY(-2px);
+    }
+  }
+
+  &:focus-visible {
+    background: transparent !important;
+    color: var(--action-700, #0369a1);
+  }
+}
+
+.commentsFeed {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 10px 10px;
+}
+
+.commentsBottomAnchor {
+  width: 100%;
+  height: 1px;
+  flex-shrink: 0;
 }
 
 .commentItem {
   background: var(--white);
   border: 1px solid var(--gray-200, #e5e7eb);
-  border-radius: 12px;
+  border-radius: 18px;
   padding: 12px 14px;
+  width: min(100%, 56%);
+  align-self: flex-start;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05);
+}
+
+.commentItemMine {
+  align-self: flex-end;
+  border-color: var(--gray-200, #e5e7eb);
+  background: var(--white);
+}
+
+.commentItemMine::after {
+  content: '';
+  position: absolute;
+  right: 18px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--white);
+  border-right: 1px solid var(--gray-200, #e5e7eb);
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  transform: rotate(45deg);
+}
+
+.commentItemMine .commentMeta {
+  justify-content: flex-start;
+}
+
+.commentItemMine .commentAvatarMini {
+  order: 1;
+}
+
+.commentItemMine .commentMetaDetails {
+  order: 2;
+  flex: 1;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.commentItemMine .commentActions {
+  order: 3;
+  margin-left: auto;
+}
+
+.commentItemMine .commentText {
+  text-align: left;
+}
+
+.commentItemMine .commentImageAttachments,
+.commentItemMine .commentAttachments {
+  justify-content: flex-start;
+}
+
+.commentItemOther {
+  align-self: flex-start;
+}
+
+.commentItemOther::after {
+  content: '';
+  position: absolute;
+  left: 18px;
+  bottom: -6px;
+  width: 12px;
+  height: 12px;
+  background: var(--white);
+  border-left: 1px solid var(--gray-200, #e5e7eb);
+  border-bottom: 1px solid var(--gray-200, #e5e7eb);
+  transform: rotate(-45deg);
 }
 
 .commentHighlight {
-  border-color: var(--gray-200, #e5e7eb);
-  background: var(--white);
   animation: commentHighlightPulse 1.6s ease-in-out infinite;
 }
 
@@ -706,6 +881,7 @@
 
 .commentImageLink {
   display: block;
+  position: relative;
   border-radius: 12px;
   overflow: hidden;
   transition: all 0.2s ease;
@@ -713,13 +889,18 @@
   &:hover {
     transform: scale(1.02);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+
+    .commentDownloadButton,
+    .commentDeleteButton {
+      opacity: 1;
+    }
   }
 }
 
 .commentImage {
   display: block;
-  max-width: 280px;
-  max-height: 200px;
+  max-width: 180px;
+  max-height: 130px;
   width: auto;
   height: auto;
   object-fit: contain;
@@ -732,6 +913,80 @@
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
+}
+
+.commentAttachmentCardWrapper {
+  position: relative;
+  display: inline-flex;
+
+  &:hover {
+    .commentDownloadButton,
+    .commentDeleteButton {
+      opacity: 1;
+    }
+  }
+}
+
+.commentDownloadButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  border: none;
+  border-radius: var(--border-radius);
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 1;
+
+  &:hover {
+    background: rgba(0, 105, 224, 0.9);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}
+
+.commentDownloadButtonWithDelete {
+  right: 44px;
+}
+
+.commentDeleteButton {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  border: none;
+  border-radius: var(--border-radius);
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  z-index: 1;
+
+  &:hover {
+    background: rgba(220, 38, 38, 0.9);
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 .attachmentItem {
@@ -894,7 +1149,7 @@
 }
 
 .commentComposerDragActive {
-  border-color: var(--action-500, #0ea5e9);
+  border-color: var(--blue-500);
   border-width: 2px;
   background: var(--action-50, #f0f9ff);
   box-shadow: 0 10px 30px rgba(14, 165, 233, 0.2);
@@ -998,6 +1253,33 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+
+.uploadProgressContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.uploadProgressLabel {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-600, #4b5563);
+}
+
+.uploadProgressBar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--gray-200, #e5e7eb);
+  overflow: hidden;
+}
+
+.uploadProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue-500);
+  transition: width 0.2s ease;
 }
 
 .pendingAttachment {
@@ -1220,6 +1502,10 @@
     flex-direction: column;
     padding: 0 1rem 2rem;
   }
+
+  .commentItem {
+    width: min(100%, 78%);
+  }
 }
 
 .templateButton {
@@ -1336,4 +1622,122 @@
   50% {
     opacity: 0.5;
   }
+}
+
+.contentTabBar {
+  display: flex;
+  border-bottom: 2px solid var(--gray-200, #e5e7eb);
+  margin-bottom: 16px;
+}
+
+.contentTab {
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-500, #6b7280);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
+
+  &:hover {
+    color: var(--gray-800, #1f2937);
+  }
+}
+
+// ── Proof activity system messages ──────────────────────────────────────────
+
+.proofActivityMessage {
+  display: flex;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--gray-50, #f9fafb);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-left: 3px solid var(--action-400, #38bdf8);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.proofActivityContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.proofActivityText {
+  font-size: 13px;
+  color: var(--gray-700, #374151);
+  line-height: 1.4;
+
+  strong {
+    font-weight: 600;
+    color: var(--gray-900, #111827);
+  }
+
+  em {
+    font-style: italic;
+    color: var(--gray-600, #4b5563);
+  }
+}
+
+.proofActivityComment {
+  font-size: 12px;
+  color: var(--gray-500, #6b7280);
+  line-height: 1.4;
+  background: white;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 4px;
+  padding: 4px 8px;
+  max-height: 60px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+
+  // Strip inline styles from HTML content
+  p {
+    margin: 0;
+  }
+}
+
+.proofActivityFooter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.proofActivityDate {
+  font-size: 11px;
+  color: var(--gray-400, #9ca3af);
+}
+
+.proofActivityLink {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--action-600, #0284c7);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+
+  &:hover {
+    color: var(--action-700, #0369a1);
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
+.contentTabActive {
+  color: var(--action-600, #0284c7);
+  border-bottom-color: var(--action-600, #0284c7);
 }

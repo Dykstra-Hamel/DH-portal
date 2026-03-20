@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { EntityType } from '@/types/activity';
+import type { Activity } from '@/types/activity';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import styles from './NotesSection.module.scss';
 
 interface NotesSectionProps {
@@ -7,6 +9,7 @@ interface NotesSectionProps {
   entityId: string;
   companyId: string;
   userId: string;
+  customerComment?: string | null;
 }
 
 export function NotesSection({
@@ -14,9 +17,59 @@ export function NotesSection({
   entityId,
   companyId,
   userId,
+  customerComment,
 }: NotesSectionProps) {
   const [note, setNote] = useState('');
+  const [notes, setNotes] = useState<Activity[]>([]);
+  const [isLoadingNotes, setIsLoadingNotes] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const loadNotes = useCallback(async () => {
+    try {
+      setIsLoadingNotes(true);
+      const url = new URL('/api/activity', window.location.origin);
+      url.searchParams.set('entity_type', entityType);
+      url.searchParams.set('entity_id', entityId);
+      url.searchParams.set('activity_type', 'note_added');
+      url.searchParams.set('limit', '100');
+
+      const response = await fetch(url.toString());
+      if (!response.ok) throw new Error('Failed to fetch notes');
+
+      const { data } = await response.json();
+      setNotes((data || []).filter((item: Activity) => Boolean(item.notes?.trim())));
+    } catch (error) {
+      console.error('Error loading notes:', error);
+      setNotes([]);
+    } finally {
+      setIsLoadingNotes(false);
+    }
+  }, [entityType, entityId]);
+
+  useEffect(() => {
+    loadNotes();
+  }, [loadNotes]);
+
+  const formatDateTime = (dateStr: string): string => {
+    return new Date(dateStr).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  };
+
+  const getUserLabel = (activity: Activity): string => {
+    const first = activity.user?.first_name?.trim() ?? '';
+    const last = activity.user?.last_name?.trim() ?? '';
+    const fullName = `${first} ${last}`.trim();
+    return fullName || activity.user?.email || 'System';
+  };
+
+  const getUserEmail = (activity: Activity): string => {
+    return activity.user?.email || 'system@dhportal.local';
+  };
 
   const handleAddNote = async () => {
     if (!note.trim()) return;
@@ -39,6 +92,11 @@ export function NotesSection({
 
       if (!response.ok) throw new Error('Failed to add note');
 
+      const { data: createdNote } = await response.json();
+      if (createdNote) {
+        setNotes(prev => [createdNote, ...prev]);
+      }
+
       // Clear the input
       setNote('');
     } catch (error) {
@@ -51,6 +109,39 @@ export function NotesSection({
 
   return (
     <div className={styles.notesSection}>
+      {customerComment && (
+      <div className={styles.customerCommentBanner}>
+          <span className={styles.customerCommentLabel}>Customer Note</span>
+          <p className={styles.customerCommentText}>{customerComment}</p>
+        </div>
+      )}
+      {isLoadingNotes ? (
+        <p className={styles.noteState}>Loading notes...</p>
+      ) : notes.length > 0 ? (
+        <div className={styles.notesList}>
+          {notes.map(activity => (
+            <div key={activity.id} className={styles.noteCard}>
+              <div className={styles.noteMeta}>
+                <span className={styles.noteAuthorWrap}>
+                  <MiniAvatar
+                    firstName={activity.user?.first_name || undefined}
+                    lastName={activity.user?.last_name || undefined}
+                    email={getUserEmail(activity)}
+                    avatarUrl={activity.user?.avatar_url || null}
+                    size="small"
+                    showTooltip={true}
+                  />
+                  <span className={styles.noteAuthor}>{getUserLabel(activity)}</span>
+                </span>
+                <span className={styles.noteDate}>{formatDateTime(activity.created_at)}</span>
+              </div>
+              <p className={styles.noteText}>{activity.notes}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className={styles.noteState}>No notes yet.</p>
+      )}
       <textarea
         className={styles.textarea}
         value={note}

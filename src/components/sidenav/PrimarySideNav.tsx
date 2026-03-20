@@ -2,11 +2,13 @@
 
 import React from 'react';
 import { usePathname } from 'next/navigation';
-import Link from 'next/link';
-import { Mails } from 'lucide-react';
+import { GuardedLink } from '@/components/Common/GuardedLink/GuardedLink';
+import { Mails, Truck } from 'lucide-react';
 import { useNavigation, PrimaryNavItem } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useFeatureAccess } from '@/hooks/useFeatureAccess';
+import { useUserDepartments } from '@/hooks/useUserDepartments';
+import { createClient } from '@/lib/supabase/client';
 import styles from './PrimarySideNav.module.scss';
 
 interface PrimarySideNavProps {
@@ -16,11 +18,29 @@ interface PrimarySideNavProps {
 export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
-  const { isAdmin, isHydrating } = useCompany();
+  const { isAdmin, isHydrating, selectedCompany } = useCompany();
   const {
     hasAccess: hasProjectManagement,
     loading: featureLoading,
   } = useFeatureAccess('project_management');
+
+  const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null);
+    });
+  }, []);
+
+  const { departments } = useUserDepartments(
+    currentUserId ?? '',
+    selectedCompany?.id ?? ''
+  );
+
+  const isTechnicianOnly =
+    departments.length > 0 && departments.every(d => d === 'technician');
+  const isTechnician = departments.includes('technician');
 
   const menuItems: Array<{
     id: PrimaryNavItem;
@@ -189,6 +209,13 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Tracker',
     },
     {
+      id: 'tech-leads' as PrimaryNavItem,
+      href: '/tech-leads',
+      disabled: false,
+      icon: <Truck size={24} />,
+      text: 'TechLeads',
+    },
+    {
       id: 'brand' as PrimaryNavItem,
       href: '/brand',
       disabled: false,
@@ -263,7 +290,11 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       return pathname.startsWith('/campaigns');
     }
     if (href === '/admin/project-management') {
-      return pathname.startsWith('/admin/project-management') || pathname.startsWith('/project-management');
+      return pathname.startsWith('/admin/project-management') ||
+        pathname.startsWith('/project-management') ||
+        pathname.startsWith('/admin/monthly-services') ||
+        pathname.startsWith('/admin/content-calendar') ||
+        pathname.startsWith('/admin/content-pieces');
     }
     return pathname.startsWith(href);
   };
@@ -271,6 +302,14 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   // Filter menu items based on super admin status and feature access
   // Hide super-admin-only items by default until we confirm user is admin
   const visibleMenuItems = menuItems.filter(item => {
+    // Technician-only users only see tech-leads and customers
+    if (isTechnicianOnly) {
+      return item.id === 'tech-leads' || item.id === 'customers';
+    }
+    // Tech-leads is only visible to technician users and admins
+    if (item.id === 'tech-leads') {
+      return isTechnician || (!isHydrating && isAdmin);
+    }
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {
       return !isHydrating && isAdmin;
@@ -302,7 +341,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
               {item.text && <p className={styles.iconText}>{item.text}</p>}
             </div>
           ) : (
-            <Link
+            <GuardedLink
               key={item.id}
               href={item.href}
               className={`${styles.iconItem} ${isActiveRoute(item.href) ? styles.active : ''}`}
@@ -311,7 +350,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
             >
               <div className={styles.iconWrapper}>{item.icon}</div>
               {item.text && <p className={styles.iconText}>{item.text}</p>}
-            </Link>
+            </GuardedLink>
           )
         )}
       </nav>

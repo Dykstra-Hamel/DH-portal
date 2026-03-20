@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useMemo } from 'react';
 import { Search } from 'lucide-react';
 import { Customer } from '@/types/customer';
 import { DataTable } from '@/components/Common/DataTable';
@@ -16,6 +16,10 @@ interface CustomersListProps {
   onCustomerClick?: (customer: Customer) => void;
   showCompanyColumn?: boolean;
   tabCounts?: { all: number; active: number; inactive: number; archived: number };
+  searchQuery?: string;
+  onSearchChange?: (query: string) => void;
+  activeTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
 function CustomersList({
@@ -27,23 +31,13 @@ function CustomersList({
   onCustomerClick,
   showCompanyColumn = false,
   tabCounts,
+  searchQuery = '',
+  onSearchChange,
+  activeTab = 'all',
+  onTabChange,
 }: CustomersListProps) {
-  // Tab and search state
-  const [activeTab, setActiveTab] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-
   // Get tabs configuration
   const tabs = useMemo(() => getCustomerTabs(tabCounts), [tabCounts]);
-
-  // Handle tab change
-  const handleTabChange = useCallback((newTab: string) => {
-    setActiveTab(newTab);
-  }, []);
-
-  // Handle search change
-  const handleSearchChange = useCallback((newQuery: string) => {
-    setSearchQuery(newQuery);
-  }, []);
 
   // Handle item actions
   const handleItemAction = (action: string, customer: Customer) => {
@@ -51,38 +45,6 @@ function CustomersList({
       onCustomerClick?.(customer);
     }
   };
-
-  // Filter data based on active tab
-  const filteredByTab = useMemo(() => {
-    if (!tabs || tabs.length === 0) return customers;
-    const activeTabConfig = tabs.find(tab => tab.key === activeTab);
-    if (!activeTabConfig) return customers;
-    return activeTabConfig.filter(customers);
-  }, [customers, activeTab, tabs]);
-
-  // Apply search filter
-  const filteredData = useMemo(() => {
-    if (!searchQuery.trim()) return filteredByTab;
-
-    const query = searchQuery.toLowerCase();
-    return filteredByTab.filter(customer => {
-      // Search in name
-      const name = `${customer.first_name || ''} ${customer.last_name || ''}`.toLowerCase();
-      if (name.includes(query)) return true;
-
-      // Search in phone
-      if (customer.phone?.toLowerCase().includes(query)) return true;
-
-      // Search in email
-      if (customer.email?.toLowerCase().includes(query)) return true;
-
-      // Search in address
-      const address = `${customer.address || ''} ${customer.city || ''} ${customer.state || ''}`.toLowerCase();
-      if (address.includes(query)) return true;
-
-      return false;
-    });
-  }, [filteredByTab, searchQuery]);
 
   return (
     <>
@@ -94,7 +56,7 @@ function CustomersList({
               <button
                 key={tab.key}
                 className={`${styles.tab} ${activeTab === tab.key ? styles.active : ''}`}
-                onClick={() => handleTabChange(tab.key)}
+                onClick={() => onTabChange?.(tab.key)}
               >
                 {tab.label}
                 {tab.getCount && (
@@ -111,7 +73,7 @@ function CustomersList({
               className={styles.searchInput}
               placeholder="Search"
               value={searchQuery}
-              onChange={e => handleSearchChange(e.target.value)}
+              onChange={e => onSearchChange?.(e.target.value)}
             />
             <Search size={18} className={styles.searchIcon} />
           </div>
@@ -120,7 +82,7 @@ function CustomersList({
 
       {/* DataTable Component */}
       <DataTable
-        data={filteredData}
+        data={customers}
         loading={loading}
         title="Customers Overview"
         columns={getCustomerColumns(showCompanyColumn)}

@@ -73,41 +73,35 @@ const formatAddress = (ticket: Ticket): string => {
   );
 };
 
-const formatTicketType = (type: string): string => {
-  const typeMap: { [key: string]: string } = {
+const formatTicketFormat = (ticket: Ticket): string => {
+  // Use format field for new records, fall back to type-based inference for legacy
+  if (ticket.format) {
+    return ticket.format.charAt(0).toUpperCase() + ticket.format.slice(1);
+  }
+  const legacyMap: { [key: string]: string } = {
     phone_call: 'Call',
     web_form: 'Form',
     email: 'Email',
     chat: 'Chat',
-    social_media: 'Social',
     in_person: 'In Person',
-    internal_task: 'Internal',
-    bug_report: 'Bug',
-    feature_request: 'Feature',
-    other: 'Other',
   };
-  return typeMap[type] || type;
+  return legacyMap[ticket.type] || ticket.type;
 };
 
 const formatSource = (ticket: Ticket): string => {
-  // For phone calls, show call direction
-  if (ticket.type === 'phone_call') {
-    if (ticket.call_direction === 'inbound' || ticket.source === 'inbound') {
-      return 'Inbound';
-    } else if (
-      ticket.call_direction === 'outbound' ||
-      ticket.source === 'outbound'
-    ) {
-      return 'Outbound';
-    }
-  }
-
-  // For all types, use the source mapping
   const sourceMap: { [key: string]: string } = {
-    organic: 'Organic',
+    // New taxonomy
+    google_ads: 'Google Ads',
+    google_organic: 'Google Organic',
+    facebook_ads: 'Facebook Ads',
     referral: 'Referral',
+    direct: 'Direct',
+    campaign: 'Campaign',
+    widget: 'Widget',
+    other: 'Other',
+    // Legacy
+    organic: 'Organic',
     google_cpc: 'Google Ads',
-    facebook_ads: 'Facebook',
     linkedin: 'LinkedIn',
     email_campaign: 'Email',
     cold_call: 'Cold Call',
@@ -115,11 +109,12 @@ const formatSource = (ticket: Ticket): string => {
     webinar: 'Webinar',
     content_marketing: 'Content',
     internal: 'Internal',
-    widget: 'Widget',
+    inbound: 'Inbound',
+    outbound: 'Outbound',
     website: 'Website',
-    other: 'Other',
   };
-  return sourceMap[ticket.source] || ticket.source;
+  if (!ticket.source) return 'Unknown';
+  return sourceMap[ticket.source] || ticket.source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 };
 
 const formatServiceType = (serviceType: string): string => {
@@ -188,14 +183,14 @@ export const getTicketColumns = (
     ),
   },
   {
-    key: 'type',
+    key: 'format',
     title: 'Format',
     width: '100px',
     sortable: true,
-    sortKey: 'type',
+    sortKey: 'format',
     render: (ticket: Ticket) => (
       <div className={styles.formatCell}>
-        {ticket.type === 'phone_call' && (
+        {(ticket.format === 'call' || (!ticket.format && ticket.type === 'phone_call')) && (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="18"
@@ -213,7 +208,7 @@ export const getTicketColumns = (
             />
           </svg>
         )}
-        {ticket.type === 'web_form' && (
+        {(ticket.format === 'form' || (!ticket.format && ticket.type === 'web_form')) && (
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="18"
@@ -231,7 +226,7 @@ export const getTicketColumns = (
             />
           </svg>
         )}
-        {formatTicketType(ticket.type)}
+        {formatTicketFormat(ticket)}
       </div>
     ),
   },
@@ -375,13 +370,13 @@ export const getTicketTabs = (
     key: 'calls',
     label: 'Calls',
     filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.type === 'phone_call'),
+      tickets.filter(ticket => ticket.format === 'call' || (!ticket.format && ticket.type === 'phone_call')),
     getCount: (tickets: Ticket[]) => {
       const callCountFromTabs =
         (tabCounts?.incoming ?? 0) + (tabCounts?.outbound ?? 0);
       if (tabCounts?.calls !== undefined) return tabCounts.calls;
       if (tabCounts) return callCountFromTabs;
-      return tickets.filter(ticket => ticket.type === 'phone_call').length;
+      return tickets.filter(ticket => ticket.format === 'call' || (!ticket.format && ticket.type === 'phone_call')).length;
     },
   },
   {

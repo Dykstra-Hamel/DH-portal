@@ -964,3 +964,25 @@
     color: var(--text-primary, #111827);
   }
 }
+
+// Specs card grid
+.specsGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.specsField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.specsFieldFull {
+  grid-column: span 2;
+}
+
+.specsFieldHalf {
+  grid-column: span 1;
+}

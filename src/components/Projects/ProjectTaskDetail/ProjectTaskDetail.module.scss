@@ -772,6 +772,33 @@
   border: 1px dashed var(--gray-300, #d1d5db);
 }
 
+.uploadProgressContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+}
+
+.uploadProgressLabel {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--gray-600, #4b5563);
+}
+
+.uploadProgressBar {
+  width: 100%;
+  height: 0.375rem;
+  border-radius: 999px;
+  background: var(--gray-200, #e5e7eb);
+  overflow: hidden;
+}
+
+.uploadProgressFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue-500);
+  transition: width 0.2s ease;
+}
+
 .pendingAttachment {
   display: inline-flex;
   align-items: center;
@@ -872,6 +899,32 @@
     svg {
       color: var(--action-600, #2563eb);
     }
+
+    .commentFileDownload {
+      opacity: 1;
+    }
+  }
+}
+
+.commentFileDownload {
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  border: none;
+  background: var(--action-100, #d6e9ff);
+  border-radius: 4px;
+  color: var(--action-600, #0069e0);
+  cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+  margin-left: 2px;
+
+  &:hover {
+    background: var(--action-200, #b8d9ff);
   }
 }
 
@@ -895,6 +948,33 @@
     display: block;
     max-height: 200px;
     object-fit: cover;
+  }
+
+  &:hover .commentImageDownload {
+    opacity: 1;
+  }
+}
+
+.commentImageDownload {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  border: none;
+  border-radius: 6px;
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+
+  &:hover {
+    background: rgba(0, 105, 224, 0.9);
   }
 }
 
@@ -1022,8 +1102,8 @@
 
   // Highlight self-mentions
   :global(span[data-type='mention'][data-mention-self='true']) {
-    background: var(--warning-50, #fffbeb);
-    color: var(--warning-700, #a16207);
+    background: var(--amber-50, #fffbeb);
+    color: var(--amber-700, #a16207);
   }
 }
 
@@ -1237,4 +1317,18 @@
   font-size: 13px;
   color: #78350f;
   margin-top: 8px;
+}
+
+.contentPieceLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-primary, #2563eb);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }

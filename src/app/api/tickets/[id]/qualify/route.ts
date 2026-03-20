@@ -209,6 +209,33 @@ export async function POST(
           }
         }
 
+        // Auto-start default cadence if lead is now in_process and assigned, and has no active cadence
+        const existingLeadStatus = customStatus || (assignedTo ? 'in_process' : 'new');
+        if (existingLeadStatus === 'in_process' && assignedTo) {
+          try {
+            const { startDefaultCadenceForStage } = await import('@/lib/cadence/start-default-cadence');
+            const { createAdminClient: getAdminClient } = await import('@/lib/supabase/server-admin');
+            const adminSupabase = getAdminClient();
+            const { data: existingCadence } = await adminSupabase
+              .from('lead_cadence_assignments')
+              .select('id')
+              .eq('lead_id', ticket.converted_to_lead_id)
+              .is('completed_at', null)
+              .maybeSingle();
+            if (!existingCadence) {
+              await startDefaultCadenceForStage(
+                ticket.converted_to_lead_id,
+                ticket.company_id,
+                'default_initial_contact_cadence_id',
+                assignedTo
+              );
+            }
+          } catch (cadenceError) {
+            console.error('Error auto-starting cadence on existing lead re-qualification:', cadenceError);
+            // Non-fatal — lead was updated successfully
+          }
+        }
+
         return NextResponse.json({
           message: 'Existing lead updated successfully',
           qualification: 'sales',
@@ -218,23 +245,43 @@ export async function POST(
         });
       }
 
+      // Map legacy ticket source values to valid lead_source taxonomy
+      const mapTicketSourceToLeadSource = (source: string) => {
+        switch (source) {
+          case 'google_ads':
+          case 'google_organic':
+          case 'facebook_ads':
+          case 'referral':
+          case 'direct':
+          case 'campaign':
+          case 'widget':
+          case 'other':
+            return source; // new taxonomy values pass through unchanged
+          case 'website':
+            return 'google_organic';
+          case 'internal':
+            return 'other';
+          case 'widget_submission':
+            return 'widget';
+          case 'inbound':
+          case 'outbound':
+          case 'cold_call':
+            return 'direct';
+          case 'organic':
+          case 'google_cpc':
+            return 'google_organic';
+          default:
+            return source || 'other';
+        }
+      };
+
       // Create a new lead from the ticket
       const leadInsertData: any = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         service_address_id: ticket.service_address_id,
-        lead_source:
-          ticket.source === 'website'
-            ? 'organic'
-            : ticket.source === 'internal'
-              ? 'other'
-              : ticket.source === 'widget'
-                ? 'widget_submission'
-                : ticket.source === 'inbound'
-                  ? 'cold_call'
-                  : ticket.source === 'outbound'
-                    ? 'cold_call'
-                    : ticket.source,
+        format: ticket.format || null,
+        lead_source: mapTicketSourceToLeadSource(ticket.source),
         lead_type: ticket.type,
         service_type: ticket.service_type,
         lead_status:
@@ -253,6 +300,7 @@ export async function POST(
         referrer_url: ticket.referrer_url,
         ip_address: ticket.ip_address,
         user_agent: ticket.user_agent,
+        attribution_data: ticket.attribution_data || (ticket.gclid ? { gclid: ticket.gclid } : null),
         converted_from_ticket_id: ticket.id, // Required for database trigger validation
       };
 
@@ -472,6 +520,24 @@ export async function POST(
             callRecordUpdateError
           );
           // Don't fail the request - the lead was created successfully
+        }
+      }
+
+      // Auto-start default initial-contact cadence when lead is assigned and in_process
+      const effectiveStatus = customStatus || (assignedTo || ticket.assigned_to ? 'in_process' : 'new');
+      const effectiveAssignedTo = assignedTo || ticket.assigned_to;
+      if (effectiveStatus === 'in_process' && effectiveAssignedTo) {
+        try {
+          const { startDefaultCadenceForStage } = await import('@/lib/cadence/start-default-cadence');
+          await startDefaultCadenceForStage(
+            newLead.id,
+            ticket.company_id,
+            'default_initial_contact_cadence_id',
+            effectiveAssignedTo
+          );
+        } catch (cadenceError) {
+          console.error('Error auto-starting cadence after ticket qualification:', cadenceError);
+          // Non-fatal — lead was created successfully
         }
       }
 
@@ -726,11 +792,42 @@ export async function POST(
         `${ticket.type} inquiry from ${ticket.source}` ||
         'Support request';
 
+      // Map ticket source to a valid SupportCaseSource value
+      const mapTicketSourceToSupportCaseSource = (source: string) => {
+        switch (source) {
+          case 'google_ads':
+          case 'google_organic':
+          case 'facebook_ads':
+          case 'referral':
+          case 'direct':
+          case 'campaign':
+          case 'widget':
+          case 'other':
+            return source;
+          case 'website':
+          case 'organic':
+          case 'google_cpc':
+            return 'google_organic';
+          case 'internal':
+            return 'other';
+          case 'widget_submission':
+            return 'widget';
+          case 'inbound':
+          case 'outbound':
+          case 'cold_call':
+            return 'direct';
+          default:
+            return 'other';
+        }
+      };
+
       // Create a new support case from the ticket
       const supportCaseInsertData = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         ticket_id: ticket.id,
+        format: ticket.format || null,
+        source: ticket.source ? mapTicketSourceToSupportCaseSource(ticket.source) : null,
         issue_type: issueType,
         summary: summary.substring(0, 255), // Ensure it fits in summary field
         description: ticket.description,

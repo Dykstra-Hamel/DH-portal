@@ -6,7 +6,7 @@
   top: 12px;
   border-radius: var(--border-radius-md) var(--border-radius-md) 0 0;
   background: var(--gradient-dh-gray);
-  color: white;
+  color: var(--gray-100);
   padding: 16px 0;
   overflow-y: auto;
 
@@ -39,12 +39,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: var(--gray-100);
   flex-shrink: 0;
 }
 
 .sectionTitle {
-  color: white;
+  color: var(--gray-100);
   font-size: 20px;
   font-weight: 800;
   margin: 0;
@@ -79,7 +79,7 @@
   font-weight: 760;
   line-height: 100%;
   letter-spacing: 0.44px;
-  color: #fff;
+  color: var(--gray-100);
   flex-shrink: 0;
   padding: 24px 14px 0 24px;
 }
@@ -99,7 +99,7 @@
   width: calc(100% - 8px);
   height: 1px;
   opacity: 0.1;
-  background: #fff;
+  background: var(--gray-100);
   margin: 16px 4px;
 }
 
@@ -119,7 +119,7 @@
 
   &:hover:not(.disabled):not(.active) {
     background: var(--gray-700);
-    color: #fff;
+    color: var(--gray-100);
 
     .countBadge {
       &:not(.active):not(.error):not(.hasNewItems) {
@@ -131,23 +131,23 @@
       &.defaultCount {
         background: transparent;
         border: 1px solid var(--gray-400);
-        color: white;
+        color: var(--gray-100);
       }
     }
   }
 
   &.active {
-    background: var(--action-600);
-    color: white;
+    background: var(--blue-500);
+    color: var(--gray-100);
 
     .countBox {
-      background: white;
-      color: var(--action-600);
+      background: var(--gray-100);
+      color: var(--blue-500);
     }
 
     .navItemIcon {
       path {
-        stroke: #fff;
+        stroke: var(--gray-100);
       }
     }
   }
@@ -202,7 +202,7 @@
   padding: 0 6px;
   font-size: 12px;
   font-weight: 600;
-  color: white;
+  color: var(--gray-100);
   background-color: transparent;
   border-radius: 4px;
   border: 1px solid var(--gray-700);
@@ -210,19 +210,19 @@
   flex-shrink: 0;
 
   &.active {
-    color: var(--action-600);
-    background-color: white;
-    border: 1px solid white;
+    color: var(--blue-500);
+    background-color: var(--gray-100);
+    border: 1px solid var(--gray-100);
   }
 
   &.error {
-    color: white;
+    color: var(--gray-100);
     background-color: var(--error-500);
     border: 1px solid var(--error-500);
   }
 
   &.neutral {
-    color: white;
+    color: var(--gray-100);
     background-color: transparent;
     border: 1px solid var(--gray-600);
   }
@@ -234,7 +234,7 @@
   &.hasNewItems {
     background-color: #fb2c36;
     border-color: #fb2c36;
-    color: white;
+    color: var(--gray-100);
   }
 }
 
@@ -256,22 +256,22 @@
 .defaultCount {
   border: 1px solid var(--gray-700);
   background: transparent;
-  color: white;
+  color: var(--gray-100);
 }
 
 .errorCount {
   background: var(--error-500);
-  color: white;
+  color: var(--gray-100);
 }
 
 .activeCount {
-  background: white;
-  color: var(--action-600);
+  background: var(--gray-100);
+  color: var(--blue-600);
 }
 
 .neutral {
   border: 1px solid var(--gray-600);
-  color: white;
+  color: var(--gray-100);
 }
 
 @keyframes countPulse {

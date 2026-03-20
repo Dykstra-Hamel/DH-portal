@@ -16,59 +16,9 @@
     border-color: var(--UI-Gray-400);
   }
 
-  // Stale card - 5+ days old (lighter overlay - more faded)
-  &.staleCard2 {
-    background: url('/images/inactive-card-bg.png') lightgray 50% / cover
-      no-repeat;
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.8);
-      border-radius: 14px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    > * {
-      position: relative;
-      z-index: 1;
-    }
-  }
-
-  // Stale card - 10+ days old (darker overlay - texture more visible)
-  &.staleCard3 {
-    background: url('/images/inactive-card-bg.png') lightgray 50% / cover
-      no-repeat;
-    position: relative;
-
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: rgba(255, 255, 255, 0.6);
-      border-radius: 14px;
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    > * {
-      position: relative;
-      z-index: 1;
-    }
-  }
-
   // Card with unread mentions - blue border
   &.hasMentionBorder {
-    border-color: var(--action-500, #0080f0);
+    border-color: var(--blue-500);
     border-width: 2px;
   }
 }

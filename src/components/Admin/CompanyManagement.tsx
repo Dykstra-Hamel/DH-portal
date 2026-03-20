@@ -22,6 +22,8 @@ import {
   Bug,
   FileCheck,
   CheckSquare,
+  Brain,
+  Puzzle,
 } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
@@ -30,10 +32,13 @@ import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
 import ServicePlansManager from './ServicePlansManager';
 import ServiceAreasManager from './ServiceAreasManager';
-import PestManager from './PestManager';
+import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
+import PestPacSettingsManager from './PestPacSettingsManager';
+import { usePageActions } from '@/contexts/PageActionsContext';
+import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './CompanyManagement.module.scss';
 
 interface GooglePlaceListing {
@@ -65,6 +70,10 @@ interface Company {
   google_place_id: string | null;
   google_places_listings?: GooglePlaceListing[];
   created_at: string;
+  ai_context?: string | null;
+  brand_voice_formality?: number | null;
+  brand_voice_humor?: number | null;
+  words_not_to_use?: string[] | null;
 }
 
 interface CompanyManagementProps {
@@ -88,7 +97,9 @@ type ActiveSection =
   | 'sales-config'
   | 'discounts'
   | 'email-domain'
-  | 'quote-page';
+  | 'quote-page'
+  | 'ai-content'
+  | 'integrations';
 
 // URL normalization utility function
 function normalizeWebsiteUrl(url: string): string {
@@ -108,6 +119,7 @@ export default function CompanyManagement({
 }: CompanyManagementProps) {
   const router = useRouter();
   const supabase = createClient();
+  const { setPageHeader } = usePageActions();
   const [company, setCompany] = useState<Company | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,6 +130,10 @@ export default function CompanyManagement({
     GooglePlaceListing[]
   >([]);
   const [websites, setWebsites] = useState<string[]>([]);
+  const [aiContext, setAiContext] = useState('');
+  const [brandVoiceFormality, setBrandVoiceFormality] = useState(50);
+  const [brandVoiceHumor, setBrandVoiceHumor] = useState(50);
+  const [wordsNotToUse, setWordsNotToUse] = useState<string[]>([]);
   const [loginPageImages, setLoginPageImages] = useState<string[]>([]);
   const [loginSlogans, setLoginSlogans] = useState({
     line1: '',
@@ -128,6 +144,25 @@ export default function CompanyManagement({
   useEffect(() => {
     loadCompany();
   }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (!company) return;
+    setPageHeader({
+      title: company.name,
+      description: 'Company Management',
+      titleLeading: (
+        <button
+          type="button"
+          onClick={() => router.push('/admin')}
+          className={headerStyles.backButton}
+          aria-label="Back to Admin"
+        >
+          <ArrowLeft size={16} />
+        </button>
+      ),
+    });
+    return () => setPageHeader(null);
+  }, [company, setPageHeader, router]);
 
   const loadCompany = async () => {
     try {
@@ -197,6 +232,11 @@ export default function CompanyManagement({
 
       // Set websites for editing
       setWebsites(foundCompany.website || []);
+      setAiContext(foundCompany.ai_context ?? '');
+      const snapToStep = (v: number) => Math.round(v / 25) * 25;
+      setBrandVoiceFormality(snapToStep(foundCompany.brand_voice_formality ?? 50));
+      setBrandVoiceHumor(snapToStep(foundCompany.brand_voice_humor ?? 50));
+      setWordsNotToUse(foundCompany.words_not_to_use ?? []);
     } catch (error) {
       console.error('Error loading company:', error);
       setError('Failed to load company');
@@ -291,8 +331,25 @@ export default function CompanyManagement({
                 type: 'string',
                 description: 'Content displayed on the quote thank you page',
               },
+              wisetack_enabled: {
+                value: String(updatedData.wisetack_enabled || false),
+                type: 'boolean',
+                description: 'Whether to show the Wisetack financing section on the quote page',
+              },
+              wisetack_url: {
+                value: updatedData.wisetack_url || '',
+                type: 'string',
+                description: 'Wisetack pre-qualification URL',
+              },
             },
           }),
+        });
+      } else if (section === 'ai-content') {
+        await adminAPI.updateCompany(companyId, {
+          ai_context: updatedData.ai_context,
+          brand_voice_formality: updatedData.brand_voice_formality,
+          brand_voice_humor: updatedData.brand_voice_humor,
+          words_not_to_use: updatedData.words_not_to_use,
         });
       } else {
         // Save company basic data
@@ -531,24 +588,12 @@ export default function CompanyManagement({
     { id: 'discounts', label: 'Discounts', icon: Tag },
     { id: 'email-domain', label: 'Email Domain', icon: Mail },
     { id: 'quote-page', label: 'Quote Page', icon: FileCheck },
+    { id: 'ai-content', label: 'AI Content', icon: Brain },
+    { id: 'integrations', label: 'Integrations', icon: Puzzle },
   ] as const;
 
   return (
     <div className={styles.companyManagement}>
-      <div className={styles.header}>
-        <button
-          onClick={() => router.push('/admin')}
-          className={styles.backButton}
-        >
-          <ArrowLeft size={16} />
-          Back to Admin
-        </button>
-        <div className={styles.companyTitle}>
-          <h1>{company.name}</h1>
-          <p>Company Management</p>
-        </div>
-      </div>
-
       {error && (
         <div className={styles.errorMessage}>
           <strong>Error:</strong> {error}
@@ -582,7 +627,9 @@ export default function CompanyManagement({
         {/* Content Area */}
         <div className={styles.mainContent}>
           {activeSection === 'overview' && (
-            <OverviewSection company={company} />
+            <OverviewSection
+              company={company}
+            />
           )}
           {activeSection === 'contact' && (
             <ContactSection
@@ -640,7 +687,7 @@ export default function CompanyManagement({
           {activeSection === 'features' && (
             <CompanyFeaturesManager companyId={companyId} />
           )}
-          {activeSection === 'pest-management' && <PestManager />}
+          {activeSection === 'pest-management' && <CompanyPestSelector companyId={companyId} />}
           {activeSection === 'service-plans' && (
             <ServicePlansManager companyId={companyId} />
           )}
@@ -659,12 +706,29 @@ export default function CompanyManagement({
           {activeSection === 'email-domain' && (
             <EmailDomainManager companyId={companyId} />
           )}
+          {activeSection === 'ai-content' && (
+            <AiContentSection
+              aiContext={aiContext}
+              onAiContextChange={setAiContext}
+              brandVoiceFormality={brandVoiceFormality}
+              onFormalityChange={setBrandVoiceFormality}
+              brandVoiceHumor={brandVoiceHumor}
+              onHumorChange={setBrandVoiceHumor}
+              wordsNotToUse={wordsNotToUse}
+              onWordsChange={setWordsNotToUse}
+              onSave={data => handleSave('ai-content', data)}
+              saving={saving}
+            />
+          )}
           {activeSection === 'quote-page' && (
             <QuotePageSection
               companyId={companyId}
               onSave={data => handleSave('quote-page', data)}
               saving={saving}
             />
+          )}
+          {activeSection === 'integrations' && (
+            <PestPacSettingsManager companyId={companyId} />
           )}
         </div>
       </div>
@@ -673,7 +737,11 @@ export default function CompanyManagement({
 }
 
 // Section Components
-function OverviewSection({ company }: { company: Company }) {
+interface OverviewSectionProps {
+  company: Company;
+}
+
+function OverviewSection({ company }: OverviewSectionProps) {
   return (
     <div className={styles.section}>
       <h2>Company Overview</h2>
@@ -1433,6 +1501,170 @@ function LoginPageSection({
           {saving ? 'Saving...' : 'Save Login Page Settings'}
         </button>
       </div>
+    </div>
+  );
+}
+
+const getFormalityLabel = (v: number) => {
+  if (v <= 12) return 'Very Casual';
+  if (v <= 37) return 'Casual';
+  if (v <= 62) return 'Balanced';
+  if (v <= 87) return 'Formal';
+  return 'Very Formal';
+};
+
+const getHumorLabel = (v: number) => {
+  if (v <= 12) return 'Very Serious';
+  if (v <= 37) return 'Serious';
+  if (v <= 62) return 'Balanced';
+  if (v <= 87) return 'Funny';
+  return 'Very Funny';
+};
+
+interface AiContentSectionProps {
+  aiContext: string;
+  onAiContextChange: (v: string) => void;
+  brandVoiceFormality: number;
+  onFormalityChange: (v: number) => void;
+  brandVoiceHumor: number;
+  onHumorChange: (v: number) => void;
+  wordsNotToUse: string[];
+  onWordsChange: (words: string[]) => void;
+  onSave: (data: Partial<Company>) => void;
+  saving: boolean;
+}
+
+function AiContentSection({
+  aiContext,
+  onAiContextChange,
+  brandVoiceFormality,
+  onFormalityChange,
+  brandVoiceHumor,
+  onHumorChange,
+  wordsNotToUse,
+  onWordsChange,
+  onSave,
+  saving,
+}: AiContentSectionProps) {
+  const [wordInput, setWordInput] = useState('');
+
+  const addWord = (raw: string) => {
+    const word = raw.trim().replace(/,+$/, '').trim();
+    if (word && !wordsNotToUse.includes(word)) {
+      onWordsChange([...wordsNotToUse, word]);
+    }
+    setWordInput('');
+  };
+
+  const handleWordKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addWord(wordInput);
+    }
+  };
+
+  const removeWord = (word: string) => {
+    onWordsChange(wordsNotToUse.filter(w => w !== word));
+  };
+
+  return (
+    <div className={styles.section}>
+      <h2>AI Content Settings</h2>
+      <form
+        onSubmit={e => {
+          e.preventDefault();
+          onSave({
+            ai_context: aiContext,
+            brand_voice_formality: brandVoiceFormality,
+            brand_voice_humor: brandVoiceHumor,
+            words_not_to_use: wordsNotToUse,
+          });
+        }}
+      >
+        <div className={styles.formGroup}>
+          <label htmlFor="ai-context">AI Context</label>
+          <textarea
+            id="ai-context"
+            value={aiContext}
+            onChange={e => onAiContextChange(e.target.value)}
+            placeholder="Short description for the AI topic generator — services offered, specialty pests, brand tone, key differentiators..."
+            rows={4}
+            disabled={saving}
+          />
+          <small>Used by the AI content topic generator. Not shown to clients.</small>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Brand Voice</label>
+          <div className={styles.voiceSlider}>
+            <span className={styles.sliderLabel}>Writing Style</span>
+            <div className={styles.sliderEndpoints}>
+              <span>Casual</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={25}
+                value={brandVoiceFormality}
+                onChange={e => onFormalityChange(Number(e.target.value))}
+                disabled={saving}
+              />
+              <span>Formal</span>
+            </div>
+            <p className={styles.sliderValueLabel}>{getFormalityLabel(brandVoiceFormality)}</p>
+          </div>
+          <div className={styles.voiceSlider}>
+            <span className={styles.sliderLabel}>Tone</span>
+            <div className={styles.sliderEndpoints}>
+              <span>Serious</span>
+              <input
+                type="range"
+                min={0}
+                max={100}
+                step={25}
+                value={brandVoiceHumor}
+                onChange={e => onHumorChange(Number(e.target.value))}
+                disabled={saving}
+              />
+              <span>Funny</span>
+            </div>
+            <p className={styles.sliderValueLabel}>{getHumorLabel(brandVoiceHumor)}</p>
+          </div>
+        </div>
+
+        <div className={styles.formGroup}>
+          <label>Words Not To Use</label>
+          <div className={styles.wordTags}>
+            {wordsNotToUse.map(word => (
+              <span key={word} className={styles.wordTag}>
+                {word}
+                <button
+                  type="button"
+                  onClick={() => removeWord(word)}
+                  disabled={saving}
+                  aria-label={`Remove ${word}`}
+                >
+                  &#x2715;
+                </button>
+              </span>
+            ))}
+          </div>
+          <input
+            type="text"
+            value={wordInput}
+            onChange={e => setWordInput(e.target.value)}
+            onKeyDown={handleWordKeyDown}
+            onBlur={() => { if (wordInput.trim()) addWord(wordInput); }}
+            placeholder="Type a word and press Enter or comma to add"
+            disabled={saving}
+          />
+          <small>Words added here will never appear in AI-generated content.</small>
+        </div>
+
+        <button type="submit" disabled={saving} className={styles.saveButton}>
+          {saving ? 'Saving...' : 'Save AI Settings'}
+        </button>
+      </form>
     </div>
   );
 }

@@ -49,7 +49,7 @@ export async function POST(
     const supabase = await createClient();
     const body = await request.json();
 
-    const { activity_type, notes } = body;
+    const { activity_type, notes, outcome } = body;
 
     // Get current user from session
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -107,6 +107,7 @@ export async function POST(
         notes: notes || null,
         metadata: {
           contact_type: activity_type, // Store original type in metadata
+          ...(outcome ? { contact_outcome: outcome } : {}),
         },
       })
       .select(`

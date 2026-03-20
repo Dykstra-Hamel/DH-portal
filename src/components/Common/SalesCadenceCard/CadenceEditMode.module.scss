@@ -9,10 +9,10 @@
   align-items: center;
   gap: 8px;
   padding: 12px 16px;
-  background-color: var(--warning-100);
-  border: 1px solid var(--warning-500);
+  background-color: var(--amber-100);
+  border: 1px solid var(--amber-500);
   border-radius: var(--border-radius);
-  color: var(--warning-700);
+  color: var(--amber-700);
   font-size: 14px;
   font-weight: 500;
 }
@@ -121,7 +121,7 @@
 
   &.dragging {
     opacity: 0.5;
-    border: 2px dashed var(--action-500);
+    border: 2px dashed var(--blue-500);
   }
 
   &:hover {
@@ -299,7 +299,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background-color: var(--action-500);
+  background-color: var(--blue-500);
   border: none;
   border-radius: var(--border-radius);
   font-size: 14px;
@@ -309,7 +309,7 @@
   transition: all 0.2s;
 
   &:hover:not(:disabled) {
-    background-color: var(--action-600);
+    background-color: var(--blue-600);
   }
 
   &:disabled {

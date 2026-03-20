@@ -95,7 +95,7 @@
   transition: all 0.2s;
 
   &:has(input[type='radio']:checked) {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -107,8 +107,8 @@
   height: 0;
 
   &:checked + .radioCustom {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
 
     &::after {
       display: block;

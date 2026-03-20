@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { sendTaskReassignedNotification } from '@/lib/slack/task-notifications';
 
 // GET /api/admin/tasks/[taskId] - Get task details
 export async function GET(
@@ -138,6 +139,13 @@ export async function PATCH(
     // Parse request body
     const body = await request.json();
 
+    // Pre-fetch current task state for reassignment detection
+    const { data: currentTask } = await supabase
+      .from('project_tasks')
+      .select('assigned_to, monthly_service_id, title')
+      .eq('id', taskId)
+      .single();
+
     // Prepare update data
     const updateData: any = {};
 
@@ -185,6 +193,52 @@ export async function PATCH(
     }
 
     console.log(`[PATCH /api/admin/tasks/${taskId}] Task updated successfully`);
+
+    // Fire reassignment notifications for monthly service tasks
+    const isAssignedToChanging = 'assigned_to' in body;
+    const oldAssignee = currentTask?.assigned_to ?? null;
+    const newAssignee = updateData.assigned_to ?? null;
+    const isMonthlyServiceTask = !!currentTask?.monthly_service_id;
+    const isReassignment =
+      isAssignedToChanging &&
+      oldAssignee !== null &&
+      newAssignee !== null &&
+      oldAssignee !== newAssignee;
+
+    if (isMonthlyServiceTask && isReassignment) {
+      const monthlyServiceId = currentTask!.monthly_service_id!;
+      const taskTitle = currentTask!.title ?? 'Untitled Task';
+
+      const { data: monthlyService } = await supabase
+        .from('monthly_services')
+        .select('company_id')
+        .eq('id', monthlyServiceId)
+        .single();
+
+      if (monthlyService?.company_id) {
+        supabase
+          .from('notifications')
+          .insert({
+            user_id: newAssignee,
+            company_id: monthlyService.company_id,
+            type: 'task_reassignment',
+            title: 'Task Assigned to You',
+            message: `You have been assigned to "${taskTitle}"`,
+            reference_id: monthlyServiceId,
+            reference_type: 'monthly_service',
+          })
+          .then(({ error: notifError }) => {
+            if (notifError) console.error('Error creating task reassignment notification:', notifError);
+          });
+
+        sendTaskReassignedNotification({
+          taskId,
+          taskTitle,
+          monthlyServiceId,
+          newAssigneeId: newAssignee,
+        }).catch(() => {});
+      }
+    }
 
     return NextResponse.json(task);
   } catch (error) {

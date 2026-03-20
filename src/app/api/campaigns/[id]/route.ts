@@ -114,6 +114,7 @@ export async function PUT(
       audience_filter_criteria,
       respect_business_hours,
       daily_limit,
+      batch_size,
       exclude_weekends,
     } = body;
 
@@ -166,6 +167,7 @@ export async function PUT(
         audience_filter_criteria,
         respect_business_hours: respect_business_hours ?? true,
         daily_limit: daily_limit ?? null,
+        batch_size: batch_size ?? 10,
         exclude_weekends: exclude_weekends ?? false,
       })
       .eq('id', id)

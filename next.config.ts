@@ -1,6 +1,19 @@
 import type { NextConfig } from 'next';
+import withPWA from 'next-pwa';
 
 const nextConfig: NextConfig = {
+  webpack: (config, { isServer }) => {
+    // React-PDF imports `pdfjs-dist` directly. During Node builds, force the
+    // legacy PDF.js bundle to avoid Node-runtime warnings from the modern build.
+    if (isServer) {
+      config.resolve.alias = {
+        ...(config.resolve.alias || {}),
+        'pdfjs-dist$': 'pdfjs-dist/legacy/build/pdf.mjs',
+      };
+    }
+
+    return config;
+  },
   images: {
     remotePatterns: [
       {
@@ -52,4 +65,9 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA({
+  dest: 'public',
+  disable: process.env.NODE_ENV === 'development',
+  register: true,
+  skipWaiting: true,
+})(nextConfig);

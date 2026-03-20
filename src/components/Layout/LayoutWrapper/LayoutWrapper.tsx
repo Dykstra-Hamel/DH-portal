@@ -6,15 +6,18 @@ import { useRouter } from 'next/navigation';
 import { GlobalHeader } from '../GlobalHeader/GlobalHeader';
 import { Sidebar } from '@/components/sidenav/Sidebar';
 import { NavigationProvider } from '@/contexts/NavigationContext';
+import { NavigationGuardProvider } from '@/contexts/NavigationGuardContext';
 import { CompanyProvider } from '@/contexts/CompanyContext';
 import {
   PageActionsProvider,
   usePageActions,
 } from '@/contexts/PageActionsContext';
+import { NotificationProvider } from '@/contexts/NotificationContext';
 import { GlobalLowerHeader } from '../GlobalLowerHeader/GlobalLowerHeader';
 import { ProjectActionMenu } from '../GlobalLowerHeader/ProjectActionMenu';
 import BackToTopButton from '@/components/Common/BackToTopButton/BackToTopButton';
 import { Settings, ArrowLeft } from 'lucide-react';
+import { WizardProvider } from '@/contexts/WizardContext';
 import styles from './LayoutWrapper.module.scss';
 
 interface LayoutWrapperProps {
@@ -32,6 +35,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     pathname === '/login' ||
     pathname === '/sign-up' ||
     pathname === '/unsubscribe' ||
+    pathname === '/recording' ||
     pathname.match(/^\/login\/[^\/]+$/);
   const isHomePage = pathname === '/';
   const isQuotePage = pathname.match(/^\/[^\/]+\/quote\/[^\/]+$/);
@@ -39,6 +43,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isProjectManagementPage =
     pathname === '/project-management' ||
     pathname === '/admin/project-management';
+
+  const isTechLeadsPage = pathname.startsWith('/tech-leads');
 
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
@@ -62,27 +68,29 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             pageHeader?.description ||
             'Manage your projects across all phases.',
           showAddButton: false,
-          projectFilterControls: pageHeader?.projectFilterControls,
           customActions: (
-            <ProjectActionMenu
-              onNewProjectFromScratch={
-                getPageAction('add-project') || (() => {})
-              }
-              onNewProjectFromTemplate={
-                getPageAction('create-from-template') || (() => {})
-              }
-              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
-              onNewTaskFromTemplate={
-                getPageAction('add-task-from-template') || (() => {})
-              }
-            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              {pageHeader?.customActions}
+              <ProjectActionMenu
+                onNewProjectFromScratch={
+                  getPageAction('add-project') || (() => {})
+                }
+                onNewProjectFromTemplate={
+                  getPageAction('create-from-template') || (() => {})
+                }
+                onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+                onNewTaskFromTemplate={
+                  getPageAction('add-task-from-template') || (() => {})
+                }
+              />
+            </div>
           ),
         };
       case '/project-management/tasks':
       case '/admin/project-management/tasks':
         return {
-          title: 'Tasks',
-          description: 'View and manage all tasks.',
+          title: pageHeader?.title || 'Tasks',
+          description: pageHeader?.description || 'View and manage all tasks.',
           showAddButton: false,
           actionButtons: [
             {
@@ -90,6 +98,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               onClick: getPageAction('add-task') || (() => {}),
             },
           ],
+          customActions: pageHeader?.customActions,
         };
       case '/dashboard':
         return {
@@ -186,20 +195,22 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description:
             pageHeader?.description || 'Internal Project and Task Management',
           showAddButton: false,
-          projectFilterControls: pageHeader?.projectFilterControls,
           customActions: (
-            <ProjectActionMenu
-              onNewProjectFromScratch={
-                getPageAction('add-project') || (() => {})
-              }
-              onNewProjectFromTemplate={
-                getPageAction('create-from-template') || (() => {})
-              }
-              onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
-              onNewTaskFromTemplate={
-                getPageAction('add-task-from-template') || (() => {})
-              }
-            />
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+              {pageHeader?.customActions}
+              <ProjectActionMenu
+                onNewProjectFromScratch={
+                  getPageAction('add-project') || (() => {})
+                }
+                onNewProjectFromTemplate={
+                  getPageAction('create-from-template') || (() => {})
+                }
+                onNewTaskFromScratch={getPageAction('add-task') || (() => {})}
+                onNewTaskFromTemplate={
+                  getPageAction('add-task-from-template') || (() => {})
+                }
+              />
+            </div>
           ),
         };
       case '/admin/project-management/templates':
@@ -222,6 +233,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           addButtonText: 'New Monthly Service',
           onAddClick: getPageAction('add-monthly-service') || (() => {}),
           customActions: pageHeader?.customActions,
+        };
+      case '/admin/content-calendar':
+        return {
+          title: pageHeader?.title || 'Content Calendar',
+          description:
+            pageHeader?.description ||
+            'Year-wide view of planned content across all active monthly services',
+          showAddButton: false,
+          customActions: pageHeader?.customActions ? (
+            <div className={styles.customActionsWrapper}>
+              {pageHeader.customActions}
+            </div>
+          ) : undefined,
         };
       case '/tickets/leads':
         return {
@@ -369,6 +393,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             return {
               title: pageHeader.title,
               titleLeading: pageHeader.titleLeading,
+              titleLogo: pageHeader.titleLogo,
               description: pageHeader.description,
               showAddButton: false,
               customActions: pageHeader.customActions,
@@ -396,6 +421,20 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           if (pageHeader) {
             return {
               title: pageHeader.title,
+              description: pageHeader.description,
+              showAddButton: false,
+              customActions: pageHeader.customActions,
+            };
+          }
+          return null;
+        }
+
+        // Show lower header for content piece detail pages
+        if (pathname.match(/^\/admin\/content-pieces\/[^\/]+$/)) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
               description: pageHeader.description,
               showAddButton: false,
               customActions: pageHeader.customActions,
@@ -475,6 +514,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           };
         }
 
+        // Show lower header for company detail pages
+        if (pathname.match(/^\/admin\/companies\/[^\/]+$/)) {
+          if (pageHeader) {
+            return {
+              title: pageHeader.title,
+              titleLeading: pageHeader.titleLeading,
+              description: pageHeader.description,
+              showAddButton: false,
+            };
+          }
+          return null;
+        }
+
         return {
           title: 'Page',
           description: 'Welcome to this section of the application.',
@@ -492,16 +544,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   return (
     <div className={styles.layoutWrapper}>
       <div className={styles.contentWrapper}>
-        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} />
+        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} hideSecondary={isTechLeadsPage} />
         <div className={styles.rightContent}>
           <GlobalHeader onMenuToggle={toggleSidebar} />
-          {pageConfig && (
+          {!isTechLeadsPage && pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
               titleLeading={
                 'titleLeading' in pageConfig
                   ? pageConfig.titleLeading
                   : undefined
+              }
+              titleLogo={
+                'titleLogo' in pageConfig ? pageConfig.titleLogo : undefined
               }
               description={pageConfig.description}
               showAddButton={pageConfig.showAddButton}
@@ -517,20 +572,23 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               supportCaseAssignmentControls={
                 pageConfig.supportCaseAssignmentControls
               }
-              projectFilterControls={pageConfig.projectFilterControls}
               customActions={pageConfig.customActions}
             />
           )}
           <main
-            className={`${styles.mainContent} ${
-              isProjectManagementPage ? styles.projectManagementMainContent : ''
-            }`.trim()}
+            className={[
+              styles.mainContent,
+              isProjectManagementPage ? styles.projectManagementMainContent : '',
+              isTechLeadsPage ? styles.techLeadsMainContent : '',
+            ].filter(Boolean).join(' ')}
             data-scroll-container="main"
           >
             <section
               className={`pageWrapper ${
                 isProjectManagementPage
                   ? styles.projectManagementPageWrapper
+                  : isTechLeadsPage
+                  ? styles.techLeadsPageWrapper
                   : ''
               }`}
             >
@@ -546,12 +604,18 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
 export function LayoutWrapper({ children }: LayoutWrapperProps) {
   return (
-    <NavigationProvider>
-      <CompanyProvider>
-        <PageActionsProvider>
-          <LayoutContent>{children}</LayoutContent>
-        </PageActionsProvider>
-      </CompanyProvider>
-    </NavigationProvider>
+    <NavigationGuardProvider>
+      <NavigationProvider>
+        <CompanyProvider>
+          <NotificationProvider>
+            <PageActionsProvider>
+              <WizardProvider>
+                <LayoutContent>{children}</LayoutContent>
+              </WizardProvider>
+            </PageActionsProvider>
+          </NotificationProvider>
+        </CompanyProvider>
+      </NavigationProvider>
+    </NavigationGuardProvider>
   );
 }

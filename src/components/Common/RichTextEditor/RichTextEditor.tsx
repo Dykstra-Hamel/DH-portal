@@ -43,6 +43,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   // Use ref to store mentionUsers so the suggestion can always access latest value
   const mentionUsersRef = useRef<MentionUser[]>(mentionUsers || []);
 
+  // Flag to distinguish programmatic content updates from real user edits
+  const isProgrammaticUpdateRef = useRef(false);
+
   // Keep ref updated when mentionUsers changes
   useEffect(() => {
     mentionUsersRef.current = mentionUsers || [];
@@ -61,17 +64,32 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
       suggestion: {
         char: '@',
         items: ({ query }: { query: string }) => {
-          // Read from ref to get latest users
           const users = mentionUsersRef.current;
-          console.log('Mention items called, users:', users, 'query:', query);
-          return users
-            .filter((user) => {
-              const searchTerm = query.toLowerCase();
-              const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
-              const email = (user.email || '').toLowerCase();
-              return fullName.includes(searchTerm) || email.includes(searchTerm);
-            })
-            .slice(0, 5);
+          const searchTerm = query.toLowerCase();
+
+          const filtered = users.filter((user) => {
+            const fullName = `${user.first_name || ''} ${user.last_name || ''}`.toLowerCase();
+            const email = (user.email || '').toLowerCase();
+            return fullName.includes(searchTerm) || email.includes(searchTerm);
+          });
+
+          filtered.sort((a, b) => {
+            const aFirst = (a.first_name || '').toLowerCase();
+            const bFirst = (b.first_name || '').toLowerCase();
+
+            if (searchTerm) {
+              const aStartsWith = aFirst.startsWith(searchTerm);
+              const bStartsWith = bFirst.startsWith(searchTerm);
+              if (aStartsWith && !bStartsWith) return -1;
+              if (!aStartsWith && bStartsWith) return 1;
+            }
+
+            const aName = `${a.first_name || ''} ${a.last_name || ''}`.toLowerCase();
+            const bName = `${b.first_name || ''} ${b.last_name || ''}`.toLowerCase();
+            return aName.localeCompare(bName);
+          });
+
+          return filtered;
         },
         render: () => {
           let component: ReactRenderer<MentionListRef, MentionListProps> | null = null;
@@ -152,7 +170,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
     extensions,
     content: value,
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      if (!isProgrammaticUpdateRef.current) {
+        onChange(editor.getHTML());
+      }
     },
     editorProps: {
       attributes: {
@@ -198,7 +218,9 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   // Update editor content when value changes externally
   useEffect(() => {
     if (editor && value !== editor.getHTML()) {
+      isProgrammaticUpdateRef.current = true;
       editor.commands.setContent(value);
+      isProgrammaticUpdateRef.current = false;
     }
   }, [value, editor]);
 

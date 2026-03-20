@@ -11,7 +11,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { createClient } from '@/lib/supabase/client';
+import { scheduleScrollToElementById } from '@/lib/scroll-utils';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -250,6 +252,9 @@ export function MonthlyServiceDetail({
   const [deletingCommentId, setDeletingCommentId] = useState<string | null>(
     null
   );
+  const [highlightedCommentId, setHighlightedCommentId] = useState<string | null>(
+    null
+  );
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
@@ -270,8 +275,12 @@ export function MonthlyServiceDetail({
   const [newTaskDepartment, setNewTaskDepartment] = useState<string>('');
   const [addToTemplate, setAddToTemplate] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
   const dragCounterRef = useRef(0);
   const commentFileInputRef = useRef<HTMLInputElement>(null);
+  const processedCommentRef = useRef<string | null>(null);
+  const highlightTimeoutRef = useRef<number | null>(null);
+  const { refreshNotifications } = useNotificationContext();
   const { getAvatarUrl, getDisplayName, getInitials } = useUser();
 
   // Convert users to mention format for RichTextEditor
@@ -459,6 +468,83 @@ export function MonthlyServiceDetail({
     setNewComment('');
     setPendingAttachments([]);
   }, [fetchComments]);
+
+  const markMentionReferenceAsRead = useCallback(
+    async (referenceId: string) => {
+      try {
+        const response = await fetch('/api/notifications/mentions/read-by-reference', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            referenceType: 'monthly_service_comment',
+            referenceId,
+          }),
+        });
+
+        if (!response.ok) {
+          console.error(
+            'Error marking monthly service mention as read:',
+            await response.text()
+          );
+          return;
+        }
+
+        await refreshNotifications();
+      } catch (error) {
+        console.error('Error marking monthly service mention as read:', error);
+      }
+    },
+    [refreshNotifications]
+  );
+
+  useEffect(() => {
+    const commentId = searchParams.get('commentId');
+    if (!commentId) return;
+
+    const key = `${selectedMonth}:${commentId}`;
+    if (processedCommentRef.current === key) {
+      return;
+    }
+
+    setIsCommentsCollapsed(false);
+    setHighlightedCommentId(commentId);
+    void markMentionReferenceAsRead(commentId);
+    processedCommentRef.current = key;
+  }, [markMentionReferenceAsRead, searchParams, selectedMonth]);
+
+  useEffect(() => {
+    if (!highlightedCommentId) return;
+
+    return scheduleScrollToElementById(
+      `monthly-service-comment-${highlightedCommentId}`,
+      {
+        topOffset: 120,
+      }
+    );
+  }, [comments.length, highlightedCommentId, isCommentsCollapsed]);
+
+  useEffect(() => {
+    if (!highlightedCommentId) {
+      return;
+    }
+
+    if (highlightTimeoutRef.current) {
+      window.clearTimeout(highlightTimeoutRef.current);
+    }
+
+    highlightTimeoutRef.current = window.setTimeout(() => {
+      setHighlightedCommentId(null);
+    }, 2400);
+
+    return () => {
+      if (highlightTimeoutRef.current) {
+        window.clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, [highlightedCommentId]);
+
   const handleMonthChange = (newValue: Dayjs | null) => {
     if (newValue) {
       setSelectedMonthDayjs(newValue);
@@ -1116,6 +1202,9 @@ export function MonthlyServiceDetail({
     0
   );
 
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const isFutureMonth = selectedMonth > currentMonth;
+
   const handlePreviousMonth = () => {
     const [year, month] = selectedMonth.split('-').map(Number);
     const newDate = new Date(year, month - 2, 1); // month - 2 because month is 1-indexed
@@ -1128,6 +1217,36 @@ export function MonthlyServiceDetail({
     const newDate = new Date(year, month, 1); // month is already correct for next month
     const newMonth = newDate.toISOString().slice(0, 7);
     setSelectedMonth(newMonth);
+  };
+
+  const handleGenerateTasks = async () => {
+    setIsGeneratingTasks(true);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(
+        `/api/admin/monthly-services/${service.id}/generate-tasks`,
+        { method: 'POST', headers, body: JSON.stringify({ month: selectedMonth }) }
+      );
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to generate tasks');
+      setToastMessage(`Generated ${data.tasksCreated} tasks for ${formatMonth(selectedMonth)}`);
+      setToastType('success');
+      setShowToast(true);
+      const refreshResponse = await fetch(
+        `/api/admin/monthly-services/${service.id}?month=${selectedMonth}`,
+        { headers }
+      );
+      if (refreshResponse.ok) {
+        const refreshData = await refreshResponse.json();
+        setServiceData(refreshData.service);
+      }
+    } catch {
+      setToastMessage('Failed to generate tasks');
+      setToastType('error');
+      setShowToast(true);
+    } finally {
+      setIsGeneratingTasks(false);
+    }
   };
 
   // Budget handlers
@@ -1359,9 +1478,21 @@ export function MonthlyServiceDetail({
 
       {/* Tasks by Week */}
       <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>
-          Tasks for {formatMonth(selectedMonth)}
-        </h2>
+        <div className={styles.taskSectionHeader}>
+          <h2 className={styles.sectionTitle}>
+            Tasks for {formatMonth(selectedMonth)}
+          </h2>
+          {isFutureMonth && totalTasks === 0 && (
+            <button
+              className={styles.generateTasksButton}
+              onClick={handleGenerateTasks}
+              disabled={isGeneratingTasks}
+              type="button"
+            >
+              {isGeneratingTasks ? 'Generating...' : 'Generate Tasks'}
+            </button>
+          )}
+        </div>
         {loading ? (
           <div className={styles.loading}>Loading tasks...</div>
         ) : (
@@ -1557,7 +1688,11 @@ export function MonthlyServiceDetail({
                     <div
                       key={comment.id}
                       id={`monthly-service-comment-${comment.id}`}
-                      className={styles.commentItem}
+                      className={`${styles.commentItem} ${
+                        highlightedCommentId === comment.id
+                          ? styles.commentHighlight
+                          : ''
+                      }`}
                     >
                       <div className={styles.commentMeta}>
                         <MiniAvatar

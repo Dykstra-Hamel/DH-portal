@@ -283,7 +283,7 @@ export const callSchedulingHandler = inngest.createFunction(
           await supabase
             .from('leads')
             .update({
-              lead_status: 'contacted',
+              lead_status: 'in_process',
               last_contacted_at: new Date().toISOString(),
               comments: `${lead.comments || ''}\n\n📞 Automated call initiated via workflow - Call ID: ${callResult.call_id}`.trim()
             })

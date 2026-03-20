@@ -185,3 +185,18 @@ All email sending goes through:
 - Use `auth.sessions` table via SQL Editor to debug sessions
 - Redirect URL for OAuth: `${window.location.origin}/auth/callback`
 - CLAUDE should not run Git commands in order to avoid mistakes.
+
+## WorkWave PestPac API Integration
+
+Full documentation lives in `Agents.md`. Key points for development:
+
+- **Base URL**: `https://api.workwave.com/pestpac/v1/`
+- **Auth Header**: `ApiKey: {key}` — store key in env as `PESTPAC_API_KEY`
+- **Tenant Header**: `tenant-id: {tenant_id}` — store as `PESTPAC_TENANT_ID`
+- **Content-Type**: Always `application/json`
+- All requests are RESTful — use GET/POST/PATCH/PUT/DELETE appropriately
+- Use PATCH for partial field updates (not PUT, which replaces the whole record)
+- Pagination: `$top` (page size) + `$skip` (offset) query params
+- Filtering: OData-style `$filter`, `$orderby`, `$select`, `$expand`
+- Do NOT store raw API keys in code — always use environment variables
+- The full endpoint reference is at `https://developer.workwave.com/documentation`

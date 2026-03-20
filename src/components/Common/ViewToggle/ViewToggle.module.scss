@@ -1,0 +1,40 @@
+.viewToggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius);
+  box-sizing: border-box;
+}
+
+.toggleButton {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--border-radius) - 2px);
+  cursor: pointer;
+  color: var(--gray-500);
+  transition: all 0.15s ease;
+
+  &:hover:not(.active) {
+    background: var(--gray-200);
+    color: var(--gray-700);
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--blue-300);
+  }
+
+  &.active {
+    background: var(--white);
+    color: var(--gray-800);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+}

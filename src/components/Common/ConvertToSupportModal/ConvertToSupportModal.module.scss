@@ -48,7 +48,7 @@
   width: 48px;
   height: 48px;
   border-radius: 50%;
-  background: var(--action-50);
+  background: var(--blue-50);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -56,7 +56,7 @@
 }
 
 .icon {
-  color: var(--action-600);
+  color: var(--blue-600);
 }
 
 .modalTitle {
@@ -100,7 +100,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -150,7 +150,7 @@
   padding: 10px 20px;
   border: none;
   border-radius: var(--border-radius);
-  background: var(--action-600);
+  background: var(--blue-600);
   color: white;
   font-size: 14px;
   font-weight: 500;
@@ -158,11 +158,11 @@
   transition: all 0.2s ease;
 
   &:hover:not(:disabled) {
-    background: var(--action-700);
+    background: var(--blue-700);
   }
 
   &:active:not(:disabled) {
-    background: var(--action-800);
+    background: var(--blue-800);
   }
 
   &:disabled {

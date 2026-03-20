@@ -10,6 +10,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import DL from 'damerau-levenshtein';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { normalizePhoneNumber } from '@/lib/utils';
 import {
@@ -25,6 +26,9 @@ import {
   createOrFindServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { deriveSource } from '@/lib/taxonomy/derive-source';
+import { inngest } from '@/lib/inngest/client';
+import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
 
 /**
  * Check for recent duplicate form submissions
@@ -82,6 +86,93 @@ async function checkForRecentDuplicate(
 
     return false;
   });
+}
+
+type CompanyPestOption = { name: string; slug: string; customLabel: string };
+
+/**
+ * Fetch active pest options for a company, resolving custom_label.
+ */
+async function fetchCompanyPestOptions(
+  supabase: any,
+  companyId: string
+): Promise<CompanyPestOption[]> {
+  const { data } = await supabase
+    .from('company_pest_options')
+    .select('custom_label, pest_types(name, slug)')
+    .eq('company_id', companyId)
+    .eq('is_active', true);
+
+  if (!data || data.length === 0) return [];
+
+  return data
+    .filter((o: any) => o.pest_types)
+    .map((o: any) => ({
+      name: o.pest_types.name,
+      slug: o.pest_types.slug,
+      customLabel: o.custom_label || o.pest_types.name,
+    }));
+}
+
+/**
+ * Match a free-text pest description against a company's configured pest options.
+ * Tries six tiers in order and returns customLabel on the first match.
+ */
+function matchPestOption(
+  pests: CompanyPestOption[],
+  input: string | null | undefined
+): string | null {
+  if (!input || pests.length === 0) return null;
+  const lower = input.toLowerCase();
+
+  // Tier 1: Exact custom_label match
+  let hit = pests.find(p => p.customLabel.toLowerCase() === lower);
+  if (hit) return hit.customLabel;
+
+  // Tier 2: Exact name match
+  hit = pests.find(p => p.name.toLowerCase() === lower);
+  if (hit) return hit.customLabel;
+
+  // Tier 3: Exact slug match
+  hit = pests.find(p => p.slug === lower.replace(/\s+/g, '_'));
+  if (hit) return hit.customLabel;
+
+  // Tier 4: Strip " Control" suffix, then startsWith / includes
+  const stripped = lower.replace(/\s*control\s*$/i, '').trim();
+  hit = pests.find(p =>
+    p.name.toLowerCase().startsWith(stripped) ||
+    p.customLabel.toLowerCase().startsWith(stripped) ||
+    stripped.includes(p.slug.replace(/_/g, ' '))
+  );
+  if (hit) return hit.customLabel;
+
+  // Tier 5: Any substring match (name, slug, or custom_label appears in input)
+  hit = pests.find(p =>
+    lower.includes(p.name.toLowerCase()) ||
+    lower.includes(p.slug.replace(/_/g, ' ')) ||
+    lower.includes(p.customLabel.toLowerCase())
+  );
+  if (hit) return hit.customLabel;
+
+  // Tier 6: Damerau-Levenshtein distance — nearest match within threshold
+  let bestMatch: CompanyPestOption | null = null;
+  let bestDistance = Infinity;
+  for (const p of pests) {
+    const d = Math.min(
+      DL(lower, p.name.toLowerCase()).steps,
+      DL(lower, p.customLabel.toLowerCase()).steps
+    );
+    if (d < bestDistance) {
+      bestDistance = d;
+      bestMatch = p;
+    }
+  }
+  if (bestMatch) {
+    const threshold = Math.max(2, Math.floor(Math.min(lower.length, bestMatch.name.length) * 0.4));
+    if (bestDistance <= threshold) return bestMatch.customLabel;
+  }
+
+  return null;
 }
 
 export async function OPTIONS(request: NextRequest) {
@@ -198,9 +289,14 @@ export async function POST(request: NextRequest) {
                        formData.campaignId || formData.campaign_id || formData['campaign-id'] ||
                        rawPayload.campaignId || rawPayload.campaign_id || rawPayload['campaign-id'] || null;
 
-    // Extract gclid separately (Google Click ID)
-    const gclid = queryParams.get('gclid') ||
-                  formData.gclid || rawPayload.gclid || null;
+    // Extract all UTM and tracking params (URL params take priority over form body)
+    const gclid = queryParams.get('gclid') || formData.gclid || rawPayload.gclid || null;
+    const fbclid = queryParams.get('fbclid') || formData.fbclid || rawPayload.fbclid || null;
+    const utmSource = queryParams.get('utm_source') || formData.utm_source || rawPayload.utm_source || null;
+    const utmMedium = queryParams.get('utm_medium') || formData.utm_medium || rawPayload.utm_medium || null;
+    const utmCampaign = queryParams.get('utm_campaign') || formData.utm_campaign || rawPayload.utm_campaign || null;
+    const utmContent = queryParams.get('utm_content') || formData.utm_content || rawPayload.utm_content || null;
+    const utmTerm = queryParams.get('utm_term') || formData.utm_term || rawPayload.utm_term || null;
 
     // Step 5: Create initial form_submissions record (pending state)
     const userAgent = request.headers.get('user-agent') || null;
@@ -297,6 +393,7 @@ export async function POST(request: NextRequest) {
 
     // Step 7: Lookup or create customer
     let customerId: string | null = null;
+    let isExistingCustomer = false;
 
     // Try to find existing customer by email first, then phone
     if (normalized.email) {
@@ -309,6 +406,7 @@ export async function POST(request: NextRequest) {
 
       if (existingCustomer) {
         customerId = existingCustomer.id;
+        isExistingCustomer = true;
       }
     }
 
@@ -323,6 +421,7 @@ export async function POST(request: NextRequest) {
 
       if (existingCustomer) {
         customerId = existingCustomer.id;
+        isExistingCustomer = true;
       }
     }
 
@@ -428,6 +527,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Step 8.5: Normalize pest_type from Gemini output to a company pest name.
+    // Fetches options once, then tries ticket.pest_type first, then pest_issue as a fallback.
+    const pestOptions = await fetchCompanyPestOptions(supabase, companyId);
+    const normalizedPestType =
+      matchPestOption(pestOptions, geminiResult.ticket.pest_type) ||
+      matchPestOption(pestOptions, geminiResult.normalized.pest_issue) ||
+      null;
+
     // Step 9: Create lead (if campaign) or ticket (if not)
     let ticketId: string | null = null;
     let leadId: string | null = null;
@@ -462,15 +569,21 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
-        campaign_id: campaign.id, // Store campaign UUID for proper FK relationship
+        campaign_id: campaign.id,
         lead_source: 'campaign',
-        lead_type: 'web_form',
+        lead_type: 'campaign_form',
+        format: 'form',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
+        pest_type: normalizedPestType || null,
         lead_status: 'new',
         comments: geminiResult.ticket.description || 'Campaign form submission',
         priority: geminiResult.ticket.priority || 'medium',
-        utm_campaign: campaignId, // Also store in UTM for tracking purposes
         gclid: gclid || null,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+        utm_content: utmContent,
+        utm_term: utmTerm,
         ip_address: ipAddress,
         user_agent: userAgent,
         referrer_url: lookupUrl,
@@ -506,14 +619,23 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
-        type: 'web_form',
-        source: 'website',
+        type: 'website_form',
+        source: deriveSource({ gclid, fbclid, utm_source: utmSource }),
+        format: 'form',
         description: geminiResult.ticket.description || 'Form submission',
         priority: geminiResult.ticket.priority || 'medium',
         service_type: geminiResult.ticket.service_type || 'Pest Control',
         status: 'new',
-        pest_type: geminiResult.ticket.pest_type || 'General Pest Control',
+        pest_type: normalizedPestType || null,
         form_submission_id: submissionId,
+        gclid: gclid,
+        fbclid: fbclid,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+        utm_content: utmContent,
+        utm_term: utmTerm,
+        referrer_url: lookupUrl,
       };
 
       const { data: ticket, error: ticketError } = await supabase
@@ -533,6 +655,34 @@ export async function POST(request: NextRequest) {
       }
 
       ticketId = ticket.id;
+    }
+
+    // Campaign attribution: fire response event for existing customers with lead
+    if (customerId && leadId && isExistingCustomer) {
+      const attribution = await detectCampaignAttribution(supabase, customerId, companyId!);
+      if (attribution) {
+        const alreadyResponded = await hasRecentResponse(supabase, customerId, attribution.campaignId);
+        if (!alreadyResponded) {
+          // Update lead with attribution from campaign executions
+          await supabase.from('leads').update({
+            campaign_id: attribution.campaignId,
+            lead_source: 'campaign',
+            lead_type: 'campaign_form',
+          }).eq('id', leadId);
+
+          await inngest.send({
+            name: 'campaign/response-detected',
+            data: {
+              leadId,
+              campaignId: attribution.campaignId,
+              campaignName: attribution.campaignName,
+              customerId,
+              companyId,
+              responseType: 'form',
+            },
+          });
+        }
+      }
     }
 
     // Step 10: Link ticket/lead and customer to form submission

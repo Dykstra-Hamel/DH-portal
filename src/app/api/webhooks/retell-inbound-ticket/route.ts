@@ -13,6 +13,8 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { inngest } from '@/lib/inngest/client';
+import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -579,17 +581,84 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     );
   }
 
-  // Only create a ticket if action is required
   let ticketId: string | null = null;
+  let leadId: string | null = null;
 
-  if (extractedData.action_required === 'true') {
-    // Build description from analysis
+  // Check campaign attribution — existing customers only
+  const attribution =
+    callRecord.customer_id && callRecord.company_id
+      ? await detectCampaignAttribution(supabase, callRecord.customer_id, callRecord.company_id)
+      : null;
+
+  if (attribution) {
+    // Campaign response: create a lead instead of a ticket
+    let description = `📞 Inbound call - Campaign Response: "${attribution.campaignName}"`;
+    if (extractedData.summary) {
+      description += `\n\n📊 Call Analysis: ${extractedData.summary}`;
+    }
+    const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
+    if (isQualified === 'true' || isQualified === true) {
+      description += `\n\n✅ AI Qualification: QUALIFIED`;
+    } else if (isQualified === 'false' || isQualified === false) {
+      description += `\n\n❌ AI Qualification: UNQUALIFIED`;
+    }
+
+    const { data: newLead, error: leadError } = await supabase
+      .from('leads')
+      .insert({
+        company_id: callRecord.company_id,
+        customer_id: callRecord.customer_id,
+        campaign_id: attribution.campaignId,
+        lead_source: 'campaign',
+        lead_type: 'campaign_call',
+        format: 'call',
+        lead_status: 'new',
+        priority: 'medium',
+        service_type: extractedData.pest_issue,
+        comments: description.trim(),
+        created_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single();
+
+    if (!leadError && newLead) {
+      leadId = newLead.id;
+
+      // Link the call record to the new lead
+      await supabase
+        .from('call_records')
+        .update({ lead_id: leadId })
+        .eq('id', callRecord.id);
+
+      // Fire campaign response event (dedup is handled inside the Inngest function)
+      const alreadyResponded = await hasRecentResponse(
+        supabase,
+        callRecord.customer_id,
+        attribution.campaignId
+      );
+      if (!alreadyResponded) {
+        await inngest.send({
+          name: 'campaign/response-detected',
+          data: {
+            leadId,
+            campaignId: attribution.campaignId,
+            campaignName: attribution.campaignName,
+            customerId: callRecord.customer_id,
+            companyId: callRecord.company_id,
+            responseType: 'call',
+          },
+        });
+      }
+    } else {
+      console.error(`❌ Failed to create campaign lead:`, leadError?.message);
+    }
+  } else if (extractedData.action_required === 'true') {
+    // No campaign attribution — create a ticket if action is required
     let description = `📞 Inbound call - Action Required`;
     if (extractedData.summary) {
       description += `\n\n📊 Call Analysis: ${extractedData.summary}`;
     }
 
-    // Determine service_type and add qualification context
     const isQualified = call_analysis?.custom_analysis_data?.is_qualified;
     let serviceType = 'Customer Service';
     if (isQualified === 'true' || isQualified === true) {
@@ -605,8 +674,9 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       .insert({
         company_id: callRecord.company_id,
         customer_id: callRecord.customer_id,
-        source: 'cold_call',
-        type: 'phone_call',
+        source: 'direct',
+        type: 'inbound_call',
+        format: 'call',
         call_direction: 'inbound',
         call_record_id: callRecord.id,
         status: 'new',
@@ -791,7 +861,13 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
             );
           }
 
-          if (ticketId) {
+          if (leadId) {
+            await supabase
+              .from('leads')
+              .update({ service_address_id: serviceAddressId })
+              .eq('id', leadId)
+              .is('service_address_id', null);
+          } else if (ticketId) {
             await supabase
               .from('tickets')
               .update({ service_address_id: serviceAddressId })
@@ -803,9 +879,10 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
     }
   }
 
-  // Send ticket notification emails if enabled and action_required is true
+  // Send ticket notification emails if enabled, action_required is true, and not a campaign lead
+  // (campaign leads are handled by the Inngest campaign-response-detector function)
   try {
-    if (extractedData.action_required === 'true') {
+    if (extractedData.action_required === 'true' && !leadId) {
       await sendTicketNotificationEmailsIfEnabled(
         supabase,
         callRecord,
@@ -818,7 +895,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       );
     } else {
       console.log(
-        `[Ticket Notification Emails] Skipping email for call ${callData.call_id} - action_required: ${extractedData.action_required}`
+        `[Ticket Notification Emails] Skipping email for call ${callData.call_id} - action_required: ${extractedData.action_required}${leadId ? ' (campaign lead — handled by Inngest)' : ''}`
       );
     }
   } catch (error) {

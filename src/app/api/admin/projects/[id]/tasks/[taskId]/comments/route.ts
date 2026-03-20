@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
+import { sendMentionSlackNotifications } from '@/lib/slack/mention-notifications';
 
 // GET /api/admin/projects/[id]/tasks/[taskId]/comments - List all comments for a task
 export async function GET(
@@ -117,9 +118,9 @@ export async function POST(
     // Parse request body
     const body = await request.json();
 
-    if (!body.comment || !body.comment.trim()) {
+    if (body.comment === undefined || body.comment === null) {
       return NextResponse.json(
-        { error: 'Comment text is required' },
+        { error: 'Comment field is required' },
         { status: 400 }
       );
     }
@@ -127,7 +128,7 @@ export async function POST(
     // Get task and project details for company_id and names
     const { data: task, error: taskError } = await supabase
       .from('project_tasks')
-      .select('id, title, project_id, projects(id, name, company_id)')
+      .select('id, title, project_id, projects(id, name, company_id, company:companies(name))')
       .eq('id', taskId)
       .single();
 
@@ -136,7 +137,12 @@ export async function POST(
       return NextResponse.json({ error: 'Task not found' }, { status: 404 });
     }
 
-    const project = (task.projects as unknown) as { id: string; name: string; company_id: string } | null;
+    const project = (task.projects as unknown) as {
+      id: string;
+      name: string;
+      company_id: string;
+      company?: { name?: string } | null;
+    } | null;
 
     // Get commenter's profile for notification message
     const { data: commenterProfile } = await supabase
@@ -205,6 +211,18 @@ export async function POST(
           console.error('Error creating mention notifications:', notificationError);
         }
       }
+    }
+
+    if (mentionedUserIds.length > 0) {
+      sendMentionSlackNotifications({
+        mentionedUserIds,
+        commenterName,
+        contextType: 'task',
+        contextName: task.title,
+        clientName: project?.company?.name || null,
+        commentText: body.comment,
+        deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?taskId=${taskId}&commentId=${comment.id}`,
+      }).catch(() => {});
     }
 
     return NextResponse.json(comment, { status: 201 });

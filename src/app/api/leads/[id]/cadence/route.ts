@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 import { logActivity } from '@/lib/activity-logger';
+import { triggerWorkflowForCadenceStep } from '@/lib/cadence/trigger-workflow-step';
 
 // POST /api/leads/[id]/cadence - Start sales cadence for a lead (manual start)
 export async function POST(
@@ -121,6 +123,32 @@ export async function POST(
         { error: 'Failed to start cadence' },
         { status: 500 }
       );
+    }
+
+    // If the first step is trigger_workflow, fire the workflow directly —
+    // the DB trigger skips task creation for trigger_workflow steps.
+    try {
+      const adminSupabase = createAdminClient();
+      const { data: firstStep } = await adminSupabase
+        .from('sales_cadence_steps')
+        .select('id, action_type, workflow_id')
+        .eq('cadence_id', cadenceId)
+        .order('display_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (firstStep?.action_type === 'trigger_workflow' && firstStep.workflow_id) {
+        await triggerWorkflowForCadenceStep({
+          leadId,
+          companyId: lead.company_id,
+          customerId: lead.customer_id ?? null,
+          cadenceStepId: firstStep.id,
+          workflowId: firstStep.workflow_id,
+          cadenceId,
+        });
+      }
+    } catch (err) {
+      console.error('Error firing trigger_workflow first step after POST cadence:', err);
     }
 
     // Log cadence started activity
@@ -266,7 +294,7 @@ export async function PUT(
     // Get the lead to check if it needs assignment or status update
     const { data: lead, error: leadError } = await supabase
       .from('leads')
-      .select('id, company_id, assigned_to, lead_status')
+      .select('id, company_id, assigned_to, lead_status, customer_id')
       .eq('id', leadId)
       .single();
 
@@ -380,6 +408,32 @@ export async function PUT(
         { error: 'Failed to assign cadence', details: error.message },
         { status: 500 }
       );
+    }
+
+    // If the first step is trigger_workflow, fire the workflow directly —
+    // the DB trigger skips task creation for trigger_workflow steps.
+    try {
+      const adminSupabase = createAdminClient();
+      const { data: firstStep } = await adminSupabase
+        .from('sales_cadence_steps')
+        .select('id, action_type, workflow_id')
+        .eq('cadence_id', cadence_id)
+        .order('display_order', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (firstStep?.action_type === 'trigger_workflow' && firstStep.workflow_id) {
+        await triggerWorkflowForCadenceStep({
+          leadId,
+          companyId: lead.company_id,
+          customerId: lead.customer_id ?? null,
+          cadenceStepId: firstStep.id,
+          workflowId: firstStep.workflow_id,
+          cadenceId: cadence_id,
+        });
+      }
+    } catch (err) {
+      console.error('Error firing trigger_workflow first step after PUT cadence:', err);
     }
 
     return NextResponse.json({ data });
@@ -523,6 +577,12 @@ export async function DELETE(
         { status: 404 }
       );
     }
+
+    // Cancel active workflow executions before removing cadence
+    await supabase.from('automation_executions')
+      .update({ execution_status: 'cancelled' })
+      .eq('lead_id', leadId)
+      .in('execution_status', ['running', 'pending']);
 
     // Delete non-completed cadence tasks
     await supabase

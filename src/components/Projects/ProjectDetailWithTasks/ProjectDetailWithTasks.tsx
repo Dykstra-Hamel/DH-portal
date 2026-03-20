@@ -6,25 +6,33 @@ import Image from 'next/image';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeFileName } from '@/lib/storage-utils';
-import { ArrowLeft, Check, ChevronDown, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
-import { Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, ProofFeedbackActivity, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
 import { adminAPI } from '@/lib/api-client';
 import { parseDateString } from '@/lib/date-utils';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import ProjectDetail from '../ProjectDetail/ProjectDetail';
 import ProjectTaskList from '../ProjectTaskList/ProjectTaskList';
 import ProjectTaskForm from '../ProjectTaskForm/ProjectTaskForm';
 import ProjectTaskDetail from '../ProjectTaskDetail/ProjectTaskDetail';
 import ApplyTemplateModal from '../ApplyTemplateModal/ApplyTemplateModal';
+import DuplicateProjectModal from '../DuplicateProjectModal/DuplicateProjectModal';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
+import dynamic from 'next/dynamic';
+const ProofsTab = dynamic(() => import('../ProofsTab/ProofsTab'), { ssr: false });
+const PDFLightbox = dynamic(
+  () => import('@/components/Common/PDFLightbox/PDFLightbox').then((mod) => mod.PDFLightbox),
+  { ssr: false }
+);
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './ProjectDetailWithTasks.module.scss';
 
@@ -34,6 +42,8 @@ interface ProjectDetailWithTasksProps {
   user: User;
   onProjectUpdate?: () => void;
 }
+
+const COMMENTS_INITIAL_VISIBLE_COUNT = 10;
 
 const formatHeaderDate = (value?: string | null) => {
   if (!value) return 'Not set';
@@ -83,10 +93,16 @@ const isDueDateOverdue = (dueDate: string | null) => {
   return due < today;
 };
 
-const isCompletionOnlyUpdate = (updates: Partial<ProjectTask>) => {
-  const keys = Object.keys(updates);
-  if (keys.length === 0) return false;
-  return keys.every((key) => key === 'is_completed' || key === 'completed_at');
+type UploadProgressState = {
+  active: boolean;
+  completed: number;
+  total: number;
+};
+
+const EMPTY_UPLOAD_PROGRESS: UploadProgressState = {
+  active: false,
+  completed: 0,
+  total: 0,
 };
 
 export default function ProjectDetailWithTasks({ project, projectLoading = false, user, onProjectUpdate }: ProjectDetailWithTasksProps) {
@@ -106,6 +122,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [allInternalCategories, setAllInternalCategories] = useState<ProjectCategory[]>([]);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [comments, setComments] = useState<ProjectComment[]>([]);
+  const [proofActivity, setProofActivity] = useState<ProofFeedbackActivity[]>([]);
+  const [isInitialTasksLoaded, setIsInitialTasksLoaded] = useState(false);
+  const [isInitialCommentsLoaded, setIsInitialCommentsLoaded] = useState(false);
+  const [isInitialProofActivityLoaded, setIsInitialProofActivityLoaded] = useState(false);
+  const [proofToOpen, setProofToOpen] = useState<string | null>(null);
   const [newComment, setNewComment] = useState('');
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [editingCommentText, setEditingCommentText] = useState('');
@@ -114,6 +135,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [commentAvatarError, setCommentAvatarError] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [projectCommentUploadProgress, setProjectCommentUploadProgress] =
+    useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
   const commentComposerDragCounterRef = React.useRef(0);
   const [toastMessage, setToastMessage] = useState('');
@@ -126,7 +149,12 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [showCompleteConfirmation, setShowCompleteConfirmation] = useState(false);
   const [isTasksCollapsed, setIsTasksCollapsed] = useState(false);
   const [isCommentsCollapsed, setIsCommentsCollapsed] = useState(false);
+  const [showAllCommentsInFeed, setShowAllCommentsInFeed] = useState(false);
   const [isEditingProjectDescription, setIsEditingProjectDescription] = useState(false);
+  const [blockedTaskHoverRef, setBlockedTaskHoverRef] = useState<{
+    id: string | null;
+    title: string | null;
+  }>({ id: null, title: null });
 
   // Error modal state
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -141,18 +169,37 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [highlightedProjectCommentId, setHighlightedProjectCommentId] = useState<string | null>(null);
   const [highlightedTaskCommentId, setHighlightedTaskCommentId] = useState<string | null>(null);
   const highlightTimeoutRef = React.useRef<number | null>(null);
+  const commentsFeedRef = React.useRef<HTMLDivElement>(null);
+  const commentsListRef = React.useRef<HTMLDivElement>(null);
+  const commentsBottomAnchorRef = React.useRef<HTMLDivElement>(null);
+  const hasAutoScrolledCommentsRef = React.useRef(false);
+  const shouldStickCommentsToBottomRef = React.useRef(true);
   const [isApplyTemplateOpen, setIsApplyTemplateOpen] = useState(false);
+  const [isDuplicateModalOpen, setIsDuplicateModalOpen] = useState(false);
+  const [activeContentTab, setActiveContentTab] = useState<'attachments' | 'proofs'>('attachments');
   const [projectAttachments, setProjectAttachments] = useState<ProjectAttachment[]>(project?.attachments || []);
   const [uploadingProjectAttachment, setUploadingProjectAttachment] = useState(false);
+  const [projectUploadProgress, setProjectUploadProgress] =
+    useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingProjectFile, setIsDraggingProjectFile] = useState(false);
   const projectDragCounterRef = React.useRef(0);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxImageIndex, setLightboxImageIndex] = useState(0);
   const [currentLightboxImages, setCurrentLightboxImages] = useState<Array<{ id: string; url: string; name: string }>>([]);
+  const [pdfLightboxOpen, setPdfLightboxOpen] = useState(false);
+  const [pdfLightboxUrl, setPdfLightboxUrl] = useState('');
+  const [pdfLightboxName, setPdfLightboxName] = useState('');
   const router = useRouter();
   const searchParams = useSearchParams();
+  const deepLinkCommentId = searchParams.get('commentId');
+  const deepLinkTaskId = searchParams.get('taskId');
+  const deepLinkTab = searchParams.get('tab');
+  const deepLinkProofId = searchParams.get('proofId');
+  const isInitialContentReady =
+    isInitialTasksLoaded && isInitialCommentsLoaded && isInitialProofActivityLoaded;
   const processedCommentRef = React.useRef<string | null>(null);
   const { setPageHeader } = usePageActions();
+  const { refreshNotifications } = useNotificationContext();
   const { getAvatarUrl, getDisplayName, getInitials } = useUser();
   const getCommentHtml = React.useCallback(
     (html: string) => {
@@ -262,7 +309,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   React.useEffect(() => {
     if (!project?.id) return;
 
-    fetchTasks(project.id);
+    let cancelled = false;
+    setIsInitialTasksLoaded(false);
+
+    void fetchTasks(project.id).finally(() => {
+      if (!cancelled) {
+        setIsInitialTasksLoaded(true);
+      }
+    });
+
     // Also fetch users for assignment (fetch in parallel)
     adminAPI.getUsers().then(data => setUsers(data || [])).catch(() => {});
     // Fetch departments (fetch in parallel)
@@ -275,6 +330,10 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       .then(res => res.json())
       .then(data => setAllInternalCategories(data || []))
       .catch(() => {});
+
+    return () => {
+      cancelled = true;
+    };
   }, [project?.id, fetchTasks]);
 
   React.useEffect(() => {
@@ -475,9 +534,89 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
   }, [project?.id, project]);
 
+  const fetchProofActivity = useCallback(async () => {
+    if (!project?.id) return;
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/proof-activity`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setProofActivity(data.activity ?? []);
+    } catch {
+      // silent
+    }
+  }, [project?.id]);
+
   React.useEffect(() => {
-    fetchComments();
-  }, [fetchComments]);
+    if (!project?.id) return;
+
+    let cancelled = false;
+    hasAutoScrolledCommentsRef.current = false;
+    setIsInitialCommentsLoaded(false);
+    setIsInitialProofActivityLoaded(false);
+
+    void fetchComments().finally(() => {
+      if (!cancelled) {
+        setIsInitialCommentsLoaded(true);
+      }
+    });
+
+    void fetchProofActivity().finally(() => {
+      if (!cancelled) {
+        setIsInitialProofActivityLoaded(true);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project?.id, fetchComments, fetchProofActivity]);
+
+  useEffect(() => {
+    if (deepLinkTab !== 'proofs' && !deepLinkProofId) return;
+    setActiveContentTab('proofs');
+    if (deepLinkProofId) {
+      setProofToOpen(deepLinkProofId);
+    }
+  }, [deepLinkTab, deepLinkProofId]);
+
+  // Realtime subscription — re-fetch comments when another user adds/edits/deletes
+  useEffect(() => {
+    if (!project?.id) return;
+
+    const supabase = createClient();
+    const commentsChannel = supabase
+      .channel(`project-comments:${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'project_comments',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => { fetchComments(); }
+      )
+      .subscribe();
+
+    const proofFeedbackChannel = supabase
+      .channel(`project-proof-feedback-activity:${project.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'proof_feedback',
+          filter: `project_id=eq.${project.id}`,
+        },
+        () => { fetchProofActivity(); }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(commentsChannel);
+      supabase.removeChannel(proofFeedbackChannel);
+    };
+  }, [project?.id, fetchComments, fetchProofActivity]);
 
   const handleCreateTask = useCallback(() => {
     setEditingTask(null);
@@ -506,8 +645,33 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
   }, [project?.id, project?.name, router, project]);
 
+  const handleDuplicateProject = useCallback(async (name: string, companyId: string) => {
+    if (!project) return;
+
+    const response = await fetch(`/api/admin/projects/${project.id}/duplicate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, companyId }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      const errorMessage = data.details
+        ? `${data.error || 'Failed to duplicate project'}: ${data.details}`
+        : (data.error || 'Failed to duplicate project');
+      throw new Error(errorMessage);
+    }
+
+    const { projectId } = await response.json();
+    router.push(`/admin/project-management/${projectId}`);
+  }, [project, router]);
+
   const handleBackToProjects = useCallback(() => {
-    router.push('/admin/project-management');
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/admin/project-management');
+    }
   }, [router]);
 
   const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null; current_department_id?: string | null }) => {
@@ -557,12 +721,20 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setIsHeaderStatusOpen(false);
       return;
     }
+
+    // Route completion through the confirmation modal
+    if (status === 'complete') {
+      setIsHeaderStatusOpen(false);
+      setShowCompleteConfirmation(true);
+      return;
+    }
+
     setIsUpdatingHeaderStatus(true);
     setIsHeaderStatusOpen(false);
     try {
       await updateProjectFields({
         status,
-        completion_date: status === 'complete' ? new Date().toISOString() : null,
+        completion_date: null,
       });
       setToastMessage('Project status updated.');
       setToastType('success');
@@ -643,10 +815,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       );
 
       setIsProjectComplete(true);
-      setToastMessage('Project marked complete.');
-      setToastType('success');
-      setShowToast(true);
       onProjectUpdate?.();
+      handleBackToProjects();
     } catch (error) {
       console.error('Error completing project:', error);
       setToastMessage('Failed to mark project complete.');
@@ -658,20 +828,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   }, [
     isCompletingProject,
     onProjectUpdate,
-    project?.assigned_to_profile,
-    project?.description,
-    project?.due_date,
-    project?.id,
-    project?.is_billable,
-    project?.name,
-    project?.notes,
-    project?.primary_file_path,
-    project?.priority,
-    project?.project_subtype,
-    project?.project_type,
-    project?.quoted_price,
-    project?.start_date,
-    project?.tags,
+    handleBackToProjects,
     tasks,
     updateTask,
     project,
@@ -824,14 +981,25 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
     const companyName = project.company?.name;
     const projectName = project.name || 'Project Details';
-    const headerTitle = companyName ? `${companyName} - ${projectName}` : projectName;
+    const brandingRaw = project.company?.branding;
+    const branding = Array.isArray(brandingRaw) ? brandingRaw[0] : brandingRaw;
+    const logoUrl = branding?.icon_logo_url;
 
     const isOverdue = isDueDateOverdue(project.due_date);
     const daysText = getDaysUntilDue(project.due_date);
     const dueDateColor = isOverdue ? '#ef4444' : '#111827';
 
     setPageHeader({
-      title: headerTitle,
+      title: projectName,
+      titleLogo: logoUrl ? (
+        <Image
+          src={logoUrl}
+          alt={companyName || ''}
+          width={36}
+          height={36}
+          className={styles.headerCompanyLogo}
+        />
+      ) : undefined,
       titleLeading: (
         <button
           type="button"
@@ -915,6 +1083,14 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
             </button>
           )}
           <button
+            className={`${headerStyles.addLeadButton} ${headerStyles.iconOnlyButton}`}
+            onClick={() => setIsDuplicateModalOpen(true)}
+            type="button"
+            aria-label="Duplicate project"
+          >
+            <Copy size={18} />
+          </button>
+          <button
             className={`${headerStyles.addLeadButton} ${headerStyles.deleteButton} ${headerStyles.iconOnlyButton}`}
             onClick={handleDeleteProject}
             type="button"
@@ -930,6 +1106,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     projectLoading,
     handleBackToProjects,
     handleDeleteProject,
+    handleDuplicateProject,
+    setIsDuplicateModalOpen,
     availableStatusOptions,
     handleHeaderStatusChange,
     handleHeaderDepartmentChange,
@@ -962,9 +1140,57 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     openTaskDetailById(task.id);
   };
 
+  const scrollCommentsToBottom = useCallback((behavior: ScrollBehavior = 'auto') => {
+    const feedElement = commentsFeedRef.current;
+    if (!feedElement) return;
+    const maxTop = Math.max(0, feedElement.scrollHeight - feedElement.clientHeight);
+    shouldStickCommentsToBottomRef.current = true;
+    if (behavior === 'auto') {
+      feedElement.scrollTop = maxTop;
+      feedElement.scrollTop = Math.max(0, feedElement.scrollHeight - feedElement.clientHeight);
+    } else {
+      feedElement.scrollTo({ top: maxTop, behavior });
+    }
+  }, []);
+
+  const handleCommentsFeedScroll = useCallback(() => {
+    const listElement = commentsFeedRef.current;
+    if (!listElement) return;
+    const distanceFromBottom =
+      listElement.scrollHeight - listElement.scrollTop - listElement.clientHeight;
+    shouldStickCommentsToBottomRef.current = distanceFromBottom <= 24;
+  }, []);
+
+  const markMentionReferenceAsRead = useCallback(
+    async (referenceType: 'project_comment', referenceId: string) => {
+      try {
+        const response = await fetch('/api/notifications/mentions/read-by-reference', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ referenceType, referenceId }),
+        });
+
+        if (!response.ok) {
+          console.error(
+            'Error marking mention as read by reference:',
+            await response.text()
+          );
+          return;
+        }
+
+        await refreshNotifications();
+      } catch (error) {
+        console.error('Error marking mention as read by reference:', error);
+      }
+    },
+    [refreshNotifications]
+  );
+
   React.useEffect(() => {
-    const commentId = searchParams.get('commentId');
-    const taskId = searchParams.get('taskId');
+    const commentId = deepLinkCommentId;
+    const taskId = deepLinkTaskId;
     if (!commentId) return;
 
     const key = `${taskId || 'project'}:${commentId}`;
@@ -980,18 +1206,110 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } else {
       setIsCommentsCollapsed(false);
       setHighlightedProjectCommentId(commentId);
+      void markMentionReferenceAsRead('project_comment', commentId);
     }
 
     processedCommentRef.current = key;
-  }, [openTaskDetailById, searchParams, selectedTask]);
+  }, [deepLinkCommentId, deepLinkTaskId, markMentionReferenceAsRead, openTaskDetailById, selectedTask]);
 
   React.useEffect(() => {
     if (!highlightedProjectCommentId) return;
-    const element = document.getElementById(`project-comment-${highlightedProjectCommentId}`);
-    if (element) {
-      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    if (isCommentsCollapsed) return;
+    const rafId = window.requestAnimationFrame(() => {
+      const targetComment = document.getElementById(
+        `project-comment-${highlightedProjectCommentId}`
+      );
+      targetComment?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(rafId);
+  }, [highlightedProjectCommentId, comments.length, isCommentsCollapsed, showAllCommentsInFeed]);
+
+  React.useEffect(() => {
+    hasAutoScrolledCommentsRef.current = false;
+    shouldStickCommentsToBottomRef.current = true;
+    setShowAllCommentsInFeed(false);
+  }, [project?.id]);
+
+  React.useEffect(() => {
+    if (isCommentsCollapsed) {
+      hasAutoScrolledCommentsRef.current = false;
+      shouldStickCommentsToBottomRef.current = true;
     }
-  }, [highlightedProjectCommentId, comments.length]);
+  }, [isCommentsCollapsed]);
+
+  React.useLayoutEffect(() => {
+    const mergedFeedCount = comments.length + proofActivity.length;
+    if (!isInitialContentReady) return;
+    if (isCommentsCollapsed) return;
+    if (mergedFeedCount === 0) return;
+    if (deepLinkCommentId) return;
+    if (highlightedProjectCommentId) return;
+    if (hasAutoScrolledCommentsRef.current) return;
+    if (!commentsFeedRef.current) return;
+    scrollCommentsToBottom('auto');
+    hasAutoScrolledCommentsRef.current = true;
+    shouldStickCommentsToBottomRef.current = true;
+  }, [
+    comments.length,
+    proofActivity.length,
+    isInitialContentReady,
+    deepLinkCommentId,
+    highlightedProjectCommentId,
+    isCommentsCollapsed,
+    scrollCommentsToBottom,
+  ]);
+
+  React.useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return;
+    if (!isInitialContentReady) return;
+    if (isCommentsCollapsed) return;
+    if (deepLinkCommentId) return;
+    if (highlightedProjectCommentId) return;
+    if (!hasAutoScrolledCommentsRef.current) return;
+
+    const listElement = commentsListRef.current;
+    if (!listElement) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      if (!shouldStickCommentsToBottomRef.current) return;
+      scrollCommentsToBottom('auto');
+    });
+
+    resizeObserver.observe(listElement);
+    return () => resizeObserver.disconnect();
+  }, [
+    comments.length,
+    proofActivity.length,
+    isInitialContentReady,
+    deepLinkCommentId,
+    highlightedProjectCommentId,
+    isCommentsCollapsed,
+    scrollCommentsToBottom,
+  ]);
+
+  React.useEffect(() => {
+    if (!isInitialContentReady) return;
+    if (isCommentsCollapsed) return;
+    if (deepLinkCommentId) return;
+    if (highlightedProjectCommentId) return;
+    if (!hasAutoScrolledCommentsRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      if (shouldStickCommentsToBottomRef.current) {
+        scrollCommentsToBottom('auto');
+      }
+    }, 120);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    comments.length,
+    proofActivity.length,
+    isInitialContentReady,
+    deepLinkCommentId,
+    highlightedProjectCommentId,
+    isCommentsCollapsed,
+    scrollCommentsToBottom,
+  ]);
 
   React.useEffect(() => {
     if (!highlightedProjectCommentId && !highlightedTaskCommentId) {
@@ -1023,7 +1341,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } = formData;
 
     const assignedTo = taskPayload.assigned_to || null;
-    const memberAdded = await ensureProjectMember(assignedTo);
+    await ensureProjectMember(assignedTo);
 
     if (editingTask) {
       await updateTask(project.id, editingTask.id, taskPayload);
@@ -1039,9 +1357,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       } catch (error) {
         console.error('Error updating blocked task department:', error);
       }
-    }
-    if (memberAdded) {
-      onProjectUpdate?.();
     }
     setIsTaskFormOpen(false);
     setEditingTask(null);
@@ -1064,7 +1379,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       if (selectedTask?.id === updatedTask.id) {
         setSelectedTask((prev) => (prev ? { ...prev, ...updatedTask } : updatedTask));
       }
-      onProjectUpdate?.();
     } catch (error) {
       console.error('Error toggling task completion:', error);
       const errorMsg = error instanceof Error ? error.message : 'Failed to update task';
@@ -1082,8 +1396,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       await ensureProjectMember(updates.assigned_to);
     }
     await updateTask(project.id, taskId, updates);
-    onProjectUpdate?.();
-  }, [project?.id, updateTask, onProjectUpdate, project, ensureProjectMember]);
+  }, [project?.id, updateTask, ensureProjectMember]);
 
   // Handler for deleting a task from the list
   const handleDeleteTaskFromList = useCallback(async (taskId: string) => {
@@ -1195,7 +1508,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     ).then(res => res.json());
 
     setSelectedTask(updatedTask);
-    onProjectUpdate?.();
 
     return newComment;
   };
@@ -1270,38 +1582,78 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       // If there are attachments, upload them directly to storage
       if (pendingAttachments.length > 0) {
         const supabase = createClient();
-        const fileMetadata = [];
+        const MAX_FILE_SIZE = 50 * 1024 * 1024;
+        setProjectCommentUploadProgress({
+          active: true,
+          completed: 0,
+          total: pendingAttachments.length,
+        });
 
-        for (const file of pendingAttachments) {
-          // Validate file size (50MB)
-          const MAX_FILE_SIZE = 50 * 1024 * 1024;
-          if (file.size > MAX_FILE_SIZE) {
-            throw new Error(`File "${file.name}" exceeds 50MB limit`);
+        const uploadResults = await Promise.allSettled(
+          pendingAttachments.map(async (file) => {
+            if (file.size > MAX_FILE_SIZE) {
+              throw new Error(`File "${file.name}" exceeds 50MB limit`);
+            }
+
+            const timestamp = Date.now();
+            const sanitizedName = sanitizeFileName(file.name);
+            const filePath = `comment-attachments/${project.id}/${comment.id}/${timestamp}-${sanitizedName}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from('brand-assets')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false,
+              });
+
+            if (uploadError) {
+              throw new Error(
+                `Failed to upload "${file.name}": ${uploadError.message}`
+              );
+            }
+
+            setProjectCommentUploadProgress((prev) => ({
+              ...prev,
+              completed: Math.min(prev.total, prev.completed + 1),
+            }));
+
+            return {
+              file_path: filePath,
+              file_name: file.name,
+              file_size: file.size,
+              mime_type: file.type,
+            };
+          })
+        );
+
+        const fileMetadata = uploadResults
+          .filter(
+            (
+              result
+            ): result is PromiseFulfilledResult<{
+              file_path: string;
+              file_name: string;
+              file_size: number;
+              mime_type: string;
+            }> => result.status === 'fulfilled'
+          )
+          .map((result) => result.value);
+
+        const firstFailedUpload = uploadResults.find(
+          (result) => result.status === 'rejected'
+        );
+
+        if (firstFailedUpload) {
+          if (fileMetadata.length > 0) {
+            await supabase.storage
+              .from('brand-assets')
+              .remove(fileMetadata.map((file) => file.file_path));
           }
 
-          // Upload directly to Supabase Storage
-          const timestamp = Date.now();
-          const sanitizedName = sanitizeFileName(file.name);
-          const filePath = `comment-attachments/${project.id}/${comment.id}/${timestamp}-${sanitizedName}`;
-
-          const { error: uploadError } = await supabase.storage
-            .from('brand-assets')
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              upsert: false,
-            });
-
-          if (uploadError) {
-            console.error('Storage upload error:', uploadError);
-            throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
-          }
-
-          fileMetadata.push({
-            file_path: filePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
-          });
+          const reason = (firstFailedUpload as PromiseRejectedResult).reason;
+          throw reason instanceof Error
+            ? reason
+            : new Error('Failed to upload one or more attachments');
         }
 
         // Save metadata via API
@@ -1331,6 +1683,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setComments(prev => [...prev, comment]);
       setNewComment('');
       setPendingAttachments([]);
+      hasAutoScrolledCommentsRef.current = true;
+      shouldStickCommentsToBottomRef.current = true;
+      window.requestAnimationFrame(() => {
+        scrollCommentsToBottom('smooth');
+      });
       onProjectUpdate?.();
     } catch (error) {
       console.error('Error posting comment:', error);
@@ -1339,6 +1696,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setShowToast(true);
     } finally {
       setIsSubmittingComment(false);
+      setProjectCommentUploadProgress(EMPTY_UPLOAD_PROGRESS);
     }
   };
 
@@ -1430,6 +1788,61 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }));
     return converted;
   }, [users]);
+
+  // Merged comment feed: project comments + proof feedback activity, sorted by created_at
+  const mergedFeed = useMemo(() => {
+    const commentItems = comments.map((c) => ({ ...c, _type: 'comment' as const }));
+    const activityItems = proofActivity.map((a) => ({ ...a, _type: 'proof_feedback' as const }));
+    return [...commentItems, ...activityItems].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+  }, [comments, proofActivity]);
+
+  const hasOlderCommentsInFeed = useMemo(
+    () =>
+      !showAllCommentsInFeed &&
+      comments.length > COMMENTS_INITIAL_VISIBLE_COUNT,
+    [comments.length, showAllCommentsInFeed]
+  );
+
+  const visibleMergedFeed = useMemo(() => {
+    if (showAllCommentsInFeed) return mergedFeed;
+    if (comments.length <= COMMENTS_INITIAL_VISIBLE_COUNT) return mergedFeed;
+
+    let commentsRemaining = COMMENTS_INITIAL_VISIBLE_COUNT;
+    let startIndex = 0;
+
+    for (let index = mergedFeed.length - 1; index >= 0; index -= 1) {
+      if (mergedFeed[index]._type === 'comment') {
+        commentsRemaining -= 1;
+      }
+
+      if (commentsRemaining === 0) {
+        startIndex = index;
+        break;
+      }
+    }
+
+    return mergedFeed.slice(startIndex);
+  }, [comments.length, mergedFeed, showAllCommentsInFeed]);
+
+  React.useEffect(() => {
+    if (!deepLinkCommentId) return;
+    if (showAllCommentsInFeed) return;
+
+    const isDeepLinkedCommentVisible = visibleMergedFeed.some(
+      (item) => item._type === 'comment' && item.id === deepLinkCommentId
+    );
+
+    if (!isDeepLinkedCommentVisible) {
+      setShowAllCommentsInFeed(true);
+    }
+  }, [deepLinkCommentId, showAllCommentsInFeed, visibleMergedFeed]);
+
+  const handleOpenProofFromActivity = useCallback((proofId: string) => {
+    setActiveContentTab('proofs');
+    setProofToOpen(proofId);
+  }, []);
 
   const handleSaveProjectDescription = async () => {
     if (!project?.id) return;
@@ -1584,75 +1997,138 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       project.members?.some((m: { user_id: string }) => m.user_id === user.id)
     );
   }, [user, project]);
+  const canUploadProjectAttachments = useMemo(() => Boolean(project?.id), [project?.id]);
 
-
-  const handleProjectFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!project?.id) return;
-    const files = Array.from(e.target.files || []);
-    if (files.length === 0) return;
+  const uploadProjectFiles = useCallback(async (files: File[]) => {
+    if (!project?.id || files.length === 0) return;
 
     setUploadingProjectAttachment(true);
+    setProjectUploadProgress({
+      active: true,
+      completed: 0,
+      total: files.length,
+    });
+
     try {
       const supabase = createClient();
+      const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
-      for (const file of files) {
-        // Validate file size (50MB)
-        const MAX_FILE_SIZE = 50 * 1024 * 1024;
-        if (file.size > MAX_FILE_SIZE) {
-          throw new Error(`File "${file.name}" exceeds 50MB limit`);
+      const uploadResults = await Promise.allSettled(
+        files.map(async (file) => {
+          if (file.size > MAX_FILE_SIZE) {
+            throw new Error(`File "${file.name}" exceeds 50MB limit`);
+          }
+
+          const sanitizedName = sanitizeFileName(file.name);
+          const timestamp = Date.now();
+          const storagePath = `${project.id}/${timestamp}-${sanitizedName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('project-files')
+            .upload(storagePath, file, {
+              contentType: file.type,
+              upsert: false,
+            });
+
+          if (uploadError) {
+            throw new Error(
+              `Failed to upload "${file.name}": ${uploadError.message}`
+            );
+          }
+
+          setProjectUploadProgress((prev) => ({
+            ...prev,
+            completed: Math.min(prev.total, prev.completed + 1),
+          }));
+
+          return {
+            file_path: storagePath,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          };
+        })
+      );
+
+      const successfulUploads = uploadResults
+        .filter(
+          (
+            result
+          ): result is PromiseFulfilledResult<{
+            file_path: string;
+            file_name: string;
+            file_size: number;
+            mime_type: string;
+          }> => result.status === 'fulfilled'
+        )
+        .map((result) => result.value);
+
+      const firstFailedUpload = uploadResults.find(
+        (result) => result.status === 'rejected'
+      );
+
+      if (firstFailedUpload) {
+        if (successfulUploads.length > 0) {
+          await supabase.storage
+            .from('project-files')
+            .remove(successfulUploads.map((file) => file.file_path));
         }
 
-        // Upload directly to Supabase Storage
-        const sanitizedName = sanitizeFileName(file.name);
-        const timestamp = Date.now();
-        const storagePath = `${project.id}/${timestamp}-${sanitizedName}`;
+        const reason = (firstFailedUpload as PromiseRejectedResult).reason;
+        throw reason instanceof Error
+          ? reason
+          : new Error('Failed to upload one or more files');
+      }
 
-        const { error: uploadError } = await supabase.storage
-          .from('project-files')
-          .upload(storagePath, file, {
-            contentType: file.type,
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error('Storage upload error:', uploadError);
-          throw new Error(`Failed to upload "${file.name}": ${uploadError.message}`);
-        }
-
-        // Save metadata via API
-        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
+      const metadataResponse = await fetch(
+        `/api/admin/projects/${project.id}/attachments`,
+        {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            file_path: storagePath,
-            file_name: file.name,
-            file_size: file.size,
-            mime_type: file.type,
+            files: successfulUploads,
           }),
-        });
-
-        if (!response.ok) {
-          // Clean up uploaded file if metadata save fails
-          await supabase.storage.from('project-files').remove([storagePath]);
-
-          let errorMessage = 'Failed to save attachment metadata';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
         }
+      );
+
+      if (!metadataResponse.ok) {
+        if (successfulUploads.length > 0) {
+          await supabase.storage
+            .from('project-files')
+            .remove(successfulUploads.map((file) => file.file_path));
+        }
+
+        let errorMessage = 'Failed to save attachment metadata';
+        try {
+          const errorData = await metadataResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = metadataResponse.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
       }
 
-      // Fetch fresh attachments from server
-      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
-      if (attachmentsResponse.ok) {
-        const { attachments } = await attachmentsResponse.json();
-        setProjectAttachments(attachments);
+      const metadataPayload = await metadataResponse
+        .json()
+        .catch(() => null);
+      const createdAttachments = Array.isArray(metadataPayload?.attachments)
+        ? metadataPayload.attachments
+        : metadataPayload?.attachment
+        ? [metadataPayload.attachment]
+        : [];
+
+      if (createdAttachments.length > 0) {
+        setProjectAttachments((prev) => [...prev, ...createdAttachments]);
+      } else {
+        const attachmentsResponse = await fetch(
+          `/api/admin/projects/${project.id}/attachments`
+        );
+        if (attachmentsResponse.ok) {
+          const { attachments } = await attachmentsResponse.json();
+          setProjectAttachments(attachments);
+        }
       }
 
       setToastMessage(`${files.length} file(s) uploaded successfully.`);
@@ -1661,15 +2137,97 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       onProjectUpdate?.();
     } catch (error) {
       console.error('Error uploading attachment:', error);
-      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
+      setToastMessage(
+        error instanceof Error ? error.message : 'Failed to upload file(s).'
+      );
       setToastType('error');
       setShowToast(true);
     } finally {
       setUploadingProjectAttachment(false);
-      // Reset file input
-      e.target.value = '';
+      setProjectUploadProgress(EMPTY_UPLOAD_PROGRESS);
     }
-  }, [project?.id, onProjectUpdate, project]);
+  }, [onProjectUpdate, project?.id]);
+
+  const handleProjectFileSelect = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      await uploadProjectFiles(files);
+    }
+    e.target.value = '';
+  }, [uploadProjectFiles]);
+
+  const handleDownloadProjectAttachment = useCallback(async (attachmentId: string, fileName: string) => {
+    try {
+      const response = await fetch(`/api/admin/projects/${project?.id}/attachments/${attachmentId}/url`);
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      // fallback: open in new tab
+      window.open(`/api/admin/projects/${project?.id}/attachments/${attachmentId}/url`, '_blank');
+    }
+  }, [project?.id]);
+
+  const handleDownloadCommentAttachment = useCallback(async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to download attachment');
+      }
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch {
+      window.open(url, '_blank');
+    }
+  }, []);
+
+  const handleDeleteCommentAttachment = useCallback(
+    async (commentId: string, attachmentId: string) => {
+      if (!project?.id) return;
+      try {
+        const response = await fetch(
+          `/api/admin/projects/${project.id}/comments/${commentId}/attachments?attachmentId=${attachmentId}`,
+          { method: 'DELETE' }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to delete attachment');
+        }
+
+        setComments((prev) =>
+          prev.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  attachments: (comment.attachments || []).filter(
+                    (attachment) => attachment.id !== attachmentId
+                  ),
+                }
+              : comment
+          )
+        );
+        setToastMessage('Attachment deleted.');
+        setToastType('success');
+        setShowToast(true);
+        onProjectUpdate?.();
+      } catch (error) {
+        console.error('Error deleting comment attachment:', error);
+        setToastMessage('Failed to delete attachment.');
+        setToastType('error');
+        setShowToast(true);
+      }
+    },
+    [onProjectUpdate, project?.id]
+  );
 
   const handleDeleteProjectAttachment = useCallback((attachmentId: string) => {
     setAttachmentToDelete(attachmentId);
@@ -1732,57 +2290,14 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const handleProjectDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!project?.id) return;
     projectDragCounterRef.current = 0;
     setIsDraggingProjectFile(false);
 
     const files = Array.from(e.dataTransfer.files || []);
     if (files.length === 0) return;
 
-    setUploadingProjectAttachment(true);
-    try {
-      for (const file of files) {
-        const formData = new FormData();
-        formData.append('file', file);
-
-        const response = await fetch(`/api/admin/projects/${project.id}/attachments`, {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!response.ok) {
-          let errorMessage = 'Failed to upload attachment';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch {
-            // If response is not JSON, use status text
-            errorMessage = response.statusText || errorMessage;
-          }
-          throw new Error(errorMessage);
-        }
-      }
-
-      // Fetch fresh attachments from server
-      const attachmentsResponse = await fetch(`/api/admin/projects/${project.id}/attachments`);
-      if (attachmentsResponse.ok) {
-        const { attachments } = await attachmentsResponse.json();
-        setProjectAttachments(attachments);
-      }
-
-      setToastMessage(`${files.length} file(s) uploaded successfully.`);
-      setToastType('success');
-      setShowToast(true);
-      onProjectUpdate?.();
-    } catch (error) {
-      console.error('Error uploading attachment:', error);
-      setToastMessage(error instanceof Error ? error.message : 'Failed to upload file(s).');
-      setToastType('error');
-      setShowToast(true);
-    } finally {
-      setUploadingProjectAttachment(false);
-    }
-  }, [project?.id, onProjectUpdate, project]);
+    await uploadProjectFiles(files);
+  }, [uploadProjectFiles]);
 
   // Lightbox handlers
   const imageAttachments = useMemo(
@@ -1828,6 +2343,21 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setLightboxOpen(true);
     }
   }, []);
+
+  const projectUploadPercent =
+    projectUploadProgress.total > 0
+      ? Math.round(
+          (projectUploadProgress.completed / projectUploadProgress.total) * 100
+        )
+      : 0;
+  const projectCommentUploadPercent =
+    projectCommentUploadProgress.total > 0
+      ? Math.round(
+          (projectCommentUploadProgress.completed /
+            projectCommentUploadProgress.total) *
+            100
+        )
+      : 0;
 
   // Internal component for loading skeleton
   const ProjectDetailSkeleton = () => {
@@ -1953,8 +2483,13 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     );
   };
 
-  // Show loading skeleton while project data is being fetched (after all hooks are called)
-  if (projectLoading || !project) {
+  const isInitialContentLoading =
+    !projectLoading &&
+    Boolean(project) &&
+    (!isInitialTasksLoaded || !isInitialCommentsLoaded || !isInitialProofActivityLoaded);
+
+  // Show loading skeleton while initial page data is being fetched (after all hooks are called)
+  if (projectLoading || !project || isInitialContentLoading) {
     return <ProjectDetailSkeleton />;
   }
 
@@ -1967,6 +2502,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
           currentIndex={lightboxImageIndex}
           onClose={handleCloseLightbox}
           onNavigate={handleNavigateLightbox}
+        />
+      )}
+
+      {/* PDF Lightbox */}
+      {pdfLightboxOpen && (
+        <PDFLightbox
+          url={pdfLightboxUrl}
+          name={pdfLightboxName}
+          onClose={() => setPdfLightboxOpen(false)}
         />
       )}
 
@@ -2107,15 +2651,43 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
               </div>
             )}
 
+            {/* Content Tab Bar */}
+            <div className={styles.contentTabBar}>
+              <button
+                className={`${styles.contentTab} ${activeContentTab === 'attachments' ? styles.contentTabActive : ''}`}
+                onClick={() => setActiveContentTab('attachments')}
+              >
+                Attachments
+              </button>
+              <button
+                className={`${styles.contentTab} ${activeContentTab === 'proofs' ? styles.contentTabActive : ''}`}
+                onClick={() => setActiveContentTab('proofs')}
+              >
+                Proofs
+              </button>
+            </div>
+
+            {activeContentTab === 'proofs' && project && (
+              <ProofsTab
+                project={project}
+                user={user}
+                canEdit={true}
+                mentionUsers={mentionUsers}
+                autoOpenProofId={proofToOpen}
+                onProofModalClosed={() => setProofToOpen(null)}
+              />
+            )}
+
             {/* Project Attachments Section */}
             <div
               className={styles.projectAttachments}
+              style={{ display: activeContentTab === 'attachments' ? undefined : 'none' }}
               onDragEnter={handleProjectDragEnter}
               onDragLeave={handleProjectDragLeave}
               onDragOver={handleProjectDragOver}
               onDrop={handleProjectDrop}
             >
-              {canEditProject && (
+              {canUploadProjectAttachments && (
                 <input
                   type="file"
                   multiple
@@ -2126,7 +2698,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                 />
               )}
 
-              {(projectAttachments.length > 0 || canEditProject) && (
+              {(projectAttachments.length > 0 || canUploadProjectAttachments) && (
                 <div className={styles.attachmentsGrid}>
                   {projectAttachments.map((attachment) => {
                     const isImage = attachment.mime_type.startsWith('image/');
@@ -2144,6 +2716,16 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                               alt={attachment.file_name}
                               loading="lazy"
                             />
+                            <button
+                              className={styles.downloadImageButton}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadProjectAttachment(attachment.id, attachment.file_name);
+                              }}
+                              aria-label="Download attachment"
+                            >
+                              <Download size={14} />
+                            </button>
                             {canEditProject && (
                               <button
                                 className={styles.deleteImageButton}
@@ -2158,20 +2740,34 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                             )}
                           </div>
                         ) : (
-                          <a
-                            href={`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <div
                             className={styles.documentWrapper}
+                            style={{ cursor: attachment.mime_type === 'application/pdf' ? 'pointer' : 'default' }}
+                            onClick={() => {
+                              if (attachment.mime_type === 'application/pdf') {
+                                setPdfLightboxUrl(`/api/admin/projects/${project.id}/attachments/${attachment.id}/url`);
+                                setPdfLightboxName(attachment.file_name);
+                                setPdfLightboxOpen(true);
+                              }
+                            }}
                           >
                             <div className={styles.documentIcon}>
                               <FileText size={48} />
                             </div>
+                            <button
+                              className={styles.downloadImageButton}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDownloadProjectAttachment(attachment.id, attachment.file_name);
+                              }}
+                              aria-label="Download attachment"
+                            >
+                              <Download size={14} />
+                            </button>
                             {canEditProject && (
                               <button
                                 className={styles.deleteImageButton}
                                 onClick={(e) => {
-                                  e.preventDefault();
                                   e.stopPropagation();
                                   handleDeleteProjectAttachment(attachment.id);
                                 }}
@@ -2180,21 +2776,35 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 <X size={14} />
                               </button>
                             )}
-                          </a>
+                          </div>
                         )}
                         <span className={styles.attachmentFileName}>{attachment.file_name}</span>
                       </div>
                     );
                   })}
 
-                  {canEditProject && (
+                  {canUploadProjectAttachments && (
                     <div
                       className={`${styles.attachmentItem} ${styles.addNewBox} ${isDraggingProjectFile ? styles.addNewBoxActive : ''}`}
                       onClick={() => document.getElementById('project-file-input')?.click()}
                     >
                       <div className={styles.addNewContent}>
                         {uploadingProjectAttachment ? (
-                          <span className={styles.addNewText}>Uploading...</span>
+                          <>
+                            <span className={styles.addNewText}>
+                              Uploading {projectUploadProgress.completed}/
+                              {projectUploadProgress.total}
+                            </span>
+                            <div className={styles.uploadProgressBarCompact}>
+                              <div
+                                className={styles.uploadProgressFill}
+                                style={{ width: `${projectUploadPercent}%` }}
+                              />
+                            </div>
+                            <span className={styles.uploadProgressCompactLabel}>
+                              {projectUploadPercent}%
+                            </span>
+                          </>
                         ) : (
                           <>
                             <span className={styles.addNewPlus}>+</span>
@@ -2240,6 +2850,9 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                     isLoading={isLoading}
                     showHeader={false}
                     onAddTask={handleCreateTask}
+                    projectDueDate={project.due_date}
+                    blockedTaskHoverRef={blockedTaskHoverRef}
+                    onBlockedTaskHoverChange={setBlockedTaskHoverRef}
                   />
                 ) : (
                   taskSections.map((section, index) => (
@@ -2261,6 +2874,9 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                         onAddTask={
                           index === taskSections.length - 1 ? handleCreateTask : undefined
                         }
+                        projectDueDate={project.due_date}
+                        blockedTaskHoverRef={blockedTaskHoverRef}
+                        onBlockedTaskHoverChange={setBlockedTaskHoverRef}
                       />
                     </div>
                   ))
@@ -2284,32 +2900,103 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                 <h3 className={styles.sectionTitle}>
                   Comments <span className={styles.sectionCount}>({comments.length})</span>
                 </h3>
+
               </div>
               {!isCommentsCollapsed && (
                 <>
-                  {comments.length > 0 ? (
-                    <div className={styles.commentsList}>
-                      {comments.map(comment => {
-                        const authorName = comment.user_profile
-                          ? `${comment.user_profile.first_name || ''} ${comment.user_profile.last_name || ''}`.trim() || comment.user_profile.email
-                          : 'Unknown';
-                        const isCommentOwner = comment.user_id === user.id;
-                        const isEditing = editingCommentId === comment.id;
-                        const isEdited = Boolean(
-                          comment.updated_at &&
-                            new Date(comment.updated_at).getTime() !==
-                              new Date(comment.created_at).getTime()
-                        );
-                        return (
-                          <div
-                            key={comment.id}
-                            id={`project-comment-${comment.id}`}
-                            className={`${styles.commentItem} ${
-                              highlightedProjectCommentId === comment.id
-                                ? styles.commentHighlight
-                                : ''
-                            }`}
-                          >
+                  <div
+                    ref={commentsFeedRef}
+                    className={styles.commentsFeed}
+                  >
+                    {mergedFeed.length > 0 ? (
+                      <div ref={commentsListRef} className={styles.commentsList}>
+                        {hasOlderCommentsInFeed && (
+                          <div className={styles.loadOlderCommentsRow}>
+                            <button
+                              type="button"
+                              className={styles.loadOlderCommentsButton}
+                              onClick={() => setShowAllCommentsInFeed(true)}
+                            >
+                              <ChevronUp size={12} />
+                              <span>Load Older Comments</span>
+                            </button>
+                          </div>
+                        )}
+                        {visibleMergedFeed.map(item => {
+                          // ── Proof feedback activity (system message) ──
+                          if (item._type === 'proof_feedback') {
+                            const activity = item as typeof item & { _type: 'proof_feedback' };
+                            const authorName = activity.user_profile
+                              ? `${activity.user_profile.first_name || ''} ${activity.user_profile.last_name || ''}`.trim()
+                              : 'Someone';
+                            const proofInfo = activity.proof;
+                            const isPin = activity.x_percent !== null;
+                            return (
+                              <div key={`pfa-${activity.id}`} className={styles.proofActivityMessage}>
+                                <MiniAvatar
+                                  firstName={activity.user_profile?.first_name || undefined}
+                                  lastName={activity.user_profile?.last_name || undefined}
+                                  email=""
+                                  avatarUrl={activity.user_profile?.avatar_url || null}
+                                  size="small"
+                                  showTooltip={false}
+                                  className={styles.commentAvatarMini}
+                                />
+                                <div className={styles.proofActivityContent}>
+                                  <span className={styles.proofActivityText}>
+                                    <strong>{authorName}</strong>
+                                    {isPin ? ' pinned feedback' : ' left feedback'}{' '}
+                                    {proofInfo && (
+                                      <>on <em>v{proofInfo.version} — {proofInfo.file_name}</em></>
+                                    )}
+                                  </span>
+                                  {activity.comment && (
+                                    <span
+                                      className={styles.proofActivityComment}
+                                      dangerouslySetInnerHTML={{ __html: activity.comment }}
+                                    />
+                                  )}
+                                  <div className={styles.proofActivityFooter}>
+                                    <span className={styles.proofActivityDate}>
+                                      {formatCommentDate(activity.created_at)}
+                                    </span>
+                                    {proofInfo && (
+                                      <button
+                                        className={styles.proofActivityLink}
+                                        onClick={() => handleOpenProofFromActivity(proofInfo.id)}
+                                      >
+                                        View Proof
+                                      </button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          }
+
+                          // ── Regular comment ──
+                          const comment = item as typeof item & { _type: 'comment' };
+                          const authorName = comment.user_profile
+                            ? `${comment.user_profile.first_name || ''} ${comment.user_profile.last_name || ''}`.trim() || comment.user_profile.email
+                            : 'Unknown';
+                          const isCommentOwner = comment.user_id === user.id;
+                          const commentAuthorLabel = isCommentOwner ? 'Me' : authorName;
+                          const isEditing = editingCommentId === comment.id;
+                          const isEdited = Boolean(
+                            comment.updated_at &&
+                              new Date(comment.updated_at).getTime() !==
+                                new Date(comment.created_at).getTime()
+                          );
+                          return (
+                            <div
+                              key={comment.id}
+                              id={`project-comment-${comment.id}`}
+                              className={[
+                                styles.commentItem,
+                                isCommentOwner ? styles.commentItemMine : styles.commentItemOther,
+                                highlightedProjectCommentId === comment.id ? styles.commentHighlight : '',
+                              ].filter(Boolean).join(' ')}
+                            >
                             <div className={styles.commentMeta}>
                               <MiniAvatar
                                 firstName={comment.user_profile?.first_name || undefined}
@@ -2321,7 +3008,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 className={styles.commentAvatarMini}
                               />
                               <div className={styles.commentMetaDetails}>
-                                <span className={styles.commentAuthor}>{authorName}</span>
+                                <span className={styles.commentAuthor}>{commentAuthorLabel}</span>
                                 <span className={styles.commentDate}>
                                   {formatCommentDate(comment.created_at)}
                                   {isEdited && (
@@ -2423,6 +3110,38 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                                 alt={attachment.file_name}
                                                 className={styles.commentImage}
                                               />
+                                              <button
+                                                type="button"
+                                                className={`${styles.commentDownloadButton} ${
+                                                  isCommentOwner ? styles.commentDownloadButtonWithDelete : ''
+                                                }`}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleDownloadCommentAttachment(
+                                                    attachment.url,
+                                                    attachment.file_name
+                                                  );
+                                                }}
+                                                aria-label="Download attachment"
+                                              >
+                                                <Download size={14} />
+                                              </button>
+                                              {isCommentOwner && (
+                                                <button
+                                                  type="button"
+                                                  className={styles.commentDeleteButton}
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    void handleDeleteCommentAttachment(
+                                                      comment.id,
+                                                      attachment.id
+                                                    );
+                                                  }}
+                                                  aria-label="Delete attachment"
+                                                >
+                                                  <X size={14} />
+                                                </button>
+                                              )}
                                             </div>
                                           ))}
                                         </div>
@@ -2430,36 +3149,71 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                       {fileAttachments.length > 0 && (
                                         <div className={styles.commentAttachments}>
                                           {fileAttachments.map((attachment: { id: string; url: string; file_name: string; mime_type?: string | null }) => (
-                                            <a
-                                              key={attachment.id}
-                                              href={attachment.url}
-                                              target="_blank"
-                                              rel="noopener noreferrer"
-                                              className={styles.attachmentCard}
-                                            >
-                                              <div className={styles.attachmentIcon}>
-                                                {attachment.mime_type === 'application/pdf' ? (
-                                                  <FileText size={16} />
-                                                ) : (
-                                                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                                                    <path
-                                                      d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
-                                                      stroke="currentColor"
-                                                      strokeWidth="2"
-                                                      strokeLinecap="round"
-                                                      strokeLinejoin="round"
-                                                    />
-                                                    <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                                                  </svg>
-                                                )}
-                                              </div>
-                                              <div className={styles.attachmentInfo}>
-                                                <span className={styles.attachmentName}>{attachment.file_name}</span>
-                                                {attachment.mime_type === 'application/pdf' && (
-                                                  <span className={styles.attachmentBadge}>PDF</span>
-                                                )}
-                                              </div>
-                                            </a>
+                                            <div key={attachment.id} className={styles.commentAttachmentCardWrapper}>
+                                              <a
+                                                href={attachment.url}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className={styles.attachmentCard}
+                                              >
+                                                <div className={styles.attachmentIcon}>
+                                                  {attachment.mime_type === 'application/pdf' ? (
+                                                    <FileText size={16} />
+                                                  ) : (
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                      <path
+                                                        d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                      />
+                                                      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                  )}
+                                                </div>
+                                                <div className={styles.attachmentInfo}>
+                                                  <span className={styles.attachmentName}>{attachment.file_name}</span>
+                                                  {attachment.mime_type === 'application/pdf' && (
+                                                    <span className={styles.attachmentBadge}>PDF</span>
+                                                  )}
+                                                </div>
+                                              </a>
+                                              <button
+                                                type="button"
+                                                className={`${styles.commentDownloadButton} ${
+                                                  isCommentOwner ? styles.commentDownloadButtonWithDelete : ''
+                                                }`}
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  handleDownloadCommentAttachment(
+                                                    attachment.url,
+                                                    attachment.file_name
+                                                  );
+                                                }}
+                                                aria-label="Download attachment"
+                                              >
+                                                <Download size={14} />
+                                              </button>
+                                              {isCommentOwner && (
+                                                <button
+                                                  type="button"
+                                                  className={styles.commentDeleteButton}
+                                                  onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    void handleDeleteCommentAttachment(
+                                                      comment.id,
+                                                      attachment.id
+                                                    );
+                                                  }}
+                                                  aria-label="Delete attachment"
+                                                >
+                                                  <X size={14} />
+                                                </button>
+                                              )}
+                                            </div>
                                           ))}
                                         </div>
                                       )}
@@ -2468,13 +3222,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 })()}
                               </>
                             )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className={styles.commentsEmpty}>No comments yet.</div>
-                  )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div className={styles.commentsEmpty}>No comments yet.</div>
+                    )}
+                    <div ref={commentsBottomAnchorRef} className={styles.commentsBottomAnchor} aria-hidden="true" />
+                  </div>
 
                   <form
                     onSubmit={handleSubmitComment}
@@ -2521,6 +3277,24 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                           ))}
                         </div>
                       )}
+                      {projectCommentUploadProgress.active && (
+                        <div className={styles.uploadProgressContainer}>
+                          <div className={styles.uploadProgressLabel}>
+                            Uploading attachments{' '}
+                            {projectCommentUploadProgress.completed}/
+                            {projectCommentUploadProgress.total} (
+                            {projectCommentUploadPercent}%)
+                          </div>
+                          <div className={styles.uploadProgressBar}>
+                            <div
+                              className={styles.uploadProgressFill}
+                              style={{
+                                width: `${projectCommentUploadPercent}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <input
                       ref={commentFileInputRef}
@@ -2551,7 +3325,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                       className={styles.commentSubmit}
                       disabled={isSubmittingComment || (isRichTextEmpty(newComment) && pendingAttachments.length === 0)}
                     >
-                      {isSubmittingComment ? 'Posting...' : 'Post'}
+                      {isSubmittingComment
+                        ? projectCommentUploadProgress.active
+                          ? `Uploading ${projectCommentUploadPercent}%`
+                          : 'Posting...'
+                        : 'Post'}
                     </button>
                   </form>
                 </>
@@ -2583,6 +3361,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         editingTask={editingTask}
         users={users}
         projectId={project.id}
+        projectDueDate={project.due_date}
         parentTasks={parentTasks}
         projectMembers={project.members}
         projectAssignedTo={project.assigned_to_profile?.id}
@@ -2599,20 +3378,18 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         }}
         onUpdate={async (taskId, updates) => {
           if (!project?.id) return;
-          const completionOnly = isCompletionOnlyUpdate(updates);
-          const isCompletingTask = updates.is_completed === true;
-          const assignedTo = updates.assigned_to || null;
-          const memberAdded = await ensureProjectMember(assignedTo);
-          await updateTask(project.id, taskId, updates);
+          const hasUpdates = Object.keys(updates).length > 0;
+
+          if (hasUpdates) {
+            const assignedTo = updates.assigned_to || null;
+            await ensureProjectMember(assignedTo);
+            await updateTask(project.id, taskId, updates);
+          }
+
           // Refresh the task details to show updated data
           const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}`);
           const updatedTask = await response.json();
           setSelectedTask(updatedTask);
-          // Always refresh project when completing a task (department may have changed)
-          // or when it's not a completion-only update, or when a member was added
-          if (isCompletingTask || !completionOnly || memberAdded) {
-            onProjectUpdate?.();
-          }
         }}
         onUpdateRelatedTask={handleUpdateRelatedTask}
         onDelete={() => handleDeleteTask()}
@@ -2630,6 +3407,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         availableTasks={tasks}
         departments={departments}
         currentUserId={user.id}
+      />
+
+      {/* Duplicate Project Modal */}
+      <DuplicateProjectModal
+        isOpen={isDuplicateModalOpen}
+        onClose={() => setIsDuplicateModalOpen(false)}
+        onDuplicate={handleDuplicateProject}
+        defaultName={`${project.name} (Copy)`}
+        defaultCompanyId={project.company.id}
       />
 
       {/* Apply Template Modal */}

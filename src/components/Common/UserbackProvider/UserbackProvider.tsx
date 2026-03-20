@@ -38,6 +38,7 @@ export function UserbackProvider({ children }: UserbackProviderProps) {
       /^\/login/, // Login page
       /^\/sign-up/, // Sign up page
       /^\/auth\//, // Auth callback pages
+      /^\/tech-leads/, // Tech leads (mobile technician app)
     ];
 
     return publicRoutes.some(route => route.test(pathname));

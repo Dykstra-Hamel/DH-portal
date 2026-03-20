@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import styles from './AddOnServiceEditor.module.scss';
 import { AddOnService, AddOnServiceFormData } from '@/types/addon-service';
 import DynamicListEditor from '@/components/Campaigns/DynamicListEditor/DynamicListEditor';
+import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 
 interface AddOnServiceEditorProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export default function AddOnServiceEditor({
     treatment_frequency: 'monthly',
     addon_features: [],
     addon_faqs: [],
+    addon_terms: '',
     eligibility_mode: 'all',
     eligible_plan_ids: [],
     is_active: true,
@@ -56,6 +58,7 @@ export default function AddOnServiceEditor({
           treatment_frequency: addon.treatment_frequency,
           addon_features: addon.addon_features || [],
           addon_faqs: addon.addon_faqs || [],
+          addon_terms: addon.addon_terms || '',
           eligibility_mode: addon.eligibility_mode,
           eligible_plan_ids: addon.eligible_plan_ids || [],
           is_active: addon.is_active,
@@ -73,6 +76,7 @@ export default function AddOnServiceEditor({
           treatment_frequency: 'monthly',
           addon_features: [],
           addon_faqs: [],
+          addon_terms: '',
           eligibility_mode: 'all',
           eligible_plan_ids: [],
           is_active: true,
@@ -343,6 +347,18 @@ export default function AddOnServiceEditor({
               addButtonText="Add FAQ"
               emptyText="No FAQs added yet. Click &apos;Add FAQ&apos; to create one."
             />
+          </div>
+
+          <div className={styles.formSection}>
+            <h3>Terms and Conditions</h3>
+            <div className={styles.formGroup}>
+              <RichTextEditor
+                value={formData.addon_terms}
+                onChange={(value) => setFormData({ ...formData, addon_terms: value })}
+                placeholder="Enter terms and conditions specific to this add-on..."
+              />
+              <p className={styles.helpText}>Displayed on the quote signing page when this add-on is selected.</p>
+            </div>
           </div>
 
           <div className={styles.formSection}>

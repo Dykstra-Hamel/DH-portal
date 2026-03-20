@@ -260,11 +260,12 @@ export async function recalculateAllLineItemPrices(
       .eq('id', lineItem.id);
   }
 
-  // Recalculate quote totals
+  // Recalculate quote totals — only count selected items
   const { data: updatedLineItems } = await supabase
     .from('quote_line_items')
     .select('final_initial_price, final_recurring_price')
-    .eq('quote_id', quoteId);
+    .eq('quote_id', quoteId)
+    .eq('is_selected', true);
 
   if (updatedLineItems) {
     const totalInitialPrice = updatedLineItems.reduce((sum: number, item: any) => sum + (item.final_initial_price || 0), 0);

@@ -18,7 +18,7 @@ export default function CallInsights({
   formSubmission,
 }: CallInsightsProps) {
   // Determine if this is a form submission
-  const isFormSubmission = ticket.type === 'web_form'
+  const isFormSubmission = ticket.format === 'form' || (!ticket.format && ticket.type === 'web_form')
   const isFailed = formSubmission?.processing_status === 'failed'
 
   if (isFormSubmission) {
@@ -105,10 +105,14 @@ export default function CallInsights({
         <div className={styles.infoField}>
           <span className={styles.label}>Source</span>
           <span className={styles.value}>
-            {ticket.source === 'google_cpc' ? 'Paid Advertisement' :
-             ticket.source === 'organic' ? 'Organic' :
+            {ticket.source === 'google_ads' || ticket.source === 'google_cpc' ? 'Google Ads' :
+             ticket.source === 'google_organic' || ticket.source === 'organic' ? 'Google Organic' :
+             ticket.source === 'facebook_ads' ? 'Facebook Ads' :
              ticket.source === 'referral' ? 'Referral' :
-             'Other'}
+             ticket.source === 'direct' ? 'Direct' :
+             ticket.source === 'campaign' ? 'Campaign' :
+             ticket.source === 'widget' ? 'Widget' :
+             ticket.source ? ticket.source : 'Other'}
           </span>
         </div>
 

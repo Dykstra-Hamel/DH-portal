@@ -29,7 +29,7 @@ export const getTaskColumns = (
                 href={`/admin/monthly-services/${task.monthly_service_id}`}
                 className={styles.monthlyServiceLink}
                 title={`View Monthly Service: ${task.monthly_service.service_name}`}
-                onClick={(e) => e.stopPropagation()}
+                onClick={e => e.stopPropagation()}
               >
                 <ArrowUpRight size={14} className={styles.monthlyServiceIcon} />
               </Link>
@@ -69,7 +69,9 @@ export const getTaskColumns = (
 
         return (
           <span className={getStatusClassName(task.status)}>
-            {task.status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            {task.status
+              .replace('_', ' ')
+              .replace(/\b\w/g, l => l.toUpperCase())}
           </span>
         );
       },
@@ -145,8 +147,7 @@ export const getTaskColumns = (
               onAction?.('view', task);
             }}
           >
-            <Eye size={14} />
-            View Task
+            View
           </button>
           <button
             className={styles.actionButton}
@@ -155,8 +156,7 @@ export const getTaskColumns = (
               onAction?.('complete', task);
             }}
           >
-            <CheckCircle size={14} />
-            Complete Task
+            Complete
           </button>
         </div>
       ),

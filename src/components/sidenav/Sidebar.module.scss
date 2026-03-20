@@ -10,6 +10,9 @@
     position: fixed;
     top: 0;
     left: -336px; /* Width of primary (80px) + secondary (256px) nav */
+    &.primaryOnly {
+      left: -80px; /* Primary-only sidebar hidden off-screen until hamburger opens */
+    }
     width: auto;
     height: 100vh;
     z-index: 1100;
@@ -44,5 +47,11 @@
 @media (max-width: 600px) {
   .sidebarContainer {
     left: -320px; /* Width of primary (64px) + secondary (256px) nav for mobile */
+    &.primaryOnly {
+      left: -64px;
+    }
+    &.active {
+      left: 0;
+    }
   }
 }

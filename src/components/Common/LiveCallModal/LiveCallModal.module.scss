@@ -75,8 +75,8 @@
   height: 0;
 
   &:checked + .radioCustom {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
 
     &::after {
       display: block;
@@ -161,7 +161,7 @@
   padding: 10px 20px;
   border: none;
   border-radius: var(--border-radius);
-  background: var(--success-500);
+  background: var(--green-500);
   color: white;
   font-size: 14px;
   font-weight: 500;
@@ -172,10 +172,10 @@
   gap: 8px;
 
   &:hover {
-    background: var(--success-600);
+    background: var(--green-600);
   }
 
   &:active {
-    background: var(--success-700);
+    background: var(--green-700);
   }
 }

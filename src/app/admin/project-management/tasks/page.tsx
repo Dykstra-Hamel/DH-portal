@@ -1,16 +1,21 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
+import { useLocalStorageFilter } from '@/hooks/useLocalStorageFilter';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { CalendarView } from '@/components/TaskManagement/CalendarView/CalendarView';
 import { TaskListView } from '@/components/TaskManagement/TaskListView/TaskListView';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
+import { ViewToggle } from '@/components/Common/ViewToggle/ViewToggle';
+import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
 import { Task } from '@/types/taskManagement';
-import { ProjectTask, Project, User } from '@/types/project';
+import { ProjectTask, Project, User, statusOptions as projectStatusOptions } from '@/types/project';
 import { createClient } from '@/lib/supabase/client';
+import { LayoutList, CalendarDays, Archive, Search } from 'lucide-react';
 import styles from '@/app/project-management/projectManagement.module.scss';
 
 type ViewType = 'list' | 'calendar' | 'archive';
@@ -37,19 +42,44 @@ interface MentionListItem {
   projectShortcode: string | null;
   taskId: string | null;
   taskTitle: string | null;
+  proofId: string | null;
   monthlyServiceId: string | null;
   monthlyServiceName: string | null;
   senderFirstName: string | null;
   senderLastName: string | null;
   senderEmail: string | null;
   senderAvatarUrl: string | null;
+  companyName: string | null;
+  companyIconUrl: string | null;
   hasAttachments: boolean;
 }
 
 const MENTIONS_PAGE_SIZE = 5;
+const PROJECTS_CARD_EXPANDED_COOKIE = 'admin_tasks_projects_expanded';
+
+const getBooleanCookie = (name: string, fallback = false): boolean => {
+  if (typeof document === 'undefined') return fallback;
+  const cookieEntry = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`));
+
+  if (!cookieEntry) return fallback;
+
+  const value = decodeURIComponent(cookieEntry.slice(name.length + 1));
+  return value === '1' || value === 'true';
+};
+
+const setBooleanCookie = (name: string, value: boolean, days = 365) => {
+  if (typeof document === 'undefined') return;
+  const expires = new Date(
+    Date.now() + days * 24 * 60 * 60 * 1000
+  ).toUTCString();
+  document.cookie = `${name}=${encodeURIComponent(value ? '1' : '0')}; expires=${expires}; path=/; SameSite=Lax`;
+};
 
 export default function AdminTasksPage() {
-  const { registerPageAction } = usePageActions();
+  const { registerPageAction, setPageHeader } = usePageActions();
+  const { markAsRead } = useNotificationContext();
   const { user } = useUser();
   const { isStarred, toggleStar, refetch: refetchStarredItems } = useStarredItems();
   const [currentView, setCurrentView] = useState<ViewType>(() => {
@@ -73,7 +103,28 @@ export default function AdminTasksPage() {
   const [mentions, setMentions] = useState<MentionListItem[]>([]);
   const [mentionsHasMore, setMentionsHasMore] = useState(false);
   const [mentionsLoading, setMentionsLoading] = useState(false);
+  const [showAllMentions, setShowAllMentions] = useState(false);
+  const [hasAnyMentions, setHasAnyMentions] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [projectsCardExpandPreference, setProjectsCardExpandPreference] =
+    useState(false);
+  const [projectsCardPreferenceLoaded, setProjectsCardPreferenceLoaded] =
+    useState(false);
+
+  // Filter state (lifted from TaskListView, persisted to localStorage)
+  const [statusFilter, setStatusFilter] = useLocalStorageFilter('tasks.statusFilter', 'all');
+  const [companyFilter, setCompanyFilter] = useLocalStorageFilter('tasks.companyFilter', 'all');
+  const [dueDateFilter, setDueDateFilter] = useLocalStorageFilter('tasks.dueDateFilter', 'all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-focus search input when it opens
+  useEffect(() => {
+    if (isSearchOpen) {
+      searchInputRef.current?.focus();
+    }
+  }, [isSearchOpen]);
 
   // Helper function to get authentication headers
   const getAuthHeaders = async () => {
@@ -94,6 +145,7 @@ export default function AdminTasksPage() {
     priority: (projectTask.priority as Task['priority']) || 'medium',
     project_id: projectTask.project_id || undefined,
     assigned_to: projectTask.assigned_to || undefined,
+    created_by: projectTask.created_by,
     due_date: projectTask.due_date || '',
     recurring_frequency: (projectTask.recurring_frequency as Task['recurring_frequency']) || undefined,
     recurring_end_date: projectTask.recurring_end_date || undefined,
@@ -106,15 +158,30 @@ export default function AdminTasksPage() {
     monthly_service_id: projectTask.monthly_service_id || null,
   }), [isStarred]);
 
+  const convertedTasks = useMemo(
+    () => tasks.map(convertToTask),
+    [tasks, convertToTask]
+  );
+
   // Filter tasks - always show only tasks assigned to current user
   const filteredTasks = useMemo(() => {
-    const convertedTasks = tasks.map(convertToTask);
     // Always filter to current user's tasks (removed toggle)
     if (user?.id) {
       return convertedTasks.filter(task => task.assigned_to === user.id);
     }
     return convertedTasks;
-  }, [tasks, user?.id, convertToTask]);
+  }, [convertedTasks, user?.id]);
+
+  const assignedOutTasks = useMemo(() => {
+    if (!user?.id) return [];
+
+    return convertedTasks.filter(
+      (task) =>
+        task.created_by === user.id &&
+        !!task.assigned_to &&
+        task.assigned_to !== user.id
+    );
+  }, [convertedTasks, user?.id]);
 
   const monthlyServiceMetaByTaskId = useMemo<Record<string, MonthlyServiceTaskMeta>>(() => {
     const meta: Record<string, MonthlyServiceTaskMeta> = {};
@@ -137,6 +204,23 @@ export default function AdminTasksPage() {
 
     return meta;
   }, [tasks]);
+
+  const companyOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    projects.forEach(project => {
+      if (project.company?.id && project.company?.name) {
+        map.set(project.company.id, project.company.name);
+      }
+    });
+    Object.values(monthlyServiceMetaByTaskId).forEach(meta => {
+      if (meta.companyId && meta.companyName) {
+        map.set(meta.companyId, meta.companyName);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [projects, monthlyServiceMetaByTaskId]);
 
   // Calculate task stats by project for progress bars
   const taskStatsByProject = useMemo(() => {
@@ -170,6 +254,95 @@ export default function AdminTasksPage() {
       setShowTaskModal(true);
     });
   }, [registerPageAction]);
+
+  // Set page header with view toggle and filters
+  useEffect(() => {
+    setPageHeader({
+      title: 'My Tasks',
+      description: 'Your assigned tasks across all projects',
+      customActions: (
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+          <div className={`${styles.searchToggleWrapper} ${isSearchOpen ? styles.searchToggleWrapperOpen : ''}`}>
+            <button
+              className={styles.searchIconButton}
+              type="button"
+              aria-label="Search tasks"
+              onClick={() => setIsSearchOpen(true)}
+            >
+              <Search size={16} />
+            </button>
+            <div className={`${styles.searchExpandable} ${isSearchOpen ? styles.searchExpandableOpen : ''}`}>
+              <input
+                ref={searchInputRef}
+                type="text"
+                placeholder="Search tasks..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className={styles.searchExpandableInput}
+                onBlur={() => { if (!searchQuery) setIsSearchOpen(false); }}
+                onKeyDown={e => { if (e.key === 'Escape') { setIsSearchOpen(false); setSearchQuery(''); } }}
+              />
+            </div>
+          </div>
+          <ViewToggle
+            value={currentView}
+            onChange={(v) => setCurrentView(v as ViewType)}
+            options={[
+              { value: 'list', icon: <LayoutList size={16} />, label: 'List' },
+              { value: 'calendar', icon: <CalendarDays size={16} />, label: 'Calendar' },
+              { value: 'archive', icon: <Archive size={16} />, label: 'Archive' },
+            ]}
+          />
+          <FilterPanel
+            onClearAll={() => {
+              setStatusFilter('all');
+              setCompanyFilter('all');
+              setDueDateFilter('all');
+            }}
+            filters={[
+              {
+                key: 'company',
+                label: 'Company',
+                value: companyFilter === 'all' ? null : companyFilter,
+                options: [
+                  { value: null, label: 'All Companies' },
+                  ...companyOptions.map(c => ({ value: c.id, label: c.name })),
+                ],
+                onChange: (v) => setCompanyFilter(v ?? 'all'),
+                searchable: true,
+              },
+              ...(currentView !== 'archive' ? [
+                {
+                  key: 'dueDate',
+                  label: 'Due Date',
+                  value: dueDateFilter === 'all' ? null : dueDateFilter,
+                  options: [
+                    { value: null, label: 'All Due Dates' },
+                    { value: 'today', label: 'Today' },
+                    { value: 'this_week', label: 'This Week' },
+                    { value: 'this_month', label: 'This Month' },
+                    { value: 'next_30_days', label: 'Next 30 Days' },
+                  ],
+                  onChange: (v: string | null) => setDueDateFilter(v ?? 'all'),
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  value: statusFilter === 'all' ? null : statusFilter,
+                  options: [
+                    { value: null, label: 'All Statuses' },
+                    ...projectStatusOptions.map(s => ({ value: s.value, label: s.label })),
+                  ],
+                  onChange: (v: string | null) => setStatusFilter(v ?? 'all'),
+                },
+              ] : []),
+            ]}
+          />
+        </div>
+      ),
+    });
+    return () => setPageHeader(null);
+  }, [currentView, companyFilter, dueDateFilter, statusFilter, searchQuery, isSearchOpen, companyOptions, setPageHeader]);
 
   // Fetch tasks from admin API
   const fetchTasks = useCallback(async () => {
@@ -227,15 +400,41 @@ export default function AdminTasksPage() {
     }
   }, []);
 
-  const fetchMentions = useCallback(async (options?: { reset?: boolean; offset?: number }) => {
+  const checkHasAnyMentions = useCallback(async (): Promise<boolean> => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(
+        '/api/admin/notifications/mentions?unreadOnly=false&limit=1&offset=0',
+        { headers }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        const mentionItems: MentionListItem[] = Array.isArray(data.mentions)
+          ? data.mentions
+          : [];
+        return mentionItems.length > 0;
+      }
+    } catch (error) {
+      console.error('Error checking mention availability:', error);
+    }
+    return false;
+  }, []);
+
+  const fetchMentions = useCallback(async (options?: {
+    reset?: boolean;
+    offset?: number;
+    unreadOnly?: boolean;
+  }) => {
     const reset = options?.reset ?? false;
     const offset = options?.offset ?? 0;
+    const unreadOnly = options?.unreadOnly ?? true;
 
     try {
       setMentionsLoading(true);
       const headers = await getAuthHeaders();
       const response = await fetch(
-        `/api/admin/notifications/mentions?unreadOnly=true&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
+        `/api/admin/notifications/mentions?unreadOnly=${unreadOnly}&limit=${MENTIONS_PAGE_SIZE}&offset=${offset}`,
         { headers }
       );
 
@@ -251,6 +450,14 @@ export default function AdminTasksPage() {
           ]);
         }
         setMentionsHasMore(Boolean(data.hasMore));
+        if (nextMentions.length > 0) {
+          setHasAnyMentions(true);
+        } else if (!unreadOnly) {
+          setHasAnyMentions(false);
+        } else if (reset) {
+          const hasAny = await checkHasAnyMentions();
+          setHasAnyMentions(hasAny);
+        }
       } else {
         console.error('Error fetching mentions:', await response.text());
         if (reset) {
@@ -267,7 +474,7 @@ export default function AdminTasksPage() {
     } finally {
       setMentionsLoading(false);
     }
-  }, []);
+  }, [checkHasAnyMentions]);
 
   // Open task detail sidebar
   const openTaskDetailById = useCallback(async (taskId: string, projectId?: string | null) => {
@@ -292,7 +499,12 @@ export default function AdminTasksPage() {
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      await Promise.all([fetchTasks(), fetchProjects(), fetchUsers(), fetchMentions({ reset: true, offset: 0 })]);
+      await Promise.all([
+        fetchTasks(),
+        fetchProjects(),
+        fetchUsers(),
+        fetchMentions({ reset: true, offset: 0, unreadOnly: true }),
+      ]);
       setIsLoading(false);
     };
 
@@ -411,16 +623,22 @@ export default function AdminTasksPage() {
   const handleMentionClick = useCallback(async (mention: MentionListItem) => {
     try {
       if (!mention.read) {
-        const headers = await getAuthHeaders();
-        await fetch(`/api/notifications/${mention.notificationId}/read`, {
-          method: 'POST',
-          headers,
-        });
+        // Use shared context markAsRead so bell badge updates immediately
+        await markAsRead(mention.notificationId);
 
-        // Remove the mention from the list since it's now read
-        setMentions((prev) =>
-          prev.filter((item) => item.notificationId !== mention.notificationId)
-        );
+        if (showAllMentions) {
+          setMentions((prev) =>
+            prev.map((item) =>
+              item.notificationId === mention.notificationId
+                ? { ...item, read: true }
+                : item
+            )
+          );
+        } else {
+          setMentions((prev) =>
+            prev.filter((item) => item.notificationId !== mention.notificationId)
+          );
+        }
       }
     } catch (error) {
       console.error('Error marking mention as read:', error);
@@ -430,11 +648,96 @@ export default function AdminTasksPage() {
       await openTaskDetailById(mention.taskId, mention.projectId);
     } else if (mention.referenceType === 'project_comment' && mention.projectId) {
       window.location.href = `/admin/project-management/${mention.projectId}?commentId=${mention.referenceId}`;
+    } else if (mention.referenceType === 'proof' && mention.projectId) {
+      const proofId = mention.proofId || mention.referenceId;
+      window.location.href = `/admin/project-management/${mention.projectId}?tab=proofs&proofId=${proofId}&proofFeedbackId=${mention.referenceId}`;
     } else if (mention.referenceType === 'monthly_service_comment' && mention.monthlyServiceId) {
       window.location.href = `/admin/monthly-services/${mention.monthlyServiceId}?commentId=${mention.referenceId}`;
     }
+  }, [markAsRead, openTaskDetailById, showAllMentions]);
 
-  }, [openTaskDetailById]);
+  const handleShowAllMentions = useCallback(async () => {
+    await fetchMentions({ reset: true, offset: 0, unreadOnly: false });
+    setShowAllMentions(true);
+  }, [fetchMentions]);
+
+  const handleHideReadMentions = useCallback(async () => {
+    await fetchMentions({ reset: true, offset: 0, unreadOnly: true });
+    setShowAllMentions(false);
+  }, [fetchMentions]);
+
+  const handleTaskCommentMentionsRead = useCallback(
+    (commentIds: string[]) => {
+      if (commentIds.length === 0) return;
+
+      const commentIdSet = new Set(commentIds);
+      setMentions((prev) =>
+        showAllMentions
+          ? prev.map((item) =>
+              item.referenceType === 'task_comment' &&
+              commentIdSet.has(item.referenceId)
+                ? { ...item, read: true }
+                : item
+            )
+          : prev.filter(
+              (item) =>
+                !(
+                  item.referenceType === 'task_comment' &&
+                  commentIdSet.has(item.referenceId)
+                )
+            )
+      );
+    },
+    [showAllMentions]
+  );
+
+  const loadAllPastMentions = useCallback(async (): Promise<MentionListItem[]> => {
+    try {
+      setMentionsLoading(true);
+      const headers = await getAuthHeaders();
+      const limit = 50;
+      let offset = 0;
+      let hasMore = true;
+      const allMentions: MentionListItem[] = [];
+      const seenIds = new Set<string>();
+
+      while (hasMore) {
+        const response = await fetch(
+          `/api/admin/notifications/mentions?unreadOnly=false&limit=${limit}&offset=${offset}`,
+          { headers }
+        );
+
+        if (!response.ok) {
+          console.error('Error fetching all past mentions:', await response.text());
+          break;
+        }
+
+        const data = await response.json();
+        const batch: MentionListItem[] = Array.isArray(data.mentions)
+          ? data.mentions
+          : [];
+
+        batch.forEach((mention) => {
+          if (seenIds.has(mention.notificationId)) return;
+          seenIds.add(mention.notificationId);
+          allMentions.push(mention);
+        });
+
+        hasMore = Boolean(data.hasMore) && batch.length > 0;
+        offset += batch.length;
+      }
+
+      setMentions(allMentions);
+      setMentionsHasMore(false);
+      setHasAnyMentions(allMentions.length > 0);
+      return allMentions;
+    } catch (error) {
+      console.error('Error loading all past mentions:', error);
+      return mentions;
+    } finally {
+      setMentionsLoading(false);
+    }
+  }, [mentions]);
 
   // Task detail sidebar handlers
   const handleUpdateTask = useCallback(async (taskId: string, updates: Partial<ProjectTask>) => {
@@ -499,6 +802,9 @@ export default function AdminTasksPage() {
         if (selectedTaskDetail?.id === updatedTask.id) {
           setSelectedTaskDetail(updatedTask);
         }
+        if (isCompleted && isStarred('task', taskId)) {
+          await toggleStar('task', taskId);
+        }
         await fetchTasks();
       } else {
         console.error('Error updating task completion:', await response.text());
@@ -506,7 +812,7 @@ export default function AdminTasksPage() {
     } catch (error) {
       console.error('Error updating task completion:', error);
     }
-  }, [fetchTasks, selectedTaskDetail]);
+  }, [fetchTasks, selectedTaskDetail, isStarred, toggleStar]);
 
   const handleDeleteTaskFromDetail = useCallback(async () => {
     if (!selectedTaskDetail?.id) return;
@@ -590,37 +896,20 @@ export default function AdminTasksPage() {
     }
   }, [currentView]);
 
-  const viewTabs = (
-    <div className={styles.viewTabs}>
-      <button
-        className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
-        onClick={() => setCurrentView('list')}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
-          <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        List
-      </button>
-      <button
-        className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
-        onClick={() => setCurrentView('calendar')}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
-          <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-        Calendar
-      </button>
-      <button
-        className={`${styles.viewTab} ${currentView === 'archive' ? styles.active : ''}`}
-        onClick={() => setCurrentView('archive')}
-      >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M2 5L8 2L14 5M2 5V12L8 15M2 5L8 8M14 5V12L8 15M14 5L8 8M8 8V15" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-        Archive
-      </button>
-    </div>
-  );
+  useEffect(() => {
+    setProjectsCardExpandPreference(
+      getBooleanCookie(PROJECTS_CARD_EXPANDED_COOKIE, false)
+    );
+    setProjectsCardPreferenceLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!projectsCardPreferenceLoaded) return;
+    setBooleanCookie(
+      PROJECTS_CARD_EXPANDED_COOKIE,
+      projectsCardExpandPreference
+    );
+  }, [projectsCardExpandPreference, projectsCardPreferenceLoaded]);
 
   const isProjectCompletedStatus = (status?: string | null) =>
     status === 'complete' || status === 'completed';
@@ -665,6 +954,18 @@ export default function AdminTasksPage() {
       !task.project_id &&
       !(task as TaskWithMonthlyServiceMeta).monthly_service_id
   );
+  const assignedOutPersonalTasks = assignedOutTasks.filter(
+    (task) =>
+      task.status !== 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
+  const completedAssignedOutPersonalTasks = assignedOutTasks.filter(
+    (task) =>
+      task.status === 'completed' &&
+      !task.project_id &&
+      !(task as TaskWithMonthlyServiceMeta).monthly_service_id
+  );
   const completedMonthlyServices = filteredTasks.filter(
     (task) =>
       task.status === 'completed' &&
@@ -683,11 +984,6 @@ export default function AdminTasksPage() {
         ) : (
           <div className={styles.taskPageLayout}>
             <div className={styles.taskMainContent}>
-              {currentView === 'calendar' && (
-                <div className={styles.taskViewTabsRow}>
-                  {viewTabs}
-                </div>
-              )}
               {currentView === 'list' && (
                 <TaskListView
                   tasks={projectTasks}
@@ -701,16 +997,37 @@ export default function AdminTasksPage() {
                   onToggleComplete={handleToggleTaskComplete}
                   onUpdateTask={handleInlineTaskUpdate}
                   currentUserId={user?.id}
+                  users={users}
                   groupTasksByProject
-                  viewTabsElement={viewTabs}
+                  statusFilter={statusFilter ?? undefined}
+                  companyFilter={companyFilter ?? undefined}
+                  dueDateFilter={dueDateFilter ?? undefined}
+                  searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
                   personalTasks={personalTasks}
+                  assignedPersonalTasks={assignedOutPersonalTasks}
                   monthlyServices={monthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
                   mentions={mentions}
                   hasMoreMentions={mentionsHasMore}
                   mentionsLoading={mentionsLoading}
+                  showAllMentions={showAllMentions}
+                  hasAnyMentions={hasAnyMentions}
                   onMentionClick={handleMentionClick}
-                  onLoadMoreMentions={() => fetchMentions({ reset: false, offset: mentions.length })}
+                  onLoadMoreMentions={() =>
+                    fetchMentions({
+                      reset: false,
+                      offset: mentions.length,
+                      unreadOnly: !showAllMentions,
+                    })
+                  }
+                  onLoadAllMentions={loadAllPastMentions}
+                  onShowAllMentions={handleShowAllMentions}
+                  onHideReadMentions={handleHideReadMentions}
+                  projectsCardExpandPreference={projectsCardExpandPreference}
+                  onProjectsCardExpandPreferenceChange={
+                    setProjectsCardExpandPreference
+                  }
                 />
               )}
               {currentView === 'calendar' && (
@@ -732,16 +1049,35 @@ export default function AdminTasksPage() {
                   onToggleComplete={handleToggleTaskComplete}
                   onUpdateTask={handleInlineTaskUpdate}
                   currentUserId={user?.id}
+                  users={users}
                   groupTasksByProject
-                  viewTabsElement={viewTabs}
+                  companyFilter={companyFilter ?? undefined}
+                  searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
                   personalTasks={completedPersonalTasks}
+                  assignedPersonalTasks={completedAssignedOutPersonalTasks}
                   monthlyServices={completedMonthlyServices}
                   monthlyServiceMetaByTaskId={monthlyServiceMetaByTaskId}
                   mentions={mentions}
                   hasMoreMentions={mentionsHasMore}
                   mentionsLoading={mentionsLoading}
+                  showAllMentions={showAllMentions}
+                  hasAnyMentions={hasAnyMentions}
                   onMentionClick={handleMentionClick}
-                  onLoadMoreMentions={() => fetchMentions({ reset: false, offset: mentions.length })}
+                  onLoadMoreMentions={() =>
+                    fetchMentions({
+                      reset: false,
+                      offset: mentions.length,
+                      unreadOnly: !showAllMentions,
+                    })
+                  }
+                  onLoadAllMentions={loadAllPastMentions}
+                  onShowAllMentions={handleShowAllMentions}
+                  onHideReadMentions={handleHideReadMentions}
+                  projectsCardExpandPreference={projectsCardExpandPreference}
+                  onProjectsCardExpandPreferenceChange={
+                    setProjectsCardExpandPreference
+                  }
                   archiveMode
                 />
               )}
@@ -782,6 +1118,7 @@ export default function AdminTasksPage() {
         users={users}
         mentionUsers={users}
         currentUserId={user?.id}
+        onTaskCommentMentionsRead={handleTaskCommentMentionsRead}
         onToggleStar={(taskId) => toggleStar('task', taskId)}
         isStarred={(taskId) => isStarred('task', taskId)}
       />

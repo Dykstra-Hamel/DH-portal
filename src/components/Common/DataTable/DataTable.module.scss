@@ -4,8 +4,9 @@
   border: 1px solid var(--gray-200, #e5e7eb);
   border-radius: var(--border-radius);
   padding: 3px;
-  min-width: 1240px;
+  min-width: 0;
   min-height: 400px;
+  overflow-x: auto;
 }
 
 .loading,
@@ -82,7 +83,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  min-width: 1220px;
+  min-width: 0;
 }
 
 .headerRow {
@@ -135,9 +136,9 @@
   &:hover {
     box-shadow:
       inset 0 1px 0 var(--row-top-shadow-color),
-      inset 3px 0 0 var(--action-500),
-      inset -3px 0 0 var(--action-500);
-    background: color-mix(in srgb, var(--action-500) 5%, transparent);
+      inset 3px 0 0 var(--blue-500),
+      inset -3px 0 0 var(--blue-500);
+    background: color-mix(in srgb, var(--blue-500) 5%, transparent);
   }
 
   &:last-child {
@@ -357,9 +358,8 @@
   align-items: center;
   gap: 8px;
   background: var(--gray-50);
-  color: var(--gray-900);
+  color: var(--gray-800);
   border: 1px solid var(--gray-300);
-  box-shadow: var(--shadow-50);
   border-radius: var(--border-radius);
   padding: 7px 8px 7px 12px;
   font-size: 14px;
@@ -369,7 +369,7 @@
   white-space: nowrap;
 
   &:hover {
-    background: var(--gray-200);
+    background: var(--gray-100);
   }
 }
 
@@ -383,7 +383,7 @@
 }
 
 .reviewingText {
-  color: var(--action-500);
+  color: var(--blue-500);
   font-size: 14px;
   font-weight: 500;
 }
@@ -399,6 +399,10 @@
 .bulkIcon,
 .bulkIcon path {
   stroke: var(--gray-900);
+}
+
+.questionIcon {
+  color: var(--gray-900);
 }
 
 .priorityIcon {
@@ -574,8 +578,8 @@
   flex-shrink: 0;
 
   &:hover {
-    color: var(--action-500);
-    background: var(--action-50);
+    color: var(--blue-500);
+    background: var(--blue-50);
   }
 }
 

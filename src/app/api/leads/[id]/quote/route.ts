@@ -438,6 +438,8 @@ export async function POST(
         final_initial_price: finalInitialPrice,
         final_recurring_price: finalRecurringPrice,
         display_order: index,
+        is_optional: planRequest.is_optional ?? false,
+        is_selected: true,
       };
     });
 

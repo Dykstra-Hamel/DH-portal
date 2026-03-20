@@ -7,6 +7,7 @@ import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import Image from 'next/image';
 import { Users, ChevronDown } from 'lucide-react';
+import { supportCaseFormatOptions, supportCaseSourceOptions } from '@/types/support-case';
 import styles from './AddSupportCaseModal.module.scss';
 
 interface AddSupportCaseModalProps {
@@ -41,6 +42,10 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
     departmentType: 'support',
     enabled: isOpen,
   });
+
+  // Support case taxonomy state
+  const [caseFormat, setCaseFormat] = useState<string>('');
+  const [caseSource, setCaseSource] = useState<string>('');
 
   // Support case form state
   const [formData, setFormData] = useState({
@@ -130,6 +135,8 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
     setCustomers([]);
     setSelectedAssignee('');
     setIsAssignmentDropdownOpen(false);
+    setCaseFormat('');
+    setCaseSource('');
     setFormData({
       firstName: '',
       lastName: '',
@@ -201,6 +208,8 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
           priority: formData.priority,
           assigned_to: isTeamAssignment() ? undefined : (selectedAssignee || undefined),
           status: selectedAssignee ? 'in_progress' : 'unassigned',
+          format: caseFormat || undefined,
+          source: caseSource || undefined,
         }),
       });
 
@@ -567,6 +576,33 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
           </div>
 
           {/* Support Case Fields */}
+          <div className={styles.formRow}>
+            <div className={styles.formGroup}>
+              <label>Format</label>
+              <select
+                value={caseFormat}
+                onChange={(e) => setCaseFormat(e.target.value)}
+              >
+                <option value="">Select format</option>
+                {supportCaseFormatOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.formGroup}>
+              <label>Source</label>
+              <select
+                value={caseSource}
+                onChange={(e) => setCaseSource(e.target.value)}
+              >
+                <option value="">Select source</option>
+                {supportCaseSourceOptions.map(opt => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className={styles.formRow}>
             <div className={styles.formGroup}>
               <label>Issue Type *</label>

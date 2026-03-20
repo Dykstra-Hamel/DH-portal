@@ -26,12 +26,12 @@
   }
 
   &.highlighted {
-    background: var(--action-50);
-    border: 2px solid var(--action-500);
+    background: var(--blue-50);
+    border: 2px solid var(--blue-500);
     animation: highlightPulse 3s ease-in-out;
 
     &:hover {
-      background: var(--action-100);
+      background: var(--blue-100);
     }
   }
 }
@@ -95,7 +95,7 @@
   width: 100px;
   flex-shrink: 0;
   justify-content: flex-start;
-  color: var(--action-600);
+  color: var(--blue-600);
   font-weight: 600;
   align-items: center;
   gap: 6px;
@@ -108,14 +108,14 @@
 .source {
   width: 120px;
   flex-shrink: 0;
-  color: var(--action-600);
+  color: var(--blue-600);
   font-weight: 600;
 }
 
 .ticketType {
   width: 150px;
   flex-shrink: 0;
-  color: var(--action-600);
+  color: var(--blue-600);
   font-weight: 600;
   text-transform: capitalize;
   align-items: center;
@@ -128,7 +128,7 @@
   vertical-align: middle;
 
   path {
-    stroke: var(--action-600);
+    stroke: var(--blue-600);
   }
 }
 
@@ -136,7 +136,7 @@
   display: inline;
   margin-right: 6px;
   vertical-align: middle;
-  color: var(--action-600);
+  color: var(--blue-600);
 }
 
 .qualifyButton {
@@ -165,7 +165,7 @@
 
   /* Different colors for different formats
   &::has-text('Call') {
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 
   &::has-text('Form') {

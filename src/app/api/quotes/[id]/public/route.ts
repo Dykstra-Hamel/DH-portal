@@ -46,10 +46,14 @@ export async function GET(
             plan_features,
             plan_faqs,
             plan_image_url,
-            plan_disclaimer
+            plan_disclaimer,
+            plan_name,
+            plan_terms
           ),
           addon_service:add_on_services(
-            addon_description
+            addon_description,
+            addon_name,
+            addon_terms
           ),
           bundle_plan:bundle_plans(
             bundle_features,
@@ -178,9 +182,47 @@ export async function GET(
       }
     }
 
+    // Fetch available add-ons eligible for the service plans in this quote
+    const servicePlanIds = (quote.line_items || [])
+      .filter((item: any) => item.service_plan_id && !item.addon_service_id)
+      .map((item: any) => item.service_plan_id);
+
+    let availableAddons: any[] = [];
+    if (servicePlanIds.length > 0) {
+      // Find addon IDs linked to these specific service plans
+      const { data: eligibilityRows } = await supabase
+        .from('addon_service_plan_eligibility')
+        .select('addon_id')
+        .in('service_plan_id', servicePlanIds);
+
+      const specificAddonIds = eligibilityRows?.map((r: any) => r.addon_id) || [];
+
+      // Fetch all active addons for this company that are eligible
+      let query = supabase
+        .from('add_on_services')
+        .select(
+          'id, addon_name, addon_description, initial_price, recurring_price, billing_frequency, addon_terms, addon_faqs'
+        )
+        .eq('company_id', quote.company_id)
+        .eq('is_active', true)
+        .order('display_order')
+        .order('addon_name');
+
+      if (specificAddonIds.length > 0) {
+        query = query.or(
+          `eligibility_mode.eq.all,id.in.(${specificAddonIds.join(',')})`
+        );
+      } else {
+        query = query.eq('eligibility_mode', 'all');
+      }
+
+      const { data: addons } = await query;
+      availableAddons = addons || [];
+    }
+
     return NextResponse.json({
       success: true,
-      data: quote,
+      data: { ...quote, available_addons: availableAddons },
     });
   } catch (error) {
     console.error('Error in public quote GET:', error);

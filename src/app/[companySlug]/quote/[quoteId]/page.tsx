@@ -15,6 +15,7 @@ interface Branding {
   alternative_colors: AlternativeColor[];
   logo_url: string;
   icon_logo_url: string;
+  font_color?: string | null;
   font_primary_name?: string;
   font_primary_url?: string;
   font_secondary_url?: string;

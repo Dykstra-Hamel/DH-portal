@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
+import { sendMentionSlackNotifications } from '@/lib/slack/mention-notifications';
 
 // GET /api/admin/monthly-services/[id]/comments - List all comments for a monthly service and month
 export async function GET(
@@ -157,7 +158,7 @@ export async function POST(
     // Get monthly service details for company_id and service name
     const { data: monthlyService, error: serviceError } = await supabase
       .from('monthly_services')
-      .select('id, service_name, company_id')
+      .select('id, service_name, company_id, company:companies(name)')
       .eq('id', monthlyServiceId)
       .single();
 
@@ -237,6 +238,23 @@ export async function POST(
       }
     } else {
       console.log('Skipping notifications - no mentions or no company_id');
+    }
+
+    if (mentionedUserIds.length > 0) {
+      const commentMonth = comment.comment_month || body.month;
+      const deepLinkUrl = commentMonth
+        ? `${process.env.NEXT_PUBLIC_SITE_URL}/admin/monthly-services/${monthlyServiceId}?month=${encodeURIComponent(commentMonth)}&commentId=${comment.id}`
+        : `${process.env.NEXT_PUBLIC_SITE_URL}/admin/monthly-services/${monthlyServiceId}?commentId=${comment.id}`;
+
+      sendMentionSlackNotifications({
+        mentionedUserIds,
+        commenterName,
+        contextType: 'monthly_service',
+        contextName: monthlyService.service_name,
+        clientName: (monthlyService.company as { name?: string } | null)?.name || null,
+        commentText: body.comment,
+        deepLinkUrl,
+      }).catch(() => {});
     }
 
     return NextResponse.json(comment, { status: 201 });

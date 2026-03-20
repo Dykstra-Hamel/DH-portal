@@ -17,10 +17,12 @@ import {
   Pencil,
   Trash2,
   ArrowUpRight,
+  X,
 } from 'lucide-react';
 import { Task, TaskStatus } from '@/types/taskManagement';
 import {
   Project,
+  User,
   statusOptions as projectStatusOptions,
 } from '@/types/project';
 import { PriorityBadge } from '../shared/PriorityBadge';
@@ -66,12 +68,15 @@ interface MentionItem {
   projectShortcode: string | null;
   taskId: string | null;
   taskTitle: string | null;
+  proofId: string | null;
   monthlyServiceId: string | null;
   monthlyServiceName: string | null;
   senderFirstName: string | null;
   senderLastName: string | null;
   senderEmail: string | null;
   senderAvatarUrl: string | null;
+  companyName: string | null;
+  companyIconUrl: string | null;
   hasAttachments: boolean;
 }
 
@@ -91,8 +96,14 @@ interface TaskListViewProps {
   ) => Promise<void> | void;
   groupTasksByProject?: boolean;
   currentUserId?: string;
-  viewTabsElement?: React.ReactNode;
+  users?: User[];
   personalTasks?: Task[];
+  assignedPersonalTasks?: Task[];
+  statusFilter?: string;
+  companyFilter?: string;
+  dueDateFilter?: string;
+  searchQuery?: string;
+  onSearchQueryChange?: (value: string) => void;
   monthlyServices?: Task[];
   monthlyServiceMetaByTaskId?: Record<
     string,
@@ -106,8 +117,15 @@ interface TaskListViewProps {
   mentions?: MentionItem[];
   hasMoreMentions?: boolean;
   mentionsLoading?: boolean;
+  showAllMentions?: boolean;
+  hasAnyMentions?: boolean;
   onMentionClick?: (mention: MentionItem) => void;
   onLoadMoreMentions?: () => void | Promise<void>;
+  onLoadAllMentions?: () => Promise<MentionItem[]>;
+  onShowAllMentions?: () => void | Promise<void>;
+  onHideReadMentions?: () => void | Promise<void>;
+  projectsCardExpandPreference?: boolean;
+  onProjectsCardExpandPreferenceChange?: (expanded: boolean) => void;
   archiveMode?: boolean;
 }
 
@@ -124,20 +142,34 @@ export function TaskListView({
   onUpdateTask,
   groupTasksByProject = false,
   currentUserId,
-  viewTabsElement,
+  users,
   personalTasks,
+  assignedPersonalTasks,
+  statusFilter: statusFilterProp,
+  companyFilter: companyFilterProp,
+  dueDateFilter: dueDateFilterProp,
+  searchQuery: searchQueryProp,
+  onSearchQueryChange,
   monthlyServices,
   monthlyServiceMetaByTaskId,
   mentions,
   hasMoreMentions = false,
   mentionsLoading = false,
+  showAllMentions = false,
+  hasAnyMentions = false,
   onMentionClick,
   onLoadMoreMentions,
+  onLoadAllMentions,
+  onShowAllMentions,
+  onHideReadMentions,
+  projectsCardExpandPreference,
+  onProjectsCardExpandPreferenceChange,
   archiveMode = false,
 }: TaskListViewProps) {
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>('all');
+  const statusFilter = (statusFilterProp ?? 'all') as StatusFilter;
+  const companyFilter = companyFilterProp ?? 'all';
+  const dueDateFilter = (dueDateFilterProp ?? 'all') as DueDateFilter;
+  const searchQuery = searchQueryProp ?? '';
   const [archiveDateFrom, setArchiveDateFrom] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 30);
@@ -146,7 +178,6 @@ export function TaskListView({
   const [archiveDateTo, setArchiveDateTo] = useState<string>(() => {
     return new Date().toISOString().split('T')[0];
   });
-  const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<SortField>('due_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
@@ -164,6 +195,10 @@ export function TaskListView({
   const [expandedWorkingOnProjects, setExpandedWorkingOnProjects] = useState<
     Record<string, boolean>
   >({});
+  const [
+    expandedProjectsSectionProjects,
+    setExpandedProjectsSectionProjects,
+  ] = useState<Record<string, boolean>>({});
   const [hoveredMonthlyServiceLink, setHoveredMonthlyServiceLink] = useState<
     string | null
   >(null);
@@ -171,6 +206,16 @@ export function TaskListView({
   const [visibleMentionCount, setVisibleMentionCount] = useState(
     DEFAULT_VISIBLE_MENTIONS
   );
+  const [isPastMentionsModalOpen, setIsPastMentionsModalOpen] = useState(false);
+  const [pastMentionsModalLoading, setPastMentionsModalLoading] =
+    useState(false);
+  const [pastMentionsModalItems, setPastMentionsModalItems] = useState<
+    MentionItem[]
+  >([]);
+  const [personalTasksMode, setPersonalTasksMode] = useState<
+    'personal' | 'assigned'
+  >('personal');
+  const showingAssignedTasks = personalTasksMode === 'assigned';
 
   const editInputRef = useRef<HTMLInputElement>(null);
   const datePickerRef = useRef<HTMLDivElement>(null);
@@ -284,6 +329,23 @@ export function TaskListView({
       return prev;
     });
   }, [mentions, hasMoreMentions]);
+
+  const closePastMentionsModal = useCallback(() => {
+    setIsPastMentionsModalOpen(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isPastMentionsModalOpen) return undefined;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        closePastMentionsModal();
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isPastMentionsModalOpen, closePastMentionsModal]);
 
   // Get project for a task
   const getProjectForTask = useCallback(
@@ -577,14 +639,44 @@ export function TaskListView({
     return personalTasks.filter(task => task.recurring_frequency !== 'monthly');
   }, [personalTasks]);
 
+  const sidebarAssignedPersonalTasks = useMemo(() => {
+    if (!assignedPersonalTasks) return [];
+    return assignedPersonalTasks.filter(
+      task => task.recurring_frequency !== 'monthly'
+    );
+  }, [assignedPersonalTasks]);
+
   const sidebarMonthlyServices = useMemo(() => {
     if (monthlyServices) return monthlyServices;
     if (!personalTasks) return [];
     return personalTasks.filter(task => task.recurring_frequency === 'monthly');
   }, [monthlyServices, personalTasks]);
 
+  const usersById = useMemo(() => {
+    const map = new Map<string, User>();
+
+    if (!users) return map;
+
+    users.forEach(user => {
+      map.set(user.id, user);
+      if (user.profiles?.id) {
+        map.set(user.profiles.id, user);
+      }
+    });
+
+    return map;
+  }, [users]);
+
+  const activePersonalTasksSource = useMemo(
+    () =>
+      personalTasksMode === 'assigned'
+        ? sidebarAssignedPersonalTasks
+        : sidebarPersonalTasks,
+    [personalTasksMode, sidebarAssignedPersonalTasks, sidebarPersonalTasks]
+  );
+
   const personalTasksList = useMemo(() => {
-    return sidebarPersonalTasks
+    return activePersonalTasksSource
       .filter(task => {
         const project = getProjectForTask(task.project_id);
         return matchesTaskFilters(task, project, task.due_date);
@@ -595,7 +687,7 @@ export function TaskListView({
           : getTaskDueDateSortValue(a) - getTaskDueDateSortValue(b)
       );
   }, [
-    sidebarPersonalTasks,
+    activePersonalTasksSource,
     getProjectForTask,
     matchesTaskFilters,
     getTaskDueDateSortValue,
@@ -781,6 +873,45 @@ export function TaskListView({
     getTaskCompletionSortValue,
   ]);
 
+  const projectGroupIdsWithTasks = useMemo(
+    () =>
+      groupedTasks.projectGroups
+        .filter(projectGroup => projectGroup.project?.id && projectGroup.tasks.length > 0)
+        .map(projectGroup => projectGroup.project!.id),
+    [groupedTasks.projectGroups]
+  );
+
+  const areAllProjectGroupsExpanded = useMemo(() => {
+    if (projectGroupIdsWithTasks.length === 0) return false;
+    return projectGroupIdsWithTasks.every(
+      projectId => !!expandedProjectsSectionProjects[projectId]
+    );
+  }, [projectGroupIdsWithTasks, expandedProjectsSectionProjects]);
+
+  useEffect(() => {
+    if (!groupTasksByProject) return;
+    if (typeof projectsCardExpandPreference !== 'boolean') return;
+    if (projectGroupIdsWithTasks.length === 0) return;
+
+    setExpandedProjectsSectionProjects(prev => {
+      const next = { ...prev };
+      let changed = false;
+
+      projectGroupIdsWithTasks.forEach(projectId => {
+        if (next[projectId] !== projectsCardExpandPreference) {
+          next[projectId] = projectsCardExpandPreference;
+          changed = true;
+        }
+      });
+
+      return changed ? next : prev;
+    });
+  }, [
+    groupTasksByProject,
+    projectGroupIdsWithTasks,
+    projectsCardExpandPreference,
+  ]);
+
   const getInitialCalendarMonth = (task?: Task) => {
     if (task?.due_date) {
       const parsed = parseDateString(task.due_date);
@@ -952,6 +1083,30 @@ export function TaskListView({
       [projectId]: !prev[projectId],
     }));
   }, []);
+
+  const toggleProjectsSectionProject = useCallback((projectId: string) => {
+    setExpandedProjectsSectionProjects(prev => ({
+      ...prev,
+      [projectId]: !prev[projectId],
+    }));
+  }, []);
+
+  const setAllProjectsSectionExpanded = useCallback(
+    (nextExpanded: boolean) => {
+      if (projectGroupIdsWithTasks.length === 0) return;
+
+      setExpandedProjectsSectionProjects(prev => {
+        const next = { ...prev };
+        projectGroupIdsWithTasks.forEach(projectId => {
+          next[projectId] = nextExpanded;
+        });
+        return next;
+      });
+
+      onProjectsCardExpandPreferenceChange?.(nextExpanded);
+    },
+    [projectGroupIdsWithTasks, onProjectsCardExpandPreferenceChange]
+  );
 
   // Project-level handlers
   const handleProjectCalendarClick = (
@@ -1556,11 +1711,46 @@ export function TaskListView({
       return parsed ? parsed.getTime() : Number.POSITIVE_INFINITY;
     };
 
+    const cwoProjectIdsWithTasks = starredProjectGroups
+      .filter(g => g.project?.id && g.tasks.length > 0)
+      .map(g => g.project!.id);
+
+    const areAllCWOExpanded =
+      cwoProjectIdsWithTasks.length === 0
+        ? false
+        : cwoProjectIdsWithTasks.every(id => expandedWorkingOnProjects[id] !== false);
+
+    const setAllCWOExpanded = (nextExpanded: boolean) => {
+      setExpandedWorkingOnProjects(prev => {
+        const next = { ...prev };
+        cwoProjectIdsWithTasks.forEach(id => { next[id] = nextExpanded; });
+        return next;
+      });
+    };
+
     return (
       <InfoCard
         title="Currently Working On"
         isCollapsible={true}
         startExpanded={true}
+        headerRight={
+          cwoProjectIdsWithTasks.length > 0 ? (
+            <div className={styles.projectsCardHeaderToggleRow}>
+              <label className={styles.projectsCardToggle}>
+                <input
+                  type="checkbox"
+                  checked={areAllCWOExpanded}
+                  onChange={event => setAllCWOExpanded(event.target.checked)}
+                  aria-label="Expand all working-on projects"
+                />
+                <span className={styles.projectsCardToggleSlider}></span>
+              </label>
+              <span className={styles.projectsCardToggleText}>
+                {areAllCWOExpanded ? 'Collapse' : 'Expand'}
+              </span>
+            </div>
+          ) : undefined
+        }
       >
         <div className={styles.starredProjectsList}>
           {starredProjectGroups.length > 0 && (
@@ -1570,8 +1760,8 @@ export function TaskListView({
                 const projectId = projectGroup.project?.id;
                 const hasTasks = projectGroup.tasks.length > 0;
                 const isExpanded = projectId
-                  ? !!expandedWorkingOnProjects[projectId]
-                  : false;
+                  ? expandedWorkingOnProjects[projectId] !== false
+                  : true;
                 const projectName = projectGroup.project?.name || 'No Project';
                 const projectCode = projectGroup.project?.shortcode
                   ? formatProjectShortcode(projectGroup.project.shortcode)
@@ -1591,12 +1781,9 @@ export function TaskListView({
                   datePickerProjectId === projectGroup.project?.id;
 
                 return (
-                  <div
-                    key={projectGroup.project?.id || 'no-project'}
-                    className={styles.projectGroup}
-                  >
+                  <React.Fragment key={projectGroup.project?.id || 'no-project'}>
                     <div
-                      className={styles.projectGroupHeader}
+                      className={`${styles.projectGroupHeader}${isExpanded && hasTasks ? ` ${styles.projectGroupHeaderExpanded}` : ''}`}
                       onClick={() =>
                         projectGroup.project &&
                         onProjectClick &&
@@ -1630,58 +1817,17 @@ export function TaskListView({
                           />
                         </div>
                       )}
-                      <span className={styles.projectGroupTitle}>
-                        {projectName}
-                      </span>
-                      {projectId && hasTasks && (
-                        <button
-                          type="button"
-                          className={styles.cwoExpandToggle}
-                          onClick={event => {
-                            event.stopPropagation();
-                            toggleWorkingOnProject(projectId);
-                          }}
-                          aria-expanded={isExpanded}
-                          aria-label={
-                            isExpanded
-                              ? `Collapse tasks for ${projectName}`
-                              : `Expand tasks for ${projectName}`
-                          }
-                        >
-                          <ChevronRight
-                            size={14}
-                            className={`${styles.cwoExpandIcon} ${isExpanded ? styles.cwoExpandIconExpanded : ''}`}
-                          />
-                        </button>
-                      )}
-                      {projectCode && (
-                        <span className={styles.projectGroupCode}>
-                          {projectCode}
+                      <div className={styles.projectGroupTitleStack}>
+                        <span className={styles.projectGroupTitle}>
+                          {projectName}
                         </span>
-                      )}
-                      <div className={styles.projectMetaActions}>
-                        {projectDueDate && (
-                          <span
-                            className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}
-                          >
-                            <ClockIcon />
-                            <span>{formatDate(projectDueDate)}</span>
+                        {projectCode && (
+                          <span className={styles.projectGroupCode}>
+                            {projectCode}
                           </span>
                         )}
-                        {projectGroup.project && onToggleStarProject && (
-                          <div className={styles.projectStarAction}>
-                            <StarButton
-                              isStarred={
-                                projectGroup.project.is_starred || false
-                              }
-                              onToggle={() =>
-                                onToggleStarProject(projectGroup.project!.id)
-                              }
-                              size="small"
-                            />
-                          </div>
-                        )}
-
+                      </div>
+                      <div className={styles.projectHeaderRight}>
                         {projectGroup.project && (
                           <div
                             className={styles.projectHoverActions}
@@ -1718,6 +1864,53 @@ export function TaskListView({
                             </button>
                           </div>
                         )}
+                        {projectDueDate && (
+                          <span
+                            className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}
+                          >
+                            <ClockIcon />
+                            <span>{formatDate(projectDueDate)}</span>
+                          </span>
+                        )}
+                        {projectGroup.project?.status && (() => {
+                          const statusOption = projectStatusOptions.find(s => s.value === projectGroup.project!.status);
+                          return statusOption ? (
+                            <span className={styles.projectGroupCode} style={{ color: statusOption.color }}>
+                              {statusOption.label}
+                            </span>
+                          ) : null;
+                        })()}
+                        {projectGroup.project && onToggleStarProject && (
+                          <div className={styles.projectStarAction}>
+                            <StarButton
+                              isStarred={
+                                projectGroup.project.is_starred || false
+                              }
+                              onToggle={() =>
+                                onToggleStarProject(projectGroup.project!.id)
+                              }
+                              size="small"
+                            />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          className={styles.cwoExpandToggle}
+                          onClick={hasTasks ? event => {
+                            event.stopPropagation();
+                            toggleWorkingOnProject(projectId);
+                          } : undefined}
+                          aria-expanded={hasTasks ? isExpanded : undefined}
+                          aria-label={hasTasks ? (isExpanded
+                            ? `Collapse tasks for ${projectName}`
+                            : `Expand tasks for ${projectName}`) : undefined}
+                          style={{ visibility: hasTasks ? undefined : 'hidden' }}
+                        >
+                          <ChevronRight
+                            size={14}
+                            className={`${styles.cwoExpandIcon} ${isExpanded ? styles.cwoExpandIconExpanded : ''}`}
+                          />
+                        </button>
                       </div>
 
                       {showProjectDatePicker && projectGroup.project && (
@@ -1824,7 +2017,7 @@ export function TaskListView({
                           .map(task => renderGroupedTaskRow(task))}
                       </ul>
                     )}
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -1890,8 +2083,75 @@ export function TaskListView({
         : mention.projectName || 'Project';
     }
 
+    if (mention.referenceType === 'proof') {
+      const projectLabel = mention.projectShortcode
+        ? formatProjectShortcode(mention.projectShortcode)
+        : mention.projectName || 'Project';
+      return `${projectLabel} • Proof`;
+    }
+
     return mention.title || 'Mention';
   };
+
+  const openPastMentionsModal = useCallback(async () => {
+    setIsPastMentionsModalOpen(true);
+    setPastMentionsModalLoading(true);
+
+    try {
+      if (onLoadAllMentions) {
+        const allMentions = await onLoadAllMentions();
+        setPastMentionsModalItems(allMentions);
+      } else {
+        setPastMentionsModalItems(mentions || []);
+      }
+    } catch (error) {
+      console.error('Error loading past mentions for modal:', error);
+      setPastMentionsModalItems(mentions || []);
+    } finally {
+      setPastMentionsModalLoading(false);
+    }
+  }, [mentions, onLoadAllMentions]);
+
+  const renderMentionRow = (mention: MentionItem, keyPrefix = '') => (
+    <li
+      key={`${keyPrefix}${mention.notificationId}`}
+      className={styles.mentionRow}
+      onClick={() => onMentionClick?.(mention)}
+    >
+      <div className={styles.mentionAvatar}>
+        <MiniAvatar
+          firstName={mention.senderFirstName || undefined}
+          lastName={mention.senderLastName || undefined}
+          email={mention.senderEmail || 'unknown@example.com'}
+          avatarUrl={mention.senderAvatarUrl}
+          size="small"
+          showTooltip={true}
+        />
+      </div>
+      <div className={styles.mentionContent}>
+        <p className={styles.mentionComment}>{mention.commentText}</p>
+        <div className={styles.mentionMetaRow}>
+          <span className={styles.mentionContext}>
+            {(mention.companyName || mention.companyIconUrl) && (
+              <span className={styles.mentionCompanyLogo}>
+                <CompanyIcon
+                  companyName={mention.companyName || 'Company'}
+                  iconUrl={mention.companyIconUrl}
+                  size="small"
+                  showTooltip={true}
+                />
+              </span>
+            )}
+            {mention.hasAttachments && (
+              <Paperclip size={12} className={styles.mentionAttachmentIcon} />
+            )}
+            <span>{getMentionContextLabel(mention)}</span>
+          </span>
+          <span className={styles.mentionDate}>{formatDate(mention.createdAt)}</span>
+        </div>
+      </div>
+    </li>
+  );
 
   const renderMentionsCard = () => {
     if (!showMentionsCard) return null;
@@ -1901,6 +2161,17 @@ export function TaskListView({
     const showLoadMore =
       visibleMentionCount < mentionItems.length || hasMoreMentions;
     const showLoadLess = visibleMentionCount > DEFAULT_VISIBLE_MENTIONS;
+    const mentionFilterToggleHandler = showAllMentions
+      ? onHideReadMentions
+      : onShowAllMentions;
+    const showMentionFilterToggle =
+      !!mentionFilterToggleHandler && (showAllMentions || hasAnyMentions);
+    const mentionFilterToggleLabel = showAllMentions
+      ? 'Hide read mentions'
+      : 'View Past Mentions';
+    const emptyMentionText =
+      !showAllMentions && hasAnyMentions ? 'No New Mentions' : 'No mentions';
+    const showMentionsLoadingState = mentionsLoading && mentionItems.length === 0;
 
     const handleLoadMoreMentions = async () => {
       const nextVisibleCount = visibleMentionCount + DEFAULT_VISIBLE_MENTIONS;
@@ -1916,50 +2187,42 @@ export function TaskListView({
       setVisibleMentionCount(nextVisibleCount);
     };
 
+    const handleMentionsLoadMoreClick = async () => {
+      if (showAllMentions) {
+        await openPastMentionsModal();
+        return;
+      }
+
+      await handleLoadMoreMentions();
+    };
+
     return (
       <InfoCard title="Mentions" isCollapsible={true} startExpanded={true}>
-        {mentionItems.length === 0 ? (
-          <p className={styles.emptyPersonalTasks}>No mentions</p>
+        {showMentionsLoadingState ? (
+          <div className={styles.mentionsLoadingState}>
+            <span className={styles.mentionsLoadingSpinner} aria-hidden="true" />
+            <p className={styles.emptyPersonalTasks}>Loading mentions...</p>
+          </div>
+        ) : mentionItems.length === 0 ? (
+          <>
+            <p className={styles.emptyPersonalTasks}>{emptyMentionText}</p>
+            {showMentionFilterToggle && (
+              <div className={styles.mentionsFilterAction}>
+                <button
+                  type="button"
+                  className={styles.mentionsLoadMore}
+                  onClick={() => void mentionFilterToggleHandler()}
+                  disabled={mentionsLoading}
+                >
+                  {mentionsLoading ? 'Loading...' : mentionFilterToggleLabel}
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <>
             <ul className={styles.mentionsList}>
-              {visibleMentions.map(mention => (
-                <li
-                  key={mention.notificationId}
-                  className={styles.mentionRow}
-                  onClick={() => onMentionClick?.(mention)}
-                >
-                  <div className={styles.mentionAvatar}>
-                    <MiniAvatar
-                      firstName={mention.senderFirstName || undefined}
-                      lastName={mention.senderLastName || undefined}
-                      email={mention.senderEmail || 'unknown@example.com'}
-                      avatarUrl={mention.senderAvatarUrl}
-                      size="small"
-                      showTooltip={true}
-                    />
-                  </div>
-                  <div className={styles.mentionContent}>
-                    <p className={styles.mentionComment}>
-                      {mention.commentText}
-                    </p>
-                    <div className={styles.mentionMetaRow}>
-                      <span className={styles.mentionContext}>
-                        {mention.hasAttachments && (
-                          <Paperclip
-                            size={12}
-                            className={styles.mentionAttachmentIcon}
-                          />
-                        )}
-                        <span>{getMentionContextLabel(mention)}</span>
-                      </span>
-                      <span className={styles.mentionDate}>
-                        {formatDate(mention.createdAt)}
-                      </span>
-                    </div>
-                  </div>
-                </li>
-              ))}
+              {visibleMentions.map(mention => renderMentionRow(mention))}
             </ul>
             {(showLoadMore || showLoadLess) && (
               <div className={styles.mentionsActions}>
@@ -1967,8 +2230,8 @@ export function TaskListView({
                   <button
                     type="button"
                     className={styles.mentionsLoadMore}
-                    onClick={handleLoadMoreMentions}
-                    disabled={mentionsLoading}
+                    onClick={() => void handleMentionsLoadMoreClick()}
+                    disabled={mentionsLoading || pastMentionsModalLoading}
                   >
                     {mentionsLoading ? 'Loading...' : 'Load more'}
                   </button>
@@ -1986,6 +2249,18 @@ export function TaskListView({
                 )}
               </div>
             )}
+            {showMentionFilterToggle && (
+              <div className={styles.mentionsFilterAction}>
+                <button
+                  type="button"
+                  className={styles.mentionsLoadMore}
+                  onClick={() => void mentionFilterToggleHandler()}
+                  disabled={mentionsLoading}
+                >
+                  {mentionsLoading ? 'Loading...' : mentionFilterToggleLabel}
+                </button>
+              </div>
+            )}
           </>
         )}
       </InfoCard>
@@ -1994,8 +2269,15 @@ export function TaskListView({
 
   const renderPersonalTaskRow = (task: Task) => {
     const overdue = isOverdue(task.due_date, task.status);
-    const isEditing = editingTaskId === task.id;
-    const showDatePicker = datePickerTaskId === task.id;
+    const isEditing = !showingAssignedTasks && editingTaskId === task.id;
+    const showDatePicker = !showingAssignedTasks && datePickerTaskId === task.id;
+    const assignee = task.assigned_to ? usersById.get(task.assigned_to) : null;
+    const assigneeProfile = assignee?.profiles;
+    const assigneeEmail =
+      assigneeProfile?.email ||
+      assignee?.email ||
+      task.assigned_to ||
+      'unknown';
 
     return (
       <li
@@ -2003,26 +2285,39 @@ export function TaskListView({
         className={`${styles.personalTaskRow} ${styles.projectTaskItem} ${task.status === 'completed' ? styles.taskCompleted : ''}`}
         onClick={() => onTaskClick(task)}
       >
-        <button
-          type="button"
-          className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
-          onClick={event => handleToggleComplete(event, task)}
-          aria-label={
-            task.status === 'completed'
-              ? 'Mark task incomplete'
-              : 'Mark task complete'
-          }
-          disabled={
-            !onToggleComplete ||
-            !!(task.blocked_by_task && !task.blocked_by_task.is_completed)
-          }
-        >
-          {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
-            <Lock size={12} />
-          ) : task.status === 'completed' ? (
-            <Check size={12} />
-          ) : null}
-        </button>
+        {showingAssignedTasks ? (
+          <div className={styles.assigneeInfo}>
+            <MiniAvatar
+              firstName={assigneeProfile?.first_name}
+              lastName={assigneeProfile?.last_name}
+              email={assigneeEmail}
+              userId={task.assigned_to || assignee?.id}
+              avatarUrl={assigneeProfile?.avatar_url}
+              size="small"
+            />
+          </div>
+        ) : (
+          <button
+            type="button"
+            className={`${styles.projectTaskToggle} ${task.status === 'completed' ? styles.projectTaskToggleDone : ''} ${task.blocked_by_task && !task.blocked_by_task.is_completed ? styles.projectTaskToggleBlocked : ''}`}
+            onClick={event => handleToggleComplete(event, task)}
+            aria-label={
+              task.status === 'completed'
+                ? 'Mark task incomplete'
+                : 'Mark task complete'
+            }
+            disabled={
+              !onToggleComplete ||
+              !!(task.blocked_by_task && !task.blocked_by_task.is_completed)
+            }
+          >
+            {task.blocked_by_task && !task.blocked_by_task.is_completed ? (
+              <Lock size={12} />
+            ) : task.status === 'completed' ? (
+              <Check size={12} />
+            ) : null}
+          </button>
+        )}
         <div
           className={`${styles.taskTitleRow} ${styles.personalTaskTitleRow}`}
         >
@@ -2047,7 +2342,7 @@ export function TaskListView({
               <ClockIcon />
               <span>{formatDate(task.due_date)}</span>
             </span>
-            {onToggleStar && (
+            {!showingAssignedTasks && onToggleStar && (
               <div className={styles.taskStarAction}>
                 <StarButton
                   isStarred={task.is_starred || false}
@@ -2057,7 +2352,7 @@ export function TaskListView({
               </div>
             )}
 
-            {!isEditing && (
+            {!showingAssignedTasks && !isEditing && (
               <div className={styles.hoverActions}>
                 <button
                   type="button"
@@ -2180,6 +2475,13 @@ export function TaskListView({
 
   const renderPersonalTasksCard = () => {
     if (!showPersonalTasksCard) return null;
+    const hasAssignedPersonalTasksToggle = assignedPersonalTasks !== undefined;
+    const personalTasksCardTitle = showingAssignedTasks
+      ? 'Assigned Tasks'
+      : 'Personal Tasks';
+    const personalTasksEmptyText = showingAssignedTasks
+      ? 'No assigned tasks'
+      : 'No personal tasks';
 
     const renderMonthlyServiceRow = (task: Task) => {
       const overdue = isOverdue(task.due_date, task.status);
@@ -2265,12 +2567,34 @@ export function TaskListView({
     return (
       <>
         <InfoCard
-          title="Personal Tasks"
+          title={personalTasksCardTitle}
           isCollapsible={true}
           startExpanded={true}
+          headerRight={
+            hasAssignedPersonalTasksToggle ? (
+              <div className={styles.projectsCardHeaderToggleRow}>
+                <label className={styles.projectsCardToggle}>
+                  <input
+                    type="checkbox"
+                    checked={showingAssignedTasks}
+                    onChange={event =>
+                      setPersonalTasksMode(
+                        event.target.checked ? 'assigned' : 'personal'
+                      )
+                    }
+                    aria-label="Toggle personal tasks and assigned tasks"
+                  />
+                  <span className={styles.projectsCardToggleSlider}></span>
+                </label>
+                <span className={styles.projectsCardToggleText}>
+                  {showingAssignedTasks ? 'Assigned' : 'Personal'}
+                </span>
+              </div>
+            ) : undefined
+          }
         >
           {personalTasksList.length === 0 ? (
-            <p className={styles.emptyPersonalTasks}>No personal tasks</p>
+            <p className={styles.emptyPersonalTasks}>{personalTasksEmptyText}</p>
           ) : (
             <ul className={styles.personalTasksList}>
               {personalTasksList.map(renderPersonalTaskRow)}
@@ -2296,99 +2620,26 @@ export function TaskListView({
 
   return (
     <div className={styles.tasksContainer}>
-      {/* Filters and View Tabs */}
-      <div className={styles.filtersAndViewTabs}>
-        <div className={styles.filters}>
-          <div className={styles.searchBar}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path
-                d="M7 12C9.76142 12 12 9.76142 12 7C12 4.23858 9.76142 2 7 2C4.23858 2 2 4.23858 2 7C2 9.76142 4.23858 12 7 12Z"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M14 14L10.5 10.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+      {/* Archive date range */}
+      {archiveMode && (
+        <div className={styles.taskListTopBar}>
+          <div className={styles.dateRangeFilter}>
             <input
-              type="text"
-              placeholder="Search tasks..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className={styles.searchInput}
+              type="date"
+              className={styles.filterDateInput}
+              value={archiveDateFrom}
+              onChange={e => setArchiveDateFrom(e.target.value)}
+            />
+            <span className={styles.dateRangeSeparator}>to</span>
+            <input
+              type="date"
+              className={styles.filterDateInput}
+              value={archiveDateTo}
+              onChange={e => setArchiveDateTo(e.target.value)}
             />
           </div>
-
-          <select
-            className={styles.filterSelect}
-            value={companyFilter}
-            onChange={e => setCompanyFilter(e.target.value)}
-          >
-            <option value="all">All Companies</option>
-            {companyOptions.map(company => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </select>
-
-          {archiveMode ? (
-            <div className={styles.dateRangeFilter}>
-              <input
-                type="date"
-                className={styles.filterDateInput}
-                value={archiveDateFrom}
-                onChange={e => setArchiveDateFrom(e.target.value)}
-              />
-              <span className={styles.dateRangeSeparator}>to</span>
-              <input
-                type="date"
-                className={styles.filterDateInput}
-                value={archiveDateTo}
-                onChange={e => setArchiveDateTo(e.target.value)}
-              />
-            </div>
-          ) : (
-            <select
-              className={styles.filterSelect}
-              value={dueDateFilter}
-              onChange={e => setDueDateFilter(e.target.value as DueDateFilter)}
-            >
-              <option value="all">All Due Dates</option>
-              <option value="today">Today</option>
-              <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
-              <option value="next_30_days">Next 30 Days</option>
-            </select>
-          )}
-
-          {!archiveMode && (
-            <select
-              className={styles.filterSelect}
-              value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as StatusFilter)}
-            >
-              <option value="all">All Status</option>
-              {projectStatusOptions.map(option => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          )}
         </div>
-
-        {/* View Tabs */}
-        {viewTabsElement && (
-          <div className={styles.viewTabsWrapper}>{viewTabsElement}</div>
-        )}
-      </div>
+      )}
 
       {/* Tasks List */}
       {groupTasksByProject ? (
@@ -2399,6 +2650,25 @@ export function TaskListView({
               title="Projects"
               isCollapsible={true}
               startExpanded={true}
+              headerRight={
+                <div className={styles.projectsCardHeaderToggleRow}>
+                  <label className={styles.projectsCardToggle}>
+                    <input
+                      type="checkbox"
+                      checked={areAllProjectGroupsExpanded}
+                      onChange={event =>
+                        setAllProjectsSectionExpanded(event.target.checked)
+                      }
+                      aria-label="Expand all projects"
+                      disabled={projectGroupIdsWithTasks.length === 0}
+                    />
+                    <span className={styles.projectsCardToggleSlider}></span>
+                  </label>
+                  <span className={styles.projectsCardToggleText}>
+                    {areAllProjectGroupsExpanded ? 'Collapse' : 'Expand'}
+                  </span>
+                </div>
+              }
             >
               <div className={styles.groupedTasks}>
                 {groupedTasks.projectGroups.length === 0 ? (
@@ -2450,6 +2720,11 @@ export function TaskListView({
                       </div>
                     )}
                     {groupedTasks.projectGroups.map(projectGroup => {
+                      const projectId = projectGroup.project?.id;
+                      const hasTasks = projectGroup.tasks.length > 0;
+                      const isExpanded = projectId
+                        ? !!expandedProjectsSectionProjects[projectId]
+                        : false;
                       const projectName =
                         projectGroup.project?.name || 'No Project';
                       const projectCode = projectGroup.project?.shortcode
@@ -2470,12 +2745,11 @@ export function TaskListView({
                       const showProjectDatePicker =
                         datePickerProjectId === projectGroup.project?.id;
                       return (
-                        <div
+                        <React.Fragment
                           key={projectGroup.project?.id || 'no-project'}
-                          className={styles.projectGroup}
                         >
                           <div
-                            className={styles.projectGroupHeader}
+                            className={`${styles.projectGroupHeader}${isExpanded && hasTasks ? ` ${styles.projectGroupHeaderExpanded}` : ''}`}
                             onClick={() =>
                               projectGroup.project &&
                               onProjectClick &&
@@ -2511,39 +2785,17 @@ export function TaskListView({
                               </div>
                             )}
 
-                            <span className={styles.projectGroupTitle}>
-                              {projectName}
-                            </span>
-                            {projectCode && (
-                              <span className={styles.projectGroupCode}>
-                                {projectCode}
+                            <div className={styles.projectGroupTitleStack}>
+                              <span className={styles.projectGroupTitle}>
+                                {projectName}
                               </span>
-                            )}
-                            <div className={styles.projectMetaActions}>
-                              {projectDueDate && (
-                                <span
-                                  className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}
-                                >
-                                  <ClockIcon />
-                                  <span>{formatDate(projectDueDate)}</span>
+                              {projectCode && (
+                                <span className={styles.projectGroupCode}>
+                                  {projectCode}
                                 </span>
                               )}
-                              {projectGroup.project && onToggleStarProject && (
-                                <div className={styles.projectStarAction}>
-                                  <StarButton
-                                    isStarred={
-                                      projectGroup.project.is_starred || false
-                                    }
-                                    onToggle={() =>
-                                      onToggleStarProject(
-                                        projectGroup.project!.id
-                                      )
-                                    }
-                                    size="small"
-                                  />
-                                </div>
-                              )}
-
+                            </div>
+                            <div className={styles.projectHeaderRight}>
                               {projectGroup.project && (
                                 <div
                                   className={styles.projectHoverActions}
@@ -2580,6 +2832,55 @@ export function TaskListView({
                                   </button>
                                 </div>
                               )}
+                              {projectDueDate && (
+                                <span
+                                  className={`${styles.projectDueDate} ${projectOverdue ? styles.projectDueDateOverdue : ''}`}
+                                >
+                                  <ClockIcon />
+                                  <span>{formatDate(projectDueDate)}</span>
+                                </span>
+                              )}
+                              {projectGroup.project?.status && (() => {
+                                const statusOption = projectStatusOptions.find(s => s.value === projectGroup.project!.status);
+                                return statusOption ? (
+                                  <span className={styles.projectGroupCode} style={{ color: statusOption.color }}>
+                                    {statusOption.label}
+                                  </span>
+                                ) : null;
+                              })()}
+                              {projectGroup.project && onToggleStarProject && (
+                                <div className={styles.projectStarAction}>
+                                  <StarButton
+                                    isStarred={
+                                      projectGroup.project.is_starred || false
+                                    }
+                                    onToggle={() =>
+                                      onToggleStarProject(
+                                        projectGroup.project!.id
+                                      )
+                                    }
+                                    size="small"
+                                  />
+                                </div>
+                              )}
+                              <button
+                                type="button"
+                                className={styles.cwoExpandToggle}
+                                onClick={hasTasks ? event => {
+                                  event.stopPropagation();
+                                  toggleProjectsSectionProject(projectId);
+                                } : undefined}
+                                aria-expanded={hasTasks ? isExpanded : undefined}
+                                aria-label={hasTasks ? (isExpanded
+                                  ? `Collapse tasks for ${projectName}`
+                                  : `Expand tasks for ${projectName}`) : undefined}
+                                style={{ visibility: hasTasks ? undefined : 'hidden' }}
+                              >
+                                <ChevronRight
+                                  size={14}
+                                  className={`${styles.cwoExpandIcon} ${isExpanded ? styles.cwoExpandIconExpanded : ''}`}
+                                />
+                              </button>
                             </div>
 
                             {showProjectDatePicker && projectGroup.project && (
@@ -2687,12 +2988,14 @@ export function TaskListView({
                               </div>
                             )}
                           </div>
-                          <ul className={styles.projectTaskList}>
-                            {projectGroup.tasks.map(task =>
-                              renderGroupedTaskRow(task)
-                            )}
-                          </ul>
-                        </div>
+                          {hasTasks && isExpanded && (
+                            <ul className={styles.projectTaskList}>
+                              {projectGroup.tasks.map(task =>
+                                renderGroupedTaskRow(task)
+                              )}
+                            </ul>
+                          )}
+                        </React.Fragment>
                       );
                     })}
                   </>
@@ -2816,6 +3119,55 @@ export function TaskListView({
               {renderPersonalTasksCard()}
             </div>
           )}
+        </div>
+      )}
+
+      {isPastMentionsModalOpen && (
+        <div
+          className={styles.mentionsModalOverlay}
+          onClick={closePastMentionsModal}
+          role="presentation"
+        >
+          <div
+            className={styles.mentionsModal}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Past mentions"
+            onClick={event => event.stopPropagation()}
+          >
+            <div className={styles.mentionsModalHeader}>
+              <h3>Past Mentions</h3>
+              <button
+                type="button"
+                className={styles.mentionsModalClose}
+                onClick={closePastMentionsModal}
+                aria-label="Close past mentions"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className={styles.mentionsModalBody}>
+              {pastMentionsModalLoading ? (
+                <div className={styles.mentionsLoadingState}>
+                  <span
+                    className={styles.mentionsLoadingSpinner}
+                    aria-hidden="true"
+                  />
+                  <p className={styles.emptyPersonalTasks}>
+                    Loading past mentions...
+                  </p>
+                </div>
+              ) : pastMentionsModalItems.length === 0 ? (
+                <p className={styles.emptyPersonalTasks}>No mentions</p>
+              ) : (
+                <ul className={styles.mentionsList}>
+                  {pastMentionsModalItems.map(mention =>
+                    renderMentionRow(mention, 'modal-')
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

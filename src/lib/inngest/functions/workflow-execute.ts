@@ -1,5 +1,6 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { triggerWorkflowForCadenceStep } from '@/lib/cadence/trigger-workflow-step';
 import { formatDateOnly, toE164PhoneNumber } from '@/lib/utils';
 import {
   fetchCompanyBusinessHours,
@@ -12,6 +13,7 @@ import {
   formatDiscount,
 } from '@/lib/campaign-utils';
 import { isPhoneSuppressed } from '@/lib/suppression';
+import { getGeminiClient } from '@/lib/ai/gemini-client';
 
 interface StepResult {
   stepIndex: number;
@@ -19,6 +21,40 @@ interface StepResult {
   completedAt: string;
   result: any;
   success: boolean;
+}
+
+const WORKFLOW_ACTION_TO_CONTACT_TYPE: Record<string, string> = {
+  send_email: 'email',
+  send_sms: 'text_message',
+  make_call: 'outbound_call',
+};
+
+async function logWorkflowActivity(
+  supabase: ReturnType<typeof createAdminClient>,
+  leadId: string | null | undefined,
+  companyId: string,
+  stepType: string,
+  smsConversationId?: string | null
+): Promise<void> {
+  const contactType = WORKFLOW_ACTION_TO_CONTACT_TYPE[stepType];
+  if (!leadId || !contactType) return;
+  const metadata: Record<string, string> = {
+    contact_type: contactType,
+    contact_outcome: 'automation_sent',
+    source: 'workflow_automation',
+  };
+  if (smsConversationId) {
+    metadata.sms_conversation_id = smsConversationId;
+  }
+  await supabase.from('activity_log').insert({
+    company_id: companyId,
+    entity_type: 'lead',
+    entity_id: leadId,
+    activity_type: 'contact_made',
+    user_id: null,
+    notes: null,
+    metadata,
+  });
 }
 
 export const workflowExecuteHandler = inngest.createFunction(
@@ -133,6 +169,7 @@ export const workflowExecuteHandler = inngest.createFunction(
 
     // Execute all workflow steps in sequence
     const stepResults: StepResult[] = [];
+    let branchCancellation: object | null = null;
 
     for (let stepIndex = 0; stepIndex < workflowSteps.length; stepIndex++) {
       const currentStep = workflowSteps[stepIndex];
@@ -271,6 +308,146 @@ export const workflowExecuteHandler = inngest.createFunction(
         };
       }
 
+      // Apply delay BEFORE executing the step (so "send email after 5 min" waits first)
+      const preStepDelayMinutes = currentStep.delay_minutes || 0;
+      if (preStepDelayMinutes > 0) {
+        // Check if this is a campaign execution and if it should respect business hours
+        const shouldRespectBusinessHours = await step.run(
+          `check-business-hours-requirement-${stepIndex}`,
+          async () => {
+            if (
+              triggerType === 'campaign' &&
+              execution.execution_data?.campaignId
+            ) {
+              const supabase = createAdminClient();
+              const { data: campaign } = await supabase
+                .from('campaigns')
+                .select('respect_business_hours')
+                .eq('id', execution.execution_data.campaignId)
+                .single();
+
+              return campaign?.respect_business_hours ?? false;
+            }
+            return false;
+          }
+        );
+
+        // Calculate when the delay will end
+        const delayEndTime = new Date(
+          Date.now() + preStepDelayMinutes * 60 * 1000
+        );
+
+        if (shouldRespectBusinessHours) {
+          const businessHours = await fetchCompanyBusinessHours(companyId);
+
+          if (!isBusinessHours(delayEndTime, businessHours)) {
+            console.log(
+              `Workflow ${executionId} step ${stepIndex}: Delay would end outside business hours`,
+              {
+                originalDelayEnd: delayEndTime.toISOString(),
+                delayMinutes: preStepDelayMinutes,
+              }
+            );
+
+            const nextBusinessSlot = getNextBusinessHourSlot(
+              new Date(),
+              businessHours
+            );
+            const adjustedDelayMs = nextBusinessSlot.getTime() - Date.now();
+            const adjustedDelayMinutes = Math.ceil(adjustedDelayMs / 60000);
+
+            console.log(
+              `Workflow ${executionId} step ${stepIndex}: Adjusted delay to respect business hours`,
+              {
+                originalDelayMinutes: preStepDelayMinutes,
+                adjustedDelayMinutes,
+                nextBusinessSlot: nextBusinessSlot.toISOString(),
+              }
+            );
+
+            await step.sleep(
+              `delay-before-step-${stepIndex}`,
+              `${adjustedDelayMinutes}m`
+            );
+          } else {
+            await step.sleep(
+              `delay-before-step-${stepIndex}`,
+              `${preStepDelayMinutes}m`
+            );
+          }
+        } else {
+          await step.sleep(
+            `delay-before-step-${stepIndex}`,
+            `${preStepDelayMinutes}m`
+          );
+        }
+
+        // Check for cancellation after sleep
+        const postSleepCheck = await step.run(
+          `check-cancellation-after-sleep-${stepIndex}`,
+          async () => {
+            const supabase = createAdminClient();
+            const { data: currentExecution } = await supabase
+              .from('automation_executions')
+              .select('execution_status, execution_data')
+              .eq('id', executionId)
+              .single();
+
+            const isCancelled =
+              currentExecution?.execution_status === 'cancelled' ||
+              currentExecution?.execution_data?.cancellationProcessed === true;
+
+            return {
+              status: currentExecution?.execution_status,
+              shouldContinue: !isCancelled,
+              cancellationReason: isCancelled
+                ? 'Database status or cancellation flag'
+                : null,
+            };
+          }
+        );
+
+        if (!postSleepCheck.shouldContinue) {
+          await step.run(
+            `save-steps-after-delay-cancellation-${stepIndex}`,
+            async () => {
+              const supabase = createAdminClient();
+              const { data: currentExecution } = await supabase
+                .from('automation_executions')
+                .select('execution_data')
+                .eq('id', executionId)
+                .single();
+
+              await supabase
+                .from('automation_executions')
+                .update({
+                  execution_data: {
+                    ...currentExecution?.execution_data,
+                    stepResults: stepResults,
+                    completedSteps: stepResults.length,
+                    cancelledAtStep: stepIndex,
+                    cancelledAfterDelay: true,
+                  },
+                })
+                .eq('id', executionId);
+
+              return { stepsSaved: stepResults.length };
+            }
+          );
+
+          return {
+            success: true,
+            cancelled: true,
+            cancelledAt: stepIndex,
+            cancelledAfter: 'delay',
+            totalSteps: workflowSteps.length,
+            completedSteps: stepResults.length,
+            message:
+              'Workflow execution stopped due to cancellation after delay',
+          };
+        }
+      }
+
       // Execute the step
       const stepResult = await step.run(
         `execute-step-${stepIndex}`,
@@ -304,7 +481,9 @@ export const workflowExecuteHandler = inngest.createFunction(
                   customerId,
                   attribution,
                   partialLeadData,
-                  executionId
+                  executionId,
+                  execution?.execution_data?.campaignId,
+                  workflowId
                 );
                 break;
               case 'make_call':
@@ -325,7 +504,8 @@ export const workflowExecuteHandler = inngest.createFunction(
                 result = await executeConditionalStep(
                   currentStep,
                   leadData,
-                  attribution
+                  attribution,
+                  leadId
                 );
                 break;
               case 'update_lead_status':
@@ -337,6 +517,17 @@ export const workflowExecuteHandler = inngest.createFunction(
                 break;
               default:
                 throw new Error(`Unsupported step type: ${currentStep.type}`);
+            }
+
+            // Log to communication log for lead-linked action steps
+            if (result?.success !== false) {
+              await logWorkflowActivity(
+                supabase,
+                leadId,
+                companyId,
+                currentStep.type,
+                currentStep.type === 'send_sms' ? (result as { conversationId?: string })?.conversationId : undefined
+              );
             }
 
             const stepData = {
@@ -428,157 +619,414 @@ export const workflowExecuteHandler = inngest.createFunction(
         success: stepResult?.success !== false,
       });
 
-      // Handle delay if this step requires it
-      const stepDelayMinutes =
-        (stepResult && 'delayMinutes' in stepResult
-          ? (stepResult.delayMinutes as number)
-          : null) ||
-        currentStep.delay_minutes ||
-        0;
-      const shouldDelay =
-        (stepResult && 'requiresDelay' in stepResult
-          ? (stepResult.requiresDelay as boolean)
-          : false) ||
-        currentStep.type === 'wait' ||
-        currentStep.type === 'delay' ||
-        (currentStep.delay_minutes && currentStep.delay_minutes > 0);
+      // Execute branch steps if this is a conditional step
+      const conditionalResult = stepResult as any;
 
-      if (shouldDelay && stepDelayMinutes > 0) {
-        // Check if this is a campaign execution and if it should respect business hours
-        const shouldRespectBusinessHours = await step.run(
-          `check-business-hours-requirement-${stepIndex}`,
-          async () => {
-            // Check if this execution is from a campaign
-            if (
-              triggerType === 'campaign' &&
-              execution.execution_data?.campaignId
-            ) {
+      // MULTI-BRANCH MODE
+      if (currentStep.type === 'conditional' && conditionalResult?.isMultiBranch === true) {
+        const branches: any[] = currentStep.branches || [];
+        const selectedBranch =
+          branches.find((b: any) => !b.isDefault && b.id === conditionalResult.matchedBranchId)
+          ?? branches.find((b: any) => b.isDefault);
+
+        const branchSteps: any[] = selectedBranch?.steps || [];
+        const branchLabel: string = selectedBranch?.id || 'default';
+
+        for (let branchIdx = 0; branchIdx < branchSteps.length; branchIdx++) {
+          const branchStep = branchSteps[branchIdx];
+
+          const branchStatusCheck = await step.run(
+            `check-cancellation-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+            async () => {
               const supabase = createAdminClient();
-              const { data: campaign } = await supabase
-                .from('campaigns')
-                .select('respect_business_hours')
-                .eq('id', execution.execution_data.campaignId)
+              const { data: currentExecution } = await supabase
+                .from('automation_executions')
+                .select('execution_status, execution_data')
+                .eq('id', executionId)
                 .single();
 
-              return campaign?.respect_business_hours ?? false;
+              let isCancelled =
+                currentExecution?.execution_status === 'cancelled' ||
+                currentExecution?.execution_data?.cancellationProcessed === true;
+              let cancellationReason = isCancelled ? 'Database status or cancellation flag' : null;
+
+              if (!isCancelled && triggerType === 'partial_lead_automation' && leadData?.partialLeadId) {
+                const { data: partialLead } = await supabase
+                  .from('partial_leads')
+                  .select('converted_to_lead_id')
+                  .eq('id', leadData.partialLeadId)
+                  .single();
+
+                if (partialLead?.converted_to_lead_id) {
+                  isCancelled = true;
+                  cancellationReason = `Partial lead converted to full lead (ID: ${partialLead.converted_to_lead_id})`;
+                  await supabase
+                    .from('automation_executions')
+                    .update({
+                      execution_status: 'cancelled',
+                      completed_at: new Date().toISOString(),
+                      execution_data: {
+                        ...currentExecution?.execution_data,
+                        cancellationReason,
+                        cancellationProcessed: true,
+                        cancelledAtStep: `${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+                      },
+                    })
+                    .eq('id', executionId);
+                }
+              }
+
+              return { shouldContinue: !isCancelled, cancellationReason };
             }
-            return false;
-          }
-        );
+          );
 
-        // Calculate when the delay will end
-        const delayEndTime = new Date(
-          Date.now() + stepDelayMinutes * 60 * 1000
-        );
-
-        // If we need to respect business hours and the delay would end outside business hours
-        if (shouldRespectBusinessHours) {
-          const businessHours = await fetchCompanyBusinessHours(companyId);
-
-          // Check if delay end time falls outside business hours
-          if (!isBusinessHours(delayEndTime, businessHours)) {
-            console.log(
-              `Workflow ${executionId} step ${stepIndex}: Delay would end outside business hours`,
-              {
-                originalDelayEnd: delayEndTime.toISOString(),
-                delayMinutes: stepDelayMinutes,
+          if (!branchStatusCheck.shouldContinue) {
+            await step.run(
+              `save-steps-before-branch-cancellation-${stepIndex}-multi`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_data')
+                  .eq('id', executionId)
+                  .single();
+                await supabase
+                  .from('automation_executions')
+                  .update({
+                    execution_data: {
+                      ...currentExecution?.execution_data,
+                      stepResults,
+                      completedSteps: stepResults.length,
+                      cancelledAtStep: `${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+                    },
+                  })
+                  .eq('id', executionId);
+                return { stepsSaved: stepResults.length };
               }
             );
 
-            // Calculate next business hour slot
-            const nextBusinessSlot = getNextBusinessHourSlot(
-              new Date(),
-              businessHours
-            );
-            const adjustedDelayMs = nextBusinessSlot.getTime() - Date.now();
-            const adjustedDelayMinutes = Math.ceil(adjustedDelayMs / 60000);
+            await inngest.send({
+              name: 'workflow/completed',
+              data: { executionId, workflowId, companyId, triggerType, success: false, cancelled: true, cancellationReason: branchStatusCheck.cancellationReason },
+            });
 
-            console.log(
-              `Workflow ${executionId} step ${stepIndex}: Adjusted delay to respect business hours`,
-              {
-                originalDelayMinutes: stepDelayMinutes,
-                adjustedDelayMinutes,
-                nextBusinessSlot: nextBusinessSlot.toISOString(),
-              }
-            );
-
-            await step.sleep('delay-step', `${adjustedDelayMinutes}m`);
-          } else {
-            // Normal delay - within business hours
-            await step.sleep('delay-step', `${stepDelayMinutes}m`);
-          }
-        } else {
-          // No business hours restriction
-          await step.sleep('delay-step', `${stepDelayMinutes}m`);
-        }
-
-        // Check for cancellation after sleep (common cancellation point)
-        const postSleepCheck = await step.run(
-          `check-cancellation-after-sleep-${stepIndex}`,
-          async () => {
-            const supabase = createAdminClient();
-            const { data: currentExecution } = await supabase
-              .from('automation_executions')
-              .select('execution_status, execution_data')
-              .eq('id', executionId)
-              .single();
-
-            // Check both database status and cancellation flags
-            const isCancelled =
-              currentExecution?.execution_status === 'cancelled' ||
-              currentExecution?.execution_data?.cancellationProcessed === true;
-
-            return {
-              status: currentExecution?.execution_status,
-              shouldContinue: !isCancelled,
-              cancellationReason: isCancelled
-                ? 'Database status or cancellation flag'
-                : null,
+            branchCancellation = {
+              success: true,
+              cancelled: true,
+              cancelledAt: `${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+              cancellationReason: branchStatusCheck.cancellationReason,
             };
+            break;
           }
-        );
 
-        if (!postSleepCheck.shouldContinue) {
-          // Save completed steps to database before returning
-          await step.run('save-steps-after-delay-cancellation', async () => {
-            const supabase = createAdminClient();
+          const branchResult = await step.run(
+            `execute-step-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+            async () => {
+              const supabase = createAdminClient();
+              let result: any;
+              switch (branchStep.type) {
+                case 'send_email':
+                  result = await executeEmailStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
+                  break;
+                case 'send_sms':
+                  result = await executeSMSStep(branchStep, leadData, companyId, leadId, customerId, attribution, partialLeadData, executionId, execution?.execution_data?.campaignId, workflowId);
+                  break;
+                case 'make_call':
+                  result = await executeMakeCallStep(branchStep, leadData, companyId, leadId, customerId, executionId);
+                  break;
+                case 'wait':
+                case 'delay':
+                  return await executeDelayStep(branchStep);
+                case 'update_lead_status':
+                  return await executeUpdateLeadStatusStep(branchStep, leadId, companyId);
+                case 'archive_call':
+                  return { success: true, archived: true, reason: branchStep.archive_reason };
+                default:
+                  return { success: true, skipped: true };
+              }
+              if (result?.success !== false) {
+                await logWorkflowActivity(
+                  supabase,
+                  leadId,
+                  companyId,
+                  branchStep.type,
+                  branchStep.type === 'send_sms' ? result?.conversationId : undefined
+                );
+              }
+              return result;
+            }
+          );
 
-            // Get current execution data to preserve existing fields
-            const { data: currentExecution } = await supabase
-              .from('automation_executions')
-              .select('execution_data')
-              .eq('id', executionId)
-              .single();
-
-            // Update with completed steps
-            await supabase
-              .from('automation_executions')
-              .update({
-                execution_data: {
-                  ...currentExecution?.execution_data,
-                  stepResults: stepResults,
-                  completedSteps: stepResults.length,
-                  cancelledAtStep: stepIndex,
-                  cancelledAfterDelay: true,
-                },
-              })
-              .eq('id', executionId);
-
-            return { stepsSaved: stepResults.length };
+          stepResults.push({
+            stepIndex,
+            stepType: `${selectedBranch?.label || 'default'}_branch:${branchStep.type}`,
+            completedAt: new Date().toISOString(),
+            result: branchResult,
+            success: branchResult?.success !== false,
           });
 
-          return {
-            success: true,
-            cancelled: true,
-            cancelledAt: stepIndex,
-            cancelledAfter: 'delay',
-            totalSteps: workflowSteps.length,
-            completedSteps: stepResults.length,
-            message:
-              'Workflow execution stopped due to cancellation after delay',
-          };
+          const branchDelay = branchStep.delay_minutes || 0;
+          if (branchDelay > 0) {
+            await step.sleep(
+              `delay-step-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+              `${branchDelay}m`
+            );
+
+            const postDelayCheck = await step.run(
+              `check-cancellation-post-delay-${stepIndex}-${branchLabel}-branch-${branchIdx}`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_status, execution_data')
+                  .eq('id', executionId)
+                  .single();
+                const isCancelled =
+                  currentExecution?.execution_status === 'cancelled' ||
+                  currentExecution?.execution_data?.cancellationProcessed === true;
+                return { shouldContinue: !isCancelled };
+              }
+            );
+
+            if (!postDelayCheck.shouldContinue) {
+              branchCancellation = { success: true, cancelled: true, cancelledAfterDelay: true };
+              break;
+            }
+          }
         }
       }
+
+      // LEGACY BINARY MODE
+      if (currentStep.type === 'conditional' && conditionalResult?.conditionMet !== undefined) {
+        const branchPath = conditionalResult.conditionMet ? 'true' : 'false';
+        const branchSteps: any[] = conditionalResult.conditionMet
+          ? (currentStep.true_steps || [])
+          : (currentStep.false_steps || []);
+
+        for (let branchIdx = 0; branchIdx < branchSteps.length; branchIdx++) {
+          const branchStep = branchSteps[branchIdx];
+
+          // Cancellation check before each branch step
+          const branchStatusCheck = await step.run(
+            `check-cancellation-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+            async () => {
+              const supabase = createAdminClient();
+              const { data: currentExecution } = await supabase
+                .from('automation_executions')
+                .select('execution_status, execution_data')
+                .eq('id', executionId)
+                .single();
+
+              let isCancelled =
+                currentExecution?.execution_status === 'cancelled' ||
+                currentExecution?.execution_data?.cancellationProcessed === true;
+              let cancellationReason = isCancelled
+                ? 'Database status or cancellation flag'
+                : null;
+
+              if (
+                !isCancelled &&
+                triggerType === 'partial_lead_automation' &&
+                leadData?.partialLeadId
+              ) {
+                const { data: partialLead } = await supabase
+                  .from('partial_leads')
+                  .select('converted_to_lead_id')
+                  .eq('id', leadData.partialLeadId)
+                  .single();
+
+                if (partialLead?.converted_to_lead_id) {
+                  isCancelled = true;
+                  cancellationReason = `Partial lead converted to full lead (ID: ${partialLead.converted_to_lead_id})`;
+                  await supabase
+                    .from('automation_executions')
+                    .update({
+                      execution_status: 'cancelled',
+                      completed_at: new Date().toISOString(),
+                      execution_data: {
+                        ...currentExecution?.execution_data,
+                        cancellationReason,
+                        cancellationProcessed: true,
+                        cancelledAtStep: `${stepIndex}-${branchPath}-branch-${branchIdx}`,
+                      },
+                    })
+                    .eq('id', executionId);
+                }
+              }
+
+              return { shouldContinue: !isCancelled, cancellationReason };
+            }
+          );
+
+          if (!branchStatusCheck.shouldContinue) {
+            await step.run(
+              `save-steps-before-branch-cancellation-${stepIndex}`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_data')
+                  .eq('id', executionId)
+                  .single();
+                await supabase
+                  .from('automation_executions')
+                  .update({
+                    execution_data: {
+                      ...currentExecution?.execution_data,
+                      stepResults,
+                      completedSteps: stepResults.length,
+                      cancelledAtStep: `${stepIndex}-${branchPath}-branch-${branchIdx}`,
+                    },
+                  })
+                  .eq('id', executionId);
+                return { stepsSaved: stepResults.length };
+              }
+            );
+
+            await inngest.send({
+              name: 'workflow/completed',
+              data: {
+                executionId,
+                workflowId,
+                companyId,
+                triggerType,
+                success: false,
+                cancelled: true,
+                cancellationReason: branchStatusCheck.cancellationReason,
+              },
+            });
+
+            branchCancellation = {
+              success: true,
+              cancelled: true,
+              cancelledAt: `${stepIndex}-${branchPath}-branch-${branchIdx}`,
+              cancellationReason: branchStatusCheck.cancellationReason,
+            };
+            break;
+          }
+
+          // Execute the branch step
+          const branchResult = await step.run(
+            `execute-step-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+            async () => {
+              const supabase = createAdminClient();
+              let result: any;
+              switch (branchStep.type) {
+                case 'send_email':
+                  result = await executeEmailStep(
+                    branchStep,
+                    leadData,
+                    companyId,
+                    leadId,
+                    customerId,
+                    attribution,
+                    partialLeadData,
+                    executionId,
+                    execution?.execution_data?.campaignId,
+                    workflowId
+                  );
+                  break;
+                case 'send_sms':
+                  result = await executeSMSStep(
+                    branchStep,
+                    leadData,
+                    companyId,
+                    leadId,
+                    customerId,
+                    attribution,
+                    partialLeadData,
+                    executionId,
+                    execution?.execution_data?.campaignId,
+                    workflowId
+                  );
+                  break;
+                case 'make_call':
+                  result = await executeMakeCallStep(
+                    branchStep,
+                    leadData,
+                    companyId,
+                    leadId,
+                    customerId,
+                    executionId
+                  );
+                  break;
+                case 'wait':
+                case 'delay':
+                  return await executeDelayStep(branchStep);
+                case 'update_lead_status':
+                  return await executeUpdateLeadStatusStep(
+                    branchStep,
+                    leadId,
+                    companyId
+                  );
+                case 'archive_call':
+                  return {
+                    success: true,
+                    archived: true,
+                    reason: branchStep.archive_reason,
+                  };
+                default:
+                  return { success: true, skipped: true };
+              }
+              if (result?.success !== false) {
+                await logWorkflowActivity(
+                  supabase,
+                  leadId,
+                  companyId,
+                  branchStep.type,
+                  branchStep.type === 'send_sms' ? result?.conversationId : undefined
+                );
+              }
+              return result;
+            }
+          );
+
+          stepResults.push({
+            stepIndex,
+            stepType: `${branchPath}_branch:${branchStep.type}`,
+            completedAt: new Date().toISOString(),
+            result: branchResult,
+            success: branchResult?.success !== false,
+          });
+
+          // Handle delay for branch steps
+          const branchDelay = branchStep.delay_minutes || 0;
+          if (branchDelay > 0) {
+            await step.sleep(
+              `delay-step-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+              `${branchDelay}m`
+            );
+
+            // Post-delay cancellation check
+            const postDelayCheck = await step.run(
+              `check-cancellation-post-delay-${stepIndex}-${branchPath}-branch-${branchIdx}`,
+              async () => {
+                const supabase = createAdminClient();
+                const { data: currentExecution } = await supabase
+                  .from('automation_executions')
+                  .select('execution_status, execution_data')
+                  .eq('id', executionId)
+                  .single();
+                const isCancelled =
+                  currentExecution?.execution_status === 'cancelled' ||
+                  currentExecution?.execution_data?.cancellationProcessed === true;
+                return { shouldContinue: !isCancelled };
+              }
+            );
+
+            if (!postDelayCheck.shouldContinue) {
+              branchCancellation = {
+                success: true,
+                cancelled: true,
+                cancelledAfterDelay: true,
+              };
+              break;
+            }
+          }
+        }
+      }
+
+      if (branchCancellation) return branchCancellation;
     }
 
     // Mark workflow as completed (but don't overwrite if already cancelled)
@@ -588,7 +1036,7 @@ export const workflowExecuteHandler = inngest.createFunction(
       // Final check to prevent overwriting cancelled status
       const { data: finalCheck } = await supabase
         .from('automation_executions')
-        .select('execution_status')
+        .select('execution_status, cadence_step_id, cadence_lead_id')
         .eq('id', executionId)
         .single();
 
@@ -629,6 +1077,106 @@ export const workflowExecuteHandler = inngest.createFunction(
           })
           .eq('automation_execution_id', executionId)
           .neq('execution_status', 'cancelled');
+      }
+
+      // If this workflow was triggered by a cadence step, mark that step complete
+      // and advance the cadence to the next step.
+      if (finalCheck?.cadence_step_id && finalCheck?.cadence_lead_id) {
+        try {
+          // 1. Mark the trigger_workflow cadence step as complete in lead_cadence_progress
+          await supabase
+            .from('lead_cadence_progress')
+            .upsert(
+              {
+                lead_id: finalCheck.cadence_lead_id,
+                cadence_step_id: finalCheck.cadence_step_id,
+                completed_at: new Date().toISOString(),
+              },
+              { onConflict: 'lead_id,cadence_step_id' }
+            );
+
+          // 2. Get the next incomplete cadence step
+          try {
+            const { data: nextStepRows } = await supabase.rpc(
+              'get_next_incomplete_cadence_step',
+              { p_lead_id: finalCheck.cadence_lead_id }
+            );
+            const nextCadenceStep = nextStepRows?.[0];
+
+            if (nextCadenceStep?.step_id) {
+              // workflow_id may not be returned by the RPC — fetch directly if needed
+              if (nextCadenceStep.action_type === 'trigger_workflow' && !nextCadenceStep.workflow_id) {
+                const { data: stepRow } = await supabase
+                  .from('sales_cadence_steps')
+                  .select('workflow_id')
+                  .eq('id', nextCadenceStep.step_id)
+                  .single();
+                nextCadenceStep.workflow_id = stepRow?.workflow_id || null;
+              }
+
+              if (nextCadenceStep.action_type === 'trigger_workflow' && nextCadenceStep.workflow_id) {
+                // Next step is also a trigger_workflow — fire it directly
+                const { data: leadForWorkflow } = await supabase
+                  .from('leads')
+                  .select('company_id, customer_id')
+                  .eq('id', finalCheck.cadence_lead_id)
+                  .single();
+
+                await triggerWorkflowForCadenceStep({
+                  leadId: finalCheck.cadence_lead_id,
+                  companyId: leadForWorkflow?.company_id ?? companyId,
+                  customerId: leadForWorkflow?.customer_id ?? customerId ?? null,
+                  cadenceStepId: nextCadenceStep.step_id,
+                  workflowId: nextCadenceStep.workflow_id,
+                  cadenceId: nextCadenceStep.cadence_id,
+                });
+              } else {
+                // Next step requires user action — create its task
+                const { data: leadForTask } = await supabase
+                  .from('leads')
+                  .select('assigned_to, company_id, customer:customers(first_name, last_name)')
+                  .eq('id', finalCheck.cadence_lead_id)
+                  .single();
+                const { data: assignment } = await supabase
+                  .from('lead_cadence_assignments')
+                  .select('started_at')
+                  .eq('lead_id', finalCheck.cadence_lead_id)
+                  .is('completed_at', null)
+                  .maybeSingle();
+                if (leadForTask?.assigned_to && assignment?.started_at) {
+                  const customerData = leadForTask.customer as { first_name?: string; last_name?: string } | null;
+                  const customerName =
+                    `${customerData?.first_name || ''} ${customerData?.last_name || ''}`.trim() ||
+                    'Unknown Customer';
+                  await supabase.rpc('create_task_for_cadence_step', {
+                    p_lead_id: finalCheck.cadence_lead_id,
+                    p_cadence_step_id: nextCadenceStep.step_id,
+                    p_assigned_to: leadForTask.assigned_to,
+                    p_company_id: leadForTask.company_id,
+                    p_customer_name: customerName,
+                    p_started_at: assignment.started_at,
+                  });
+                }
+              }
+            } else {
+              // No next step — cadence is complete
+              await supabase
+                .from('lead_cadence_assignments')
+                .update({ completed_at: new Date().toISOString() })
+                .eq('lead_id', finalCheck.cadence_lead_id)
+                .is('completed_at', null);
+            }
+          } catch (advanceError) {
+            console.error('Error advancing cadence after workflow completion:', advanceError);
+            // Don't throw — workflow completed successfully
+          }
+        } catch (cadenceError) {
+          console.error(
+            'Error advancing cadence after workflow completion:',
+            cadenceError
+          );
+          // Don't throw — workflow completed successfully even if cadence advancement fails
+        }
       }
 
       // Send workflow completion event for campaign tracking
@@ -1321,7 +1869,9 @@ async function executeSMSStep(
   customerId: string,
   attribution: any,
   partialLeadData: any = null,
-  executionId: string
+  executionId: string,
+  campaignId?: string,
+  workflowId?: string
 ) {
   try {
     // Get SMS agent ID
@@ -1413,6 +1963,45 @@ async function executeSMSStep(
 
     // Get full lead data with customer and service address details
     const supabase = createAdminClient();
+
+    // Get company slug (needed for campaign URL generation)
+    const { data: company } = await supabase
+      .from('companies')
+      .select('slug')
+      .eq('id', companyId)
+      .single();
+    const companySlug = company?.slug || '';
+
+    // Get the lead's most recent sent/accepted/draft quote (if any)
+    let quoteFullUrl = '';
+    if (leadId) {
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('quote_url, quote_token')
+        .eq('lead_id', leadId)
+        .in('quote_status', ['sent', 'accepted', 'draft'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (quote?.quote_url && quote?.quote_token) {
+        const { getFullQuoteUrl } = await import('@/lib/quote-utils');
+        const basePath = getFullQuoteUrl(quote.quote_url);
+        const separator = quote.quote_url.includes('?') ? '&' : '?';
+        quoteFullUrl = `${basePath}${separator}token=${quote.quote_token}`;
+      }
+    }
+
+    // Get campaign data if campaignId is present
+    let campaign: any = null;
+    if (campaignId) {
+      const { data: campaignData } = await supabase
+        .from('campaigns')
+        .select('id, campaign_id, name')
+        .eq('id', campaignId)
+        .single();
+      campaign = campaignData;
+    }
 
     const { data: fullLeadData } = await supabase
       .from('leads')
@@ -1552,7 +2141,7 @@ async function executeSMSStep(
         '',
 
       // Service details
-      pestType: leadData.pestType || leadData.pest_type || '',
+      pestType: fullLeadData?.pest_type || leadData.pestType || leadData.pest_type || '',
       urgency: leadData.urgency || '',
       leadSource: leadData.leadSource || leadData.lead_source || '',
 
@@ -1571,6 +2160,21 @@ async function executeSMSStep(
       selectedPlanRecurringPrice: formatPrice(
         planData?.recurring_price || leadData.selectedPlan?.recurring_price
       ),
+
+      // Quote URL — link to the customer's quote page
+      quoteUrl: quoteFullUrl,
+
+      // Campaign URL — link to the campaign landing page (if campaign-triggered)
+      campaignLandingUrl:
+        campaignId && customerId && companySlug
+          ? generateCampaignLandingUrl(
+              companySlug,
+              campaign?.campaign_id || campaignId,
+              customerId,
+              true
+            )
+          : '',
+      campaignName: campaign?.name || '',
     };
 
     // Debug logging for SMS variables before replacement
@@ -1622,6 +2226,7 @@ async function executeSMSStep(
           companyId: companyId,
           customerNumber: e164Phone, // Use E.164 formatted phone number
           agentId: agentId,
+          forceNew: true,
           dynamicVariables: {
             initialMessage: personalizedMessage,
             ...emailVariables, // Include all variables for additional personalization
@@ -1690,16 +2295,111 @@ async function executeDelayStep(step: any) {
 async function executeConditionalStep(
   step: any,
   leadData: any,
-  attribution: any
+  attribution: any,
+  leadId?: string
 ) {
-  // Simple condition evaluation
   const condition = step.condition || {};
 
+  // Fetch current lead data from DB so the condition reflects live state,
+  // not the stale snapshot from the trigger payload.
+  let currentLeadData = leadData;
+  if (leadId) {
+    const supabase = createAdminClient();
+    const { data: freshLead } = await supabase
+      .from('leads')
+      .select('*, customers(*)')
+      .eq('id', leadId)
+      .single();
+    if (freshLead) {
+      currentLeadData = { ...leadData, ...freshLead };
+    }
+  }
+
+  // MULTI-BRANCH MODE
+  if (Array.isArray(step.branches) && step.branches.length > 0) {
+    const fieldValue = currentLeadData[condition.field] ?? attribution?.[condition.field] ?? null;
+    const nonDefault = step.branches.filter((b: any) => !b.isDefault);
+    let matchedBranchId: string | null = null;
+
+    // --- Phase 1: fast exact/substring matching (no AI cost) ---
+    for (const branch of nonDefault) {
+      let matched = false;
+      switch (condition.operator) {
+        case 'equals':
+          matched = String(fieldValue).toLowerCase() === String(branch.value).toLowerCase();
+          break;
+        case 'not_equals':
+          matched = String(fieldValue).toLowerCase() !== String(branch.value).toLowerCase();
+          break;
+        case 'contains':
+          matched = String(fieldValue).toLowerCase().includes(String(branch.value).toLowerCase());
+          break;
+        default:
+          matched = String(fieldValue).toLowerCase() === String(branch.value).toLowerCase();
+      }
+      if (matched) {
+        matchedBranchId = branch.id;
+        break;
+      }
+    }
+
+    // --- Phase 2: Gemini fuzzy fallback (only when no exact match found) ---
+    if (matchedBranchId === null && nonDefault.length > 0 && fieldValue !== null && fieldValue !== '') {
+      try {
+        const gemini = getGeminiClient();
+        const branchList = nonDefault
+          .map((b: any) => `- ID: "${b.id}", Match value: "${b.value}"`)
+          .join('\n');
+
+        const prompt = `You are a workflow routing assistant for a pest control company.
+
+A workflow step needs to route to the correct branch based on a lead's data.
+
+Field being checked: "${condition.field}"
+Operator: "${condition.operator}"
+Actual value from the lead: "${fieldValue}"
+
+Available branches:
+${branchList}
+
+Determine which branch ID (if any) the actual value most closely corresponds to.
+Consider: alternate spellings, pluralization, abbreviations, common synonyms, and industry terminology.
+Examples: "Bedbugs" matches "Bed Bugs", "Google Organic" matches "organic", "Roaches" matches "Cockroaches".
+
+If the operator is "not_equals", find the branch whose value does NOT match the lead value.
+If no branch is a reasonable match, return null.
+
+Respond with JSON only:
+{
+  "matchedBranchId": "<id string or null>",
+  "reasoning": "<one sentence>"
+}`;
+
+        const aiResponse = await gemini.generate<{ matchedBranchId: string | null; reasoning: string }>(
+          prompt,
+          { jsonMode: true, temperature: 0.1, maxOutputTokens: 256 }
+        );
+
+        if (aiResponse.success && aiResponse.data?.matchedBranchId) {
+          const validId = nonDefault.find((b: any) => b.id === aiResponse.data!.matchedBranchId);
+          if (validId) {
+            matchedBranchId = aiResponse.data.matchedBranchId;
+          }
+        }
+      } catch {
+        // Gemini unavailable — fall through to Default branch (no-op)
+      }
+    }
+
+    return { success: true, isMultiBranch: true, matchedBranchId, fieldValue };
+  }
+
+  // LEGACY MODE
   let conditionMet = true;
 
   if (condition.field && condition.operator && condition.value) {
     const fieldValue =
-      leadData[condition.field] || attribution[condition.field];
+      currentLeadData[condition.field] || attribution?.[condition.field];
 
     switch (condition.operator) {
       case 'equals':
@@ -1720,7 +2420,7 @@ async function executeConditionalStep(
     success: true,
     conditionMet,
     condition,
-    fieldValue: leadData[condition.field] || attribution[condition.field],
+    fieldValue: currentLeadData[condition.field] || attribution?.[condition.field],
   };
 }
 
@@ -1930,11 +2630,11 @@ async function executeMakeCallStep(
     // Don't throw - call was successful even if logging failed
   }
 
-  // Update lead status to contacted
+  // Update lead status to in_process
   await supabase
     .from('leads')
     .update({
-      lead_status: 'contacted',
+      lead_status: 'in_process',
       last_contacted_at: new Date().toISOString(),
     })
     .eq('id', leadId);

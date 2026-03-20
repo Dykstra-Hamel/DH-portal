@@ -38,7 +38,7 @@
     .sidebarCollapseButton,
     .sidebarExpandButton {
       svg path {
-        stroke: var(--action-500);
+        stroke: var(--blue-500);
       }
     }
   }
@@ -59,8 +59,8 @@
 
   &:hover {
     background: var(--gray-50);
-    border-color: var(--action-500);
-    color: var(--action-500);
+    border-color: var(--blue-500);
+    color: var(--blue-500);
   }
 
   svg {

@@ -7,6 +7,8 @@ export type ShowToastCallback = (
 ) => void;
 export type RequestUndoCallback = (undoHandler: () => Promise<void>) => void;
 export type LeadUpdateCallback = (updatedLead?: Lead) => void;
+// Surgical patch: merges specific fields into lead state without a full refetch
+export type LeadFieldUpdateCallback = (fields: Partial<Lead>) => void;
 
 // Assigned user info type
 export interface AssignedUserInfo {
@@ -74,23 +76,23 @@ export interface LeadSchedulingSectionProps {
 export interface LeadContactSectionProps {
   lead: Lead;
   nextTask: CadenceTask | null;
+  afterNextActionType?: string | null;
   loadingNextTask: boolean;
   hasActiveCadence: boolean | null;
-  selectedActionType: string;
   activityNotes: string;
   isLoggingActivity: boolean;
   selectedCadenceId: string | null;
-  onActionTypeChange: (type: string) => void;
-  onActivityNotesChange: (notes: string) => void;
-  onLogActivity: (
-    type: string,
-    notes: string,
-    matchesTask: boolean
-  ) => Promise<void>;
+  availableCadences?: { id: string; name: string }[];
+  cadenceSteps?: any[];
+  cadenceStartedAt?: string | null;
+  activeWorkflowExecution?: any | null;
+  onNotesChange: (notes: string) => void;
+  onLogActivity: (outcome?: string | null) => void;
   onCadenceSelect: (cadenceId: string | null) => void;
+  onStartQuoting: () => void;
+  onScheduleService?: () => void;
   onShowToast?: ShowToastCallback;
   onLeadUpdate?: LeadUpdateCallback;
-  onViewLogHistory?: () => void;
   isSidebarExpanded?: boolean;
 }
 
@@ -113,6 +115,7 @@ export interface LeadQuoteSectionProps {
   onEditAddress?: () => void;
   onShowToast?: ShowToastCallback;
   onRequestUndo?: RequestUndoCallback;
+  onLeadFieldUpdate?: LeadFieldUpdateCallback;
   broadcastQuoteUpdate: (quote: any) => Promise<void>;
   setSelectedPests: (pests: string[]) => void;
   setAdditionalPests: (pests: string[]) => void;

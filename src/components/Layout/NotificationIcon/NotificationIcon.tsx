@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useNotifications } from '@/hooks/useNotifications';
+import { useNotificationContext } from '@/contexts/NotificationContext';
 import { Notification } from '@/types/notification';
 import { NotificationModal } from '../NotificationModal';
 import styles from './NotificationIcon.module.scss';
@@ -25,7 +25,7 @@ export function NotificationIcon() {
     deleteNotification,
     refreshNotifications,
     navigateToReference,
-  } = useNotifications();
+  } = useNotificationContext();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

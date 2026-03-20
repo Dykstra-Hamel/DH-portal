@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import type { Activity, EntityType } from '@/types/activity';
 import { FIELD_LABELS } from '@/types/activity';
 import {
@@ -7,6 +7,7 @@ import {
   removeActivityChannel,
   type ActivityUpdatePayload,
 } from '@/lib/realtime/activity-channel';
+import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import styles from './ActivityFeed.module.scss';
 
 interface ActivityFeedProps {
@@ -23,12 +24,7 @@ export function ActivityFeed({
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadActivities();
-    subscribeToActivities();
-  }, [entityType, entityId]);
-
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
     try {
       setLoading(true);
       const url = new URL('/api/activity', window.location.origin);
@@ -45,9 +41,9 @@ export function ActivityFeed({
     } finally {
       setLoading(false);
     }
-  };
+  }, [entityId, entityType]);
 
-  const subscribeToActivities = () => {
+  const subscribeToActivities = useCallback(() => {
     const channel = createActivityChannel(companyId);
 
     subscribeToActivityUpdates(channel, async (payload: ActivityUpdatePayload) => {
@@ -90,7 +86,12 @@ export function ActivityFeed({
     return () => {
       removeActivityChannel(channel);
     };
-  };
+  }, [companyId, entityId, entityType, loadActivities]);
+
+  useEffect(() => {
+    loadActivities();
+    return subscribeToActivities();
+  }, [loadActivities, subscribeToActivities]);
 
   const getFieldLabel = (fieldName: string): string => {
     return FIELD_LABELS[fieldName] || fieldName.replace(/_/g, ' ');
@@ -319,13 +320,15 @@ export function ActivityFeed({
           const formatted = formatActivityText(activity);
           return (
             <div key={activity.id} className={styles.activityItem}>
-              <div className={styles.avatarContainer}>
-                <div className={styles.avatarFallback}>
-                  {activity.user?.first_name?.[0]?.toUpperCase() ||
-                    activity.user?.email?.[0]?.toUpperCase() ||
-                    'S'}
-                </div>
-              </div>
+              <MiniAvatar
+                firstName={activity.user?.first_name || undefined}
+                lastName={activity.user?.last_name || undefined}
+                email={activity.user?.email || 'System'}
+                avatarUrl={activity.user?.avatar_url || null}
+                size="small"
+                showTooltip={true}
+                className={styles.activityAvatar}
+              />
               <div className={styles.activityContent}>
                 <div className={styles.activityRow}>
                   {formatted.main}

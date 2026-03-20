@@ -10,6 +10,8 @@ interface SMSSendRequest {
   retellNumber?: string; // Optional, will use default if not provided
   metadata?: Record<string, any>;
   dynamicVariables?: Record<string, any>; // Dynamic variables for Retell LLM personalization
+  forceNew?: boolean;
+  leadId?: string; // Optional: when provided, logs activity with sms_conversation_id
 }
 
 export async function POST(request: NextRequest) {
@@ -21,6 +23,8 @@ export async function POST(request: NextRequest) {
       retellNumber,
       metadata = {},
       dynamicVariables = {},
+      forceNew,
+      leadId,
     }: SMSSendRequest = await request.json();
 
     // Basic validation
@@ -118,7 +122,8 @@ export async function POST(request: NextRequest) {
         ...metadata,
         source: 'dh_portal_api'
       },
-      dynamicVariables
+      dynamicVariables,
+      forceNew,
     });
 
     if (!result.success) {
@@ -129,6 +134,23 @@ export async function POST(request: NextRequest) {
         },
         { status: 500 }
       );
+    }
+
+    // If a leadId was provided, log activity so the communication log shows "View Chat"
+    if (leadId && result.conversationId) {
+      await supabase.from('activity_log').insert({
+        company_id: companyId,
+        entity_type: 'lead',
+        entity_id: leadId,
+        activity_type: 'contact_made',
+        user_id: null,
+        notes: null,
+        metadata: {
+          contact_type: 'text_message',
+          contact_outcome: 'automation_sent',
+          sms_conversation_id: result.conversationId,
+        },
+      });
     }
 
     return NextResponse.json({

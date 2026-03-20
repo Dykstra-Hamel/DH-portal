@@ -128,17 +128,17 @@
     background: transparent;
     border: none;
     box-shadow: none;
-    color: var(--action-500, #0088cc);
+    color: var(--blue-500);
 
     &::after {
-      background: var(--action-500, #0088cc);
+      background: var(--blue-500);
       transform: scaleX(1);
     }
   }
 }
 
 .tabCount {
-  color: var(--action-600);
+  color: var(--blue-600);
   font-family: var(--font-satoshi);
   font-size: 14px;
   font-style: normal;

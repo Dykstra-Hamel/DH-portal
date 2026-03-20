@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { notifyCustomerCommentAdded } from '@/lib/notifications/lead-notifications';
 
 interface UpdateCommentRequest {
   customer_comments: string;
@@ -39,7 +40,7 @@ export async function PATCH(
     // Fetch the quote to verify it exists and validate token
     const { data: quote, error: fetchError } = await supabase
       .from('quotes')
-      .select('id, quote_token, token_expires_at, quote_url')
+      .select('id, quote_token, token_expires_at, quote_url, lead_id')
       .eq('id', id)
       .single();
 
@@ -91,6 +92,31 @@ export async function PATCH(
         { error: 'Failed to save comment' },
         { status: 500 }
       );
+    }
+
+    // Log activity and send notification if comment was added (not cleared)
+    if (body.customer_comments && quote.lead_id) {
+      // Fetch company_id for the activity log
+      const { data: lead } = await supabase
+        .from('leads')
+        .select('company_id')
+        .eq('id', quote.lead_id)
+        .single();
+
+      if (lead?.company_id) {
+        await supabase.from('activity_log').insert({
+          company_id: lead.company_id,
+          entity_type: 'lead',
+          entity_id: quote.lead_id,
+          activity_type: 'note_added',
+          notes: body.customer_comments,
+          metadata: { source: 'customer_quote_comment', quote_id: id },
+        });
+      }
+
+      notifyCustomerCommentAdded(id, body.customer_comments).catch(err => {
+        console.error('Customer comment notification failed:', err);
+      });
     }
 
     return NextResponse.json({

@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Failed to fetch analytics data. Please check your Google Analytics configuration.',
-          configured: false
+          configured: true
         },
         { status: 503 }
       );

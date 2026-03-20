@@ -21,41 +21,18 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get project with attachments to verify access
+    // Fetch the project using the authenticated user's Supabase client.
+    // The projects_select_optimized RLS policy already enforces access control
+    // (requested_by, assigned_to, same company via user_companies, or admin role),
+    // so if this query returns a row the user is authorized.
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select(`
-        id,
-        attachments,
-        requested_by,
-        assigned_to,
-        company_id,
-        members:project_members(user_id)
-      `)
+      .select('id, attachments')
       .eq('id', projectId)
       .single();
 
     if (projectError || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 });
-    }
-
-    // Check if user has access to this project
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('is_admin, company_id')
-      .eq('id', user.id)
-      .single();
-
-    const hasAccess = (
-      profile?.is_admin ||
-      project.requested_by === user.id ||
-      project.assigned_to === user.id ||
-      project.company_id === profile?.company_id ||
-      project.members?.some((m: { user_id: string }) => m.user_id === user.id)
-    );
-
-    if (!hasAccess) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Find the attachment

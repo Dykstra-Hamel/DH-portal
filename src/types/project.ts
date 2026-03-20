@@ -25,6 +25,14 @@ export interface ProjectDepartment {
   updated_at: string;
 }
 
+export interface AttributeField {
+  id: string; // stable UUID for keying values
+  label: string;
+  type: 'text' | 'number' | 'select' | 'textarea';
+  options?: string[]; // only for type === 'select'
+  columns?: 1 | 2; // 1 = half width, 2 = full width (default: 2)
+}
+
 // Project Type Subtypes (related to project types, not categories)
 export interface ProjectTypeSubtype {
   id: string;
@@ -32,6 +40,8 @@ export interface ProjectTypeSubtype {
   name: string;
   description: string | null;
   sort_order: number;
+  has_custom_attributes: boolean;
+  custom_attribute_schema: AttributeField[];
   created_at: string;
   updated_at: string;
 }
@@ -89,6 +99,9 @@ export interface Project {
   description: string;
   project_type: string; // Existing broad category
   project_subtype: string | null; // Existing specific subcategory
+  project_subtype_id: string | null; // FK to project_type_subtypes.id
+  custom_attribute_values: Record<string, string | number | null>; // custom attribute values keyed by field id
+  project_subtype_details?: Pick<ProjectTypeSubtype, 'id' | 'name' | 'has_custom_attributes' | 'custom_attribute_schema'> | null;
   type_code?: ProjectTypeCode; // NEW: Type code for shortcode generation
   shortcode?: string; // NEW: Auto-generated shortcode (read-only)
   status: 'new' | 'in_progress' | 'on_hold' | 'internal_review' | 'out_to_client' | 'ready_to_print' | 'printing' | 'bill_client' | 'complete';
@@ -154,6 +167,7 @@ export interface ProjectFormData {
   description: string;
   project_type: string;
   project_subtype: string;
+  project_subtype_id?: string; // Optional FK to project_type_subtypes.id
   type_code?: string; // Optional type code for shortcode generation
   requested_by: string;
   company_id: string;
@@ -212,15 +226,15 @@ export const statusOptions = [
 
 export const projectTypeOptions = [
   { value: 'none', label: 'None (no shortcode)', code: null },
-  { value: 'website', label: 'Website', code: 'WEB' },
-  { value: 'social', label: 'Social Media', code: 'SOC' },
-  { value: 'email', label: 'Email Media', code: 'EML' },
-  { value: 'print', label: 'Print Media', code: 'PRT' },
-  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
-  { value: 'digital', label: 'Digital Designs', code: 'DIG' },
-  { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
   { value: 'campaigns', label: 'Campaigns', code: 'CAM' },
+  { value: 'digital', label: 'Digital Designs', code: 'DIG' },
+  { value: 'email', label: 'Email Media', code: 'EML' },
+  { value: 'ads', label: 'Paid Ad Designs', code: 'ADS' },
+  { value: 'print', label: 'Print Media', code: 'PRT' },
+  { value: 'social', label: 'Social Media', code: 'SOC' },
   { value: 'software', label: 'Software', code: 'SFT' },
+  { value: 'vehicle', label: 'Vehicle Design', code: 'VEH' },
+  { value: 'website', label: 'Website', code: 'WEB' },
 ];
 
 export const printSubtypes = [
@@ -359,6 +373,8 @@ export interface ProjectTask {
   } | null; // The ONE task blocking this task
   hasUnreadComments?: boolean; // Whether there are comments newer than user's last view
   hasUnreadMentions?: boolean; // Whether there are unread comments that mention the current user
+  comment_count?: number; // Total number of comments (from list API)
+  has_attachments?: boolean; // Whether any comment has attachments (from list API)
 }
 
 export interface ProjectTaskFormData {
@@ -459,6 +475,66 @@ export interface ProjectAttachment {
   mime_type: string;
   uploaded_by: string;
   uploaded_at: string;
+}
+
+export interface ProjectProof {
+  id: string;
+  project_id: string;
+  group_id: string;
+  file_path: string;
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  uploaded_by: string;
+  is_current: boolean;
+  is_approved: boolean;
+  version: number;
+  created_at: string;
+  updated_at: string;
+  feedback_total?: number;
+  feedback_resolved?: number;
+  uploaded_by_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+}
+
+export interface ProofGroup {
+  id: string;
+  project_id: string;
+  name: string;
+  created_at: string;
+  updated_at: string;
+  currentProof?: ProjectProof | null;
+  archivedProofs?: ProjectProof[];
+}
+
+export interface ProofFeedback {
+  id: string;
+  proof_id: string;
+  project_id: string;
+  user_id: string;
+  x_percent: number | null;
+  y_percent: number | null;
+  page_number: number;
+  comment: string;
+  pin_number: number;
+  is_resolved: boolean;
+  created_at: string;
+  updated_at: string;
+  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+}
+
+export interface ProofFeedbackActivity {
+  id: string;
+  proof_id: string;
+  user_id: string;
+  comment: string;
+  pin_number: number;
+  x_percent: number | null;
+  y_percent: number | null;
+  page_number: number;
+  is_resolved: boolean;
+  created_at: string;
+  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+  proof?: { id: string; file_name: string; version: number; is_current: boolean; mime_type: string };
 }
 
 export interface ProjectComment {

@@ -1,0 +1,111 @@
+.progressBarRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.stepsContainer {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  max-width: 66%;
+  background: var(--gray-200);
+  border-radius: 20px;
+  overflow: hidden;
+  height: 30px;
+}
+
+.gradientFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  border-radius: 20px;
+  background: linear-gradient(90deg, var(--blue-200) 0%, var(--blue-500) 100%);
+  transition: width 0.3s ease;
+  z-index: 0;
+}
+
+.step {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: default;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-400);
+  line-height: 1;
+  gap: 4px;
+}
+
+.stepCompleted {
+  background: transparent;
+  color: var(--blue-100);
+}
+
+.stepCurrent {
+  background: transparent;
+  color: var(--gray-25);
+  font-weight: 700;
+  animation: textPulse 3s ease-in-out infinite;
+}
+
+@keyframes textPulse {
+  0%,
+  100% {
+    color: white;
+  }
+  50% {
+    color: var(--gray-300);
+  }
+}
+
+// Lost/Won buttons
+.actionsWrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.completedLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue-500);
+  white-space: nowrap;
+}
+
+.statusChip {
+  width: 98px;
+  height: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--gray-300);
+  background: transparent;
+  color: var(--slate-400);
+  user-select: none;
+}
+
+.lostActive {
+  background: var(--error-500);
+  border-color: var(--error-500);
+  color: white;
+}
+
+.wonActive {
+  background: var(--green-400);
+  border-color: var(--green-400);
+  color: white;
+}

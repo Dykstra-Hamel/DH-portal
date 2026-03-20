@@ -72,7 +72,7 @@ export const leadFollowUpSequence = inngest.createFunction(
     // Step 3: Check if lead is still eligible for follow-up
     const isEligible = await step.run('check-followup-eligibility', async () => {
       // Don't follow up on won, lost, or unqualified leads
-      if (['won', 'lost', 'unqualified'].includes(leadData.lead_status)) {
+      if (['won', 'lost'].includes(leadData.lead_status)) {
         return { eligible: false, reason: `Lead status is ${leadData.lead_status}` };
       }
 

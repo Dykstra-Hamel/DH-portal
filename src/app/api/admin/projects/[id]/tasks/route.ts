@@ -33,6 +33,19 @@ export async function GET(
     const isCompleted = searchParams.get('is_completed');
     const parentTaskId = searchParams.get('parent_task_id');
 
+    // Fetch unread mention notifications for the current user (to mark tasks)
+    const { data: mentionNotifications } = await supabase
+      .from('notifications')
+      .select('reference_id')
+      .eq('user_id', user.id)
+      .eq('type', 'mention')
+      .eq('reference_type', 'task_comment')
+      .eq('read', false);
+
+    const unreadMentionCommentIds = new Set(
+      (mentionNotifications || []).map((n: any) => n.reference_id as string)
+    );
+
     // Build query
     let query = supabase
       .from('project_tasks')
@@ -46,7 +59,8 @@ export async function GET(
         project_task_category_assignments(
           category_type,
           category:project_categories(id, name)
-        )
+        ),
+        project_task_comments(id, comment_attachments(id))
       `
       )
       .eq('project_id', projectId)
@@ -85,11 +99,27 @@ export async function GET(
         }))
         .filter((category: any) => category !== null) || [];
 
-      const { project_task_category_assignments, ...taskWithoutAssignments } = task;
+      const taskComments: any[] = task.project_task_comments || [];
+      const comment_count = taskComments.length;
+      const has_attachments = taskComments.some(
+        (c: any) => (c.comment_attachments || []).length > 0
+      );
+      const hasUnreadMentions = taskComments.some((c: any) =>
+        unreadMentionCommentIds.has(c.id)
+      );
+
+      const {
+        project_task_category_assignments,
+        project_task_comments,
+        ...taskWithoutExtras
+      } = task;
 
       return {
-        ...taskWithoutAssignments,
+        ...taskWithoutExtras,
         categories,
+        comment_count,
+        has_attachments,
+        hasUnreadMentions,
       };
     });
 

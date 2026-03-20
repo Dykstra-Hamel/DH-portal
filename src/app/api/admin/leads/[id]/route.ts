@@ -4,6 +4,9 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendEvent } from '@/lib/inngest/client';
 import { getCustomerPrimaryServiceAddress } from '@/lib/service-addresses';
 import { logFieldChanges } from '@/lib/activity-logger';
+import { closeLeadForTerminalStatus } from '@/lib/leads/close-lead';
+import { startDefaultCadenceForStage } from '@/lib/cadence/start-default-cadence';
+import { stopActiveCadence } from '@/lib/leads/stop-active-cadence';
 
 export async function GET(
   request: NextRequest,
@@ -122,6 +125,20 @@ export async function GET(
       }
     }
 
+    // Get submitted_by user profile if lead has one
+    let submittedUser = null;
+    if (lead.submitted_by) {
+      const { data: submittedProfileData, error: submittedProfileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.submitted_by)
+        .single();
+
+      if (!submittedProfileError && submittedProfileData) {
+        submittedUser = submittedProfileData;
+      }
+    }
+
     // Get call record separately using lead_id foreign key
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
@@ -135,6 +152,7 @@ export async function GET(
       call_record: callRecord || null,
       assigned_user: assignedUser,
       scheduler_user: schedulerUser,
+      submitted_user: submittedUser,
       primary_service_address: primaryServiceAddress,
     };
 
@@ -302,6 +320,61 @@ export async function PUT(
         console.error('Error sending lead status changed event:', eventError);
         // Don't fail the API call if event sending fails
       }
+
+    }
+
+    // Automatic cadence management based on status transitions
+    if (newStatus && oldStatus !== newStatus) {
+      const assignedTo = body.assigned_to ?? existingLead.assigned_to;
+      try {
+        if (newStatus === 'in_process' && assignedTo) {
+          const { data: existingCadence } = await supabase
+            .from('lead_cadence_assignments')
+            .select('id')
+            .eq('lead_id', id)
+            .is('completed_at', null)
+            .maybeSingle();
+          if (!existingCadence) {
+            await startDefaultCadenceForStage(id, existingLead.company_id,
+              'default_initial_contact_cadence_id', assignedTo);
+          }
+        } else if (newStatus === 'quoted') {
+          await stopActiveCadence(id);
+          if (assignedTo) {
+            await startDefaultCadenceForStage(id, existingLead.company_id,
+              'default_quote_followup_cadence_id', assignedTo);
+          }
+        } else if (newStatus === 'scheduling') {
+          await stopActiveCadence(id);
+        } else if (newStatus === 'won' || newStatus === 'lost') {
+          await closeLeadForTerminalStatus(id);
+        }
+      } catch (cadenceError) {
+        console.error('Error managing cadence on status change:', cadenceError);
+        // Non-fatal: don't fail the lead update
+      }
+    }
+
+    // Scheduler assignment → start scheduling cadence
+    const currentStatus = newStatus ?? existingLead.lead_status;
+    const oldAssignedScheduler = existingLead.assigned_scheduler;
+    const newAssignedScheduler = body.assigned_scheduler;
+    console.log('[admin scheduler-cadence] check', {
+      newAssignedScheduler,
+      oldAssignedScheduler,
+      currentStatus,
+      willRun: !!(newAssignedScheduler && newAssignedScheduler !== oldAssignedScheduler && currentStatus === 'scheduling'),
+    });
+    if (newAssignedScheduler && newAssignedScheduler !== oldAssignedScheduler
+        && currentStatus === 'scheduling') {
+      try {
+        // Always clear any existing cadence and start fresh for the new scheduler
+        await stopActiveCadence(id);
+        await startDefaultCadenceForStage(id, existingLead.company_id,
+          'default_scheduling_followup_cadence_id', newAssignedScheduler);
+      } catch (cadenceError) {
+        console.error('Error starting scheduling cadence:', cadenceError);
+      }
     }
 
     // Get customer's primary service address if lead has a customer
@@ -357,6 +430,20 @@ export async function PUT(
       }
     }
 
+    // Get submitted_by user profile if lead has one
+    let submittedUser = null;
+    if (lead.submitted_by) {
+      const { data: submittedProfileData, error: submittedProfileError } = await supabase
+        .from('profiles')
+        .select('id, first_name, last_name, email, avatar_url')
+        .eq('id', lead.submitted_by)
+        .single();
+
+      if (!submittedProfileError && submittedProfileData) {
+        submittedUser = submittedProfileData;
+      }
+    }
+
     // Get call record separately using lead_id foreign key
     const { data: callRecord, error: callError } = await supabase
       .from('call_records')
@@ -370,6 +457,7 @@ export async function PUT(
       call_record: callRecord || null,
       assigned_user: assignedUser,
       scheduler_user: schedulerUser,
+      submitted_user: submittedUser,
       primary_service_address: primaryServiceAddress,
     };
 

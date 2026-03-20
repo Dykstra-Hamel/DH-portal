@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { createClient } from '@/lib/supabase/client';
 import RichTextEditor from '@/components/UI/RichTextEditor/RichTextEditor';
+import FullRichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import styles from './WidgetConfig.module.scss';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { calculateIntervalCount, getIntervalLabel } from '@/lib/pricing-calculations';
@@ -26,6 +27,7 @@ interface ServicePlan {
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
+  plan_terms: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -326,6 +328,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     requires_quote: false,
     plan_image_url: '',
     plan_disclaimer: '',
+    plan_terms: '',
     is_active: true,
     allow_custom_pricing: false,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
@@ -368,6 +371,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         requires_quote: plan.requires_quote,
         plan_image_url: plan.plan_image_url || '',
         plan_disclaimer: plan.plan_disclaimer || '',
+        plan_terms: plan.plan_terms || '',
         is_active: plan.is_active,
         allow_custom_pricing: (plan as any).allow_custom_pricing || false,
         pest_coverage: plan.pest_coverage?.map(pc => ({
@@ -409,6 +413,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         requires_quote: false,
         plan_image_url: '',
         plan_disclaimer: '',
+        plan_terms: '',
         is_active: true,
         allow_custom_pricing: false,
         pest_coverage: [],
@@ -908,6 +913,16 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   placeholder="Enter disclaimer text for this plan..."
                   rows={4}
                 />
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Terms and Conditions</label>
+                <FullRichTextEditor
+                  value={formData.plan_terms || ''}
+                  onChange={(value) => handleInputChange('plan_terms', value)}
+                  placeholder="Enter terms and conditions specific to this plan..."
+                />
+                <small>Displayed on the quote signing page when this plan is selected.</small>
               </div>
 
               <div className={styles.checkboxGroup}>

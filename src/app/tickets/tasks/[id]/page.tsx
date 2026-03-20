@@ -25,10 +25,7 @@ import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { formatHeaderDate } from '@/lib/date-utils';
-import {
-  markTaskAsSeen,
-  markActionAsSeen,
-} from '@/hooks/useRealtimeCounts';
+import { markTaskAsSeen, markActionAsSeen } from '@/hooks/useRealtimeCounts';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -326,7 +323,7 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
       }
 
       // Redirect to tasks page after successful deletion
-      router.push('/tickets/tasks');
+      router.push('/tickets/my-tasks');
     } catch (error) {
       console.error('Error deleting task:', error);
       alert('Failed to delete task. Please try again.');
@@ -508,7 +505,14 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     return () => {
       setPageHeader(null);
     };
-  }, [task, isEditing, setPageHeader, handleEdit, handleCompleteClick, handleDeleteClick]);
+  }, [
+    task,
+    isEditing,
+    setPageHeader,
+    handleEdit,
+    handleCompleteClick,
+    handleDeleteClick,
+  ]);
 
   if (loading || taskLoading) {
     return <div className={styles.loading}>Loading task...</div>;
@@ -522,7 +526,10 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     return (
       <div className={styles.error}>
         <h2>Task not found</h2>
-        <p>The task you&apos;re looking for doesn&apos;t exist or you don&apos;t have permission to view it.</p>
+        <p>
+          The task you&apos;re looking for doesn&apos;t exist or you don&apos;t
+          have permission to view it.
+        </p>
       </div>
     );
   }
@@ -534,11 +541,11 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
     <div className="container">
       <div className={styles.content}>
         {isEditing && editFormData ? (
-            <div className={styles.detailCard}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>Edit Task</h3>
-              </div>
-              <div className={styles.editForm}>
+          <div className={styles.detailCard}>
+            <div className={styles.cardHeader}>
+              <h3 className={styles.cardTitle}>Edit Task</h3>
+            </div>
+            <div className={styles.editForm}>
               <div className={styles.formField}>
                 <label>Title</label>
                 <input
@@ -578,7 +585,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <label>Priority</label>
                   <select
                     value={editFormData.priority}
-                    onChange={e => handleInputChange('priority', e.target.value)}
+                    onChange={e =>
+                      handleInputChange('priority', e.target.value)
+                    }
                     className={styles.select}
                   >
                     {taskPriorityOptions.map(option => (
@@ -595,7 +604,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <input
                     type="date"
                     value={editFormData.due_date}
-                    onChange={e => handleInputChange('due_date', e.target.value)}
+                    onChange={e =>
+                      handleInputChange('due_date', e.target.value)
+                    }
                     className={styles.input}
                   />
                 </div>
@@ -604,7 +615,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <input
                     type="time"
                     value={editFormData.due_time}
-                    onChange={e => handleInputChange('due_time', e.target.value)}
+                    onChange={e =>
+                      handleInputChange('due_time', e.target.value)
+                    }
                     className={styles.input}
                   />
                 </div>
@@ -656,40 +669,44 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
           </div>
         ) : (
           <div className={styles.detailCard}>
-              <div className={styles.cardHeader}>
-                <div className={styles.titleBlock}>
-                  <h3 className={styles.cardTitle}>{getTaskDisplayTitle(task)}</h3>
-                  <div className={styles.badgeRow}>
-                    <div className={styles.metaChip}>
-                      <span className={styles.chipLabel}>Status</span>
-                      <span
-                        className={styles.chipDot}
-                        style={{ backgroundColor: getStatusColor(task.status) }}
-                      />
-                      <span className={styles.chipValue}>
-                        {task.status.charAt(0).toUpperCase() +
-                          task.status.slice(1).replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className={styles.metaChip}>
-                      <span className={styles.chipLabel}>Priority</span>
-                      <span
-                        className={styles.chipDot}
-                        style={{ backgroundColor: getPriorityColor(task.priority) }}
-                      />
-                      <span
-                        className={styles.chipValue}
-                        style={{ color: getPriorityColor(task.priority) }}
-                      >
-                        {task.priority.charAt(0).toUpperCase() +
-                          task.priority.slice(1)}
-                      </span>
-                    </div>
-                    {isOverdue && (
-                      <span className={styles.overdueIndicator}>
-                        <AlertCircle size={16} />
-                        Overdue
-                      </span>
+            <div className={styles.cardHeader}>
+              <div className={styles.titleBlock}>
+                <h3 className={styles.cardTitle}>
+                  {getTaskDisplayTitle(task)}
+                </h3>
+                <div className={styles.badgeRow}>
+                  <div className={styles.metaChip}>
+                    <span className={styles.chipLabel}>Status</span>
+                    <span
+                      className={styles.chipDot}
+                      style={{ backgroundColor: getStatusColor(task.status) }}
+                    />
+                    <span className={styles.chipValue}>
+                      {task.status.charAt(0).toUpperCase() +
+                        task.status.slice(1).replace('_', ' ')}
+                    </span>
+                  </div>
+                  <div className={styles.metaChip}>
+                    <span className={styles.chipLabel}>Priority</span>
+                    <span
+                      className={styles.chipDot}
+                      style={{
+                        backgroundColor: getPriorityColor(task.priority),
+                      }}
+                    />
+                    <span
+                      className={styles.chipValue}
+                      style={{ color: getPriorityColor(task.priority) }}
+                    >
+                      {task.priority.charAt(0).toUpperCase() +
+                        task.priority.slice(1)}
+                    </span>
+                  </div>
+                  {isOverdue && (
+                    <span className={styles.overdueIndicator}>
+                      <AlertCircle size={16} />
+                      Overdue
+                    </span>
                   )}
                 </div>
               </div>
@@ -706,8 +723,8 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                 ) : (
                   <span className={styles.unassigned}>Unassigned</span>
                 )}
+              </div>
             </div>
-          </div>
 
             {(task.description || task.notes) && (
               <div className={styles.sectionRow}>
@@ -766,7 +783,9 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <label>Due Date</label>
                   <div className={styles.dueDateInfo}>
                     <Calendar size={16} />
-                    <span>{formatTaskDueDateTime(task.due_date, task.due_time)}</span>
+                    <span>
+                      {formatTaskDueDateTime(task.due_date, task.due_time)}
+                    </span>
                   </div>
                 </div>
               )}
@@ -794,12 +813,15 @@ function TaskDetailPageContent({ params }: TaskPageProps) {
                   <div className={styles.userInfo}>
                     <UserIcon size={16} />
                     <span>
-                      {task.created_user.first_name} {task.created_user.last_name}
+                      {task.created_user.first_name}{' '}
+                      {task.created_user.last_name}
                     </span>
                   </div>
                 ) : (
                   <span className={styles.unassigned}>
-                    {task.created_by ? `User ID: ${task.created_by}` : 'Unknown'}
+                    {task.created_by
+                      ? `User ID: ${task.created_by}`
+                      : 'Unknown'}
                   </span>
                 )}
               </div>

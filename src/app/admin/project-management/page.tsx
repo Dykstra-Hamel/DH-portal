@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useStarredItems } from '@/hooks/useStarredItems';
+import { useLocalStorageFilter } from '@/hooks/useLocalStorageFilter';
 import ProjectForm from '@/components/Projects/ProjectForm/ProjectForm';
 import { TaskModal } from '@/components/TaskManagement/TaskModal/TaskModal';
 import { ProjectKanbanView } from '@/components/ProjectManagement/ProjectKanbanView/ProjectKanbanView';
@@ -23,7 +24,9 @@ import {
   subscribeToProjectUpdates,
   ProjectUpdatePayload,
 } from '@/lib/realtime/project-channel';
-import { Search } from 'lucide-react';
+import { Search, KanbanSquare, LayoutList, CalendarDays } from 'lucide-react';
+import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
+import { ViewToggle } from '@/components/Common/ViewToggle/ViewToggle';
 import styles from '../../project-management/projectManagement.module.scss';
 
 type ViewType = 'kanban' | 'list' | 'calendar';
@@ -62,8 +65,8 @@ export default function AdminProjectManagementDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isTasksLoading, setIsTasksLoading] = useState(false);
 
-  // Category filtering state
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  // Category filtering state (persisted to localStorage)
+  const [selectedCategoryId, setSelectedCategoryId] = useLocalStorageFilter('pm.selectedCategoryId');
   const [availableCategories, setAvailableCategories] = useState<ProjectCategory[]>([]);
 
   // Department state
@@ -72,10 +75,11 @@ export default function AdminProjectManagementDashboard() {
   // Search state
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Project filter state
-  const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
-  const [filterAssignedTo, setFilterAssignedTo] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string | null>(null);
+  // Project filter state (persisted to localStorage)
+  const [filterCompanyId, setFilterCompanyId] = useLocalStorageFilter('pm.filterCompanyId');
+  const [filterAssignedTo, setFilterAssignedTo] = useLocalStorageFilter('pm.filterAssignedTo');
+  const [filterMemberId, setFilterMemberId] = useLocalStorageFilter('pm.filterMemberId');
+  const [filterStatus, setFilterStatus] = useLocalStorageFilter('pm.filterStatus');
 
   // Realtime subscription refs
   const subscriptionActiveRef = useRef(false);
@@ -160,6 +164,11 @@ export default function AdminProjectManagementDashboard() {
         params.append('assignedTo', filterAssignedTo);
       }
 
+      // Add member filter if selected
+      if (filterMemberId) {
+        params.append('memberId', filterMemberId);
+      }
+
       // NOTE: Do NOT add category filter - we need all projects for accurate counts
 
       const response = await fetch(`${url}?${params.toString()}`, { headers });
@@ -174,7 +183,7 @@ export default function AdminProjectManagementDashboard() {
       console.error('Error fetching all projects for counts:', error);
       setAllProjectsForCounts([]);
     }
-  }, [filterCompanyId, filterAssignedTo]);
+  }, [filterCompanyId, filterAssignedTo, filterMemberId]);
 
   // Fetch projects from API
   const fetchProjects = useCallback(async () => {
@@ -206,6 +215,11 @@ export default function AdminProjectManagementDashboard() {
         params.append('assignedTo', filterAssignedTo);
       }
 
+      // Add member filter if selected
+      if (filterMemberId) {
+        params.append('memberId', filterMemberId);
+      }
+
       const response = await fetch(`${url}?${params.toString()}`, { headers });
 
       if (response.ok) {
@@ -220,7 +234,7 @@ export default function AdminProjectManagementDashboard() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedCategoryId, filterCompanyId, filterAssignedTo]);
+  }, [selectedCategoryId, filterCompanyId, filterAssignedTo, filterMemberId]);
 
   // Fetch users (admin users only)
   useEffect(() => {
@@ -520,9 +534,10 @@ export default function AdminProjectManagementDashboard() {
     };
   }, [registerPageAction]);
 
-  // Set page header with filter controls
+  // Set page header with filter panel and view toggle
   useEffect(() => {
     if (user && profile && companies.length > 0) {
+      const currentUserName = `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email || '';
       const assignableUsers = users.map(u => {
         // Handle both API formats
         const firstName = (u as any).first_name || u.profiles?.first_name || '';
@@ -539,44 +554,110 @@ export default function AdminProjectManagementDashboard() {
         };
       });
 
+      const handleClearAllFilters = () => {
+        setFilterCompanyId(null);
+        setFilterAssignedTo(null);
+        setSelectedCategoryId(null);
+        setFilterStatus(null);
+        setFilterMemberId(null);
+      };
+
+      const userOptions = [
+        { value: null, label: 'All Users' },
+        {
+          value: user.id,
+          label: currentUserName,
+          subtitle: 'Myself',
+          avatar: profile.avatar_url || null,
+        },
+        ...assignableUsers
+          .filter(u => u.id !== user.id)
+          .map(u => ({
+            value: u.id,
+            label: u.display_name,
+            subtitle: u.email,
+            avatar: u.avatar_url ?? null,
+          })),
+      ];
+
       setPageHeader({
         title: 'Admin Project Dashboard',
         description: 'Internal Project and Task Management',
-        projectFilterControls: {
-          selectedCompanyId: filterCompanyId,
-          selectedAssignedTo: filterAssignedTo,
-          selectedCategoryId,
-          companies: companies,
-          categories: [
-            ...availableCategories.filter(c => !c.is_hidden).map(category => ({
-              id: category.id,
-              name: category.name,
-              count: categoryCounts[category.id] || 0,
-            })),
-            { id: 'billing', name: 'Billing', count: categoryCounts['billing'] || 0 },
-          ],
-          assignableUsers: assignableUsers,
-          currentUser: {
-            id: user.id,
-            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || user.email || '',
-            email: user.email || '',
-            avatar: profile.avatar_url || undefined,
-          },
-          onCompanyChange: (companyId: string | null) => {
-            setFilterCompanyId(companyId);
-          },
-          onAssignedToChange: (userId: string | null) => {
-            setFilterAssignedTo(userId);
-          },
-          onCategoryChange: (categoryId: string | null) => {
-            setSelectedCategoryId(categoryId);
-          },
-        },
+        customActions: (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+            <ViewToggle
+              value={currentView}
+              onChange={(v) => setCurrentView(v as ViewType)}
+              options={[
+                { value: 'kanban', icon: <KanbanSquare size={18} />, label: 'Kanban' },
+                { value: 'list', icon: <LayoutList size={16} />, label: 'List' },
+                { value: 'calendar', icon: <CalendarDays size={16} />, label: 'Calendar' },
+              ]}
+            />
+            <FilterPanel
+              onClearAll={handleClearAllFilters}
+              filters={[
+                {
+                  key: 'company',
+                  label: 'Company',
+                  value: filterCompanyId,
+                  options: [
+                    { value: null, label: 'All Companies' },
+                    ...companies
+                      .slice()
+                      .sort((a, b) => a.name.localeCompare(b.name))
+                      .map(c => ({ value: c.id, label: c.name })),
+                  ],
+                  onChange: setFilterCompanyId,
+                  searchable: true,
+                },
+                {
+                  key: 'category',
+                  label: 'Category',
+                  value: selectedCategoryId,
+                  options: [
+                    { value: null, label: 'All Categories' },
+                    ...availableCategories
+                      .filter(c => !c.is_hidden)
+                      .map(c => ({ value: c.id, label: c.name })),
+                    { value: 'billing', label: 'Billing' },
+                  ],
+                  onChange: setSelectedCategoryId,
+                },
+                {
+                  key: 'assignedTo',
+                  label: 'Assigned To',
+                  value: filterAssignedTo,
+                  options: userOptions,
+                  onChange: setFilterAssignedTo,
+                },
+                {
+                  key: 'member',
+                  label: 'Project Member',
+                  value: filterMemberId,
+                  options: userOptions,
+                  onChange: setFilterMemberId,
+                  searchable: true,
+                },
+                {
+                  key: 'status',
+                  label: 'Status',
+                  value: filterStatus,
+                  options: [
+                    { value: null, label: 'All Statuses' },
+                    ...statusOptions.map(s => ({ value: s.value, label: s.label })),
+                  ],
+                  onChange: setFilterStatus,
+                },
+              ]}
+            />
+          </div>
+        ),
       });
     }
 
     return () => setPageHeader(null);
-  }, [user, profile, users, companies, filterCompanyId, filterAssignedTo, selectedCategoryId, availableCategories, categoryCounts, setPageHeader]);
+  }, [user, profile, users, companies, filterCompanyId, filterAssignedTo, filterMemberId, selectedCategoryId, filterStatus, availableCategories, currentView, setPageHeader]);
 
   // Fetch companies
   useEffect(() => {
@@ -873,53 +954,6 @@ export default function AdminProjectManagementDashboard() {
             />
             <Search size={18} className={styles.searchIcon} />
           </div>
-        </div>
-        <div className={styles.tabsRight}>
-          <div className={styles.viewTabs}>
-            <button
-              className={`${styles.viewTab} ${currentView === 'kanban' ? styles.active : ''}`}
-              onClick={() => setCurrentView('kanban')}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none">
-                <path d="M4.55539 3.7778V9.22224M7.6665 3.7778V6.88891M10.7776 3.7778V10.7778M2.22206 0.666687H13.1109C13.9701 0.666687 14.6665 1.36313 14.6665 2.22224V13.1111C14.6665 13.9702 13.9701 14.6667 13.1109 14.6667H2.22206C1.36295 14.6667 0.666504 13.9702 0.666504 13.1111V2.22224C0.666504 1.36313 1.36295 0.666687 2.22206 0.666687Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Kanban
-            </button>
-            <button
-              className={`${styles.viewTab} ${currentView === 'list' ? styles.active : ''}`}
-              onClick={() => setCurrentView('list')}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="12" viewBox="0 0 16 12" fill="none">
-                <path d="M0.666504 0.666687H0.674282M0.666504 5.66669H0.674282M0.666504 10.6667H0.674282M4.55539 0.666687H14.6665M4.55539 5.66669H14.6665M4.55539 10.6667H14.6665" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              List
-            </button>
-            <button
-              className={`${styles.viewTab} ${currentView === 'calendar' ? styles.active : ''}`}
-              onClick={() => setCurrentView('calendar')}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="15" viewBox="0 0 14 15" fill="none">
-                <path d="M3.99984 0.666687V3.33335M9.33317 0.666687V3.33335M0.666504 6.00002H12.6665M1.99984 2.00002H11.3332C12.0696 2.00002 12.6665 2.59697 12.6665 3.33335V12.6667C12.6665 13.4031 12.0696 14 11.3332 14H1.99984C1.26346 14 0.666504 13.4031 0.666504 12.6667V3.33335C0.666504 2.59697 1.26346 2.00002 1.99984 2.00002Z" stroke="currentColor" strokeWidth="1.33333" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Calendar
-            </button>
-          </div>
-
-          {/* Status Filter Dropdown */}
-          <select
-            className={styles.statusFilter}
-            value={filterStatus || ''}
-            onChange={(e) => setFilterStatus(e.target.value || null)}
-          >
-            <option value="">All Statuses</option>
-          {statusOptions
-            .filter(status => status.value !== 'new' && status.value !== 'complete' && status.value !== 'on_hold')
-            .map((status) => (
-              <option key={status.value} value={status.value}>
-                {status.label}
-              </option>
-            ))}
-          </select>
         </div>
       </div>
 

@@ -17,10 +17,12 @@ import PartialLeadsManager from './PartialLeadsManager';
 import AttributionAnalytics from './AttributionAnalytics';
 import FormAnalytics from './FormAnalytics';
 import TemplateLibraryManager from './TemplateLibraryManager';
+import CadenceLibraryManager from './CadenceLibraryManager';
 import SMSTestManager from './SMSTestManager';
 import ExecutionManager from '../Automation/ExecutionManager';
 import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
 import InternalDepartmentSettings from '../ProjectManagement/DepartmentSettings/InternalDepartmentSettings';
+import PestManager from './PestManager';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -42,7 +44,7 @@ type AnalyticsSubsection =
   | 'call-records'
   | 'partial-leads'
   | 'pest-pressure';
-type AutomationSubsection = 'templates' | 'executions';
+type AutomationSubsection = 'templates' | 'executions' | 'cadence-library';
 type SystemSubsection =
   | 'widgets'
   | 'pest-management'
@@ -72,6 +74,7 @@ type AdminSection =
   | 'form-analytics'
   | 'pest-management'
   | 'template-library'
+  | 'cadence-library'
   | 'workflow-executions'
   | 'sms-testing'
   | 'admin-pest-pressure';
@@ -162,6 +165,11 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
         label: 'Workflow Executions',
         legacySection: 'workflow-executions',
       },
+      {
+        id: 'cadence-library',
+        label: 'Cadence Library',
+        legacySection: 'cadence-library',
+      },
     ],
   },
   {
@@ -173,6 +181,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'calling', label: 'Calling', legacySection: 'call-settings' },
       { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
       { id: 'project-settings', label: 'Project Management' },
+      { id: 'pest-management', label: 'Pest Management' },
     ],
   },
 ];
@@ -247,6 +256,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         return <FormAnalytics />;
       case 'templates':
         return <TemplateLibraryManager />;
+      case 'cadence-library':
+        return <CadenceLibraryManager />;
       case 'executions':
         return selectedCompanyId ? (
           <ExecutionManager companyId={selectedCompanyId} />
@@ -262,7 +273,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
               Navigate to{' '}
               <Link
                 href="/admin/pest-pressure"
-                style={{ color: 'var(--action-500)' }}
+                style={{ color: 'var(--blue-500)' }}
               >
                 /admin/pest-pressure
               </Link>{' '}
@@ -272,11 +283,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       case 'project-settings':
         return (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
+          <div
+            style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}
+          >
             <InternalDepartmentSettings />
             <InternalCategorySettings />
           </div>
         );
+      case 'pest-management':
+        return <PestManager />;
       default:
         return <UsersManager />;
     }
@@ -335,17 +350,17 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
           <select
             id="company-select"
             value={selectedCompanyId}
-              onChange={e => setSelectedCompanyId(e.target.value)}
-              className={styles.companySelect}
-            >
-              {companies.map(company => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
+            onChange={e => setSelectedCompanyId(e.target.value)}
+            className={styles.companySelect}
+          >
+            {companies.map(company => (
+              <option key={company.id} value={company.id}>
+                {company.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       <main className={styles.content}>{renderSection()}</main>
     </div>

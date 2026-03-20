@@ -9,6 +9,38 @@
   z-index: 1000;
 }
 
+.desktopTrigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+}
+
+.mobileTrigger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: none;
+  border: none;
+  border-radius: var(--border-radius);
+  color: var(--gray-700);
+  cursor: pointer;
+  padding: 0;
+
+  &:hover {
+    background: var(--gray-100);
+  }
+
+  @media (max-width: 768px) {
+    display: flex;
+  }
+}
+
 .iconLogoWrapper {
   display: flex;
   position: relative;
@@ -16,8 +48,6 @@
   height: 32px;
   justify-content: center;
   align-items: center;
-  padding: 3px;
-  border-radius: 50%;
 }
 
 .iconLogo {
@@ -72,14 +102,23 @@
 }
 
 .menu {
-  position: absolute;
-  top: calc(100% + 4px);
+  position: fixed;
+  top: 60px;
   left: 0;
   right: 0;
-  width: 265px;
+  width: 100%;
   background: white;
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-sm);
+  border-radius: 0;
+
+  @media (min-width: 769px) {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: auto;
+    width: 265px;
+    border-radius: var(--border-radius-sm);
+  }
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   z-index: 1001;
   overflow: hidden;
@@ -109,7 +148,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
   }
 }
 
@@ -172,12 +211,12 @@
   }
 
   &.selected {
-    background: var(--action-100);
-    color: var(--action-600);
+    background: var(--blue-100);
+    color: var(--blue-600);
     font-weight: 760;
 
     &:hover {
-      background: var(--action-100);
+      background: var(--blue-100);
     }
   }
 
@@ -190,7 +229,7 @@
 }
 
 .checkmark {
-  color: var(--action-600);
+  color: var(--blue-600);
   font-weight: bold;
   font-size: 12px;
   flex-shrink: 0;
@@ -204,8 +243,3 @@
   line-height: 20px;
 }
 
-@media (max-width: 768px) {
-  .companyDropdown {
-    display: none;
-  }
-}

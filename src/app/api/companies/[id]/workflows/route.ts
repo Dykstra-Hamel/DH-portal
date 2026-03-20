@@ -152,7 +152,7 @@ export async function POST(
           is_active: workflowData.is_active || false,
           business_hours_only: workflowData.business_hours_only !== false,
           auto_cancel_on_status: workflowData.auto_cancel_on_status !== false,
-          cancel_on_statuses: workflowData.cancel_on_statuses || ['won', 'closed_won', 'converted'],
+          cancel_on_statuses: workflowData.cancel_on_statuses || ['won', 'lost'],
         },
       ])
       .select()

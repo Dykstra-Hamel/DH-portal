@@ -85,7 +85,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -118,7 +118,7 @@
 
   &:focus {
     outline: none;
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -141,10 +141,7 @@
 
 // Address Actions (Save/Cancel buttons)
 .addressActions {
-  background: var(--amber-50);
-  border: 1px solid var(--amber-200);
-  border-radius: 8px;
-  margin: 16px 0;
+  margin-top: 16px;
 }
 
 .actionButtons {
@@ -176,13 +173,13 @@
 }
 
 .saveButton {
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
-  border: 1px solid var(--action-500);
+  border: 1px solid var(--blue-500);
 
   &:hover:not(:disabled) {
-    background: var(--action-600);
-    border-color: var(--action-600);
+    background: var(--blue-600);
+    border-color: var(--blue-600);
   }
 }
 

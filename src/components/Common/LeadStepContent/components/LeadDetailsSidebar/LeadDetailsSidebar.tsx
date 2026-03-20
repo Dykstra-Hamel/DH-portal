@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useCallback, Dispatch, SetStateAction } from 'react';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { DetailsCardsSidebar } from '@/components/Common/DetailsCardsSidebar/DetailsCardsSidebar';
+import styles from './LeadDetailsSidebar.module.scss';
 import { CustomerInformation } from '@/components/Tickets/TicketContent';
 import { ServiceLocationCard } from '@/components/Common/ServiceLocationCard/ServiceLocationCard';
 import { ActivityFeed } from '@/components/Common/ActivityFeed/ActivityFeed';
@@ -39,6 +40,7 @@ interface LeadDetailsSidebarProps {
   serviceLocationCardRef?: React.RefObject<HTMLDivElement | null>;
   shouldExpandServiceLocation?: boolean;
   shouldExpandActivity?: boolean;
+  customerComment?: string | null;
 }
 
 export function LeadDetailsSidebar({
@@ -52,6 +54,7 @@ export function LeadDetailsSidebar({
   serviceLocationCardRef,
   shouldExpandServiceLocation,
   shouldExpandActivity,
+  customerComment,
 }: LeadDetailsSidebarProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   const [isSavingAddress, setIsSavingAddress] = useState(false);
@@ -455,15 +458,6 @@ export function LeadDetailsSidebar({
 
   // Accordion: track which single card is expanded
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
-  const [autoExpandCallForm, setAutoExpandCallForm] = useState(false);
-
-  // Auto-expand Call/Form Details card only once on initial mount
-  useEffect(() => {
-    setAutoExpandCallForm(true);
-    const timer = setTimeout(() => setAutoExpandCallForm(false), 200);
-    return () => clearTimeout(timer);
-  }, []);
-
   // When activity is force-expanded externally, sync accordion state
   useEffect(() => {
     if (shouldExpandActivity) {
@@ -504,16 +498,16 @@ export function LeadDetailsSidebar({
     >
           <InfoCard
             title={
-              lead.lead_type === 'web_form'
+              lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form'
                 ? 'Form Details'
-                : lead.lead_type === 'other' || lead.lead_source === 'campaign'
+                : lead.lead_type === 'manual' || lead.lead_type === 'other'
                 ? 'Attribution Details'
                 : 'Call Information'
             }
             icon={
-              lead.lead_type === 'web_form' ? (
+              lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
                 <TextCursorInput size={20} />
-              ) : lead.lead_type === 'other' || lead.lead_source === 'campaign' ? (
+              ) : lead.lead_type === 'manual' || lead.lead_type === 'other' ? (
                 <ClipboardList size={20} />
               ) : (
                 <Phone size={20} />
@@ -523,7 +517,6 @@ export function LeadDetailsSidebar({
             onExpand={() => handleCardExpand('callFormDetails')}
             onCollapse={() => handleCardCollapse('callFormDetails')}
             forceCollapse={isForceCollapsed('callFormDetails')}
-            forceExpand={autoExpandCallForm}
             isCompact={!isSidebarExpanded}
             inSidebar={true}
           >
@@ -641,12 +634,18 @@ export function LeadDetailsSidebar({
             forceCollapse={isForceCollapsed('notes')}
             isCompact={!isSidebarExpanded}
             inSidebar={true}
+            headerRight={
+              customerComment ? (
+                <span className={styles.customerCommentDot} title="Customer note" />
+              ) : undefined
+            }
           >
             <NotesSection
               entityType="lead"
               entityId={lead.id}
               companyId={lead.company_id}
               userId={user?.id || ''}
+              customerComment={customerComment}
             />
           </InfoCard>
     </DetailsCardsSidebar>

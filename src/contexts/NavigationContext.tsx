@@ -16,7 +16,8 @@ export type PrimaryNavItem =
   | 'customers'
   | 'tasks'
   | 'brand'
-  | 'project-management';
+  | 'project-management'
+  | 'tech-leads';
 
 interface NavigationContextType {
   activePrimaryNav: PrimaryNavItem;
@@ -51,9 +52,13 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
     } else if (
       pathname.startsWith('/project-management') ||
       pathname.startsWith('/admin/project-management') ||
-      pathname.startsWith('/admin/monthly-services')
+      pathname.startsWith('/admin/monthly-services') ||
+      pathname.startsWith('/admin/content-calendar') ||
+      pathname.startsWith('/admin/content-pieces')
     ) {
       setActivePrimaryNav('project-management');
+    } else if (pathname.startsWith('/tech-leads')) {
+      setActivePrimaryNav('tech-leads');
     } else if (pathname.startsWith('/dashboard')) {
       setActivePrimaryNav('dashboard');
     } else {

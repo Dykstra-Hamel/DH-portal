@@ -5,6 +5,7 @@ import { sendQuoteSignedNotification } from '@/lib/email/quote-notifications';
 import { QuoteSignedEmailData } from '@/lib/email/types';
 import { logActivity } from '@/lib/activity-logger';
 import { inngest } from '@/lib/inngest/client';
+import { stopActiveCadence } from '@/lib/leads/stop-active-cadence';
 
 interface AcceptQuoteRequest {
   signature_data: string;
@@ -12,6 +13,9 @@ interface AcceptQuoteRequest {
   token: string;
   preferred_date?: string;
   preferred_time?: string;
+  selected_addon_ids?: string[];
+  selected_plan_ids?: string[];
+  interested_in_financing?: boolean;
   client_device_data?: {
     timezone?: string;
     screen_resolution?: string;
@@ -113,7 +117,7 @@ export async function POST(
     }
 
     // FIELD WHITELISTING: Validate that only allowed fields are present in body
-    const allowedFields = ['signature_data', 'terms_accepted', 'token', 'preferred_date', 'preferred_time', 'client_device_data'];
+    const allowedFields = ['signature_data', 'terms_accepted', 'token', 'preferred_date', 'preferred_time', 'selected_addon_ids', 'selected_plan_ids', 'interested_in_financing', 'client_device_data'];
     const requestedFields = Object.keys(body);
     const unauthorizedFields = requestedFields.filter(field => !allowedFields.includes(field));
 
@@ -155,6 +159,91 @@ export async function POST(
         { error: 'Failed to accept quote' },
         { status: 500 }
       );
+    }
+
+    // Update regular plan line items based on selected_plan_ids
+    if (body.selected_plan_ids !== undefined) {
+      const { data: regularItems } = await supabase
+        .from('quote_line_items')
+        .select('id')
+        .eq('quote_id', id)
+        .is('addon_service_id', null);
+
+      if (regularItems && regularItems.length > 0) {
+        for (const item of regularItems) {
+          await supabase
+            .from('quote_line_items')
+            .update({ is_selected: body.selected_plan_ids.includes(item.id) })
+            .eq('id', item.id);
+        }
+      }
+    }
+
+    // Delete all existing addon line items for this quote, then re-insert selected ones
+    const selectedAddonIds = body.selected_addon_ids || [];
+
+    await supabase
+      .from('quote_line_items')
+      .delete()
+      .eq('quote_id', id)
+      .not('addon_service_id', 'is', null);
+
+    if (selectedAddonIds.length > 0) {
+      const { data: addons } = await supabase
+        .from('add_on_services')
+        .select('id, addon_name, initial_price, recurring_price, billing_frequency')
+        .in('id', selectedAddonIds)
+        .eq('company_id', quote.company_id)
+        .eq('is_active', true);
+
+      if (addons && addons.length > 0) {
+        const addonLineItems = addons.map((addon: any) => ({
+          quote_id: id,
+          addon_service_id: addon.id,
+          plan_name: addon.addon_name,
+          initial_price: addon.initial_price || 0,
+          recurring_price: addon.recurring_price || 0,
+          final_initial_price: addon.initial_price || 0,
+          final_recurring_price: addon.recurring_price || 0,
+          billing_frequency: addon.billing_frequency || 'monthly',
+          is_selected: true,
+        }));
+
+        await supabase.from('quote_line_items').insert(addonLineItems);
+      }
+    }
+
+    // Recalculate quote totals from all selected line items
+    const { data: selectedItems } = await supabase
+      .from('quote_line_items')
+      .select('final_initial_price, final_recurring_price, initial_price, recurring_price')
+      .eq('quote_id', id)
+      .eq('is_selected', true);
+
+    if (selectedItems) {
+      const newInitial = selectedItems.reduce((s, i) => s + (i.final_initial_price ?? i.initial_price ?? 0), 0);
+      const newRecurring = selectedItems.reduce((s, i) => s + (i.final_recurring_price ?? i.recurring_price ?? 0), 0);
+      await supabase
+        .from('quotes')
+        .update({ total_initial_price: newInitial, total_recurring_price: newRecurring })
+        .eq('id', id);
+    }
+
+    // Log Wisetack financing interest as a system note on the lead
+    if (body.interested_in_financing && quote.lead_id) {
+      try {
+        await supabase.from('activity_log').insert({
+          company_id: quote.company_id,
+          entity_type: 'lead',
+          entity_id: quote.lead_id,
+          activity_type: 'note_added',
+          user_id: null,
+          notes: 'Customer expressed interest in Wisetack financing when signing their quote.',
+          metadata: { system_note: true, source: 'quote_acceptance' },
+        });
+      } catch (noteError) {
+        console.error('Error logging Wisetack financing note:', noteError);
+      }
     }
 
     // Log activity for quote acceptance
@@ -200,6 +289,14 @@ export async function POST(
       if (updateLeadError) {
         console.error('Error updating lead status:', updateLeadError);
         // Don't fail the request if lead update fails - quote is already accepted
+      } else {
+        // Stop any active cadence, tasks, and workflows now that lead is scheduling
+        try {
+          await stopActiveCadence(quote.lead_id);
+        } catch (cadenceError) {
+          console.error('Error stopping active cadence on quote acceptance:', cadenceError);
+          // Non-fatal: don't fail the quote acceptance
+        }
       }
 
       // Trigger status-changed event for scheduling notifications
@@ -291,7 +388,8 @@ export async function POST(
             const { data: lineItems } = await supabase
               .from('quote_line_items')
               .select('final_initial_price')
-              .eq('quote_id', id);
+              .eq('quote_id', id)
+              .eq('is_selected', true);
 
             let quoteTotal = 0;
             if (lineItems && lineItems.length > 0) {

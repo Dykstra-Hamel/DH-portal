@@ -33,6 +33,7 @@ import {
 import { StepItem } from '@/components/Common/Step/Step';
 import { LeadStepWrapper } from '@/components/Common/LeadStepWrapper/LeadStepWrapper';
 import { LeadStepContent } from '@/components/Common/LeadStepContent/LeadStepContent';
+import { LeadProgressBar } from '@/components/Common/LeadProgressBar/LeadProgressBar';
 import { ReassignModal } from '@/components/Common/ReassignModal/ReassignModal';
 import { LiveCallModal } from '@/components/Common/LiveCallModal/LiveCallModal';
 import { QuickTaskModal } from '@/components/Common/QuickTaskModal/QuickTaskModal';
@@ -566,6 +567,11 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     [leadId, isAdmin]
   );
 
+  // Surgical lead state patch — updates only specific fields without a full API refetch
+  const patchLead = useCallback((fields: Partial<Lead>) => {
+    setLead(prev => prev ? { ...prev, ...fields } : prev);
+  }, []);
+
   // Fetch lead when leadId is available
   useEffect(() => {
     if (leadId && !loading) {
@@ -850,14 +856,26 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           await adminAPI.updateUserLead(leadId, updateData);
         }
 
-        await fetchLead();
+        setLead(prev => {
+          if (!prev) return prev;
+          const newLead = { ...prev };
+          if ('lead_status' in updateData) newLead.lead_status = updateData.lead_status;
+          if ('lost_reason' in updateData) newLead.lost_reason = updateData.lost_reason;
+          if ('assigned_to' in updateData) {
+            newLead.assigned_to = updateData.assigned_to;
+            newLead.assigned_user = updateData.assigned_to
+              ? (stableAssignableUsers.find(u => u.id === updateData.assigned_to) as Lead['assigned_user'] ?? prev.assigned_user)
+              : undefined;
+          }
+          return newLead;
+        });
         handleShowToast(successMessage, 'success');
       } catch (error) {
         console.error('Error assigning lead:', error);
         handleShowToast('Failed to assign lead. Please try again.', 'error');
       }
     },
-    [leadId, lead, ticketType, isAdmin, fetchLead, handleShowToast]
+    [leadId, lead, ticketType, isAdmin, stableAssignableUsers, handleShowToast]
   );
 
   // Handle scheduler change
@@ -878,7 +896,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           });
         }
 
-        await fetchLead();
+        setLead(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            assigned_scheduler: schedulerId,
+            scheduler_user: (stableAssignableUsers.find(u => u.id === schedulerId) as Lead['scheduler_user']) ?? prev.scheduler_user,
+          };
+        });
         handleShowToast('Scheduler assigned successfully!', 'success');
       } catch (error) {
         console.error('Error assigning scheduler:', error);
@@ -888,7 +913,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         );
       }
     },
-    [leadId, isAdmin, fetchLead, handleShowToast]
+    [leadId, isAdmin, stableAssignableUsers, handleShowToast]
   );
 
   // Handle status change
@@ -911,7 +936,17 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           await adminAPI.updateUserLead(leadId, updateData);
         }
 
-        await fetchLead();
+        setLead(prev => {
+          if (!prev) return prev;
+          const patch: Partial<Lead> = { lead_status: status as Lead['lead_status'] };
+          if (status === 'new') {
+            patch.assigned_to = undefined;
+            patch.assigned_scheduler = undefined;
+            patch.assigned_user = undefined;
+            patch.scheduler_user = undefined;
+          }
+          return { ...prev, ...patch };
+        });
 
         const message = status === 'new'
           ? 'Lead status updated and users unassigned successfully!'
@@ -925,7 +960,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         );
       }
     },
-    [leadId, lead, isAdmin, fetchLead, handleShowToast]
+    [leadId, lead, isAdmin, handleShowToast]
   );
 
   // Update page header when lead data changes
@@ -1288,11 +1323,15 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
   return (
     <>
       <div className="container">
+        <LeadProgressBar
+          leadStatus={lead.lead_status as 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost'}
+        />
         <div className={styles.content}>
           <LeadStepContent
             lead={lead}
             isAdmin={isAdmin}
             onLeadUpdate={fetchLead}
+            onLeadFieldUpdate={patchLead}
             onShowToast={handleShowToast}
             onRequestUndo={handleRequestUndo}
             onEmailQuote={handleEmailQuoteButton}

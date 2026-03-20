@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, ReactNode } from 'react';
 import Image from 'next/image';
-import { Building2, ChevronDown, Tag, UserRound, Users } from 'lucide-react';
-import { statusOptions as projectStatusOptions } from '@/types/project';
+import { ChevronDown, Users } from 'lucide-react';
 import styles from './GlobalLowerHeader.module.scss';
 
 interface ActionButton {
@@ -53,25 +52,11 @@ interface SupportCaseAssignmentControls {
   onStatusChange: (status: string) => void;
 }
 
-interface ProjectFilterControls {
-  selectedCompanyId?: string | null;
-  selectedAssignedTo?: string | null | undefined;
-  selectedStatus?: string | null;
-  selectedCategoryId?: string | null;
-  companies: Array<{ id: string; name: string }>;
-  assignableUsers: AssignableUser[];
-  categories?: Array<{ id: string; name: string; count?: number }>;
-  currentUser: { id: string; name: string; email: string; avatar?: string };
-  onCompanyChange: (companyId: string | null) => void;
-  onAssignedToChange: (userId: string | null) => void;
-  onStatusChange?: (status: string | null) => void;
-  onCategoryChange?: (categoryId: string | null) => void;
-}
-
 interface GlobalLowerHeaderProps {
   title: ReactNode;
   description: string;
   titleLeading?: ReactNode;
+  titleLogo?: ReactNode;
   showAddButton?: boolean;
   addButtonText?: string;
   onAddClick?: () => void;
@@ -79,7 +64,6 @@ interface GlobalLowerHeaderProps {
   actionButtons?: ActionButton[];
   leadAssignmentControls?: LeadAssignmentControls;
   supportCaseAssignmentControls?: SupportCaseAssignmentControls;
-  projectFilterControls?: ProjectFilterControls;
   customActions?: ReactNode;
 }
 
@@ -103,7 +87,7 @@ const PlusIcon = () => (
 
 const TeamAvatar = () => (
   <div className={styles.teamAvatar}>
-    <Users size={20} color="var(--action-600)" />
+    <Users size={20} color="var(--blue-600)" />
   </div>
 );
 
@@ -121,29 +105,20 @@ export function GlobalLowerHeader({
   actionButtons,
   leadAssignmentControls,
   supportCaseAssignmentControls,
-  projectFilterControls,
   customActions,
   titleLeading,
+  titleLogo,
 }: GlobalLowerHeaderProps) {
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
-  const [isProjectCompanyOpen, setIsProjectCompanyOpen] = useState(false);
-  const [isProjectCategoryOpen, setIsProjectCategoryOpen] = useState(false);
-  const [isProjectAssignedToOpen, setIsProjectAssignedToOpen] = useState(false);
-  const [isProjectStatusOpen, setIsProjectStatusOpen] = useState(false);
   const [hasShadow, setHasShadow] = useState(false);
-  const [companySearchQuery, setCompanySearchQuery] = useState('');
 
   const leadTypeRef = useRef<HTMLDivElement>(null);
   const assignedToRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
   const supportAssignedToRef = useRef<HTMLDivElement>(null);
   const supportStatusRef = useRef<HTMLDivElement>(null);
-  const projectCompanyRef = useRef<HTMLDivElement>(null);
-  const projectCategoryRef = useRef<HTMLDivElement>(null);
-  const projectAssignedToRef = useRef<HTMLDivElement>(null);
-  const projectStatusRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -177,30 +152,6 @@ export function GlobalLowerHeader({
         !supportStatusRef.current.contains(event.target as Node)
       ) {
         setIsStatusOpen(false);
-      }
-      if (
-        projectCompanyRef.current &&
-        !projectCompanyRef.current.contains(event.target as Node)
-      ) {
-        setIsProjectCompanyOpen(false);
-      }
-      if (
-        projectCategoryRef.current &&
-        !projectCategoryRef.current.contains(event.target as Node)
-      ) {
-        setIsProjectCategoryOpen(false);
-      }
-      if (
-        projectAssignedToRef.current &&
-        !projectAssignedToRef.current.contains(event.target as Node)
-      ) {
-        setIsProjectAssignedToOpen(false);
-      }
-      if (
-        projectStatusRef.current &&
-        !projectStatusRef.current.contains(event.target as Node)
-      ) {
-        setIsProjectStatusOpen(false);
       }
     };
 
@@ -368,79 +319,37 @@ export function GlobalLowerHeader({
       .length;
   };
 
-  // Project Filter helper functions
-  const getProjectCompanyDisplay = () => {
-    if (!projectFilterControls) return 'All Companies';
-    const { selectedCompanyId, companies } = projectFilterControls;
-
-    if (!selectedCompanyId) return 'All Companies';
-
-    const company = companies.find(c => c.id === selectedCompanyId);
-    return company?.name || 'All Companies';
-  };
-
-  const getProjectAssignedToDisplay = () => {
-    if (!projectFilterControls)
-      return { name: 'All Users', subtitle: '', avatar: null };
-
-    const { selectedAssignedTo, assignableUsers, currentUser } = projectFilterControls;
-
-    if (!selectedAssignedTo) {
-      return { name: 'All Users', subtitle: '', avatar: null };
-    }
-
-    if (selectedAssignedTo === currentUser.id) {
-      return {
-        name: currentUser.name,
-        subtitle: 'Myself',
-        avatar: currentUser.avatar || null,
-      };
-    }
-
-    const user = assignableUsers.find(u => u.id === selectedAssignedTo);
-    if (user) {
-      return {
-        name: user.display_name,
-        subtitle: user.email,
-        avatar: user.avatar_url || null,
-      };
-    }
-
-    return { name: 'All Users', subtitle: '', avatar: null };
-  };
-
-  const getProjectStatusDisplay = () => {
-    if (!projectFilterControls) return 'All Statuses';
-    const { selectedStatus } = projectFilterControls;
-
-    if (!selectedStatus) return 'All Statuses';
-
-    const match = projectStatusOptions.find(option => option.value === selectedStatus);
-    return match?.label ?? selectedStatus;
-  };
-
-  const getProjectCategoryDisplay = () => {
-    if (!projectFilterControls) return 'All Categories';
-    const { selectedCategoryId, categories } = projectFilterControls;
-    if (!selectedCategoryId) return 'All Categories';
-    const match = categories?.find(category => category.id === selectedCategoryId);
-    return match?.name || 'All Categories';
-  };
-
   return (
     <div
       className={`${styles.globalLowerHeader} ${hasShadow ? styles.globalLowerHeaderScrolled : ''}`}
     >
       <div className={styles.headerContent}>
-        <div className={`${styles.leftSection} ${titleLeading ? styles.leftSectionWithLeading : ''}`}>
-          {titleLeading && <div className={styles.titleLeading}>{titleLeading}</div>}
-          <div className={styles.titleStack}>
-            <h1 className={styles.title}>{title}</h1>
-            <p
-              className={styles.description}
-              dangerouslySetInnerHTML={{ __html: description }}
-            />
-          </div>
+        <div
+          className={`${styles.leftSection} ${titleLeading ? styles.leftSectionWithLeading : ''}`}
+        >
+          {titleLeading && (
+            <div className={styles.titleLeading}>{titleLeading}</div>
+          )}
+          {titleLogo ? (
+            <div className={styles.titleWithLogoWrapper}>
+              <div className={styles.titleLogoCol}>{titleLogo}</div>
+              <div className={styles.titleStack}>
+                <h1 className={styles.title}>{title}</h1>
+                <p
+                  className={styles.description}
+                  dangerouslySetInnerHTML={{ __html: description }}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className={styles.titleStack}>
+              <h1 className={styles.title}>{title}</h1>
+              <p
+                className={styles.description}
+                dangerouslySetInnerHTML={{ __html: description }}
+              />
+            </div>
+          )}
         </div>
 
         {leadAssignmentControls && (
@@ -957,299 +866,13 @@ export function GlobalLowerHeader({
             </div>
           </div>
         )}
-        {projectFilterControls && (
-          <div className={styles.controlsSection}>
-            {/* Company Filter Dropdown */}
-            <div className={styles.controlGroup} ref={projectCompanyRef}>
-              <label
-                className={`${styles.controlLabel} ${styles.iconOnlyLabel}`}
-                aria-label="What Company"
-                title="What Company"
-              >
-                <Building2 size={18} aria-hidden="true" />
-              </label>
-              <button
-                className={`${styles.controlDropdown} ${styles.companyControlDropdown}`}
-                onClick={() => setIsProjectCompanyOpen(!isProjectCompanyOpen)}
-              >
-                <span className={`${styles.controlValue} ${styles.companyControlValue}`}>
-                  {getProjectCompanyDisplay()}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`${styles.chevron} ${isProjectCompanyOpen ? styles.open : ''}`}
-                />
-              </button>
-              {isProjectCompanyOpen && (
-                <div className={`${styles.dropdownMenu} ${styles.companyDropdownMenu}`}>
-                  <div className={styles.searchContainer}>
-                    <input
-                      type="text"
-                      placeholder="Search companies..."
-                      className={styles.searchInput}
-                      value={companySearchQuery}
-                      onChange={(e) => setCompanySearchQuery(e.target.value)}
-                      onClick={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                  <button
-                    className={`${styles.dropdownOption} ${styles.companyDropdownOption} ${!projectFilterControls.selectedCompanyId ? styles.selected : ''}`}
-                    onClick={() => {
-                      projectFilterControls.onCompanyChange(null);
-                      setIsProjectCompanyOpen(false);
-                      setCompanySearchQuery('');
-                    }}
-                  >
-                    All Companies
-                  </button>
-                  {projectFilterControls.companies
-                    .filter((company) =>
-                      company.name.toLowerCase().includes(companySearchQuery.toLowerCase())
-                    )
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((company) => (
-                      <button
-                        key={company.id}
-                        className={`${styles.dropdownOption} ${styles.companyDropdownOption} ${projectFilterControls.selectedCompanyId === company.id ? styles.selected : ''}`}
-                        onClick={() => {
-                          projectFilterControls.onCompanyChange(company.id);
-                          setIsProjectCompanyOpen(false);
-                          setCompanySearchQuery('');
-                        }}
-                      >
-                        {company.name}
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            {/* Category Filter Dropdown */}
-            {projectFilterControls.onCategoryChange && projectFilterControls.categories && projectFilterControls.categories.length > 0 && (
-              <div className={styles.controlGroup} ref={projectCategoryRef}>
-                <label
-                  className={`${styles.controlLabel} ${styles.iconOnlyLabel}`}
-                  aria-label="Category"
-                  title="Category"
-                >
-                  <Tag size={18} aria-hidden="true" />
-                </label>
-                <button
-                  className={`${styles.controlDropdown} ${styles.categoryControlDropdown}`}
-                  onClick={() => setIsProjectCategoryOpen(!isProjectCategoryOpen)}
-                >
-                  <span className={`${styles.controlValue} ${styles.categoryControlValue}`}>
-                    {getProjectCategoryDisplay()}
-                  </span>
-                  <ChevronDown
-                    size={16}
-                    className={`${styles.chevron} ${isProjectCategoryOpen ? styles.open : ''}`}
-                  />
-                </button>
-                {isProjectCategoryOpen && (
-                  <div className={`${styles.dropdownMenu} ${styles.categoryDropdownMenu}`}>
-                    <button
-                      className={`${styles.dropdownOption} ${styles.categoryDropdownOption} ${!projectFilterControls.selectedCategoryId ? styles.selected : ''}`}
-                      onClick={() => {
-                        projectFilterControls.onCategoryChange?.(null);
-                        setIsProjectCategoryOpen(false);
-                      }}
-                    >
-                      All Categories
-                    </button>
-                    {projectFilterControls.categories.map((category) => (
-                      <button
-                        key={category.id}
-                        className={`${styles.dropdownOption} ${styles.categoryDropdownOption} ${projectFilterControls.selectedCategoryId === category.id ? styles.selected : ''}`}
-                        onClick={() => {
-                          projectFilterControls.onCategoryChange?.(category.id);
-                          setIsProjectCategoryOpen(false);
-                        }}
-                      >
-                        {category.name}
-                        {typeof category.count === 'number' ? ` (${category.count})` : ''}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Assigned To Filter Dropdown */}
-            <div className={styles.controlGroup} ref={projectAssignedToRef}>
-              <label
-                className={`${styles.controlLabel} ${styles.iconOnlyLabel}`}
-                aria-label="Assigned To"
-                title="Assigned To"
-              >
-                <UserRound size={18} aria-hidden="true" />
-              </label>
-              <button
-                className={`${styles.controlDropdown} ${styles.usersControlDropdown}`}
-                onClick={() => setIsProjectAssignedToOpen(!isProjectAssignedToOpen)}
-              >
-                <div className={styles.assignedToContent}>
-                  {(() => {
-                    const display = getProjectAssignedToDisplay();
-                    if (display.avatar) {
-                      return (
-                        <Image
-                          src={display.avatar}
-                          alt={display.name}
-                          width={24}
-                          height={24}
-                          className={styles.avatar}
-                        />
-                      );
-                    }
-                    return <DefaultAvatar name={display.name} />;
-                  })()}
-                  <span className={`${styles.controlValue} ${styles.usersControlValue}`}>
-                    {getProjectAssignedToDisplay().name}
-                  </span>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`${styles.chevron} ${isProjectAssignedToOpen ? styles.open : ''}`}
-                />
-              </button>
-              {isProjectAssignedToOpen && (
-                <div className={`${styles.dropdownMenu} ${styles.usersDropdownMenu}`}>
-                  {/* All Users option */}
-                  <button
-                    className={`${styles.dropdownOption} ${styles.usersDropdownOption} ${!projectFilterControls.selectedAssignedTo ? styles.selected : ''}`}
-                    onClick={() => {
-                      projectFilterControls.onAssignedToChange(null);
-                      setIsProjectAssignedToOpen(false);
-                    }}
-                  >
-                    <div className={styles.optionContent}>
-                      <DefaultAvatar name="All Users" />
-                      <div className={styles.optionInfo}>
-                        <div className={styles.optionName}>All Users</div>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Current User option */}
-                  <button
-                    className={`${styles.dropdownOption} ${styles.usersDropdownOption} ${projectFilterControls.selectedAssignedTo === projectFilterControls.currentUser.id ? styles.selected : ''}`}
-                    onClick={() => {
-                      projectFilterControls.onAssignedToChange(projectFilterControls.currentUser.id);
-                      setIsProjectAssignedToOpen(false);
-                    }}
-                  >
-                    <div className={styles.optionContent}>
-                      {projectFilterControls.currentUser.avatar ? (
-                        <Image
-                          src={projectFilterControls.currentUser.avatar}
-                          alt={projectFilterControls.currentUser.name}
-                          width={32}
-                          height={32}
-                          className={styles.avatar}
-                        />
-                      ) : (
-                        <DefaultAvatar name={projectFilterControls.currentUser.name} />
-                      )}
-                      <div className={styles.optionInfo}>
-                        <div className={styles.optionName}>
-                          {projectFilterControls.currentUser.name}
-                        </div>
-                        <div className={styles.optionSubtitle}>Myself</div>
-                      </div>
-                    </div>
-                  </button>
-
-                  {/* Other users */}
-                  {projectFilterControls.assignableUsers
-                    .filter(u => u.id !== projectFilterControls.currentUser.id)
-                    .map(user => (
-                      <button
-                        key={user.id}
-                        className={`${styles.dropdownOption} ${styles.usersDropdownOption} ${projectFilterControls.selectedAssignedTo === user.id ? styles.selected : ''}`}
-                        onClick={() => {
-                          projectFilterControls.onAssignedToChange(user.id);
-                          setIsProjectAssignedToOpen(false);
-                        }}
-                      >
-                        <div className={styles.optionContent}>
-                          {user.avatar_url ? (
-                            <Image
-                              src={user.avatar_url}
-                              alt={user.display_name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar name={user.display_name} />
-                          )}
-                          <div className={styles.optionInfo}>
-                            <div className={styles.optionName}>
-                              {user.display_name}
-                            </div>
-                            <div className={styles.optionSubtitle}>
-                              {user.email}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                </div>
-              )}
-            </div>
-
-            {/* Status Filter Dropdown */}
-            {projectFilterControls.onStatusChange && (
-              <div className={styles.controlGroup} ref={projectStatusRef}>
-                <label className={styles.controlLabel}>Status:</label>
-                <button
-                  className={styles.controlDropdown}
-                  onClick={() => setIsProjectStatusOpen(!isProjectStatusOpen)}
-                >
-                  <span className={styles.controlValue}>
-                    {getProjectStatusDisplay()}
-                  </span>
-                  <ChevronDown
-                    size={16}
-                    className={`${styles.chevron} ${isProjectStatusOpen ? styles.open : ''}`}
-                  />
-                </button>
-                {isProjectStatusOpen && (
-                  <div className={styles.dropdownMenu}>
-                    <button
-                      className={`${styles.dropdownOption} ${!projectFilterControls.selectedStatus ? styles.selected : ''}`}
-                      onClick={() => {
-                        projectFilterControls.onStatusChange!(null);
-                        setIsProjectStatusOpen(false);
-                      }}
-                    >
-                      All Statuses
-                    </button>
-                    {projectStatusOptions.map(({ value, label }) => (
-                      <button
-                        key={value}
-                        className={`${styles.dropdownOption} ${projectFilterControls.selectedStatus === value ? styles.selected : ''}`}
-                        onClick={() => {
-                          projectFilterControls.onStatusChange!(value);
-                          setIsProjectStatusOpen(false);
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
         {((actionButtons && actionButtons?.length > 0) ||
           showAddButton ||
           customActions) && (
           <div className={styles.rightSection}>
             {customActions && customActions}
-            {actionButtons && actionButtons.length > 0 && (
+            {actionButtons &&
+              actionButtons.length > 0 &&
               actionButtons.map((button, index) => (
                 <button
                   key={index}
@@ -1260,8 +883,7 @@ export function GlobalLowerHeader({
                   <PlusIcon />
                   <span>{button.text}</span>
                 </button>
-              ))
-            )}
+              ))}
             {showAddButton && (
               <button
                 className={styles.addLeadButton}

@@ -7,7 +7,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: white;
   padding: 0;
   border: none;
@@ -73,7 +73,7 @@
 
   &:hover {
     background: var(--gray-50);
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 
   &:active {
@@ -86,7 +86,7 @@
   }
 
   &:hover svg {
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 }
 
@@ -107,7 +107,7 @@
 
   &:hover {
     background: var(--gray-50);
-    color: var(--action-600);
+    color: var(--blue-600);
   }
 
   &:active {

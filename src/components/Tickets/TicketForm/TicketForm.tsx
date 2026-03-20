@@ -3,10 +3,14 @@
 import React, { useState, useEffect } from 'react';
 import {
   TicketFormData,
+  TicketFormat,
   TicketSource,
   TicketType,
   ticketStatusOptions,
   ticketPriorityOptions,
+  ticketFormatOptions,
+  ticketSourceOptions,
+  ticketTypesByFormat,
 } from '@/types/ticket';
 import {
   SearchableDropdown,
@@ -33,8 +37,9 @@ export default function TicketForm({
   loading = false,
 }: TicketFormProps) {
   const [formData, setFormData] = useState<TicketFormData>({
-    source: 'inbound',
-    type: 'phone_call',
+    format: 'call',
+    source: 'direct',
+    type: 'inbound_call',
     status: 'new',
     priority: 'medium',
     description: '',
@@ -47,27 +52,9 @@ export default function TicketForm({
     Partial<Record<keyof TicketFormData, string>>
   >({});
 
-  // Get source options based on format (type) selection
-  const getSourceOptions = () => {
-    switch (formData.type) {
-      case 'phone_call':
-        return [
-          { value: 'inbound', label: 'Inbound' },
-          { value: 'outbound', label: 'Outbound' },
-        ];
-      case 'web_form':
-        return [
-          { value: 'widget', label: 'Widget' },
-          { value: 'website', label: 'Website' },
-          { value: 'other', label: 'Other' },
-        ];
-      case 'email':
-      case 'in_person':
-      case 'other':
-      default:
-        return [{ value: 'other', label: 'Other' }];
-    }
-  };
+  const [pestOptions, setPestOptions] = useState<Array<{ id: string; name: string; custom_label: string }>>([]);
+  const [loadingPestOptions, setLoadingPestOptions] = useState(false);
+
   const [customers, setCustomers] = useState<SearchableDropdownItem[]>([]);
   const [selectedCustomer, setSelectedCustomer] =
     useState<SearchableDropdownItem | null>(null);
@@ -156,13 +143,13 @@ export default function TicketForm({
   ) => {
     const { name, value } = e.target;
 
-    // If format (type) changes, reset source to the first available option for that format
-    if (name === 'type') {
-      const newSourceOptions = getSourceOptionsForType(value);
+    // If format changes, reset type to the first available option for that format
+    if (name === 'format') {
+      const firstType = ticketTypesByFormat[value]?.[0]?.value || 'manual';
       setFormData(prev => ({
         ...prev,
-        type: value as TicketType,
-        source: (newSourceOptions[0]?.value || 'other') as TicketSource,
+        format: value as TicketFormat,
+        type: firstType as TicketType,
       }));
     } else {
       setFormData(prev => ({
@@ -177,28 +164,6 @@ export default function TicketForm({
         ...prev,
         [name]: undefined,
       }));
-    }
-  };
-
-  // Helper function to get source options for a given type (used in handleInputChange)
-  const getSourceOptionsForType = (type: string) => {
-    switch (type) {
-      case 'call':
-        return [
-          { value: 'inbound', label: 'Inbound' },
-          { value: 'outbound', label: 'Outbound' },
-        ];
-      case 'form':
-        return [
-          { value: 'widget', label: 'Widget' },
-          { value: 'website', label: 'Website' },
-          { value: 'other', label: 'Other' },
-        ];
-      case 'email':
-      case 'in_person':
-      case 'other':
-      default:
-        return [{ value: 'other', label: 'Other' }];
     }
   };
 
@@ -239,6 +204,10 @@ export default function TicketForm({
   const validateForm = (updateErrors: boolean = true): boolean => {
     const newErrors: Partial<Record<keyof TicketFormData, string>> = {};
 
+    if (!formData.format) {
+      newErrors.format = 'Format is required';
+    }
+
     if (!formData.source) {
       newErrors.source = 'Source is required';
     }
@@ -269,6 +238,16 @@ export default function TicketForm({
     }
     return Object.keys(newErrors).length === 0;
   };
+
+  useEffect(() => {
+    if (!companyId) return;
+    setLoadingPestOptions(true);
+    fetch(`/api/pest-options/${companyId}`)
+      .then(res => res.json())
+      .then(data => setPestOptions(data.data || []))
+      .catch(() => setPestOptions([]))
+      .finally(() => setLoadingPestOptions(false));
+  }, [companyId]);
 
   useEffect(() => {
     if (onFormDataChange) {
@@ -475,26 +454,26 @@ export default function TicketForm({
         )}
       </div>
 
-      {/* Format and Source */}
+      {/* Format, Source, and Type */}
       <div className={styles.row}>
         <div className={styles.formGroup}>
-          <label htmlFor="type" className={styles.label}>
+          <label htmlFor="format" className={styles.label}>
             Format *
           </label>
           <select
-            name="type"
-            value={formData.type}
+            name="format"
+            value={formData.format || ''}
             onChange={handleInputChange}
             className={styles.select}
             required
           >
-            <option value="phone_call">Call</option>
-            <option value="web_form">Form</option>
-            <option value="email">Email</option>
-            <option value="in_person">In Person</option>
-            <option value="other">Other</option>
+            {ticketFormatOptions.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
-          {errors.type && <div className={styles.error}>{errors.type}</div>}
+          {errors.format && <div className={styles.error}>{errors.format}</div>}
         </div>
 
         <div className={styles.formGroup}>
@@ -508,7 +487,7 @@ export default function TicketForm({
             className={styles.select}
             required
           >
-            {getSourceOptions().map(option => (
+            {ticketSourceOptions.map(option => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
@@ -516,6 +495,26 @@ export default function TicketForm({
           </select>
           {errors.source && <div className={styles.error}>{errors.source}</div>}
         </div>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label htmlFor="type" className={styles.label}>
+          Type *
+        </label>
+        <select
+          name="type"
+          value={formData.type}
+          onChange={handleInputChange}
+          className={styles.select}
+          required
+        >
+          {(ticketTypesByFormat[formData.format || 'call'] || ticketTypesByFormat['call']).map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+        {errors.type && <div className={styles.error}>{errors.type}</div>}
       </div>
 
       {/* Status and Priority */}
@@ -605,14 +604,20 @@ export default function TicketForm({
           <label htmlFor="pest_type" className={styles.label}>
             Pest Type
           </label>
-          <input
-            type="text"
+          <select
             name="pest_type"
             value={formData.pest_type || ''}
             onChange={handleInputChange}
-            className={styles.input}
-            placeholder="e.g., Ants, Rodents, Spiders"
-          />
+            className={styles.select}
+            disabled={loadingPestOptions}
+          >
+            <option value="">Select pest type</option>
+            {pestOptions.map(pest => (
+              <option key={pest.id} value={pest.custom_label}>
+                {pest.custom_label}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 

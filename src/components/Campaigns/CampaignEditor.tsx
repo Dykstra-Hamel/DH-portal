@@ -55,6 +55,7 @@ export default function CampaignEditor({
     start_datetime: '',
     workflow_id: '',
     daily_limit: 500,
+    batch_size: 10,
     respect_business_hours: true,
   });
 
@@ -198,6 +199,14 @@ export default function CampaignEditor({
     // Note: We can't auto-select the newly created discount without knowing its ID
     // The DiscountModal would need to return the created discount ID in its onSave callback
   };
+
+  const isEmailOnly =
+    selectedWorkflow != null &&
+    Array.isArray(selectedWorkflow.workflow_steps) &&
+    selectedWorkflow.workflow_steps.length > 0 &&
+    selectedWorkflow.workflow_steps.every(
+      (s: any) => s.type !== 'make_call' && s.type !== 'send_sms'
+    );
 
   const validateCampaignId = async (campaignId: string) => {
     if (!campaignId.trim()) {
@@ -363,6 +372,7 @@ export default function CampaignEditor({
         start_datetime: campaign.start_datetime || '',
         workflow_id: campaign.workflow_id || '',
         daily_limit: campaign.daily_limit || 500,
+        batch_size: campaign.batch_size || 10,
         respect_business_hours: campaign.respect_business_hours ?? true,
       });
       setSelectedWorkflow(campaign.workflow);
@@ -716,6 +726,7 @@ export default function CampaignEditor({
       start_datetime: '',
       workflow_id: '',
       daily_limit: 500,
+      batch_size: 10,
       respect_business_hours: true,
     });
     setSelectedWorkflow(null);
@@ -1190,9 +1201,29 @@ export default function CampaignEditor({
                 </div>
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Batch Size:</span>
-                  <span className={styles.reviewValue}>
-                    10 contacts per batch (system default)
-                  </span>
+                  {isEmailOnly ? (
+                    <span className={styles.reviewValue}>
+                      <input
+                        id="batch-size"
+                        type="number"
+                        min={1}
+                        max={25}
+                        value={formData.batch_size}
+                        onChange={e =>
+                          setFormData({
+                            ...formData,
+                            batch_size: Math.min(25, Math.max(1, parseInt(e.target.value) || 1)),
+                          })
+                        }
+                        className={styles.batchSizeInput}
+                      />
+                      <span className={styles.batchSizeHint}> contacts/batch (email-only — max 25)</span>
+                    </span>
+                  ) : (
+                    <span className={styles.reviewValue}>
+                      10 contacts per batch (system default)
+                    </span>
+                  )}
                 </div>
                 <div className={styles.reviewItem}>
                   <span className={styles.reviewLabel}>Batch Interval:</span>

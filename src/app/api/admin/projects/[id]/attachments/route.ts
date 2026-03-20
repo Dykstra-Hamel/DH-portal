@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { sanitizeFileName } from '@/lib/storage-utils';
 
 const STORAGE_BUCKET = 'project-files';
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
@@ -118,68 +117,74 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Check permissions
-    const canEdit = await canEditProject(supabase, projectId, user.id);
-    if (!canEdit) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    }
-
-    // Parse JSON body (file already uploaded directly to storage)
-    const body = await request.json();
-    const { file_path, file_name, file_size, mime_type } = body;
-
-    if (!file_path || !file_name || !file_size || !mime_type) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
-
-    // Validate file type
-    if (!ALLOWED_TYPES.includes(mime_type)) {
-      return NextResponse.json(
-        { error: `File type ${mime_type} is not allowed` },
-        { status: 400 }
-      );
-    }
-
-    // Validate file size
-    if (file_size > MAX_FILE_SIZE) {
-      return NextResponse.json(
-        { error: `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit` },
-        { status: 400 }
-      );
-    }
-
-    // Verify the file exists in storage (optional - client already uploaded it)
-    // We trust the client upload succeeded if we got this far
-
-    // Create attachment metadata
-    const attachmentId = crypto.randomUUID();
-    const attachment = {
-      id: attachmentId,
-      file_path,
-      file_name,
-      file_size,
-      mime_type,
-      uploaded_by: user.id,
-      uploaded_at: new Date().toISOString(),
-    };
-
-    // Get current attachments
-    const { data: project, error: fetchError } = await supabase
+    // Any authenticated user with access to this project (via RLS) can add attachments.
+    const { data: project, error: projectError } = await supabase
       .from('projects')
       .select('attachments')
       .eq('id', projectId)
       .single();
-
-    if (fetchError) {
-      return NextResponse.json({ error: 'Failed to fetch project' }, { status: 500 });
+    if (projectError || !project) {
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     }
+
+    // Parse JSON body (file(s) already uploaded directly to storage)
+    const body = await request.json();
+    const files: Array<{
+      file_path: string;
+      file_name: string;
+      file_size: number;
+      mime_type: string;
+    }> = Array.isArray(body?.files) ? body.files : [body];
+
+    if (!files || files.length === 0) {
+      return NextResponse.json(
+        { error: 'No files provided' },
+        { status: 400 }
+      );
+    }
+
+    for (const file of files) {
+      if (
+        !file?.file_path ||
+        !file?.file_name ||
+        !file?.file_size ||
+        !file?.mime_type
+      ) {
+        return NextResponse.json(
+          { error: 'Missing required file fields' },
+          { status: 400 }
+        );
+      }
+
+      if (!ALLOWED_TYPES.includes(file.mime_type)) {
+        return NextResponse.json(
+          { error: `File type ${file.mime_type} is not allowed` },
+          { status: 400 }
+        );
+      }
+
+      if (file.file_size > MAX_FILE_SIZE) {
+        return NextResponse.json(
+          { error: `File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit` },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Create attachment metadata
+    const attachments = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file_path: file.file_path,
+      file_name: file.file_name,
+      file_size: file.file_size,
+      mime_type: file.mime_type,
+      uploaded_by: user.id,
+      uploaded_at: new Date().toISOString(),
+    }));
 
     // Update attachments array
     const currentAttachments = project.attachments || [];
-    const updatedAttachments = [...currentAttachments, attachment];
+    const updatedAttachments = [...currentAttachments, ...attachments];
 
     const { error: updateError } = await supabase
       .from('projects')
@@ -193,7 +198,12 @@ export async function POST(
       );
     }
 
-    return NextResponse.json({ attachment }, { status: 201 });
+    return NextResponse.json(
+      files.length === 1
+        ? { attachment: attachments[0], attachments }
+        : { attachments },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error saving attachment metadata:', error);
     return NextResponse.json(

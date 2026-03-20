@@ -26,6 +26,7 @@ interface ServicePlan {
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
+  plan_terms: string | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -104,7 +105,13 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
-          setAvailablePestTypes(data.data.availablePestTypes || []);
+          const companyPestIds = new Set(
+            (data.data.companyPestOptions || []).map((o: { pest_id: string }) => o.pest_id)
+          );
+          const filtered = (data.data.availablePestTypes || []).filter(
+            (p: { id: string }) => companyPestIds.has(p.id)
+          );
+          setAvailablePestTypes(filtered);
         }
       }
     } catch (error) {

@@ -32,7 +32,7 @@
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: var(--white);
   border: none;
   border-radius: var(--border-radius);
@@ -43,7 +43,7 @@
   transition: background-color 0.2s ease;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   svg {
@@ -289,9 +289,19 @@
   width: 100%;
   max-height: 90vh;
   overflow: hidden;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
   display: flex;
   flex-direction: column;
+
+  form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 .modalHeader {
@@ -373,7 +383,7 @@
   outline: none;
 
   &:focus {
-    border-color: var(--action-500);
+    border-color: var(--blue-500);
     box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
@@ -458,13 +468,13 @@
   font-weight: 600;
   border-radius: 8px;
   border: none;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: var(--white);
   cursor: pointer;
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--action-600);
+    background: var(--blue-600);
   }
 
   &:disabled {
@@ -526,7 +536,7 @@
   color: var(--gray-800);
   cursor: pointer;
 
-  input[type="checkbox"] {
+  input[type='checkbox'] {
     width: 16px;
     height: 16px;
     cursor: pointer;
@@ -584,8 +594,8 @@
   gap: 6px;
   padding: 6px 12px;
   background: var(--white);
-  color: var(--action-500);
-  border: 1px solid var(--action-500);
+  color: var(--blue-500);
+  border: 1px solid var(--blue-500);
   border-radius: 4px;
   font-family: var(--font-satoshi);
   font-size: 13px;
@@ -594,7 +604,7 @@
   transition: all 0.2s ease;
 
   &:hover {
-    background: var(--action-500);
+    background: var(--blue-500);
     color: var(--white);
   }
 
@@ -704,7 +714,7 @@
   justify-content: center;
   min-width: 52px;
   padding: 6px 10px;
-  background: var(--action-500);
+  background: var(--blue-500);
   color: var(--white);
   border-radius: var(--border-radius);
   font-family: var(--font-satoshi);
@@ -751,5 +761,210 @@
   svg {
     width: 20px;
     height: 20px;
+  }
+}
+
+// Custom Attribute Field Builder
+.attributeToggleRow {
+  margin-bottom: 16px;
+}
+
+.attributeToggleLabel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--gray-700);
+
+  input[type='checkbox'] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+  }
+}
+
+.attributeFieldList {
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  padding: 12px;
+  background: var(--gray-50);
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attributeFieldListHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.attributeFieldRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: white;
+  border: 1px solid var(--gray-200);
+  border-radius: 6px;
+  padding: 8px;
+}
+
+.attributeFieldMain {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+
+  input {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+.attributeTypeSelect {
+  flex-shrink: 0;
+  width: 130px;
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  color: var(--gray-800);
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-500);
+  }
+}
+
+.attributeOptionsInput {
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+  color: var(--gray-800);
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.attributeFieldActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.attributeColumnButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: white;
+  color: var(--gray-500);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+
+  &:hover {
+    background: var(--gray-100);
+    color: var(--gray-800);
+  }
+}
+
+.attributeColumnButtonActive {
+  background: var(--primary-50, #eff6ff);
+  border-color: var(--primary-400, #60a5fa);
+  color: var(--primary-600, #2563eb);
+
+  &:hover {
+    background: var(--primary-100, #dbeafe);
+  }
+}
+
+.attributeOrderButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: white;
+  color: var(--gray-600);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-100);
+    color: var(--gray-800);
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+}
+
+.attributeRemoveButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--red-200, #fecaca);
+  border-radius: 4px;
+  background: white;
+  color: var(--red-500, #ef4444);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--red-50, #fef2f2);
+  }
+}
+
+.addFieldButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px dashed var(--gray-400);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--gray-600);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    border-color 0.15s ease;
+  align-self: flex-start;
+
+  &:hover {
+    background: var(--gray-100);
+    color: var(--gray-800);
+    border-color: var(--gray-500);
   }
 }

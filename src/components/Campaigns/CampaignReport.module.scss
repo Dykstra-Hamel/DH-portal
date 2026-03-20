@@ -69,8 +69,8 @@
 
   &:hover:not(:disabled) {
     background: var(--gray-50);
-    border-color: var(--action-600);
-    color: var(--action-600);
+    border-color: var(--blue-600);
+    color: var(--blue-600);
   }
 
   &:disabled {
@@ -130,7 +130,9 @@
   border: 1px solid var(--gray-200);
   border-radius: var(--border-radius-md);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 
   &:hover {
     transform: translateY(-2px);
@@ -304,7 +306,7 @@
 
         &:nth-child(3) {
           font-weight: 500;
-          color: var(--action-600);
+          color: var(--blue-600);
         }
       }
     }

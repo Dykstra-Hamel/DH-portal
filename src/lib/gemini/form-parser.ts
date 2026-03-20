@@ -97,7 +97,7 @@ YOUR TASK:
    - description (1-2 sentences describing the service request)
    - priority (low/medium/high/urgent based on urgency indicators)
    - service_type (MUST be either "Support" or "Sales" - this is for department routing)
-   - pest_type (e.g., "Rodent Control", "Mosquito Control", "Bed Bug Control", "Termite Control", "General Pest Control")
+   - pest_type (e.g., "Termites", "Rodents", "Ants", "Cockroaches", "Mosquitoes", "Spiders", "Bed Bugs", "Wasps", or "General")
 
 3. Determine service_type (department routing) based on form content:
    - "Sales" indicators: new customer inquiry, requesting quote, asking about pricing, "interested in service", first-time contact, comparing services
@@ -137,7 +137,7 @@ RESPONSE FORMAT (valid JSON only):
     "description": "generated description",
     "priority": "low|medium|high|urgent",
     "service_type": "Support|Sales",
-    "pest_type": "Rodent Control|Mosquito Control|Bed Bug Control|etc"
+    "pest_type": "Termites|Rodents|Ants|Cockroaches|Mosquitoes|Spiders|Bed Bugs|Wasps|General|etc"
   },
   "confidence": 0.85
 }

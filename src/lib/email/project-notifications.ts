@@ -1,7 +1,7 @@
 import { EmailRecipient, ProjectNotificationData } from './types';
 import { generateProjectCreatedEmailTemplate } from './templates/project-created';
 import { getCompanyFromEmail, getCompanyTenantName } from './index';
-import { sendEmailWithFallback } from '@/lib/aws-ses/send-email';
+import { sendEmailRouted } from '@/lib/email/router';
 
 export async function sendProjectCreatedNotification(
   recipient: EmailRecipient,
@@ -19,7 +19,7 @@ export async function sendProjectCreatedNotification(
     const html = generateProjectCreatedEmailTemplate(recipient.name, projectData);
 
     // Send email using AWS SES
-    const result = await sendEmailWithFallback({
+    const result = await sendEmailRouted({
       tenantName,
       from: fromEmail,
       fromName,

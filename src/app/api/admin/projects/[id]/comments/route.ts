@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
+import { sendMentionSlackNotifications } from '@/lib/slack/mention-notifications';
 
 // GET /api/admin/projects/[id]/comments - List all comments for a project
 export async function GET(
@@ -127,7 +128,7 @@ export async function POST(
     // Get project details for company_id and project name
     const { data: project, error: projectError } = await supabase
       .from('projects')
-      .select('id, name, company_id')
+      .select('id, name, company_id, company:companies(name)')
       .eq('id', projectId)
       .single();
 
@@ -212,6 +213,18 @@ export async function POST(
       }
     } else {
       console.log('Skipping notifications - no mentions or no company_id');
+    }
+
+    if (mentionedUserIds.length > 0) {
+      sendMentionSlackNotifications({
+        mentionedUserIds,
+        commenterName,
+        contextType: 'project',
+        contextName: project.name,
+        clientName: (project.company as { name?: string } | null)?.name || null,
+        commentText: body.comment,
+        deepLinkUrl: `${process.env.NEXT_PUBLIC_SITE_URL}/admin/project-management/${projectId}?commentId=${comment.id}`,
+      }).catch(() => {});
     }
 
     return NextResponse.json(comment, { status: 201 });

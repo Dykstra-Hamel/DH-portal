@@ -9,6 +9,7 @@ import {
 } from '@/lib/api-utils';
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
+import { logCreation } from '@/lib/activity-logger';
 
 export async function GET(request: NextRequest) {
   try {
@@ -32,6 +33,13 @@ export async function GET(request: NextRequest) {
     const includeArchived = searchParams.get('includeArchived') === 'true';
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
+    const paginate = searchParams.get('paginate') === 'true';
+    const page = Math.max(
+      1,
+      parseInt(searchParams.get('page') || '1', 10) || 1
+    );
+    const requestedLimit = parseInt(searchParams.get('limit') || '100', 10) || 100;
+    const limit = Math.min(Math.max(1, requestedLimit), 500);
 
     if (!companyId) {
       return NextResponse.json(
@@ -67,6 +75,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Build query - specify only needed columns to reduce data transfer
+    const selectOptions = paginate ? ({ count: 'exact' as const }) : undefined;
     let query = supabase
       .from('leads')
       .select(
@@ -101,7 +110,8 @@ export async function GET(request: NextRequest) {
           email,
           phone
         )
-      `
+      `,
+        selectOptions
       )
       .eq('company_id', companyId)
       .order('created_at', { ascending: false });
@@ -147,7 +157,13 @@ export async function GET(request: NextRequest) {
     // Apply sorting
     query = query.order(sortBy, { ascending: sortOrder === 'asc' });
 
-    const { data: leads, error } = await query;
+    if (paginate) {
+      const from = (page - 1) * limit;
+      const to = from + limit - 1;
+      query = query.range(from, to);
+    }
+
+    const { data: leads, error, count } = await query;
 
     if (error) {
       console.error('Error fetching leads:', error);
@@ -158,10 +174,22 @@ export async function GET(request: NextRequest) {
     }
 
     if (!leads || leads.length === 0) {
+      if (paginate) {
+        return NextResponse.json({
+          leads: [],
+          pagination: {
+            page,
+            limit,
+            total: count || 0,
+            totalPages: Math.ceil((count || 0) / limit),
+            hasMore: false,
+          },
+        });
+      }
       return NextResponse.json([]);
     }
 
-    // Get all unique user IDs from leads (assigned_to and assigned_scheduler fields)
+    // Get all unique user IDs from leads (assigned_to, assigned_scheduler, submitted_by fields)
     const userIds = new Set<string>();
     leads.forEach((lead: Lead) => {
       if (lead.assigned_to) {
@@ -169,6 +197,9 @@ export async function GET(request: NextRequest) {
       }
       if (lead.assigned_scheduler) {
         userIds.add(lead.assigned_scheduler);
+      }
+      if (lead.submitted_by) {
+        userIds.add(lead.submitted_by);
       }
     });
 
@@ -254,11 +285,29 @@ export async function GET(request: NextRequest) {
         scheduler_user: lead.assigned_scheduler
           ? profileMap.get(lead.assigned_scheduler) || null
           : null,
+        submitted_user: lead.submitted_by
+          ? profileMap.get(lead.submitted_by) || null
+          : null,
         primary_service_address: customerId
           ? primaryServiceAddressMap.get(customerId) || null
           : null,
       };
     });
+
+    if (paginate) {
+      const total = count || 0;
+      const totalPages = Math.ceil(total / limit);
+      return NextResponse.json({
+        leads: enhancedLeads,
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages,
+          hasMore: page < totalPages,
+        },
+      });
+    }
 
     return NextResponse.json(enhancedLeads);
   } catch (error) {
@@ -295,12 +344,26 @@ export async function POST(request: NextRequest) {
       zip,
       pestType,
       comments,
+      notes,
       leadSource,
+      leadFormat,
+      leadType,
+      leadStatus,
       priority,
       estimatedValue,
       serviceType,
       assignedTo,
+      scheduledDate,
+      scheduledTime,
+      selectedPlanId,
+      recommendedPlanName,
+      photoUrls,
     } = body;
+
+    const normalizedLeadNotes = typeof notes === 'string' ? notes.trim() : '';
+
+    // Auto-set submitted_by to the authenticated user for technician leads
+    const submittedBy = leadSource === 'technician' ? user.id : (body.submittedBy ?? null);
 
     // Validate required fields
     if (!companyId) {
@@ -451,15 +514,22 @@ export async function POST(request: NextRequest) {
           company_id: companyId,
           customer_id: customerId,
           service_address_id: serviceAddressId,
-          lead_type: 'other',
-          lead_source: leadSource || 'other',
-          lead_status: assignedTo ? 'in_process' : 'new',
+          format: leadFormat || undefined,
+          lead_type: leadType || 'manual',
+          lead_source: leadSource || 'direct',
+          lead_status: leadStatus || (assignedTo ? 'in_process' : 'new'),
+          scheduled_date: scheduledDate || null,
+          scheduled_time: scheduledTime || null,
+          selected_plan_id: selectedPlanId || null,
+          recommended_plan_name: recommendedPlanName || null,
+          photo_urls: Array.isArray(photoUrls) && photoUrls.length > 0 ? photoUrls : null,
           priority: priority || 'medium',
           pest_type: pestType,
           comments,
           service_type: serviceType,
           estimated_value: estimatedValue,
           assigned_to: assignedTo || null,
+          submitted_by: submittedBy,
           created_at: new Date().toISOString(),
         },
       ])
@@ -472,6 +542,35 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       );
+    }
+
+    // Log lead creation activity
+    await logCreation({
+      entityType: 'lead',
+      entityId: newLead.id,
+      companyId,
+      userId: submittedBy ?? user.id,
+    });
+
+    // Capture initial technician notes in the lead Notes activity feed
+    if (normalizedLeadNotes) {
+      const { error: noteError } = await supabase
+        .from('activity_log')
+        .insert({
+          company_id: companyId,
+          entity_type: 'lead',
+          entity_id: newLead.id,
+          activity_type: 'note_added',
+          user_id: user.id,
+          notes: normalizedLeadNotes,
+          metadata: {
+            source: 'techleads',
+          },
+        });
+
+      if (noteError) {
+        console.error('Error creating initial lead note activity:', noteError);
+      }
     }
 
     // Auto-link service address to quote if customer has one and lead doesn't
