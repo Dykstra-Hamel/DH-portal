@@ -8,6 +8,7 @@ export default function DefaultItemRow<T>({
   item,
   columns,
   onAction,
+  rowKey,
 }: DefaultItemRowProps<T>) {
   // Helper function to get nested property value
   const getNestedValue = (obj: any, path: string): any => {
@@ -27,7 +28,7 @@ export default function DefaultItemRow<T>({
   };
 
   return (
-    <div className={styles.defaultRow} onClick={handleClick}>
+    <div className={styles.defaultRow} onClick={handleClick} data-row-key={rowKey}>
       {columns.map((column, index) => {
         const value = getNestedValue(item, column.key);
         const cellContent = column.render

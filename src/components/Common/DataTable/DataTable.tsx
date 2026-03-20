@@ -4,6 +4,7 @@ import React, {
   useState,
   useMemo,
   useEffect,
+  useLayoutEffect,
   useRef,
   useCallback,
 } from 'react';
@@ -26,6 +27,7 @@ export default function DataTable<T>({
   hasMore = false,
   onLoadMore,
   loadingMore = false,
+  preserveWindowScrollAnchor = false,
   searchEnabled = true,
   searchPlaceholder = 'Search...',
   customComponents,
@@ -71,6 +73,8 @@ export default function DataTable<T>({
   // Infinite scroll refs and state
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const dataRowsRef = useRef<HTMLDivElement>(null);
+  const anchorRowRef = useRef<{ rowKey: string; top: number } | null>(null);
+  const prevLoadingMoreRef = useRef(loadingMore);
 
   // Filter data based on active tab
   const filteredData = useMemo(() => {
@@ -244,6 +248,71 @@ export default function DataTable<T>({
     };
   }, [handleLoadMore, infiniteScrollEnabled]);
 
+  useLayoutEffect(() => {
+    if (!preserveWindowScrollAnchor || !infiniteScrollEnabled || !dataRowsRef.current) {
+      prevLoadingMoreRef.current = loadingMore;
+      if (!loadingMore) {
+        anchorRowRef.current = null;
+      }
+      return;
+    }
+
+    const getRows = () =>
+      Array.from(
+        dataRowsRef.current!.querySelectorAll<HTMLElement>('[data-row-key]')
+      );
+
+    const findAnchorRow = () => {
+      const rows = getRows();
+      if (rows.length === 0) return null;
+
+      // Use the first row currently visible in viewport as anchor.
+      const candidate =
+        rows.find(row => row.getBoundingClientRect().bottom >= 0) || rows[0];
+
+      const rowKey = candidate.dataset.rowKey;
+      if (!rowKey) return null;
+
+      return { rowKey, top: candidate.getBoundingClientRect().top };
+    };
+
+    const applyAnchor = () => {
+      const anchor = anchorRowRef.current;
+      if (!anchor) return;
+
+      const target = getRows().find(row => row.dataset.rowKey === anchor.rowKey);
+      if (!target) return;
+
+      const delta = target.getBoundingClientRect().top - anchor.top;
+      if (Math.abs(delta) > 1) {
+        window.scrollBy(0, delta);
+      }
+    };
+
+    // Capture anchor when loading-more starts.
+    if (!prevLoadingMoreRef.current && loadingMore) {
+      anchorRowRef.current = findAnchorRow();
+    }
+
+    // Keep anchor steady while new rows are inserted.
+    if (loadingMore && anchorRowRef.current) {
+      applyAnchor();
+    }
+
+    // Final settle pass when loading completes.
+    if (prevLoadingMoreRef.current && !loadingMore && anchorRowRef.current) {
+      applyAnchor();
+      anchorRowRef.current = null;
+    }
+
+    prevLoadingMoreRef.current = loadingMore;
+  }, [
+    preserveWindowScrollAnchor,
+    infiniteScrollEnabled,
+    loadingMore,
+    visibleSortedData,
+  ]);
+
   // Handle toast
   const handleShowToast = useCallback((message: string) => {
     setToastMessage(message);
@@ -283,6 +352,23 @@ export default function DataTable<T>({
   };
   const tableClass = getTableClass();
   const skeletonWidths = ['40%', '55%', '45%', '65%', '35%', '50%', '30%'];
+  const getRowKey = useCallback((item: T, index: number) => {
+    if (item && typeof item === 'object') {
+      const record = item as Record<string, unknown>;
+      const id = record.id;
+      const type = record._type;
+
+      if ((typeof id === 'string' || typeof id === 'number') && typeof type === 'string') {
+        return `${type}-${id}`;
+      }
+
+      if (typeof id === 'string' || typeof id === 'number') {
+        return String(id);
+      }
+    }
+
+    return `row-${index}`;
+  }, []);
 
   return (
     <>
@@ -365,12 +451,14 @@ export default function DataTable<T>({
               {/* Data Rows */}
               <div className={styles.dataRows} ref={dataRowsRef}>
                 {visibleSortedData.map((item, index) => {
+                  const rowKey = getRowKey(item, index);
+
                   // Use custom row component if provided, otherwise use default
                   if (customComponents?.itemRow) {
                     const ItemRowComponent = customComponents.itemRow;
                     return (
                       <ItemRowComponent
-                        key={index}
+                        key={rowKey}
                         item={item}
                         onAction={handleItemAction}
                       />
@@ -379,7 +467,8 @@ export default function DataTable<T>({
 
                   return (
                     <DefaultItemRow
-                      key={index}
+                      key={rowKey}
+                      rowKey={rowKey}
                       item={item}
                       columns={columns}
                       onAction={handleItemAction}
