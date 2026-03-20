@@ -46,6 +46,7 @@ export interface DataTableProps<T> {
   hasMore?: boolean;
   onLoadMore?: () => void;
   loadingMore?: boolean;
+  preserveWindowScrollAnchor?: boolean;
 
   // Search
   searchEnabled?: boolean; // Enable/disable search (default: true)
@@ -86,6 +87,7 @@ export interface DefaultItemRowProps<T> {
   item: T;
   columns: ColumnDefinition<T>[];
   onAction?: (action: string, item: T) => void;
+  rowKey?: string;
 }
 
 // Generic action button configuration

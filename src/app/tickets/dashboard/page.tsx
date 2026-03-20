@@ -217,6 +217,9 @@ const getDashboardItemSourceLabel = (item: DashboardItem): string => {
   return getOptionLabel(item.source, ticketSourceOptions) || NA_FIELD_LABEL;
 };
 
+const sortByCreatedAtAsc = <T extends { created_at: string }>(items: T[]): T[] =>
+  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
 // Search filter helper - searches all string values in an object recursively
 const filterBySearch = <T extends object>(items: T[], query: string): T[] => {
   if (!query.trim()) return items;
@@ -317,6 +320,7 @@ function TicketsDashboardContent() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingSupportCases, setLoadingSupportCases] = useState(false);
   const [loadingMyData, setLoadingMyData] = useState(false);
+  const [loadingMoreData, setLoadingMoreData] = useState(false);
 
   // Total counts for tabs (not affected by pagination)
   const [totalCounts, setTotalCounts] = useState({
@@ -1704,51 +1708,59 @@ function TicketsDashboardContent() {
     ]
   );
 
+  const latestNewTabItems = useMemo<DashboardItem[]>(() => {
+    if (!selectedCompany?.id) return [];
+
+    return [
+      ...tickets
+        .filter(ticket => ticket.status !== 'live')
+        .map(ticket => ({
+          ...ticket,
+          _type: 'ticket' as const,
+          _typeSortLabel: 'New',
+          _formatSortLabel:
+            getOptionLabel(ticket.type, ticketTypeOptions) || NA_FIELD_LABEL,
+          _sourceSortLabel:
+            getOptionLabel(ticket.source, ticketSourceOptions) || NA_FIELD_LABEL,
+        })),
+      ...leads.map(lead => ({
+        ...lead,
+        _type: 'lead' as const,
+        _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+        _formatSortLabel:
+          getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
+        _sourceSortLabel:
+          getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
+      })),
+      ...supportCases.map(supportCase => ({
+        ...supportCase,
+        _type: 'support_case' as const,
+        _typeSortLabel: 'Support',
+        _formatSortLabel:
+          getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
+          getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+          NA_FIELD_LABEL,
+        _sourceSortLabel:
+          getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
+          NA_FIELD_LABEL,
+      })),
+    ];
+  }, [tickets, leads, supportCases, selectedCompany?.id]);
+  const sortedNewTabItems = useMemo(
+    () => sortByCreatedAtAsc(latestNewTabItems),
+    [latestNewTabItems]
+  );
+
   // Get current data for dashboard table based on tab
   const getDashboardTableData = () => {
     switch (dashboardTab) {
       case 'new': {
-        // Sort oldest to newest (ascending by created_at)
-        // Add sortable labels for format/source/ticket type columns.
-        const combinedData = [
-          ...tickets
-            .filter(ticket => ticket.status !== 'live')
-            .map(ticket => ({
-              ...ticket,
-              _type: 'ticket' as const,
-              _typeSortLabel: 'New',
-              _formatSortLabel:
-                getOptionLabel(ticket.type, ticketTypeOptions) || NA_FIELD_LABEL,
-              _sourceSortLabel:
-                getOptionLabel(ticket.source, ticketSourceOptions) || NA_FIELD_LABEL,
-            })),
-          ...leads.map(lead => ({
-            ...lead,
-            _type: 'lead' as const,
-            _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
-            _formatSortLabel:
-              getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
-            _sourceSortLabel:
-              getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
-          })),
-          ...supportCases.map(supportCase => ({
-            ...supportCase,
-            _type: 'support_case' as const,
-            _typeSortLabel: 'Support',
-            _formatSortLabel:
-              getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
-              getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
-              NA_FIELD_LABEL,
-            _sourceSortLabel:
-              getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
-              NA_FIELD_LABEL,
-          })),
-        ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
         return {
-          data: filterBySearch(combinedData, tableSearch),
+          data: filterBySearch(sortedNewTabItems, tableSearch),
           columns: dashboardOverviewColumns,
-          loading: loading || loadingLeads || loadingSupportCases,
+          loading:
+            loading ||
+            ((loadingLeads || loadingSupportCases) && !loadingMoreData),
           tableType: 'tickets' as const,
           customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
@@ -1836,12 +1848,36 @@ function TicketsDashboardContent() {
 
   const tableContent = getDashboardTableData();
   const tableData = (tableContent.data || []) as any[];
+  // Clear loadingMoreData once leads + support cases both finish fetching
+  useEffect(() => {
+    if (loadingMoreData && !loadingLeads && !loadingSupportCases) {
+      setLoadingMoreData(false);
+    }
+  }, [loadingLeads, loadingSupportCases, loadingMoreData]);
+
   const tableHasMore =
     dashboardTab === 'new' &&
-    tableData.length > tableVisibleCount;
+    (tableData.length > tableVisibleCount ||
+      loadingMoreData ||
+      (!queueFullFetchEnabledRef.current && tableData.length >= DASHBOARD_INITIAL_PAGE_SIZE));
   const handleTableLoadMore = () => {
     const nextVisibleCount = tableVisibleCount + 5;
     setTableVisibleCount(nextVisibleCount);
+
+    // When we've shown all currently-fetched items and haven't loaded all pages yet,
+    // trigger a full server fetch so the rest of the items come in
+    if (
+      !queueFullFetchEnabledRef.current &&
+      nextVisibleCount >= tableData.length &&
+      selectedCompany?.id
+    ) {
+      queueFullFetchEnabledRef.current = true;
+      pendingFullTicketFetchRef.current = false;
+      setLoadingMoreData(true);
+      fetchTickets(selectedCompany.id, { showLoading: false, fetchAllPages: true });
+      fetchLeads(selectedCompany.id, { fetchAllPages: true });
+      fetchSupportCases(selectedCompany.id, { fetchAllPages: true });
+    }
   };
 
   const tableEmptyStateMessage =
@@ -2015,7 +2051,8 @@ function TicketsDashboardContent() {
               visibleCount={dashboardTab === 'new' ? tableVisibleCount : undefined}
               hasMore={tableHasMore}
               onLoadMore={handleTableLoadMore}
-              loadingMore={false}
+              loadingMore={loadingMoreData}
+              preserveWindowScrollAnchor={dashboardTab === 'new'}
               tableType={tableContent.tableType}
               customColumnWidths={tableContent.customColumnWidths}
               searchEnabled={false}
