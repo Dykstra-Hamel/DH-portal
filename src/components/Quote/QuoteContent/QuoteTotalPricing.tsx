@@ -80,12 +80,14 @@ export default function QuoteTotalPricing({
       <>
         {recurring && (
           <span className={styles.totalItemPriceRecurring}>
-            ${formatCurrency(recurring)}/{abbreviateFrequency(freq)}
+            <span className={styles.totalItemPriceAmount}>${formatCurrency(recurring)}</span>
+            <span className={styles.totalItemPriceFreq}>/{abbreviateFrequency(freq)}</span>
           </span>
         )}
         {initial && (
           <span className={styles.totalItemPriceInitial}>
-            ${formatCurrency(initial)} initial
+            <span className={styles.totalItemPriceAmount}>${formatCurrency(initial)}</span>
+            <span className={styles.totalItemPriceFreq}> initial</span>
           </span>
         )}
       </>
@@ -169,7 +171,7 @@ export default function QuoteTotalPricing({
             <sup>$</sup>
             {formatCurrency(totalRecurring)}
           </strong>
-          /{abbreviateFrequency(billingFrequency)}
+          <span className={styles.totalRowFreq}>/{abbreviateFrequency(billingFrequency)}</span>
         </span>
       </div>
     </div>
