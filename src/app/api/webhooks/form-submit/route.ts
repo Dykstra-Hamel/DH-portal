@@ -619,7 +619,7 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
-        type: 'website_form',
+        type: 'web_form',
         source: deriveSource({ gclid, fbclid, utm_source: utmSource }),
         format: 'form',
         description: geminiResult.ticket.description || 'Form submission',

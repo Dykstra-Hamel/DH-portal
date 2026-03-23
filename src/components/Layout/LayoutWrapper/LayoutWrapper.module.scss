@@ -48,8 +48,9 @@
 
 
 :global(.pageWrapper).techLeadsPageWrapper {
-  max-width: none;
-  margin: 0;
+  width: 100%;
+  max-width: 1309px;
+  margin: 0 auto;
   padding: 0;
   height: 100%;
   display: flex;

@@ -36,12 +36,14 @@ async function getTicketTabCounts(
     : 'archived.is.null,archived.eq.false';
 
   // Use parallel queries to get accurate counts
+  const callTypes = ['phone_call', 'inbound_call', 'campaign_call'];
+  const formTypes = ['web_form', 'website_form'];
   const [allCount, callsCount, incomingCount, outboundCount, formsCount] = await Promise.all([
     adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'phone_call').eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).eq('type', 'web_form').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
+    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', formTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter),
   ]);
 
   return {
@@ -142,26 +144,28 @@ export async function GET(request: NextRequest) {
     }
 
     // Apply tab filter with status exclusions
+    const callTypeFilter = ['phone_call', 'inbound_call', 'campaign_call'];
+    const formTypeFilter = ['web_form', 'website_form'];
     if (tabFilter === 'calls') {
       query = query
-        .eq('type', 'phone_call')
+        .in('type', callTypeFilter)
         .neq('status', 'live')
         .neq('status', 'closed');
     } else if (tabFilter === 'incoming') {
       query = query
-        .eq('type', 'phone_call')
+        .in('type', callTypeFilter)
         .eq('call_direction', 'inbound')
         .neq('status', 'live')
         .neq('status', 'closed');
     } else if (tabFilter === 'outbound') {
       query = query
-        .eq('type', 'phone_call')
+        .in('type', callTypeFilter)
         .eq('call_direction', 'outbound')
         .neq('status', 'live')
         .neq('status', 'closed');
     } else if (tabFilter === 'forms') {
       query = query
-        .eq('type', 'web_form')
+        .in('type', formTypeFilter)
         .neq('status', 'live')
         .neq('status', 'closed');
     } else if (tabFilter === 'all') {

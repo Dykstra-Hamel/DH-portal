@@ -675,7 +675,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         company_id: callRecord.company_id,
         customer_id: callRecord.customer_id,
         source: 'direct',
-        type: 'inbound_call',
+        type: 'phone_call',
         format: 'call',
         call_direction: 'inbound',
         call_record_id: callRecord.id,

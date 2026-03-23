@@ -59,6 +59,7 @@ export async function GET(
         'quote_thanks_content',
         'wisetack_enabled',
         'wisetack_url',
+        'quote_accent_color_preference',
       ]);
 
     // Parse settings into usable format
@@ -95,6 +96,7 @@ export async function GET(
         quote_thanks_content: companySettings.quote_thanks_content,
         wisetack_enabled: companySettings.wisetack_enabled === 'true',
         wisetack_url: companySettings.wisetack_url || '',
+        quote_accent_color_preference: (companySettings.quote_accent_color_preference as 'primary' | 'secondary') || 'primary',
       },
       branding: {
         logo_url: brandData?.logo_url || null,

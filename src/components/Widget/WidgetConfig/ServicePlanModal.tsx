@@ -329,6 +329,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_image_url: '',
     plan_disclaimer: '',
     plan_terms: '',
+    plan_video_url: null as string | null,
     is_active: true,
     allow_custom_pricing: false,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
@@ -351,6 +352,8 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
   const [activeTab, setActiveTab] = useState('basic');
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isUploadingVideo, setIsUploadingVideo] = useState(false);
+  const [videoSizeWarning, setVideoSizeWarning] = useState(false);
 
   useEffect(() => {
     if (plan) {
@@ -372,6 +375,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_image_url: plan.plan_image_url || '',
         plan_disclaimer: plan.plan_disclaimer || '',
         plan_terms: plan.plan_terms || '',
+        plan_video_url: (plan as any).plan_video_url || null,
         is_active: plan.is_active,
         allow_custom_pricing: (plan as any).allow_custom_pricing || false,
         pest_coverage: plan.pest_coverage?.map(pc => ({
@@ -414,6 +418,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_image_url: '',
         plan_disclaimer: '',
         plan_terms: '',
+        plan_video_url: null,
         is_active: true,
         allow_custom_pricing: false,
         pest_coverage: [],
@@ -580,6 +585,36 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       // Could add error state handling here if needed
     } finally {
       setIsUploadingImage(false);
+    }
+  };
+
+  const MB = 1024 * 1024;
+  const VIDEO_WARN_LIMIT = 200 * MB;
+  const VIDEO_HARD_LIMIT = 300 * MB;
+
+  const handleVideoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > VIDEO_HARD_LIMIT) {
+      alert('Video exceeds the 300MB limit. Please compress the file (e.g. using HandBrake) and try again.');
+      event.target.value = '';
+      return;
+    }
+
+    setVideoSizeWarning(file.size > VIDEO_WARN_LIMIT);
+    setIsUploadingVideo(true);
+    try {
+      if (formData.plan_video_url) {
+        await deleteFileFromStorage(formData.plan_video_url);
+      }
+      const url = await uploadFile(file, 'brand-assets', 'service-plans');
+      if (url) {
+        handleInputChange('plan_video_url', url);
+        event.target.value = '';
+      }
+    } finally {
+      setIsUploadingVideo(false);
     }
   };
 
@@ -900,6 +935,56 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                           <div className={styles.overlaySpinner}></div>
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.formGroup}>
+                <label>Plan Video <span style={{ fontWeight: 400, color: '#6b7280' }}>(optional)</span></label>
+                <div className={styles.fileUploadSection}>
+                  <div className={styles.fileUploadInfo}>
+                    <small>
+                      Upload a video to display with this plan. Videos are stored in{' '}
+                      <code>/brand-assets/service-plans/</code>
+                    </small>
+                  </div>
+                  {isUploadingVideo ? (
+                    <div className={styles.uploadingIndicator}>
+                      <div className={styles.spinner}></div>
+                      <span>Uploading video...</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      accept="video/*"
+                      onChange={handleVideoUpload}
+                      className={styles.fileInput}
+                    />
+                  )}
+                  {videoSizeWarning && (
+                    <p style={{ fontSize: '12px', color: '#d97706', marginTop: '6px' }}>
+                      ⚠ This video is over 200MB. It will still work, but consider compressing it for faster playback.
+                    </p>
+                  )}
+                  {formData.plan_video_url && (
+                    <div style={{ marginTop: '10px' }}>
+                      <video
+                        src={formData.plan_video_url}
+                        controls
+                        style={{ width: '100%', maxWidth: '320px', borderRadius: '8px', display: 'block' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await deleteFileFromStorage(formData.plan_video_url!);
+                          handleInputChange('plan_video_url', null);
+                          setVideoSizeWarning(false);
+                        }}
+                        style={{ fontSize: '12px', color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', padding: 0, marginTop: '6px' }}
+                      >
+                        Remove video
+                      </button>
                     </div>
                   )}
                 </div>
