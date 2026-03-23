@@ -686,6 +686,8 @@ export function LeadStepContent({
     }, 50);
   }, [activityNotes, lead.id, nextTask?.action_type]);
 
+  const isReadyToSchedule = lead.lead_status === 'scheduling';
+
   // Render content based on lead status
   const renderContent = () => {
     // Show all sections simultaneously instead of conditionally based on status
@@ -741,57 +743,119 @@ export function LeadStepContent({
         )}
 
         {/* Two-column ticket details */}
-        <div className={styles.ticketDetailsSection} ref={quotingSectionRef}>
+        <div className={styles.ticketDetailsSection}>
           <div className={styles.contentLeft}>
-            <LeadQuoteSection
-              lead={lead}
-              quote={quote}
-              isQuoteUpdating={isQuoteUpdating}
-              pricingSettings={pricingSettings}
-              selectedPests={selectedPests}
-              additionalPests={additionalPests}
-              homeSize={homeSize}
-              yardSize={yardSize}
-              linearFeet={linearFeet}
-              selectedHomeSizeOption={selectedHomeSizeOption}
-              selectedYardSizeOption={selectedYardSizeOption}
-              preferredDate={preferredDate}
-              preferredTime={preferredTime}
-              onEmailQuote={handleEmailQuote}
-              onEditAddress={handleEditAddress}
-              onShowToast={onShowToast}
-              onRequestUndo={onRequestUndo}
-              onLeadFieldUpdate={onLeadFieldUpdate}
-              broadcastQuoteUpdate={broadcastQuoteUpdate}
-              setSelectedPests={setSelectedPests}
-              setAdditionalPests={setAdditionalPests}
-              setHomeSize={setHomeSize}
-              setYardSize={setYardSize}
-              setLinearFeet={setLinearFeet}
-              setSelectedHomeSizeOption={setSelectedHomeSizeOption}
-              setSelectedYardSizeOption={setSelectedYardSizeOption}
-              onPreferredDateChange={handlePreferredDateChange}
-              onPreferredTimeChange={handlePreferredTimeChange}
-              onNotInterested={onNotInterested || (() => {})}
-              onReadyToSchedule={onReadyToSchedule || (() => {})}
-              isSidebarExpanded={isSidebarExpanded}
-            />
-            <div ref={schedulingSectionRef}>
-              <LeadSchedulingSection
-                lead={lead}
-                quote={quote}
-                isQuoteUpdating={isQuoteUpdating}
-                scheduledDate={scheduledDate}
-                scheduledTime={scheduledTime}
-                confirmationNote={confirmationNote}
-                onScheduledDateChange={setScheduledDate}
-                onScheduledTimeChange={setScheduledTime}
-                onConfirmationNoteChange={setConfirmationNote}
-                onFinalizeSale={handleFinalizeSale}
-                onEmailQuote={handleEmailQuote}
-                isSidebarExpanded={isSidebarExpanded}
-              />
-            </div>
+            {isReadyToSchedule ? (
+              <>
+                <div ref={schedulingSectionRef}>
+                  <LeadSchedulingSection
+                    lead={lead}
+                    quote={quote}
+                    isQuoteUpdating={isQuoteUpdating}
+                    scheduledDate={scheduledDate}
+                    scheduledTime={scheduledTime}
+                    confirmationNote={confirmationNote}
+                    onScheduledDateChange={setScheduledDate}
+                    onScheduledTimeChange={setScheduledTime}
+                    onConfirmationNoteChange={setConfirmationNote}
+                    onFinalizeSale={handleFinalizeSale}
+                    onEmailQuote={handleEmailQuote}
+                    isSidebarExpanded={isSidebarExpanded}
+                  />
+                </div>
+                <div ref={quotingSectionRef}>
+                  <LeadQuoteSection
+                    lead={lead}
+                    quote={quote}
+                    isQuoteUpdating={isQuoteUpdating}
+                    pricingSettings={pricingSettings}
+                    selectedPests={selectedPests}
+                    additionalPests={additionalPests}
+                    homeSize={homeSize}
+                    yardSize={yardSize}
+                    linearFeet={linearFeet}
+                    selectedHomeSizeOption={selectedHomeSizeOption}
+                    selectedYardSizeOption={selectedYardSizeOption}
+                    preferredDate={preferredDate}
+                    preferredTime={preferredTime}
+                    onEmailQuote={handleEmailQuote}
+                    onEditAddress={handleEditAddress}
+                    onShowToast={onShowToast}
+                    onRequestUndo={onRequestUndo}
+                    onLeadFieldUpdate={onLeadFieldUpdate}
+                    broadcastQuoteUpdate={broadcastQuoteUpdate}
+                    setSelectedPests={setSelectedPests}
+                    setAdditionalPests={setAdditionalPests}
+                    setHomeSize={setHomeSize}
+                    setYardSize={setYardSize}
+                    setLinearFeet={setLinearFeet}
+                    setSelectedHomeSizeOption={setSelectedHomeSizeOption}
+                    setSelectedYardSizeOption={setSelectedYardSizeOption}
+                    onPreferredDateChange={handlePreferredDateChange}
+                    onPreferredTimeChange={handlePreferredTimeChange}
+                    onNotInterested={onNotInterested || (() => {})}
+                    onReadyToSchedule={onReadyToSchedule || (() => {})}
+                    isSidebarExpanded={isSidebarExpanded}
+                    startExpanded={false}
+                    forceCollapse={true}
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div ref={quotingSectionRef}>
+                  <LeadQuoteSection
+                    lead={lead}
+                    quote={quote}
+                    isQuoteUpdating={isQuoteUpdating}
+                    pricingSettings={pricingSettings}
+                    selectedPests={selectedPests}
+                    additionalPests={additionalPests}
+                    homeSize={homeSize}
+                    yardSize={yardSize}
+                    linearFeet={linearFeet}
+                    selectedHomeSizeOption={selectedHomeSizeOption}
+                    selectedYardSizeOption={selectedYardSizeOption}
+                    preferredDate={preferredDate}
+                    preferredTime={preferredTime}
+                    onEmailQuote={handleEmailQuote}
+                    onEditAddress={handleEditAddress}
+                    onShowToast={onShowToast}
+                    onRequestUndo={onRequestUndo}
+                    onLeadFieldUpdate={onLeadFieldUpdate}
+                    broadcastQuoteUpdate={broadcastQuoteUpdate}
+                    setSelectedPests={setSelectedPests}
+                    setAdditionalPests={setAdditionalPests}
+                    setHomeSize={setHomeSize}
+                    setYardSize={setYardSize}
+                    setLinearFeet={setLinearFeet}
+                    setSelectedHomeSizeOption={setSelectedHomeSizeOption}
+                    setSelectedYardSizeOption={setSelectedYardSizeOption}
+                    onPreferredDateChange={handlePreferredDateChange}
+                    onPreferredTimeChange={handlePreferredTimeChange}
+                    onNotInterested={onNotInterested || (() => {})}
+                    onReadyToSchedule={onReadyToSchedule || (() => {})}
+                    isSidebarExpanded={isSidebarExpanded}
+                  />
+                </div>
+                <div ref={schedulingSectionRef}>
+                  <LeadSchedulingSection
+                    lead={lead}
+                    quote={quote}
+                    isQuoteUpdating={isQuoteUpdating}
+                    scheduledDate={scheduledDate}
+                    scheduledTime={scheduledTime}
+                    confirmationNote={confirmationNote}
+                    onScheduledDateChange={setScheduledDate}
+                    onScheduledTimeChange={setScheduledTime}
+                    onConfirmationNoteChange={setConfirmationNote}
+                    onFinalizeSale={handleFinalizeSale}
+                    onEmailQuote={handleEmailQuote}
+                    isSidebarExpanded={isSidebarExpanded}
+                  />
+                </div>
+              </>
+            )}
           </div>
           <LeadDetailsSidebar
             lead={lead}

@@ -45,6 +45,7 @@ interface Company {
   quote_thanks_content: string;
   wisetack_enabled?: boolean;
   wisetack_url?: string;
+  quote_accent_color_preference?: 'primary' | 'secondary';
 }
 
 interface Quote {
@@ -122,6 +123,31 @@ export default function QuoteContent({
   );
 
   const signatureRef = useRef<SignatureCanvas>(null);
+  const termsModalBodyRef = useRef<HTMLDivElement>(null);
+
+  // Mark terms as viewed when modal opens:
+  // - immediately if content doesn't overflow (no scrolling needed)
+  // - only after scrolling to the bottom if it does overflow
+  useEffect(() => {
+    if (!termsModalOpen) return;
+
+    const el = termsModalBodyRef.current;
+    if (!el) return;
+
+    if (el.scrollHeight <= el.clientHeight) {
+      setTermsViewed(true);
+      return;
+    }
+
+    const handleScroll = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {
+        setTermsViewed(true);
+      }
+    };
+
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [termsModalOpen]);
 
   const heroContent = {
     title: `Your Custom Pest Protection Plan Is Ready, ${quote.customer.first_name}`,
@@ -280,10 +306,11 @@ export default function QuoteContent({
     });
 
   // Apply branding colors and font via CSS variables
+  const isReversed = company.quote_accent_color_preference === 'secondary';
   const brandingStyle = {
-    '--brand-primary': branding?.primary_color,
-    '--brand-secondary': branding?.secondary_color,
-    '--accent-color': branding?.alternative_colors[0].hex,
+    '--brand-primary': isReversed ? branding?.secondary_color : branding?.primary_color,
+    '--brand-secondary': isReversed ? branding?.primary_color : branding?.secondary_color,
+    '--accent-color': isReversed ? branding?.secondary_color : branding?.primary_color,
     '--color-text': branding?.font_color || undefined,
     '--primary-font': branding?.font_primary_name,
     '--secondary-font': branding?.font_secondary_name || branding?.font_primary_name,
@@ -753,7 +780,7 @@ export default function QuoteContent({
                   <button
                     type="button"
                     className={`${styles.viewTermsButton} ${termsNudge ? styles.viewTermsNudge : ''}`}
-                    onClick={() => { setTermsModalOpen(true); setTermsViewed(true); setTermsNudge(false); }}
+                    onClick={() => { setTermsModalOpen(true); setTermsNudge(false); }}
                   >
                     View Terms and Conditions
                   </button>
@@ -775,8 +802,14 @@ export default function QuoteContent({
                     type="checkbox"
                     id="terms-checkbox"
                     checked={termsAccepted}
-                    disabled={!termsViewed}
-                    onChange={e => setTermsAccepted(e.target.checked)}
+                    onChange={e => {
+                      if (!termsViewed) {
+                        setTermsNudge(true);
+                        setTimeout(() => setTermsNudge(false), 2000);
+                        return;
+                      }
+                      setTermsAccepted(e.target.checked);
+                    }}
                   />
                   <label htmlFor="terms-checkbox" className={styles.termsLabel}>
                     I have read and accept the terms and conditions
@@ -801,17 +834,9 @@ export default function QuoteContent({
                     />
                   </div>
                   <div className={styles.signatureActions}>
-                    <div className={styles.dateSection}>
-                      <label>
-                        Date <span>Read only</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={new Date().toLocaleDateString()}
-                        readOnly
-                        className={styles.input}
-                      />
-                    </div>
+                    <p className={styles.signingDate}>
+                      Signing on {new Date().toLocaleDateString()}
+                    </p>
                     <button
                       type="button"
                       onClick={clearSignature}
@@ -889,7 +914,7 @@ export default function QuoteContent({
                 &#215;
               </button>
             </div>
-            <div className={styles.termsModalBody}>
+            <div className={styles.termsModalBody} ref={termsModalBodyRef}>
               <div dangerouslySetInnerHTML={{ __html: company.quote_terms }} />
 
               {quote.line_items
@@ -917,6 +942,7 @@ export default function QuoteContent({
                 type="button"
                 onClick={() => setTermsModalOpen(false)}
                 className={styles.termsModalCloseBtn}
+                disabled={!termsViewed}
               >
                 Close
               </button>

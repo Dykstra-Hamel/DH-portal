@@ -80,7 +80,10 @@ const formatTicketFormat = (ticket: Ticket): string => {
   }
   const legacyMap: { [key: string]: string } = {
     phone_call: 'Call',
+    inbound_call: 'Call',
+    campaign_call: 'Call',
     web_form: 'Form',
+    website_form: 'Form',
     email: 'Email',
     chat: 'Chat',
     in_person: 'In Person',
@@ -370,13 +373,13 @@ export const getTicketTabs = (
     key: 'calls',
     label: 'Calls',
     filter: (tickets: Ticket[]) =>
-      tickets.filter(ticket => ticket.format === 'call' || (!ticket.format && ticket.type === 'phone_call')),
+      tickets.filter(ticket => ticket.format === 'call' || (!ticket.format && ['phone_call', 'inbound_call', 'campaign_call'].includes(ticket.type))),
     getCount: (tickets: Ticket[]) => {
       const callCountFromTabs =
         (tabCounts?.incoming ?? 0) + (tabCounts?.outbound ?? 0);
       if (tabCounts?.calls !== undefined) return tabCounts.calls;
       if (tabCounts) return callCountFromTabs;
-      return tickets.filter(ticket => ticket.format === 'call' || (!ticket.format && ticket.type === 'phone_call')).length;
+      return tickets.filter(ticket => ticket.format === 'call' || (!ticket.format && ['phone_call', 'inbound_call', 'campaign_call'].includes(ticket.type))).length;
     },
   },
   {

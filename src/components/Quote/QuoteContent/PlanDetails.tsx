@@ -8,6 +8,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import styles from './quotecontent.module.scss';
 import QuoteTotalPricing from './QuoteTotalPricing';
+import VideoLightbox from './VideoLightbox';
 
 interface FaqItemProps {
   faq: { question: string; answer: string };
@@ -146,6 +147,7 @@ export default function PlanDetails({
 }: PlanDetailsProps) {
   // State for FAQ tabs
   const [activeFaqTab, setActiveFaqTab] = useState(0);
+  const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
 
   // Get plans with FAQs — only for selected plans
   const plansWithFaqs = regularLineItems.filter((item: any) => {
@@ -194,7 +196,7 @@ export default function PlanDetails({
               key={index}
               className={`${styles.planCard} ${styles.collapsible} ${
                 isExpanded ? styles.expanded : ''
-              }`}
+              } ${isPlanSelected ? styles.selectedCard : ''}`}
             >
               {/* Collapsible Header */}
               <div
@@ -361,21 +363,28 @@ export default function PlanDetails({
 
                           {/* Right: Initial Price */}
                           <div className={styles.priceRight}>
-                            <div className={styles.priceInitial}>
-                              <span className={styles.initialLabel}>Initial Only</span>
-                              <span className={styles.priceNumber}>
-                                <sup>$</sup>
-                                {formatCurrency(
-                                  item.final_initial_price ||
-                                    item.initial_price ||
-                                    0
-                                )}
-                              </span>
-                            </div>
-                            {hasDiscount && (
-                              <div className={styles.priceNormally}>
-                                Normally{' '}
-                                <span className={styles.priceCrossed}>
+                            {hasDiscount ? (
+                              <>
+                                <div className={styles.priceInitialInline}>
+                                  <span className={styles.initialLabel}>Initial Only</span>
+                                  {' '}
+                                  <span className={styles.priceNumber}>
+                                    <sup>$</sup>
+                                    {formatCurrency(item.final_initial_price || item.initial_price || 0)}
+                                  </span>
+                                </div>
+                                <div className={styles.priceNormally}>
+                                  Normally{' '}
+                                  <span className={styles.priceCrossed}>
+                                    <sup>$</sup>
+                                    {formatCurrency(item.initial_price || 0)}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className={styles.priceInitial}>
+                                <span className={styles.initialLabel}>Initial Only</span>
+                                <span className={styles.priceNumber}>
                                   <sup>$</sup>
                                   {formatCurrency(item.initial_price || 0)}
                                 </span>
@@ -417,14 +426,39 @@ export default function PlanDetails({
                         )}
                       </div>
 
-                      {/* Disclaimer */}
-                      {item.service_plan?.plan_disclaimer && (
-                        <div className={styles.planDisclaimer}>
-                          <p
-                            dangerouslySetInnerHTML={{
-                              __html: item.service_plan.plan_disclaimer,
-                            }}
-                          ></p>
+                      {/* Disclaimer + Video */}
+                      {(item.service_plan?.plan_disclaimer || item.service_plan?.plan_video_url) && (
+                        <div className={`${styles.planDisclaimerVideoRow}${item.service_plan?.plan_video_url ? ` ${styles.hasVideo}` : ''}`}>
+                          {item.service_plan?.plan_disclaimer && (
+                            <div className={styles.planDisclaimer}>
+                              <p
+                                dangerouslySetInnerHTML={{
+                                  __html: item.service_plan.plan_disclaimer,
+                                }}
+                              ></p>
+                            </div>
+                          )}
+                          {item.service_plan?.plan_video_url && (
+                            <button
+                              type="button"
+                              className={styles.planVideoThumbnail}
+                              onClick={() => setVideoLightboxUrl(item.service_plan.plan_video_url)}
+                              aria-label="Play plan video"
+                            >
+                              <video
+                                src={item.service_plan.plan_video_url}
+                                muted
+                                preload="metadata"
+                                className={styles.planVideoThumbnailVideo}
+                              />
+                              <span className={styles.planVideoPlayOverlay}>
+                                <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                                  <circle cx="16" cy="16" r="16" fill="rgba(0,0,0,0.5)" />
+                                  <path d="M13 10.5L23 16L13 21.5V10.5Z" fill="white" />
+                                </svg>
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -450,7 +484,7 @@ export default function PlanDetails({
                 key={index}
                 className={`${styles.planCard} ${styles.collapsible} ${
                   isExpanded ? styles.expanded : ''
-                }`}
+                } ${isSelected ? styles.selectedCard : ''}`}
               >
                 <div
                   className={styles.planHeader}
@@ -636,6 +670,13 @@ export default function PlanDetails({
             </>
           )}
         </div>
+      )}
+
+      {videoLightboxUrl && (
+        <VideoLightbox
+          videoUrl={videoLightboxUrl}
+          onClose={() => setVideoLightboxUrl(null)}
+        />
       )}
     </>
   );

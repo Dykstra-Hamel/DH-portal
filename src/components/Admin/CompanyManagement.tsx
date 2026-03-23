@@ -341,6 +341,11 @@ export default function CompanyManagement({
                 type: 'string',
                 description: 'Wisetack pre-qualification URL',
               },
+              quote_accent_color_preference: {
+                value: updatedData.quote_accent_color_preference || 'primary',
+                type: 'string',
+                description: 'Which brand color is used as the primary accent on the public quote page',
+              },
             },
           }),
         });

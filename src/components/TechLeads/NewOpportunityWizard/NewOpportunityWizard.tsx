@@ -2643,7 +2643,7 @@ export function NewOpportunityWizard() {
               {isSubmitting ? (
                 <><span className={styles.spinner} />Submitting…</>
               ) : (
-                <>Schedule Service</>
+                <>Refer To Sales</>
               )}
             </button>
             <button
@@ -2651,7 +2651,7 @@ export function NewOpportunityWizard() {
               onClick={() => setStepIndex(i => i + 1)}
               disabled={isSubmitting}
             >
-              <>Service Today</>
+              <>Sell It</>
             </button>
           </div>
         )}

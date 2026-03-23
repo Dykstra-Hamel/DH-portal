@@ -129,4 +129,6 @@ export interface LeadQuoteSectionProps {
   onNotInterested: () => void;
   onReadyToSchedule: () => void;
   isSidebarExpanded?: boolean;
+  startExpanded?: boolean;
+  forceCollapse?: boolean;
 }

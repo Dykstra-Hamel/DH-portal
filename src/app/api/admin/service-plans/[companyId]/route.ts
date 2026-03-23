@@ -21,6 +21,7 @@ interface ServicePlan {
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
+  plan_video_url: string | null;
   home_size_pricing: {
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
@@ -52,6 +53,7 @@ interface CreateServicePlanRequest {
   requires_quote?: boolean;
   plan_image_url?: string;
   plan_disclaimer?: string;
+  plan_video_url?: string | null;
   home_size_pricing?: {
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
