@@ -64,6 +64,7 @@ export interface LeadSchedulingSectionProps {
   scheduledDate: string;
   scheduledTime: string;
   confirmationNote: string;
+  customerComment?: string | null;
   onScheduledDateChange: (date: string) => void;
   onScheduledTimeChange: (time: string) => void;
   onConfirmationNoteChange: (note: string) => void;
@@ -129,4 +130,6 @@ export interface LeadQuoteSectionProps {
   onNotInterested: () => void;
   onReadyToSchedule: () => void;
   isSidebarExpanded?: boolean;
+  startExpanded?: boolean;
+  forceCollapse?: boolean;
 }

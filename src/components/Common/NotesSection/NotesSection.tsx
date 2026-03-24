@@ -10,6 +10,8 @@ interface NotesSectionProps {
   companyId: string;
   userId: string;
   customerComment?: string | null;
+  readOnly?: boolean;
+  onNotesLoaded?: (hasNotes: boolean) => void;
 }
 
 export function NotesSection({
@@ -18,6 +20,8 @@ export function NotesSection({
   companyId,
   userId,
   customerComment,
+  readOnly = false,
+  onNotesLoaded,
 }: NotesSectionProps) {
   const [note, setNote] = useState('');
   const [notes, setNotes] = useState<Activity[]>([]);
@@ -37,7 +41,13 @@ export function NotesSection({
       if (!response.ok) throw new Error('Failed to fetch notes');
 
       const { data } = await response.json();
-      setNotes((data || []).filter((item: Activity) => Boolean(item.notes?.trim())));
+      const filtered = (data || []).filter(
+        (item: Activity) =>
+          Boolean(item.notes?.trim()) &&
+          item.metadata?.source !== 'customer_quote_comment'
+      );
+      setNotes(filtered);
+      onNotesLoaded?.(filtered.length > 0);
     } catch (error) {
       console.error('Error loading notes:', error);
       setNotes([]);
@@ -110,7 +120,7 @@ export function NotesSection({
   return (
     <div className={styles.notesSection}>
       {customerComment && (
-      <div className={styles.customerCommentBanner}>
+        <div className={styles.customerCommentBanner}>
           <span className={styles.customerCommentLabel}>Customer Note</span>
           <p className={styles.customerCommentText}>{customerComment}</p>
         </div>
@@ -131,35 +141,43 @@ export function NotesSection({
                     size="small"
                     showTooltip={true}
                   />
-                  <span className={styles.noteAuthor}>{getUserLabel(activity)}</span>
+                  <span className={styles.noteAuthor}>
+                    {getUserLabel(activity)}
+                  </span>
                 </span>
-                <span className={styles.noteDate}>{formatDateTime(activity.created_at)}</span>
+                <span className={styles.noteDate}>
+                  {formatDateTime(activity.created_at)}
+                </span>
               </div>
               <p className={styles.noteText}>{activity.notes}</p>
             </div>
           ))}
         </div>
       ) : (
-        <p className={styles.noteState}>No notes yet.</p>
+        <p className={styles.noteState}>No system or user notes yet.</p>
       )}
-      <textarea
-        className={styles.textarea}
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-        placeholder="Add a note..."
-        rows={3}
-        disabled={isSubmitting}
-      />
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={handleAddNote}
-          disabled={!note.trim() || isSubmitting}
-        >
-          {isSubmitting ? 'Adding...' : 'Add Note'}
-        </button>
-      </div>
+      {!readOnly && (
+        <>
+          <textarea
+            className={styles.textarea}
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="Add a note..."
+            rows={3}
+            disabled={isSubmitting}
+          />
+          <div className={styles.actions}>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              onClick={handleAddNote}
+              disabled={!note.trim() || isSubmitting}
+            >
+              {isSubmitting ? 'Adding...' : 'Add Note'}
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }

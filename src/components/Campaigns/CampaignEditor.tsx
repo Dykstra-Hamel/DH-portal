@@ -809,7 +809,7 @@ export default function CampaignEditor({
   if (!isOpen) return null;
 
   return (
-    <div className={styles.modal} onClick={handleClose}>
+    <div className={styles.modal}>
       <div className={styles.modalContent} onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className={styles.modalHeader}>

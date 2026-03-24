@@ -44,6 +44,7 @@ interface ServicePlan {
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendEvent } from '@/lib/inngest/client';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress, extractAddressData } from '@/lib/service-addresses';
+import { generateQuoteToken, generateQuoteUrl } from '@/lib/quote-utils';
 
 // Helper function to check if auto-calling is enabled for a company
 async function shouldAutoCall(companyId: string): Promise<boolean> {
@@ -579,15 +580,13 @@ export async function POST(request: NextRequest) {
     // Set priority to medium for all leads
     const priority = 'medium';
 
-    // Set lead status to unassigned for new leads
     const status:
-      | 'unassigned'
-      | 'contacting'
+      | 'new'
+      | 'in_process'
       | 'quoted'
-      | 'ready_to_schedule'
-      | 'scheduled'
+      | 'scheduling'
       | 'won'
-      | 'lost' = 'unassigned';
+      | 'lost' = 'scheduling';
 
     // Create lead notes
     let notes = `Widget Submission:\n`;
@@ -683,6 +682,61 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.warn('Error updating partial lead conversion status:', error);
         // Don't fail the lead creation if this update fails
+      }
+    }
+
+    // Create quote + line item for the selected service plan
+    if (submission.selectedPlan) {
+      try {
+        const plan = submission.selectedPlan;
+        const quoteToken = generateQuoteToken();
+
+        const { data: newQuote } = await supabase
+          .from('quotes')
+          .insert({
+            lead_id: lead.id,
+            company_id: submission.companyId,
+            customer_id: customerId,
+            service_address_id: serviceAddressId,
+            total_initial_price: plan.initial_price || 0,
+            total_recurring_price: plan.recurring_price || 0,
+            quote_status: 'draft',
+            quote_token: quoteToken,
+          })
+          .select('id')
+          .single();
+
+        if (newQuote) {
+          // Generate and store the quote URL now that we have the ID
+          const { data: companySlugRow } = await supabase
+            .from('companies')
+            .select('slug')
+            .eq('id', submission.companyId)
+            .single();
+
+          if (companySlugRow?.slug) {
+            const quoteUrl = generateQuoteUrl(companySlugRow.slug, newQuote.id, quoteToken);
+            await supabase.from('quotes').update({ quote_url: quoteUrl }).eq('id', newQuote.id);
+          }
+
+          await supabase.from('quote_line_items').insert({
+            quote_id: newQuote.id,
+            service_plan_id: plan.id,
+            plan_name: plan.plan_name,
+            plan_description: plan.plan_description || null,
+            initial_price: plan.initial_price || 0,
+            recurring_price: plan.recurring_price || 0,
+            billing_frequency: plan.billing_frequency || 'monthly',
+            final_initial_price: plan.initial_price || 0,
+            final_recurring_price: plan.recurring_price || 0,
+            display_order: 0,
+            is_optional: false,
+            is_selected: true,
+          });
+        }
+      } catch (err) {
+        console.warn('[widget-submit] Failed to create quote/line item:', err);
+        // Non-fatal — lead was already created
       }
     }
 

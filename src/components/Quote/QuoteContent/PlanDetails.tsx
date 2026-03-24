@@ -8,6 +8,7 @@ import { useState } from 'react';
 import Image from 'next/image';
 import styles from './quotecontent.module.scss';
 import QuoteTotalPricing from './QuoteTotalPricing';
+import VideoLightbox from './VideoLightbox';
 
 interface FaqItemProps {
   faq: { question: string; answer: string };
@@ -146,6 +147,7 @@ export default function PlanDetails({
 }: PlanDetailsProps) {
   // State for FAQ tabs
   const [activeFaqTab, setActiveFaqTab] = useState(0);
+  const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
 
   // Get plans with FAQs — only for selected plans
   const plansWithFaqs = regularLineItems.filter((item: any) => {
@@ -188,18 +190,28 @@ export default function PlanDetails({
           const isExpanded = expandedPlanIndexes.includes(index);
           const isPlanSelected = selectedPlanIds.includes(item.id);
           const isOnlySelected = selectedPlanIds.length === 1 && isPlanSelected;
+          const planHasContent = Boolean(
+            item.plan_description ||
+            item.bundle_plan?.bundle_description ||
+            getAllFeaturesFromLineItem(item).length > 0 ||
+            getAllFaqsFromLineItem(item).length > 0 ||
+            item.service_plan?.plan_image_url ||
+            item.bundle_plan?.bundle_image_url ||
+            item.service_plan?.plan_disclaimer ||
+            item.service_plan?.plan_video_url
+          );
 
           return (
             <div
               key={index}
               className={`${styles.planCard} ${styles.collapsible} ${
                 isExpanded ? styles.expanded : ''
-              }`}
+              } ${isPlanSelected ? styles.selectedCard : ''}`}
             >
               {/* Collapsible Header */}
               <div
                 className={styles.planHeader}
-                onClick={() => {
+                onClick={planHasContent ? () => {
                   if (isExpanded) {
                     setExpandedPlanIndexes(
                       expandedPlanIndexes.filter(i => i !== index)
@@ -207,8 +219,8 @@ export default function PlanDetails({
                   } else {
                     setExpandedPlanIndexes([...expandedPlanIndexes, index]);
                   }
-                }}
-                style={{ cursor: 'pointer' }}
+                } : undefined}
+                style={{ cursor: planHasContent ? 'pointer' : 'default' }}
               >
                 {regularLineItems.length > 1 && (
                   <label
@@ -225,44 +237,48 @@ export default function PlanDetails({
                   </label>
                 )}
                 <h3 className={styles.planHeaderTitle}>{item.plan_name}</h3>
-                <div className={styles.planHeaderPricing}>
-                  <span className={styles.planHeaderRecurring}>
-                    <sup>$</sup>
-                    {formatCurrency(
-                      item.final_recurring_price || item.recurring_price || 0
-                    )}
-                    <span className={styles.planRecurringFrequency}>
-                      /
-                      {abbreviateFrequency(item.billing_frequency || 'monthly')}
+                <div className={styles.addonHeaderRight}>
+                  <div className={styles.planHeaderPricing}>
+                    <span className={styles.planHeaderRecurring}>
+                      <sup>$</sup>
+                      {formatCurrency(
+                        item.final_recurring_price || item.recurring_price || 0
+                      )}
+                      <span className={styles.planRecurringFrequency}>
+                        /
+                        {abbreviateFrequency(item.billing_frequency || 'monthly')}
+                      </span>
                     </span>
-                  </span>
-                  <span className={styles.planHeaderDivider}>|</span>
-                  <span className={styles.planHeaderInitial}>
-                    <sup>$</sup>
-                    {formatCurrency(
-                      item.final_initial_price || item.initial_price || 0
-                    )}
-                    <span className={styles.initialText}> Initial</span>
-                  </span>
+                    <span className={styles.planHeaderDivider}>|</span>
+                    <span className={styles.planHeaderInitial}>
+                      <sup>$</sup>
+                      {formatCurrency(
+                        item.final_initial_price || item.initial_price || 0
+                      )}
+                      <span className={styles.initialText}> Initial</span>
+                    </span>
+                  </div>
+                  {planHasContent && (
+                    <span className={styles.planHeaderIcon}>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="32"
+                        height="32"
+                        viewBox="0 0 32 32"
+                        fill="none"
+                      >
+                        <circle cx="16" cy="16" r="16" fill="#000" />
+                        <path
+                          d="M10 14L16 20L22 14"
+                          stroke="white"
+                          strokeWidth="1.75"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </span>
+                  )}
                 </div>
-                <span className={styles.planHeaderIcon}>
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="32"
-                    height="32"
-                    viewBox="0 0 32 32"
-                    fill="none"
-                  >
-                    <circle cx="16" cy="16" r="16" fill="#000" />
-                    <path
-                      d="M10 14L16 20L22 14"
-                      stroke="white"
-                      strokeWidth="1.75"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </span>
               </div>
 
               {/* Plan Content */}
@@ -276,6 +292,18 @@ export default function PlanDetails({
                   <div className={styles.planContentGrid}>
                     {/* Left Column - Content */}
                     <div className={styles.planContentLeft}>
+                      {/* Plan Image - mobile only */}
+                      <div className={styles.planImageWrapperMobile}>
+                        {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
+                          <Image
+                            src={item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url}
+                            alt={item.plan_name || 'Plan image'}
+                            fill={true}
+                            className={styles.planImage}
+                          />
+                        ) : null}
+                      </div>
+
                       {/* Plan Description */}
                       {(item.plan_description || item.bundle_plan?.bundle_description) && (
                         <p className={styles.planDescription}>
@@ -361,21 +389,28 @@ export default function PlanDetails({
 
                           {/* Right: Initial Price */}
                           <div className={styles.priceRight}>
-                            <div className={styles.priceInitial}>
-                              <span className={styles.initialLabel}>Initial Only</span>
-                              <span className={styles.priceNumber}>
-                                <sup>$</sup>
-                                {formatCurrency(
-                                  item.final_initial_price ||
-                                    item.initial_price ||
-                                    0
-                                )}
-                              </span>
-                            </div>
-                            {hasDiscount && (
-                              <div className={styles.priceNormally}>
-                                Normally{' '}
-                                <span className={styles.priceCrossed}>
+                            {hasDiscount ? (
+                              <>
+                                <div className={styles.priceInitialInline}>
+                                  <span className={styles.initialLabel}>Initial Only</span>
+                                  {' '}
+                                  <span className={styles.priceNumber}>
+                                    <sup>$</sup>
+                                    {formatCurrency(item.final_initial_price || item.initial_price || 0)}
+                                  </span>
+                                </div>
+                                <div className={styles.priceNormally}>
+                                  Normally{' '}
+                                  <span className={styles.priceCrossed}>
+                                    <sup>$</sup>
+                                    {formatCurrency(item.initial_price || 0)}
+                                  </span>
+                                </div>
+                              </>
+                            ) : (
+                              <div className={styles.priceInitial}>
+                                <span className={styles.initialLabel}>Initial Only</span>
+                                <span className={styles.priceNumber}>
                                   <sup>$</sup>
                                   {formatCurrency(item.initial_price || 0)}
                                 </span>
@@ -388,7 +423,7 @@ export default function PlanDetails({
 
                     {/* Right Column - Image and Disclaimer */}
                     <div className={styles.planContentRight}>
-                      {/* Plan Image */}
+                      {/* Plan Image - desktop only */}
                       <div className={styles.planImageWrapper}>
                         {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
                           <Image
@@ -417,14 +452,39 @@ export default function PlanDetails({
                         )}
                       </div>
 
-                      {/* Disclaimer */}
-                      {item.service_plan?.plan_disclaimer && (
-                        <div className={styles.planDisclaimer}>
-                          <p
-                            dangerouslySetInnerHTML={{
-                              __html: item.service_plan.plan_disclaimer,
-                            }}
-                          ></p>
+                      {/* Disclaimer + Video */}
+                      {(item.service_plan?.plan_disclaimer || item.service_plan?.plan_video_url) && (
+                        <div className={`${styles.planDisclaimerVideoRow}${item.service_plan?.plan_video_url ? ` ${styles.hasVideo}` : ''}`}>
+                          {item.service_plan?.plan_disclaimer && (
+                            <div className={styles.planDisclaimer}>
+                              <p
+                                dangerouslySetInnerHTML={{
+                                  __html: item.service_plan.plan_disclaimer,
+                                }}
+                              ></p>
+                            </div>
+                          )}
+                          {item.service_plan?.plan_video_url && (
+                            <button
+                              type="button"
+                              className={styles.planVideoThumbnail}
+                              onClick={() => setVideoLightboxUrl(item.service_plan.plan_video_url)}
+                              aria-label="Play plan video"
+                            >
+                              <video
+                                src={item.service_plan.plan_video_url}
+                                muted
+                                preload="metadata"
+                                className={styles.planVideoThumbnailVideo}
+                              />
+                              <span className={styles.planVideoPlayOverlay}>
+                                <svg width="45" height="45" viewBox="0 0 45 45" fill="none">
+                                  <circle cx="22.5" cy="22.5" r="22.5" fill="rgba(0,0,0,0.5)" />
+                                  <path d="M18 14.5L32 22.5L18 30.5V14.5Z" fill="white" />
+                                </svg>
+                              </span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
@@ -450,7 +510,7 @@ export default function PlanDetails({
                 key={index}
                 className={`${styles.planCard} ${styles.collapsible} ${
                   isExpanded ? styles.expanded : ''
-                }`}
+                } ${isSelected ? styles.selectedCard : ''}`}
               >
                 <div
                   className={styles.planHeader}
@@ -485,25 +545,30 @@ export default function PlanDetails({
                     <span className={styles.addonCheckboxCustom} />
                   </label>
                   <h3 className={styles.planHeaderTitle}>{item.addon_name}</h3>
-                  <div className={styles.planHeaderPricing}>
-                    <span className={styles.planHeaderRecurring}>
-                      <sup>$</sup>
-                      {formatCurrency(item.recurring_price || 0)}
-                      <span className={styles.planRecurringFrequency}>
-                        /
-                        {abbreviateFrequency(item.billing_frequency || 'monthly')}
-                      </span>
-                    </span>
-                    {(item.initial_price ?? 0) > 0 && (
-                      <>
-                        <span className={styles.planHeaderDivider}>|</span>
-                        <span className={styles.planHeaderInitial}>
-                          <sup>$</sup>
-                          {formatCurrency(item.initial_price)}
-                          <span className={styles.initialText}> Initial</span>
-                        </span>
-                      </>
+                  <div className={`${styles.addonHeaderRight}${isSelected ? ` ${styles.addonHeaderRightWithPill}` : ''}`}>
+                    {isSelected && (
+                      <span className={styles.addedToPlanPill}>Added To Plan</span>
                     )}
+                    <div className={styles.planHeaderPricing}>
+                      <span className={styles.planHeaderRecurring}>
+                        <sup>$</sup>
+                        {formatCurrency(item.recurring_price || 0)}
+                        <span className={styles.planRecurringFrequency}>
+                          /
+                          {abbreviateFrequency(item.billing_frequency || 'monthly')}
+                        </span>
+                      </span>
+                      {(item.initial_price ?? 0) > 0 && (
+                        <>
+                          <span className={styles.planHeaderDivider}>|</span>
+                          <span className={styles.planHeaderInitial}>
+                            <sup>$</sup>
+                            {formatCurrency(item.initial_price)}
+                            <span className={styles.initialText}> Initial</span>
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   {hasContent && (
                     <span className={styles.planHeaderIcon}>
@@ -636,6 +701,13 @@ export default function PlanDetails({
             </>
           )}
         </div>
+      )}
+
+      {videoLightboxUrl && (
+        <VideoLightbox
+          videoUrl={videoLightboxUrl}
+          onClose={() => setVideoLightboxUrl(null)}
+        />
       )}
     </>
   );

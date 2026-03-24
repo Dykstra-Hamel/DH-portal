@@ -39,6 +39,7 @@ interface Company {
   terms_conditions_url: string;
   quote_terms: string;
   quote_thanks_content: string;
+  quote_accent_color_preference?: 'primary' | 'secondary';
 }
 
 interface Quote {

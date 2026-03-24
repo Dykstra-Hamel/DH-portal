@@ -157,13 +157,14 @@ export async function POST(request: NextRequest) {
   }
 
   if (!existingCustomer && normalizedPhone) {
-    const { data: allCustomers } = await adminSupabase
+    const { data: byPhone } = await adminSupabase
       .from('customers')
       .select('*')
       .eq('company_id', companyId)
-      .not('phone', 'is', null);
+      .eq('phone', normalizedPhone)
+      .single();
 
-    existingCustomer = allCustomers?.find(c => normalizePhoneNumber(c.phone) === normalizedPhone) ?? null;
+    if (byPhone) existingCustomer = byPhone;
   }
 
   if (!existingCustomer && email) {
@@ -195,7 +196,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (updateError || !updatedCustomer) {
-      return NextResponse.json({ error: 'Failed to update customer' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to update customer', detail: updateError?.message ?? null }, { status: 500 });
     }
 
     customerId = updatedCustomer.id;
@@ -232,7 +233,7 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (insertError || !newCustomer) {
-      return NextResponse.json({ error: 'Failed to create customer' }, { status: 500 });
+      return NextResponse.json({ error: 'Failed to create customer', detail: insertError?.message ?? null }, { status: 500 });
     }
 
     customerId = newCustomer.id;

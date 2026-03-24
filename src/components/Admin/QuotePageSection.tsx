@@ -13,7 +13,7 @@ import styles from './CompanyManagement.module.scss';
 
 interface QuotePageSectionProps {
   companyId: string;
-  onSave: (data: { quote_terms: string; quote_thanks_content: string; wisetack_enabled: boolean; wisetack_url: string }) => void;
+  onSave: (data: { quote_terms: string; quote_thanks_content: string; wisetack_enabled: boolean; wisetack_url: string; quote_accent_color_preference: string }) => void;
   saving: boolean;
 }
 
@@ -26,6 +26,7 @@ export default function QuotePageSection({
   const [quoteThanksContent, setQuoteThanksContent] = useState('');
   const [wisetackEnabled, setWisetackEnabled] = useState(false);
   const [wisetackUrl, setWisetackUrl] = useState('');
+  const [quoteAccentColorPreference, setQuoteAccentColorPreference] = useState<'primary' | 'secondary'>('primary');
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -42,6 +43,7 @@ export default function QuotePageSection({
         setQuoteThanksContent(settings.quote_thanks_content?.value || '');
         setWisetackEnabled(settings.wisetack_enabled?.value === 'true');
         setWisetackUrl(settings.wisetack_url?.value || '');
+        setQuoteAccentColorPreference((settings.quote_accent_color_preference?.value as 'primary' | 'secondary') || 'primary');
       }
     } catch (error) {
       console.error('Error loading quote page settings:', error);
@@ -56,6 +58,7 @@ export default function QuotePageSection({
       quote_thanks_content: quoteThanksContent,
       wisetack_enabled: wisetackEnabled,
       wisetack_url: wisetackUrl,
+      quote_accent_color_preference: quoteAccentColorPreference,
     });
   };
 
@@ -120,6 +123,22 @@ export default function QuotePageSection({
             </p>
           </div>
         )}
+      </div>
+
+      <div className={styles.formGroup}>
+        <label htmlFor="quote-accent-color">Quote Page Color Preference</label>
+        <select
+          id="quote-accent-color"
+          value={quoteAccentColorPreference}
+          onChange={e => setQuoteAccentColorPreference(e.target.value as 'primary' | 'secondary')}
+          className={styles.textInput}
+        >
+          <option value="primary">Primary Color (default)</option>
+          <option value="secondary">Secondary Color (reversed)</option>
+        </select>
+        <p className={styles.fieldDescription}>
+          Choose which brand color is used as the primary accent on the public quote page. &quot;Reversed&quot; swaps the primary and secondary brand colors.
+        </p>
       </div>
 
       <div className={styles.actions}>

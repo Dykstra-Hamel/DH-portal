@@ -48,7 +48,8 @@ export async function GET(
             plan_image_url,
             plan_disclaimer,
             plan_name,
-            plan_terms
+            plan_terms,
+            plan_video_url
           ),
           addon_service:add_on_services(
             addon_description,

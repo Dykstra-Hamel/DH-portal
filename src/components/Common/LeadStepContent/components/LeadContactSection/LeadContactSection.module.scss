@@ -157,6 +157,16 @@
   padding: 2px 7px;
 }
 
+.nextStepDue {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin-top: 3px;
+}
+
+.nextStepDueOverdue {
+  color: var(--red-500);
+}
+
 // ── Shared textarea ───────────────────────────────────────────────────────────
 
 .notesTextarea {
