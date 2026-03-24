@@ -116,6 +116,7 @@ export async function PUT(
     }
 
     const isQuoteSigned = existingQuote.signed_at !== null;
+    const isIntentionalUnlock = body.quote_status === 'draft' && existingQuote.quote_status === 'accepted';
     let requiresReset = false;
 
     // Prepare update data
@@ -123,6 +124,12 @@ export async function PUT(
 
     if (body.quote_status) {
       updateData.quote_status = body.quote_status;
+      // If intentionally resetting an accepted quote to draft, clear signature
+      if (isIntentionalUnlock) {
+        updateData.signed_at = null;
+        updateData.signature_data = null;
+        updateData.device_data = null;
+      }
     }
 
     if (body.valid_until !== undefined) {
@@ -217,6 +224,38 @@ export async function PUT(
         } catch (activityError) {
           console.error('Error logging quote reset activity:', activityError);
           // Don't fail the request if activity logging fails
+        }
+      }
+
+      // Log activity for intentional admin unlocks
+      if (isIntentionalUnlock) {
+        try {
+          const { data: unlockQuoteData } = await supabase
+            .from('quotes')
+            .select('lead_id, company_id')
+            .eq('id', id)
+            .single();
+
+          if (unlockQuoteData) {
+            await logActivity({
+              company_id: unlockQuoteData.company_id,
+              entity_type: 'lead',
+              entity_id: unlockQuoteData.lead_id,
+              activity_type: 'field_update',
+              field_name: 'quote_status',
+              old_value: 'accepted',
+              new_value: 'draft',
+              user_id: null,
+              notes: 'Quote unlocked by admin for editing',
+              metadata: {
+                quote_id: id,
+                reason: 'intentional_admin_unlock',
+                unlocked_at: new Date().toISOString(),
+              },
+            });
+          }
+        } catch (activityError) {
+          console.error('Error logging quote unlock activity:', activityError);
         }
       }
 
