@@ -120,7 +120,7 @@ export function NotesSection({
   return (
     <div className={styles.notesSection}>
       {customerComment && (
-      <div className={styles.customerCommentBanner}>
+        <div className={styles.customerCommentBanner}>
           <span className={styles.customerCommentLabel}>Customer Note</span>
           <p className={styles.customerCommentText}>{customerComment}</p>
         </div>
@@ -141,23 +141,27 @@ export function NotesSection({
                     size="small"
                     showTooltip={true}
                   />
-                  <span className={styles.noteAuthor}>{getUserLabel(activity)}</span>
+                  <span className={styles.noteAuthor}>
+                    {getUserLabel(activity)}
+                  </span>
                 </span>
-                <span className={styles.noteDate}>{formatDateTime(activity.created_at)}</span>
+                <span className={styles.noteDate}>
+                  {formatDateTime(activity.created_at)}
+                </span>
               </div>
               <p className={styles.noteText}>{activity.notes}</p>
             </div>
           ))}
         </div>
       ) : (
-        <p className={styles.noteState}>No notes yet.</p>
+        <p className={styles.noteState}>No system or user notes yet.</p>
       )}
       {!readOnly && (
         <>
           <textarea
             className={styles.textarea}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={e => setNote(e.target.value)}
             placeholder="Add a note..."
             rows={3}
             disabled={isSubmitting}

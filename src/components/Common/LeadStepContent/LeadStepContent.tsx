@@ -755,6 +755,7 @@ export function LeadStepContent({
                     scheduledDate={scheduledDate}
                     scheduledTime={scheduledTime}
                     confirmationNote={confirmationNote}
+                    customerComment={quote?.customer_comments}
                     onScheduledDateChange={setScheduledDate}
                     onScheduledTimeChange={setScheduledTime}
                     onConfirmationNoteChange={setConfirmationNote}
@@ -846,6 +847,7 @@ export function LeadStepContent({
                     scheduledDate={scheduledDate}
                     scheduledTime={scheduledTime}
                     confirmationNote={confirmationNote}
+                    customerComment={quote?.customer_comments}
                     onScheduledDateChange={setScheduledDate}
                     onScheduledTimeChange={setScheduledTime}
                     onConfirmationNoteChange={setConfirmationNote}

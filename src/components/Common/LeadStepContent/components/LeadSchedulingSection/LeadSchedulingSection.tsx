@@ -27,6 +27,7 @@ export function LeadSchedulingSection({
   scheduledDate,
   scheduledTime,
   confirmationNote,
+  customerComment,
   onScheduledDateChange,
   onScheduledTimeChange,
   onConfirmationNoteChange,
@@ -152,6 +153,7 @@ export function LeadSchedulingSection({
             entityId={lead.id}
             companyId={lead.company_id}
             userId={user?.id || ''}
+            customerComment={customerComment}
             readOnly
           />
         </div>
