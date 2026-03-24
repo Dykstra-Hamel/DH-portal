@@ -482,7 +482,7 @@
   color: var(--brand-primary) !important;
 
   @media (max-width: 768px) {
-    font-size: 22px;
+    font-size: 22px !important;
     text-align: left;
     flex: 1;
     min-width: 0;
