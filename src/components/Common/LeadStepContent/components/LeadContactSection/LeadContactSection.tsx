@@ -582,6 +582,12 @@ export function LeadContactSection({
       nextTask.action_type as keyof typeof ACTION_TYPE_LABELS
     ] || nextTask.action_type;
 
+  const formatDueDate = (dateStr?: string | null): string => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+  };
+
   return (
     <div
       className={styles.cardContent}
@@ -592,6 +598,9 @@ export function LeadContactSection({
         <span className={styles.nextStepName}>{stepLabel}</span>
         {nextTask.day_number && (
           <span className={styles.nextStepDay}>Day {nextTask.day_number}</span>
+        )}
+        {nextTask.due_date && (
+          <span className={styles.nextStepDue}>Due {formatDueDate(nextTask.due_date)}</span>
         )}
       </div>
 

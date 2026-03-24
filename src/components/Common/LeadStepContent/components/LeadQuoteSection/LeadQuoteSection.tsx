@@ -16,6 +16,7 @@ import {
   PenLine,
   ChevronRight,
   ExternalLink,
+  Lock,
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useActiveSection } from '@/contexts/ActiveSectionContext';
@@ -139,6 +140,9 @@ export function LeadQuoteSection({
   const [addonRequiresQuote, setAddonRequiresQuote] = useState<
     Record<string, boolean>
   >({});
+
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
 
   const [calculatedPrices, setCalculatedPrices] = useState<
     Record<
@@ -1293,6 +1297,30 @@ export function LeadQuoteSection({
     }
   };
 
+  const isQuoteLocked = quote?.quote_status === 'accepted';
+
+  async function handleUnlockConfirm() {
+    if (!quote) return;
+    setIsUnlocking(true);
+    try {
+      const response = await fetch(`/api/quotes/${quote.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quote_status: 'draft' }),
+      });
+      if (!response.ok) throw new Error('Failed to unlock quote');
+      const data = await response.json();
+      if (data.success && data.data) {
+        await broadcastQuoteUpdate(data.data);
+      }
+      setShowUnlockModal(false);
+    } catch {
+      onShowToast?.('Failed to unlock quote', 'error');
+    } finally {
+      setIsUnlocking(false);
+    }
+  }
+
   // Helper functions for managing service selections
   const addServiceSelection = () => {
     if (serviceSelections.length >= 3) return;
@@ -1329,6 +1357,29 @@ export function LeadQuoteSection({
           className={styles.cardContent}
           data-sidebar-expanded={isSidebarExpanded}
         >
+          {/* Quote Locked Banner */}
+          {isQuoteLocked && (
+            <div className={styles.lockedBanner}>
+              <div className={styles.lockedBannerLeft}>
+                <Lock size={16} className={styles.lockedBannerIcon} />
+                <div>
+                  <div className={styles.lockedBannerTitle}>Quote Accepted &amp; Signed</div>
+                  {quote?.signed_at && (
+                    <div className={styles.lockedBannerSubtitle}>
+                      Signed on {new Date(quote.signed_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <button
+                type="button"
+                className={styles.unlockButton}
+                onClick={(e) => { e.stopPropagation(); setShowUnlockModal(true); }}
+              >
+                Unlock to Edit
+              </button>
+            </div>
+          )}
           {/* Pest Selection Section */}
           <div className={styles.section}>
             {loadingPlan && (
@@ -1343,7 +1394,7 @@ export function LeadQuoteSection({
                 Loading pest options...
               </div>
             ) : (
-              <div className={styles.pestSelectRow}>
+              <div className={`${styles.pestSelectRow}${isQuoteLocked ? ` ${styles.lockedControlsWrapper}` : ''}`}>
                 {/* Primary Pest Section */}
                 <PestSelection
                   selectedPestId={selectedPests[0] || null}
@@ -1455,6 +1506,7 @@ export function LeadQuoteSection({
                     <CustomDropdown
                       options={homeSizeOptions}
                       value={selectedHomeSizeOption}
+                      disabled={isQuoteLocked}
                       onChange={async rangeValue => {
                         const oldValue = selectedHomeSizeOption;
                         const oldHomeSize = homeSize;
@@ -1574,6 +1626,7 @@ export function LeadQuoteSection({
                     <CustomDropdown
                       options={yardSizeOptions}
                       value={selectedYardSizeOption}
+                      disabled={isQuoteLocked}
                       onChange={async rangeValue => {
                         const oldValue = selectedYardSizeOption;
                         const oldYardSize = yardSize;
@@ -1694,6 +1747,7 @@ export function LeadQuoteSection({
                       type="number"
                       min="0"
                       step="1"
+                      disabled={isQuoteLocked}
                       value={linearFeet}
                       onChange={(e) => {
                         const newValue = e.target.value === '' ? '' : Number(e.target.value);
@@ -1819,6 +1873,7 @@ export function LeadQuoteSection({
                         { label: 'Not Sure', value: 'not_sure' },
                       ]}
                       value={hadPestControlBefore}
+                      disabled={isQuoteLocked}
                       onChange={async value => {
                         const oldValue = hadPestControlBefore;
 
@@ -1918,6 +1973,7 @@ export function LeadQuoteSection({
                           {index > 0 && (
                             <button
                               type="button"
+                              disabled={isQuoteLocked}
                               onClick={() => {
                                 console.log('X button clicked! Index:', index, 'Selection:', selection);
                                 removeServiceSelection(selection.displayOrder);
@@ -1990,11 +2046,12 @@ export function LeadQuoteSection({
                               }
                             }}
                             placeholder="Program or Service"
-                            disabled={loadingServicePlans || loadingBundles}
+                            disabled={isQuoteLocked || loadingServicePlans || loadingBundles}
                           />
                           {selection.servicePlan?.allow_custom_pricing && !selection.servicePlan?.requires_quote && (
                             <button
                               type="button"
+                              disabled={isQuoteLocked}
                               className={styles.customPricingToggleButton}
                               onClick={() => {
                                 const isExpanding =
@@ -2093,6 +2150,7 @@ export function LeadQuoteSection({
                             }}
                             placeholder="Frequency"
                             disabled={
+                              isQuoteLocked ||
                               selection.servicePlan?.plan_category ===
                               'one-time'
                             }
@@ -2151,7 +2209,7 @@ export function LeadQuoteSection({
                                   : 'Select Discount'
                             }
                             disabled={
-                              loadingDiscounts || selection.isCustomPriced
+                              isQuoteLocked || loadingDiscounts || selection.isCustomPriced
                             }
                           />
                         </div>
@@ -2164,6 +2222,7 @@ export function LeadQuoteSection({
                           <div className={styles.addServiceButtonContainer}>
                             <button
                               type="button"
+                              disabled={isQuoteLocked}
                               onClick={addServiceSelection}
                               className={styles.addServiceButton}
                             >
@@ -2191,6 +2250,7 @@ export function LeadQuoteSection({
                                   type="number"
                                   min="0"
                                   step="0.01"
+                                  disabled={isQuoteLocked}
                                   className={styles.priceInput}
                                   value={
                                     selection.customInitialPrice ??
@@ -2226,6 +2286,7 @@ export function LeadQuoteSection({
                                   type="number"
                                   min="0"
                                   step="0.01"
+                                  disabled={isQuoteLocked}
                                   className={styles.priceInput}
                                   value={
                                     selection.customRecurringPrice ??
@@ -2259,6 +2320,7 @@ export function LeadQuoteSection({
                             <div className={styles.customPricingActions}>
                               <button
                                 type="button"
+                                disabled={isQuoteLocked}
                                 className={styles.saveCustomPriceButton}
                                 onClick={async () => {
                                   if (selection.servicePlan) {
@@ -2312,6 +2374,7 @@ export function LeadQuoteSection({
                               {!selection.servicePlan?.requires_quote && (
                               <button
                                 type="button"
+                                disabled={isQuoteLocked}
                                 className={styles.clearCustomPriceButton}
                                 onClick={async () => {
                                   if (selection.servicePlan) {
@@ -2355,6 +2418,7 @@ export function LeadQuoteSection({
                       selection.isCustomPriced && (
                         <button
                           type="button"
+                          disabled={isQuoteLocked}
                           className={styles.editCustomPricingButton}
                           onClick={() => {
                             setCustomPricingExpanded(prev => ({
@@ -2453,6 +2517,7 @@ export function LeadQuoteSection({
                       <div className={styles.addServiceButtonContainer}>
                         <button
                           type="button"
+                          disabled={isQuoteLocked}
                           onClick={addServiceSelection}
                           className={styles.addServiceButton}
                         >
@@ -2465,7 +2530,7 @@ export function LeadQuoteSection({
 
                 {/* Add-On Services Section */}
                 {serviceSelections[0]?.servicePlan && (
-                  <div>
+                  <div className={isQuoteLocked ? styles.lockedControlsWrapper : undefined}>
                     <EligibleAddOnSelector
                       companyId={lead.company_id}
                       servicePlanId={serviceSelections[0].servicePlan.id}
@@ -3580,6 +3645,38 @@ export function LeadQuoteSection({
             )}
           </div>
         </div>
+
+        {/* Unlock Confirmation Modal */}
+        {showUnlockModal && (
+          <div className={styles.modalOverlay} onClick={() => setShowUnlockModal(false)}>
+            <div className={styles.confirmModal} onClick={(e) => e.stopPropagation()}>
+              <div className={styles.confirmModalTitle}>Unlock Quote for Editing</div>
+              <div className={styles.confirmModalBody}>
+                This quote was accepted and signed by the customer
+                {quote?.signed_at && ` on ${new Date(quote.signed_at).toLocaleDateString()}`}.
+                Unlocking it will clear the signature and require the quote to be resent and re-accepted by the customer.
+              </div>
+              <div className={styles.confirmModalActions}>
+                <button
+                  type="button"
+                  className={styles.confirmCancelBtn}
+                  onClick={() => setShowUnlockModal(false)}
+                  disabled={isUnlocking}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className={styles.confirmUnlockBtn}
+                  onClick={handleUnlockConfirm}
+                  disabled={isUnlocking}
+                >
+                  {isUnlocking ? 'Unlocking...' : 'Yes, Unlock Quote'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </InfoCard>
     </div>
   );
