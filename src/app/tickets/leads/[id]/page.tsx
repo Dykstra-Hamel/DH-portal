@@ -49,6 +49,7 @@ import { formatHeaderDate } from '@/lib/date-utils';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import styles from './page.module.scss';
+import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 
 interface Profile {
   id: string;
@@ -683,6 +684,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     router.push('/tickets/leads');
   };
 
+  const handleBackToLeads = useCallback(() => {
+    if (window.history.length > 1) {
+      router.back();
+    } else {
+      router.push('/tickets/leads');
+    }
+  }, [router]);
+
   const handleShowToast = useCallback(
     (message: string, type: 'success' | 'error') => {
       setToastMessage(message);
@@ -978,6 +987,16 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
       setPageHeader({
         title: customerName,
         description: description,
+        titleLeading: (
+          <button
+            type="button"
+            onClick={handleBackToLeads}
+            className={headerStyles.backButton}
+            aria-label="Back to leads"
+          >
+            <ArrowLeft size={16} />
+          </button>
+        ),
         leadAssignmentControls: {
           leadType: ticketType,
           leadStatus: lead.lead_status,
@@ -1012,6 +1031,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     ticketType,
     stableAssignableUsers,
     // setPageHeader is intentionally omitted - it's a stable context setter
+    handleBackToLeads,
     handleLeadTypeChange,
     handleLeadTypeChangeWithModal,
     handleAssigneeChange,
