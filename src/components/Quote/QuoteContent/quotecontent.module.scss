@@ -482,13 +482,14 @@
   color: var(--brand-primary) !important;
 
   @media (max-width: 768px) {
-    font-size: 18px;
+    font-size: 22px !important;
     text-align: left;
     flex: 1;
     min-width: 0;
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
+    padding-right: 36px;
   }
 }
 

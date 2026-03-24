@@ -579,15 +579,14 @@ export async function POST(request: NextRequest) {
     // Set priority to medium for all leads
     const priority = 'medium';
 
-    // Set lead status to unassigned for new leads
+    // Set lead status to new for new leads
     const status:
-      | 'unassigned'
-      | 'contacting'
+      | 'new'
+      | 'in_process'
       | 'quoted'
-      | 'ready_to_schedule'
-      | 'scheduled'
+      | 'scheduling'
       | 'won'
-      | 'lost' = 'unassigned';
+      | 'lost' = 'new';
 
     // Create lead notes
     let notes = `Widget Submission:\n`;
