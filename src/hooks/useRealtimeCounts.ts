@@ -561,9 +561,16 @@ export function useRealtimeCounts() {
     let reconnectAttempts = 0;
     const maxReconnectAttempts = 3;
     let reconnectTimeout: NodeJS.Timeout | null = null;
+    // AbortController for cancelling in-flight fetch calls when channel tears down
+    let broadcastAbortController: AbortController | null = null;
 
     const setupChannel = () => {
       if (!isSubscribed) return null;
+
+      // Cancel any in-flight fetches from the previous channel instance
+      broadcastAbortController?.abort();
+      broadcastAbortController = new AbortController();
+      const { signal } = broadcastAbortController;
 
       const supabase = createClient();
       const channel = supabase
@@ -585,8 +592,10 @@ export function useRealtimeCounts() {
             switch (table) {
               case 'tickets':
                 const ticketsResponse = await fetch(
-                  `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`
+                  `/api/tickets?companyId=${selectedCompany.id}&includeArchived=false&countOnly=true`,
+                  { signal }
                 );
+                if (!isSubscribed) return;
                 if (ticketsResponse.ok) {
                   const ticketsData = await ticketsResponse.json();
                   // Handle new paginated response format
@@ -605,19 +614,24 @@ export function useRealtimeCounts() {
                   myLeadsResponse,
                 ] = await Promise.all([
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&status=new,in_process,quoted`
+                    `/api/leads?companyId=${selectedCompany.id}&status=new,in_process,quoted`,
+                    { signal }
                   ),
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=new,in_process,quoted`
+                    `/api/leads?companyId=${selectedCompany.id}&unassigned=true&status=new,in_process,quoted`,
+                    { signal }
                   ),
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&status=scheduling,won`
+                    `/api/leads?companyId=${selectedCompany.id}&status=scheduling,won`,
+                    { signal }
                   ),
                   fetch(
-                    `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+                    `/api/leads?companyId=${selectedCompany.id}&assignedTo=${user.id}`,
+                    { signal }
                   ),
                 ]);
 
+                if (!isSubscribed) return;
                 if (activeLeadsResponse.ok) {
                   const activeLeadsData = await activeLeadsResponse.json();
                   updateCount(
@@ -658,16 +672,20 @@ export function useRealtimeCounts() {
                 const [casesResponse, unassignedCasesResponse, myCasesResponse] =
                   await Promise.all([
                     fetch(
-                      `/api/support-cases?companyId=${selectedCompany.id}&includeArchived=false`
+                      `/api/support-cases?companyId=${selectedCompany.id}&includeArchived=false`,
+                      { signal }
                     ),
                     fetch(
-                      `/api/support-cases?companyId=${selectedCompany.id}&status=new`
+                      `/api/support-cases?companyId=${selectedCompany.id}&status=new`,
+                      { signal }
                     ),
                     fetch(
-                      `/api/support-cases?companyId=${selectedCompany.id}&assignedTo=${user.id}`
+                      `/api/support-cases?companyId=${selectedCompany.id}&assignedTo=${user.id}`,
+                      { signal }
                     ),
                   ]);
 
+                if (!isSubscribed) return;
                 if (casesResponse.ok) {
                   const casesData = await casesResponse.json();
                   updateCount(
@@ -696,8 +714,10 @@ export function useRealtimeCounts() {
 
               case 'customers':
                 const customersResponse = await fetch(
-                  `/api/customers?companyId=${selectedCompany.id}`
+                  `/api/customers?companyId=${selectedCompany.id}`,
+                  { signal }
                 );
+                if (!isSubscribed) return;
                 if (customersResponse.ok) {
                   const customersData = await customersResponse.json();
                   updateCount(
@@ -709,8 +729,10 @@ export function useRealtimeCounts() {
 
               case 'tasks':
                 const tasksResponse = await fetch(
-                  `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`
+                  `/api/tasks?companyId=${selectedCompany.id}&assignedTo=${user.id}&includeArchived=false`,
+                  { signal }
                 );
+                if (!isSubscribed) return;
                 if (tasksResponse.ok) {
                   const tasksData = await tasksResponse.json();
                   const activeTasks = Array.isArray(tasksData.tasks)
@@ -730,6 +752,8 @@ export function useRealtimeCounts() {
                 // Unknown table - no action needed
             }
           } catch (error) {
+            // Ignore aborted requests — these are expected on unmount/navigation
+            if (error instanceof DOMException && error.name === 'AbortError') return;
             // Only log in development, suppress in production to reduce noise
             if (isDevelopment) {
               console.error(`Error updating ${table} count:`, error);
@@ -781,6 +805,7 @@ export function useRealtimeCounts() {
 
     return () => {
       isSubscribed = false;
+      broadcastAbortController?.abort();
       if (reconnectTimeout) {
         clearTimeout(reconnectTimeout);
       }
