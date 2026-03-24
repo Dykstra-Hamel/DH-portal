@@ -57,7 +57,32 @@ export function LeadDetailsSidebar({
   customerComment,
 }: LeadDetailsSidebarProps) {
   const { activeSection, setActiveSection } = useActiveSection();
+  const [hasActivityNotes, setHasActivityNotes] = useState(false);
   const [isSavingAddress, setIsSavingAddress] = useState(false);
+
+  useEffect(() => {
+    const checkForNotes = async () => {
+      try {
+        const url = new URL('/api/activity', window.location.origin);
+        url.searchParams.set('entity_type', 'lead');
+        url.searchParams.set('entity_id', lead.id);
+        url.searchParams.set('activity_type', 'note_added');
+        url.searchParams.set('limit', '100');
+        const res = await fetch(url.toString());
+        if (!res.ok) return;
+        const { data } = await res.json();
+        const hasNotes = (data || []).some(
+          (item: { notes?: string; metadata?: Record<string, any> | null }) =>
+            Boolean(item.notes?.trim()) &&
+            item.metadata?.source !== 'customer_quote_comment'
+        );
+        setHasActivityNotes(hasNotes);
+      } catch {
+        // silently ignore — dot just won't show
+      }
+    };
+    checkForNotes();
+  }, [lead.id]);
   // Service Location form state
   const [serviceLocationData, setServiceLocationData] =
     useState<ServiceAddressData>({
@@ -635,8 +660,8 @@ export function LeadDetailsSidebar({
             isCompact={!isSidebarExpanded}
             inSidebar={true}
             headerRight={
-              customerComment ? (
-                <span className={styles.customerCommentDot} title="Customer note" />
+              (customerComment || hasActivityNotes) ? (
+                <span className={styles.customerCommentDot} title="Has notes" />
               ) : undefined
             }
           >
@@ -646,6 +671,7 @@ export function LeadDetailsSidebar({
               companyId={lead.company_id}
               userId={user?.id || ''}
               customerComment={customerComment}
+              onNotesLoaded={setHasActivityNotes}
             />
           </InfoCard>
     </DetailsCardsSidebar>

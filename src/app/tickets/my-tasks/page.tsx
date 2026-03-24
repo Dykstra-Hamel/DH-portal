@@ -196,6 +196,11 @@ const getOverdueDays = (dueDate: string): number => {
 
 const getTodayStr = () => new Date().toISOString().split('T')[0];
 
+const formatDueDate = (dateStr: string): string => {
+  const date = new Date(dateStr + 'T00:00:00');
+  return date.toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', year: '2-digit' });
+};
+
 type ActionIconType = 'phone' | 'text' | 'email' | 'other';
 
 const parseActionInfo = (
@@ -663,6 +668,9 @@ export default function MyTasksPage() {
                   <span className={pageStyles.overdueCircle} />
                   Overdue {overdueDays} {overdueDays === 1 ? 'day' : 'days'}
                 </span>
+              )}
+              {!isOverdue && action.due_date && action.due_date > today && (
+                <span className={pageStyles.dueDateLabel}>Due {formatDueDate(action.due_date)}</span>
               )}
             </div>
           );
