@@ -44,6 +44,7 @@ interface ServicePlan {
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendEvent } from '@/lib/inngest/client';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress, extractAddressData } from '@/lib/service-addresses';
+import { generateQuoteToken, generateQuoteUrl } from '@/lib/quote-utils';
 
 // Helper function to check if auto-calling is enabled for a company
 async function shouldAutoCall(companyId: string): Promise<boolean> {
@@ -688,6 +689,8 @@ export async function POST(request: NextRequest) {
     if (submission.selectedPlan) {
       try {
         const plan = submission.selectedPlan;
+        const quoteToken = generateQuoteToken();
+
         const { data: newQuote } = await supabase
           .from('quotes')
           .insert({
@@ -698,11 +701,24 @@ export async function POST(request: NextRequest) {
             total_initial_price: plan.initial_price || 0,
             total_recurring_price: plan.recurring_price || 0,
             quote_status: 'draft',
+            quote_token: quoteToken,
           })
           .select('id')
           .single();
 
         if (newQuote) {
+          // Generate and store the quote URL now that we have the ID
+          const { data: companySlugRow } = await supabase
+            .from('companies')
+            .select('slug')
+            .eq('id', submission.companyId)
+            .single();
+
+          if (companySlugRow?.slug) {
+            const quoteUrl = generateQuoteUrl(companySlugRow.slug, newQuote.id, quoteToken);
+            await supabase.from('quotes').update({ quote_url: quoteUrl }).eq('id', newQuote.id);
+          }
+
           await supabase.from('quote_line_items').insert({
             quote_id: newQuote.id,
             service_plan_id: plan.id,
