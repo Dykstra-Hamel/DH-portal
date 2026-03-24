@@ -50,7 +50,7 @@ import { AnnouncementsModal } from '@/components/Common/AnnouncementsModal/Annou
 import ActionsTasksQuickView from '@/components/Common/ActionsTasksQuickView/ActionsTasksQuickView';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils';
-import { ChevronRight, Search, Loader2 } from 'lucide-react';
+import { ChevronRight, Search, Loader2, Truck } from 'lucide-react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import tableStyles from '@/components/Common/DataTable/DataTable.module.scss';
 import styles from './page.module.scss';
@@ -78,7 +78,7 @@ type DashboardItem =
   | (SupportCase & { _type: 'support_case' } & DashboardSortLabels);
 
 const DASHBOARD_OVERVIEW_COLUMN_WIDTHS =
-  '120px 180px 140px 250px 120px 120px 120px 1fr';
+  '120px 188px 140px 250px 120px 120px 120px 1fr';
 const DASHBOARD_INITIAL_PAGE_SIZE = 25;
 const TICKETS_FETCH_BATCH_SIZE = 100;
 const MAX_TICKET_FETCH_PAGES = 200;
@@ -193,17 +193,34 @@ const getOptionLabel = (
   return options.find(option => option.value === value)?.label || value;
 };
 
+const legacyTicketTypeToFormat: Record<string, string> = {
+  phone_call: 'Call',
+  inbound_call: 'Call',
+  campaign_call: 'Call',
+  web_form: 'Form',
+  website_form: 'Form',
+  email: 'Email',
+  chat: 'Chat',
+  in_person: 'In Person',
+};
+
 const getDashboardItemFormatLabel = (item: DashboardItem): string => {
   if (item._type === 'lead') {
     return getOptionLabel(item.lead_type, leadTypeOptions) || NA_FIELD_LABEL;
   }
   if (item._type === 'support_case') {
-    return (
-      getOptionLabel(item.ticket?.type, ticketTypeOptions) ||
-      getOptionLabel(item.issue_type, supportCaseIssueTypeOptions) ||
-      NA_FIELD_LABEL
-    );
+    const ticketType = item.ticket?.type;
+    if (ticketType) {
+      if (legacyTicketTypeToFormat[ticketType]) return legacyTicketTypeToFormat[ticketType];
+      return getOptionLabel(ticketType, ticketTypeOptions) || legacyTicketTypeToFormat[ticketType] || NA_FIELD_LABEL;
+    }
+    return getOptionLabel(item.issue_type, supportCaseIssueTypeOptions) || NA_FIELD_LABEL;
   }
+  // Ticket: use format field first, then fall back to legacy type map
+  if (item.format) {
+    return item.format.charAt(0).toUpperCase() + item.format.slice(1);
+  }
+  if (legacyTicketTypeToFormat[item.type]) return legacyTicketTypeToFormat[item.type];
   return getOptionLabel(item.type, ticketTypeOptions) || NA_FIELD_LABEL;
 };
 
@@ -216,6 +233,9 @@ const getDashboardItemSourceLabel = (item: DashboardItem): string => {
   }
   return getOptionLabel(item.source, ticketSourceOptions) || NA_FIELD_LABEL;
 };
+
+const sortByCreatedAtAsc = <T extends { created_at: string }>(items: T[]): T[] =>
+  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
 // Search filter helper - searches all string values in an object recursively
 const filterBySearch = <T extends object>(items: T[], query: string): T[] => {
@@ -317,6 +337,10 @@ function TicketsDashboardContent() {
   const [loadingLeads, setLoadingLeads] = useState(false);
   const [loadingSupportCases, setLoadingSupportCases] = useState(false);
   const [loadingMyData, setLoadingMyData] = useState(false);
+  const [loadingMoreData, setLoadingMoreData] = useState(false);
+  const [ticketsHasMore, setTicketsHasMore] = useState(false);
+  const [leadsHasMore, setLeadsHasMore] = useState(false);
+  const [supportCasesHasMore, setSupportCasesHasMore] = useState(false);
 
   // Total counts for tabs (not affected by pagination)
   const [totalCounts, setTotalCounts] = useState({
@@ -335,7 +359,7 @@ function TicketsDashboardContent() {
 
   // Search states
   const [tableSearch, setTableSearch] = useState('');
-  const [tableVisibleCount, setTableVisibleCount] = useState(5);
+  const [tableVisibleCount, setTableVisibleCount] = useState(DASHBOARD_INITIAL_PAGE_SIZE);
 
   // Announcements modal state
   const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
@@ -352,7 +376,7 @@ function TicketsDashboardContent() {
   });
 
   useEffect(() => {
-    setTableVisibleCount(5);
+    setTableVisibleCount(DASHBOARD_INITIAL_PAGE_SIZE);
   }, [dashboardTab]);
 
   // Modal state for ticket review
@@ -367,6 +391,9 @@ function TicketsDashboardContent() {
   const isFetchingRef = useRef(false);
   const queueFullFetchEnabledRef = useRef(false);
   const pendingFullTicketFetchRef = useRef(false);
+  const ticketsNextPageRef = useRef(2);
+  const leadsNextPageRef = useRef(2);
+  const supportCasesNextPageRef = useRef(2);
   const reviewChannelRef = useRef<RealtimeChannel | null>(null);
   const taskChannelRef = useRef<RealtimeChannel | null>(null);
 
@@ -537,6 +564,7 @@ function TicketsDashboardContent() {
 
       // For initial load, use page 1 only. Once sorting is engaged, load
       // all pages so client-side sorting works against the full queue.
+      let ticketsPageHasMore = false;
       const regularTicketsPromise = (async () => {
         if (!fetchAllPages) {
           const response = await fetch(
@@ -555,6 +583,8 @@ function TicketsDashboardContent() {
           }
 
           const data = await response.json();
+          ticketsPageHasMore = Boolean(data?.pagination?.hasMore);
+          ticketsNextPageRef.current = 2;
           return Array.isArray(data?.tickets) ? data.tickets : [];
         }
 
@@ -639,6 +669,7 @@ function TicketsDashboardContent() {
 
         return [...uniqueLiveTickets, ...mergedRegular];
       });
+      setTicketsHasMore(ticketsPageHasMore);
     } catch (error) {
       console.error('Error fetching tickets:', error);
     } finally {
@@ -683,10 +714,13 @@ function TicketsDashboardContent() {
 
         if (Array.isArray(payload)) {
           setLeads(payload);
+          setLeadsHasMore(false);
           return;
         }
 
         setLeads(Array.isArray(payload?.leads) ? payload.leads : []);
+        leadsNextPageRef.current = 2;
+        setLeadsHasMore(Boolean(payload?.pagination?.hasMore));
         return;
       }
 
@@ -735,6 +769,7 @@ function TicketsDashboardContent() {
         new Map(allLeads.map(lead => [lead.id, lead])).values()
       );
       setLeads(dedupedLeads);
+      setLeadsHasMore(false);
     } catch (error) {
       console.error('Error fetching leads:', error);
     } finally {
@@ -771,12 +806,15 @@ function TicketsDashboardContent() {
 
         if (Array.isArray(payload)) {
           setSupportCases(payload);
+          setSupportCasesHasMore(false);
           return;
         }
 
         setSupportCases(
           Array.isArray(payload?.supportCases) ? payload.supportCases : []
         );
+        supportCasesNextPageRef.current = 2;
+        setSupportCasesHasMore(Boolean(payload?.pagination?.hasMore));
         return;
       }
 
@@ -830,10 +868,119 @@ function TicketsDashboardContent() {
         ).values()
       );
       setSupportCases(dedupedSupportCases);
+      setSupportCasesHasMore(false);
     } catch (error) {
       console.error('Error fetching support cases:', error);
     } finally {
       setLoadingSupportCases(false);
+    }
+  }, []);
+
+  // Fetch next page of data and append to existing state
+  const fetchMoreData = useCallback(async (
+    companyId: string,
+    hasMoreTickets: boolean,
+    hasMoreLeads: boolean,
+    hasMoreSupportCases: boolean
+  ) => {
+    setLoadingMoreData(true);
+    try {
+      const fetches: Promise<void>[] = [];
+
+      if (hasMoreTickets) {
+        const page = ticketsNextPageRef.current;
+        fetches.push(
+          fetch(`/api/tickets?${new URLSearchParams({
+            companyId,
+            includeArchived: 'false',
+            page: page.toString(),
+            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+          })}`)
+            .then(r => r.json())
+            .then(data => {
+              const newTickets: Ticket[] = Array.isArray(data?.tickets) ? data.tickets : [];
+              ticketsNextPageRef.current = page + 1;
+              setTicketsHasMore(Boolean(data?.pagination?.hasMore));
+              setTickets(prev => {
+                const liveTickets = prev.filter(t => t.status === 'live');
+                const merged = new Map(prev.filter(t => t.status !== 'live').map(t => [t.id, t]));
+                newTickets.forEach(t => merged.set(t.id, t));
+                return [
+                  ...liveTickets,
+                  ...Array.from(merged.values()).sort(
+                    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                  ),
+                ];
+              });
+            })
+        );
+      }
+
+      if (hasMoreLeads) {
+        const page = leadsNextPageRef.current;
+        fetches.push(
+          fetch(`/api/leads?${new URLSearchParams({
+            companyId,
+            unassigned: 'true',
+            status: 'new,in_process,quoted,scheduling',
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+            paginate: 'true',
+            page: page.toString(),
+            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+          })}`)
+            .then(r => r.json())
+            .then(payload => {
+              const newLeads: Lead[] = Array.isArray(payload?.leads) ? payload.leads : (Array.isArray(payload) ? payload : []);
+              leadsNextPageRef.current = page + 1;
+              setLeadsHasMore(Boolean(payload?.pagination?.hasMore));
+              setLeads(prev => {
+                const merged = new Map(prev.map(l => [l.id, l]));
+                newLeads.forEach(l => merged.set(l.id, l));
+                return Array.from(merged.values()).sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+              });
+            })
+        );
+      }
+
+      if (hasMoreSupportCases) {
+        const page = supportCasesNextPageRef.current;
+        fetches.push(
+          fetch(`/api/support-cases?${new URLSearchParams({
+            companyId,
+            unassigned: 'true',
+            includeArchived: 'false',
+            sortBy: 'created_at',
+            sortOrder: 'asc',
+            paginate: 'true',
+            page: page.toString(),
+            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+          })}`)
+            .then(r => r.json())
+            .then(payload => {
+              const newCases: SupportCase[] = Array.isArray(payload?.supportCases) ? payload.supportCases : (Array.isArray(payload) ? payload : []);
+              supportCasesNextPageRef.current = page + 1;
+              setSupportCasesHasMore(Boolean(payload?.pagination?.hasMore));
+              setSupportCases(prev => {
+                const merged = new Map(prev.map(c => [c.id, c]));
+                newCases.forEach(c => merged.set(c.id, c));
+                return Array.from(merged.values()).sort(
+                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                );
+              });
+            })
+        );
+      }
+
+      await Promise.all(fetches);
+    } catch (error) {
+      console.error('Error fetching more data:', error);
+    } finally {
+      setLoadingMoreData(false);
     }
   }, []);
 
@@ -1509,7 +1656,7 @@ function TicketsDashboardContent() {
       {
         key: 'customer.name',
         title: 'Name',
-        width: '180px',
+        width: '188px',
         sortable: false,
         render: (item: DashboardItem) => (
           <span className={tableStyles.nameCell}>
@@ -1545,11 +1692,30 @@ function TicketsDashboardContent() {
         width: '120px',
         sortable: true,
         sortKey: '_formatSortLabel',
-        render: (item: DashboardItem) => (
-          <span className={tableStyles.formatCell}>
-            {getDashboardItemFormatLabel(item)}
-          </span>
-        ),
+        render: (item: DashboardItem) => {
+          const label = getDashboardItemFormatLabel(item);
+          const isCall =
+            item._type === 'ticket' &&
+            (item.format === 'call' || (!item.format && ['phone_call', 'inbound_call', 'campaign_call'].includes(item.type)));
+          const isForm =
+            item._type === 'ticket' &&
+            (item.format === 'form' || (!item.format && ['web_form', 'website_form'].includes(item.type)));
+          return (
+            <div className={tableStyles.formatCell}>
+              {isCall && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="19" viewBox="0 0 18 19" fill="none" className={tableStyles.phoneIcon}>
+                  <path d="M10.374 13.0652C10.5289 13.1363 10.7034 13.1525 10.8688 13.1112C11.0341 13.0699 11.1805 12.9735 11.2838 12.8379L11.55 12.4892C11.6897 12.3029 11.8709 12.1517 12.0792 12.0475C12.2875 11.9434 12.5171 11.8892 12.75 11.8892H15C15.3978 11.8892 15.7794 12.0472 16.0607 12.3285C16.342 12.6098 16.5 12.9913 16.5 13.3892V15.6392C16.5 16.037 16.342 16.4185 16.0607 16.6998C15.7794 16.9811 15.3978 17.1392 15 17.1392C11.4196 17.1392 7.9858 15.7168 5.45406 13.1851C2.92232 10.6534 1.5 7.21958 1.5 3.63916C1.5 3.24134 1.65804 2.8598 1.93934 2.5785C2.22064 2.2972 2.60218 2.13916 3 2.13916H5.25C5.64782 2.13916 6.02936 2.2972 6.31066 2.5785C6.59196 2.8598 6.75 3.24134 6.75 3.63916V5.88916C6.75 6.12203 6.69578 6.3517 6.59164 6.55998C6.4875 6.76826 6.33629 6.94944 6.15 7.08916L5.799 7.35241C5.66131 7.45754 5.56426 7.6071 5.52434 7.77567C5.48442 7.94425 5.50409 8.12144 5.58 8.27716C6.60501 10.3591 8.29082 12.0428 10.374 13.0652Z" stroke="#0088CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              {isForm && (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="19" viewBox="0 0 18 19" fill="none" className={tableStyles.formIcon}>
+                  <path d="M9 15.6392H8.25C7.85218 15.6392 7.47064 15.4811 7.18934 15.1998C6.90804 14.9185 6.75 14.537 6.75 14.1392M6.75 14.1392C6.75 14.537 6.59196 14.9185 6.31066 15.1998C6.02936 15.4811 5.64782 15.6392 5.25 15.6392H4.5M6.75 14.1392V5.13916M9.75 6.63916H15C15.3978 6.63916 15.7794 6.7972 16.0607 7.0785C16.342 7.3598 16.5 7.74134 16.5 8.13916V11.1392C16.5 11.537 16.342 11.9185 16.0607 12.1998C15.7794 12.4811 15.3978 12.6392 15 12.6392H9.75M3.75 12.6392H3C2.60218 12.6392 2.22064 12.4811 1.93934 12.1998C1.65804 11.9185 1.5 11.537 1.5 11.1392V8.13916C1.5 7.74134 1.65804 7.3598 1.93934 7.0785C2.22064 6.7972 2.60218 6.63916 3 6.63916H3.75M4.5 3.63916H5.25C5.64782 3.63916 6.02936 3.7972 6.31066 4.0785C6.59196 4.3598 6.75 4.74134 6.75 5.13916M6.75 5.13916C6.75 4.74134 6.90804 4.3598 7.18934 4.0785C7.47064 3.7972 7.85218 3.63916 8.25 3.63916H9" stroke="#0088CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              )}
+              {label}
+            </div>
+          );
+        },
       },
       {
         key: 'source',
@@ -1558,15 +1724,17 @@ function TicketsDashboardContent() {
         sortable: true,
         sortKey: '_sourceSortLabel',
         render: (item: DashboardItem) => {
-          const label = getDashboardItemSourceLabel(item);
+          const isTech = item._type === 'lead' && item.lead_source === 'technician';
+          const label = isTech ? 'Tech' : getDashboardItemSourceLabel(item);
           return (
-            <span
+            <div
               className={`${tableStyles.formatCell} ${
                 label === NA_FIELD_LABEL ? tableStyles.mutedText : ''
               }`}
             >
+              {isTech && <Truck size={18} color="#0088CC" strokeWidth={1.5} />}
               {label}
-            </span>
+            </div>
           );
         },
       },
@@ -1704,51 +1872,59 @@ function TicketsDashboardContent() {
     ]
   );
 
+  const latestNewTabItems = useMemo<DashboardItem[]>(() => {
+    if (!selectedCompany?.id) return [];
+
+    return [
+      ...tickets
+        .filter(ticket => ticket.status !== 'live')
+        .map(ticket => ({
+          ...ticket,
+          _type: 'ticket' as const,
+          _typeSortLabel: 'New',
+          _formatSortLabel:
+            getOptionLabel(ticket.type, ticketTypeOptions) || NA_FIELD_LABEL,
+          _sourceSortLabel:
+            getOptionLabel(ticket.source, ticketSourceOptions) || NA_FIELD_LABEL,
+        })),
+      ...leads.map(lead => ({
+        ...lead,
+        _type: 'lead' as const,
+        _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+        _formatSortLabel:
+          getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
+        _sourceSortLabel:
+          getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
+      })),
+      ...supportCases.map(supportCase => ({
+        ...supportCase,
+        _type: 'support_case' as const,
+        _typeSortLabel: 'Support',
+        _formatSortLabel:
+          getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
+          getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+          NA_FIELD_LABEL,
+        _sourceSortLabel:
+          getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
+          NA_FIELD_LABEL,
+      })),
+    ];
+  }, [tickets, leads, supportCases, selectedCompany?.id]);
+  const sortedNewTabItems = useMemo(
+    () => sortByCreatedAtAsc(latestNewTabItems),
+    [latestNewTabItems]
+  );
+
   // Get current data for dashboard table based on tab
-  const getDashboardTableData = () => {
+  const tableContent = useMemo(() => {
     switch (dashboardTab) {
       case 'new': {
-        // Sort oldest to newest (ascending by created_at)
-        // Add sortable labels for format/source/ticket type columns.
-        const combinedData = [
-          ...tickets
-            .filter(ticket => ticket.status !== 'live')
-            .map(ticket => ({
-              ...ticket,
-              _type: 'ticket' as const,
-              _typeSortLabel: 'New',
-              _formatSortLabel:
-                getOptionLabel(ticket.type, ticketTypeOptions) || NA_FIELD_LABEL,
-              _sourceSortLabel:
-                getOptionLabel(ticket.source, ticketSourceOptions) || NA_FIELD_LABEL,
-            })),
-          ...leads.map(lead => ({
-            ...lead,
-            _type: 'lead' as const,
-            _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
-            _formatSortLabel:
-              getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
-            _sourceSortLabel:
-              getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
-          })),
-          ...supportCases.map(supportCase => ({
-            ...supportCase,
-            _type: 'support_case' as const,
-            _typeSortLabel: 'Support',
-            _formatSortLabel:
-              getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
-              getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
-              NA_FIELD_LABEL,
-            _sourceSortLabel:
-              getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
-              NA_FIELD_LABEL,
-          })),
-        ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-
         return {
-          data: filterBySearch(combinedData, tableSearch),
+          data: filterBySearch(sortedNewTabItems, tableSearch),
           columns: dashboardOverviewColumns,
-          loading: loading || loadingLeads || loadingSupportCases,
+          loading:
+            loading ||
+            ((loadingLeads || loadingSupportCases) && !loadingMoreData),
           tableType: 'tickets' as const,
           customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
@@ -1832,17 +2008,23 @@ function TicketsDashboardContent() {
           customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
     }
-  };
-
-  const tableContent = getDashboardTableData();
+  }, [dashboardTab, sortedNewTabItems, tableSearch, dashboardOverviewColumns, loading,
+      loadingLeads, loadingSupportCases, loadingMoreData, myLeads, mySupportCases,
+      loadingMyData]);
   const tableData = (tableContent.data || []) as any[];
+  const serverHasMore = ticketsHasMore || leadsHasMore || supportCasesHasMore;
   const tableHasMore =
     dashboardTab === 'new' &&
-    tableData.length > tableVisibleCount;
-  const handleTableLoadMore = () => {
-    const nextVisibleCount = tableVisibleCount + 5;
+    (tableData.length > tableVisibleCount || loadingMoreData || serverHasMore);
+  const handleTableLoadMore = useCallback(() => {
+    const nextVisibleCount = tableVisibleCount + DASHBOARD_INITIAL_PAGE_SIZE;
     setTableVisibleCount(nextVisibleCount);
-  };
+
+    if (!loadingMoreData && nextVisibleCount >= tableData.length && serverHasMore && selectedCompany?.id) {
+      fetchMoreData(selectedCompany.id, ticketsHasMore, leadsHasMore, supportCasesHasMore);
+    }
+  }, [tableVisibleCount, tableData.length, loadingMoreData, serverHasMore, selectedCompany?.id,
+      ticketsHasMore, leadsHasMore, supportCasesHasMore, fetchMoreData]);
 
   const tableEmptyStateMessage =
     dashboardTab === 'new'
@@ -2015,7 +2197,8 @@ function TicketsDashboardContent() {
               visibleCount={dashboardTab === 'new' ? tableVisibleCount : undefined}
               hasMore={tableHasMore}
               onLoadMore={handleTableLoadMore}
-              loadingMore={false}
+              loadingMore={loadingMoreData}
+              preserveWindowScrollAnchor={dashboardTab === 'new'}
               tableType={tableContent.tableType}
               customColumnWidths={tableContent.customColumnWidths}
               searchEnabled={false}

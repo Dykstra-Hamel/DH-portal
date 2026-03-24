@@ -937,7 +937,7 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
           company_id: callRecord.company_id,
           customer_id: callRecord.customer_id,
           source: 'campaign',
-          type: 'campaign_call',
+          type: 'phone_call',
           format: 'call',
           call_direction: 'outbound',
           status: 'new',

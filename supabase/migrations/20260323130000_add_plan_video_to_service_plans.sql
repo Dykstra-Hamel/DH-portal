@@ -1,0 +1,2 @@
+ALTER TABLE service_plans
+  ADD COLUMN IF NOT EXISTS plan_video_url TEXT DEFAULT NULL;

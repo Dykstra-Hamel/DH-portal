@@ -66,6 +66,8 @@ export function LeadQuoteSection({
   onNotInterested,
   onReadyToSchedule,
   isSidebarExpanded,
+  startExpanded = true,
+  forceCollapse = false,
 }: LeadQuoteSectionProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   // Refs
@@ -1347,7 +1349,8 @@ export function LeadQuoteSection({
         title="Program Quoting"
         icon={<ScrollText size={20} />}
         isCollapsible={true}
-        startExpanded={true}
+        startExpanded={startExpanded}
+        forceCollapse={forceCollapse}
         isActive={activeSection === 'quote'}
       >
         <div
