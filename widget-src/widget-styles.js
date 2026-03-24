@@ -1763,7 +1763,7 @@ height: 100%;
 @media (min-width: 1024px) {
   .dh-pest-selection {
     overflow: hidden;
-    max-height: 300px; /* Approximate height for 2 rows */
+    max-height: 320px; /* Approximate height for 2 rows */
     transition: max-height 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
