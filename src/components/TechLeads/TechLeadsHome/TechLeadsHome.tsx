@@ -85,8 +85,8 @@ export function TechLeadsHome() {
               <Image
                 src={selectedCompany.branding.icon_logo_url}
                 alt={selectedCompany.name}
-                width={96}
-                height={96}
+                width={175}
+                height={175}
                 style={{ objectFit: 'contain' }}
               />
             ) : (
