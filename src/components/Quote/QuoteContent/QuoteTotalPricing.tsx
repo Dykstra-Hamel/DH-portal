@@ -78,13 +78,13 @@ export default function QuoteTotalPricing({
     const freq = item.billing_frequency;
     return (
       <>
-        {recurring && (
+        {recurring > 0 && (
           <span className={styles.totalItemPriceRecurring}>
             <span className={styles.totalItemPriceAmount}>${formatCurrency(recurring)}</span>
             <span className={styles.totalItemPriceFreq}>/{abbreviateFrequency(freq)}</span>
           </span>
         )}
-        {initial && (
+        {initial > 0 && (
           <span className={styles.totalItemPriceInitial}>
             <span className={styles.totalItemPriceAmount}>${formatCurrency(initial)}</span>
             <span className={styles.totalItemPriceFreq}> initial</span>
