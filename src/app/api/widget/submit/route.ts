@@ -579,14 +579,13 @@ export async function POST(request: NextRequest) {
     // Set priority to medium for all leads
     const priority = 'medium';
 
-    // Set lead status to new for new leads
     const status:
       | 'new'
       | 'in_process'
       | 'quoted'
       | 'scheduling'
       | 'won'
-      | 'lost' = 'new';
+      | 'lost' = 'scheduling';
 
     // Create lead notes
     let notes = `Widget Submission:\n`;
@@ -682,6 +681,46 @@ export async function POST(request: NextRequest) {
       } catch (error) {
         console.warn('Error updating partial lead conversion status:', error);
         // Don't fail the lead creation if this update fails
+      }
+    }
+
+    // Create quote + line item for the selected service plan
+    if (submission.selectedPlan) {
+      try {
+        const plan = submission.selectedPlan;
+        const { data: newQuote } = await supabase
+          .from('quotes')
+          .insert({
+            lead_id: lead.id,
+            company_id: submission.companyId,
+            customer_id: customerId,
+            service_address_id: serviceAddressId,
+            total_initial_price: plan.initial_price || 0,
+            total_recurring_price: plan.recurring_price || 0,
+            quote_status: 'draft',
+          })
+          .select('id')
+          .single();
+
+        if (newQuote) {
+          await supabase.from('quote_line_items').insert({
+            quote_id: newQuote.id,
+            service_plan_id: plan.id,
+            plan_name: plan.plan_name,
+            plan_description: plan.plan_description || null,
+            initial_price: plan.initial_price || 0,
+            recurring_price: plan.recurring_price || 0,
+            billing_frequency: plan.billing_frequency || 'monthly',
+            final_initial_price: plan.initial_price || 0,
+            final_recurring_price: plan.recurring_price || 0,
+            display_order: 0,
+            is_optional: false,
+            is_selected: true,
+          });
+        }
+      } catch (err) {
+        console.warn('[widget-submit] Failed to create quote/line item:', err);
+        // Non-fatal — lead was already created
       }
     }
 
