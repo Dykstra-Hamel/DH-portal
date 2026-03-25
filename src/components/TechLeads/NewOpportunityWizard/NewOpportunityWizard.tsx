@@ -1,7 +1,24 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { UserPlus, TrendingUp, ChevronDown, X } from 'lucide-react';
+import {
+  UserPlus,
+  TrendingUp,
+  ChevronDown,
+  X,
+  ArrowLeft,
+  ArrowRight,
+  MapPinned,
+  LocateFixed,
+  Keyboard,
+  WandSparkles,
+  Lock,
+  Unlock,
+  Move3d,
+  Undo2,
+  Trash2,
+} from 'lucide-react';
+import { APIProvider, Map } from '@vis.gl/react-google-maps';
 import { useRouter } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -17,9 +34,12 @@ type LeadType = 'new-lead' | 'upsell';
 
 type StepId =
   | 'type-select'
+  | 'new-lead-path'
+  | 'map-address'
   | 'photos'
   | 'ai-review'
   | 'new-customer'
+  | 'map-plot'
   | 'select-site'
   | 'service-plan-select'
   | 'service-details'
@@ -28,14 +48,73 @@ type StepId =
 
 const STEP_ID_LABELS: Record<StepId, string> = {
   'type-select': 'Type',
+  'new-lead-path': 'Path',
+  'map-address': 'Address',
   'photos': 'Photos',
   'ai-review': 'AI Review',
   'new-customer': 'Customer',
+  'map-plot': 'Map',
   'select-site': 'Site',
   'service-plan-select': 'Plan',
   'service-details': 'Services',
   'review': 'Review',
   'service-today-confirm': 'Confirm',
+};
+
+type NewLeadPathMode = 'standard' | 'map-plot';
+
+type MapStampType = 'activity' | 'entry' | 'nest' | 'recommendation';
+type MapDrawTool = 'stamp' | 'outline';
+
+interface MapPlotStamp {
+  id: string;
+  x: number; // normalized 0..1
+  y: number; // normalized 0..1
+  type: MapStampType;
+}
+
+interface MapOutlinePoint {
+  x: number; // normalized 0..1
+  y: number; // normalized 0..1
+}
+
+interface MapPlotData {
+  addressInput: string;
+  addressComponents: AddressComponents | null;
+  centerLat: number | null;
+  centerLng: number | null;
+  zoom: number;
+  heading: number;
+  tilt: number;
+  isViewSet: boolean;
+  drawTool: MapDrawTool;
+  selectedStampType: MapStampType;
+  stamps: MapPlotStamp[];
+  outlinePoints: MapOutlinePoint[];
+  updatedAt: string | null;
+}
+
+const MAP_STAMP_OPTIONS: Array<{ type: MapStampType; label: string; emoji: string; color: string }> = [
+  { type: 'activity', label: 'Activity', emoji: '🐜', color: '#b91c1c' },
+  { type: 'entry', label: 'Entry Point', emoji: '🚪', color: '#1d4ed8' },
+  { type: 'nest', label: 'Nest', emoji: '🏠', color: '#a16207' },
+  { type: 'recommendation', label: 'Recommend', emoji: '✅', color: '#047857' },
+];
+
+const DEFAULT_MAP_PLOT_DATA: MapPlotData = {
+  addressInput: '',
+  addressComponents: null,
+  centerLat: null,
+  centerLng: null,
+  zoom: 20,
+  heading: 0,
+  tilt: 0,
+  isViewSet: false,
+  drawTool: 'stamp',
+  selectedStampType: 'activity',
+  stamps: [],
+  outlinePoints: [],
+  updatedAt: null,
 };
 
 interface NewCustomerForm {
@@ -157,6 +236,79 @@ function getPrimaryAddress(c: CustomerResult): ServiceAddress | null {
     };
   }
   return null;
+}
+
+function getMapLatitude(mapPlotData: MapPlotData | null): number | null {
+  if (!mapPlotData) return null;
+  if (typeof mapPlotData.centerLat === 'number') return mapPlotData.centerLat;
+  if (!mapPlotData.addressComponents?.latitude) return null;
+  return Number(mapPlotData.addressComponents.latitude);
+}
+
+function getMapLongitude(mapPlotData: MapPlotData | null): number | null {
+  if (!mapPlotData) return null;
+  if (typeof mapPlotData.centerLng === 'number') return mapPlotData.centerLng;
+  if (!mapPlotData.addressComponents?.longitude) return null;
+  return Number(mapPlotData.addressComponents.longitude);
+}
+
+function clampNormalized(value: number): number {
+  if (Number.isNaN(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
+function getMapStampOption(type: MapStampType) {
+  return MAP_STAMP_OPTIONS.find(option => option.type === type) ?? MAP_STAMP_OPTIONS[0];
+}
+
+function getMapPlotSummaryLines(mapPlotData: MapPlotData | null): string[] {
+  if (!mapPlotData) return [];
+
+  const lat = getMapLatitude(mapPlotData);
+  const lng = getMapLongitude(mapPlotData);
+
+  const grouped = mapPlotData.stamps.reduce<Record<MapStampType, number>>(
+    (acc, stamp) => {
+      acc[stamp.type] = (acc[stamp.type] ?? 0) + 1;
+      return acc;
+    },
+    {
+      activity: 0,
+      entry: 0,
+      nest: 0,
+      recommendation: 0,
+    }
+  );
+
+  const typeSummary = MAP_STAMP_OPTIONS
+    .filter(option => grouped[option.type] > 0)
+    .map(option => `${option.label}: ${grouped[option.type]}`);
+
+  const lines = [
+    `Address: ${mapPlotData.addressComponents?.formatted_address || mapPlotData.addressInput || 'N/A'}`,
+    lat !== null && lng !== null
+      ? `Coordinates: ${lat.toFixed(6)}, ${lng.toFixed(6)}`
+      : 'Coordinates: Not available',
+    `View: ${mapPlotData.isViewSet ? 'Set' : 'Not Set'}`,
+    `Camera: zoom ${mapPlotData.zoom}, heading ${Math.round(mapPlotData.heading)}°, tilt ${Math.round(mapPlotData.tilt)}°`,
+    `Outline Points: ${mapPlotData.outlinePoints.length}`,
+    `Stamp Points: ${mapPlotData.stamps.length}`,
+  ];
+
+  if (typeSummary.length > 0) {
+    lines.push(`Breakdown: ${typeSummary.join(' | ')}`);
+  }
+
+  return lines;
+}
+
+function buildMapPlotNote(mapPlotData: MapPlotData | null): string | null {
+  if (!mapPlotData) return null;
+  const lines = getMapPlotSummaryLines(mapPlotData);
+  if (lines.length === 0) return null;
+  return `Map & Plot:\n${lines.join('\n')}`;
 }
 
 function normalizeForMatching(value: string | null | undefined): string {
@@ -321,6 +473,777 @@ function StepTypeSelect({
           <span className={styles.typeCardLabel}>Termite Renewal</span>
           <span className={styles.typeCardSub}>Renew termite protection plan</span>
           <span className={styles.typeCardComingSoon}>Coming Soon</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StepNewLeadPath({
+  onSelect,
+}: {
+  onSelect: (mode: NewLeadPathMode) => void;
+}) {
+  return (
+    <div className={styles.stepContent}>
+      <h2 className={styles.stepTitle}>New Lead Path</h2>
+      <p className={styles.stepDesc}>Do you want to map and plot this property now?</p>
+      <div className={styles.flowCards}>
+        <button type="button" className={styles.flowCardPrimary} onClick={() => onSelect('map-plot')}>
+          <span className={styles.flowCardIcon}>
+            <MapPinned size={28} strokeWidth={1.6} />
+          </span>
+          <span className={styles.flowCardLabel}>Map &amp; Plot</span>
+          <span className={styles.flowCardSub}>Satellite view + tap-to-plot pest points</span>
+        </button>
+        <button type="button" className={styles.flowCard} onClick={() => onSelect('standard')}>
+          <span className={styles.flowCardIcon}>↪</span>
+          <span className={styles.flowCardLabel}>Continue Without Mapping</span>
+          <span className={styles.flowCardSub}>You can add mapping later</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function StepMapAddress({
+  mapPlotData,
+  onChange,
+}: {
+  mapPlotData: MapPlotData;
+  onChange: (next: MapPlotData) => void;
+}) {
+  const [isLocating, setIsLocating] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [manualMode, setManualMode] = useState(!mapPlotData.addressComponents);
+  const autoAttemptedRef = useRef(false);
+
+  const applyAddressSelection = useCallback(
+    (addressComponents: AddressComponents, addressInput: string) => {
+      const lat = typeof addressComponents.latitude === 'number' ? addressComponents.latitude : null;
+      const lng = typeof addressComponents.longitude === 'number' ? addressComponents.longitude : null;
+
+      onChange({
+        ...mapPlotData,
+        addressInput,
+        addressComponents,
+        centerLat: lat,
+        centerLng: lng,
+        zoom: 20,
+        heading: 0,
+        tilt: 0,
+        isViewSet: false,
+        drawTool: 'stamp',
+        selectedStampType: 'activity',
+        stamps: [],
+        outlinePoints: [],
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    [mapPlotData, onChange]
+  );
+
+  const tryUseCurrentAddress = useCallback(async () => {
+    if (!navigator.geolocation) {
+      setLocationError('Location is unavailable on this device. Use manual address entry.');
+      return;
+    }
+
+    setIsLocating(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      async position => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const response = await fetch('/api/internal/reverse-geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ latitude, longitude }),
+          });
+
+          if (!response.ok) {
+            const errorBody = await response.json().catch(() => ({}));
+            throw new Error(errorBody.error || 'Could not resolve your current address.');
+          }
+
+          const payload = await response.json();
+          const components = payload.addressComponents as AddressComponents | undefined;
+          if (!components || !components.formatted_address) {
+            throw new Error('Could not resolve your current address. Enter it manually.');
+          }
+
+          const street = `${components.street_number ? `${components.street_number} ` : ''}${components.route ?? ''}`.trim();
+          applyAddressSelection(components, street || components.formatted_address);
+          setManualMode(false);
+        } catch (error: any) {
+          setLocationError(error?.message || 'Could not resolve your current address.');
+          setManualMode(true);
+        } finally {
+          setIsLocating(false);
+        }
+      },
+      error => {
+        setIsLocating(false);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationError('Location permission denied. Enter address manually.');
+        } else {
+          setLocationError('Could not access your location. Enter address manually.');
+        }
+        setManualMode(true);
+      },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
+    );
+  }, [applyAddressSelection]);
+
+  useEffect(() => {
+    if (autoAttemptedRef.current || mapPlotData.addressComponents) return;
+    autoAttemptedRef.current = true;
+    void tryUseCurrentAddress();
+  }, [mapPlotData.addressComponents, tryUseCurrentAddress]);
+
+  return (
+    <div className={styles.stepContent}>
+      <h2 className={styles.stepTitle}>Map Address</h2>
+      <p className={styles.stepDesc}>We&apos;ll try your current location first, or you can enter the address manually.</p>
+
+      <div className={styles.mapAddressActions}>
+        <button
+          type="button"
+          className={styles.mapAddressBtnPrimary}
+          onClick={() => void tryUseCurrentAddress()}
+          disabled={isLocating}
+        >
+          <LocateFixed size={16} />
+          {isLocating ? 'Locating...' : 'Use Current Address'}
+        </button>
+        <button
+          type="button"
+          className={styles.mapAddressBtn}
+          onClick={() => setManualMode(true)}
+        >
+          <Keyboard size={16} />
+          Enter Address Manually
+        </button>
+      </div>
+
+      {mapPlotData.addressComponents?.formatted_address && (
+        <div className={styles.mapAddressSelected}>
+          <p className={styles.mapAddressSelectedLabel}>Selected Address</p>
+          <p className={styles.mapAddressSelectedValue}>
+            {mapPlotData.addressComponents.formatted_address}
+          </p>
+        </div>
+      )}
+
+      {manualMode && (
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel}>Manual Address</label>
+          <AddressAutocomplete
+            value={mapPlotData.addressInput}
+            onChange={value =>
+              onChange({
+                ...mapPlotData,
+                addressInput: value,
+                addressComponents: null,
+                centerLat: null,
+                centerLng: null,
+                isViewSet: false,
+                stamps: [],
+                outlinePoints: [],
+              })
+            }
+            onAddressSelect={components => {
+              const street = `${components.street_number ? `${components.street_number} ` : ''}${components.route ?? ''}`.trim();
+              applyAddressSelection(components, street || components.formatted_address || mapPlotData.addressInput);
+            }}
+            placeholder="Start typing address..."
+          />
+        </div>
+      )}
+
+      {locationError && <p className={styles.errorState}>{locationError}</p>}
+      <p className={styles.fieldHint}>
+        After an address is selected, tap <strong>Next</strong> to set the satellite view.
+      </p>
+    </div>
+  );
+}
+
+function StepMapPlot({
+  companyId,
+  mapPlotData,
+  onChange,
+  onBack,
+  onNext,
+  canNext,
+}: {
+  companyId: string;
+  mapPlotData: MapPlotData;
+  onChange: (next: MapPlotData) => void;
+  onBack: () => void;
+  onNext: () => void;
+  canNext: boolean;
+}) {
+  const mapRef = useRef<HTMLDivElement>(null);
+  const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
+  const [mapsError, setMapsError] = useState<string | null>(null);
+  const [draggingStampId, setDraggingStampId] = useState<string | null>(null);
+  const [autoMapLoading, setAutoMapLoading] = useState(false);
+  const [autoMapError, setAutoMapError] = useState<string | null>(null);
+  const [autoMapArmed, setAutoMapArmed] = useState(false);
+  const [lastAutoMapOutline, setLastAutoMapOutline] = useState<MapOutlinePoint[] | null>(null);
+  const dragMovedRef = useRef(false);
+  const lastDragAtRef = useRef<number>(0);
+
+  const latitude = getMapLatitude(mapPlotData);
+  const longitude = getMapLongitude(mapPlotData);
+  const hasCoordinates = latitude !== null && longitude !== null;
+
+  const updateMapPlotData = useCallback(
+    (updates: Partial<MapPlotData>) => {
+      onChange({
+        ...mapPlotData,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+      });
+    },
+    [mapPlotData, onChange]
+  );
+
+  useEffect(() => {
+    const fetchApiKey = async () => {
+      try {
+        const response = await fetch('/api/google-places-key');
+        const payload = await response.json();
+        if (!response.ok || !payload.apiKey) {
+          throw new Error(payload.error || 'Google Maps key unavailable.');
+        }
+        setGoogleMapsApiKey(payload.apiKey);
+      } catch (error: any) {
+        setMapsError(error?.message || 'Unable to load Google Maps.');
+      }
+    };
+    void fetchApiKey();
+  }, []);
+
+  const getNormalizedPoint = useCallback((clientX: number, clientY: number) => {
+    const container = mapRef.current;
+    if (!container) return null;
+    const rect = container.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    return {
+      x: clampNormalized((clientX - rect.left) / rect.width),
+      y: clampNormalized((clientY - rect.top) / rect.height),
+    };
+  }, []);
+
+  const addStampAtPoint = useCallback((point: { x: number; y: number }) => {
+    const nextStamp: MapPlotStamp = {
+      id: crypto.randomUUID(),
+      x: point.x,
+      y: point.y,
+      type: mapPlotData.selectedStampType,
+    };
+
+    setLastAutoMapOutline(null);
+    updateMapPlotData({
+      stamps: [...mapPlotData.stamps, nextStamp],
+    });
+  }, [mapPlotData.selectedStampType, mapPlotData.stamps, updateMapPlotData]);
+
+  const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!mapPlotData.isViewSet || autoMapLoading) return;
+    if (Date.now() - lastDragAtRef.current < 180) return;
+
+    const point = getNormalizedPoint(event.clientX, event.clientY);
+    if (!point) return;
+
+    if (autoMapArmed) {
+      setAutoMapArmed(false);
+      void handleAutoMap(point);
+      return;
+    }
+
+    if (mapPlotData.drawTool === 'outline') {
+      setLastAutoMapOutline(null);
+      updateMapPlotData({
+        outlinePoints: [...mapPlotData.outlinePoints, point],
+      });
+      return;
+    }
+
+    addStampAtPoint(point);
+  };
+
+  const moveStamp = useCallback((stampId: string, x: number, y: number) => {
+    updateMapPlotData({
+      stamps: mapPlotData.stamps.map(stamp =>
+        stamp.id === stampId ? { ...stamp, x: clampNormalized(x), y: clampNormalized(y) } : stamp
+      ),
+    });
+  }, [mapPlotData.stamps, updateMapPlotData]);
+
+  const handleStampPointerDown = (stampId: string, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!mapPlotData.isViewSet) return;
+    event.preventDefault();
+    event.stopPropagation();
+    dragMovedRef.current = false;
+    setDraggingStampId(stampId);
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handleStampPointerMove = (stampId: string, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (draggingStampId !== stampId) return;
+    dragMovedRef.current = true;
+    const point = getNormalizedPoint(event.clientX, event.clientY);
+    if (!point) return;
+    moveStamp(stampId, point.x, point.y);
+  };
+
+  const stopDragging = () => {
+    if (dragMovedRef.current) {
+      lastDragAtRef.current = Date.now();
+    }
+    setDraggingStampId(null);
+  };
+
+  const setView = () => {
+    if (!hasCoordinates) return;
+    updateMapPlotData({ isViewSet: true });
+  };
+
+  const unsetView = () => {
+    updateMapPlotData({ isViewSet: false });
+  };
+
+  const onCameraChanged = (event: any) => {
+    if (mapPlotData.isViewSet) return;
+
+    const detail = event?.detail;
+    if (!detail?.center) return;
+
+    updateMapPlotData({
+      centerLat: detail.center.lat,
+      centerLng: detail.center.lng,
+      zoom: typeof detail.zoom === 'number' ? detail.zoom : mapPlotData.zoom,
+      heading: typeof detail.heading === 'number' ? detail.heading : mapPlotData.heading,
+      tilt: typeof detail.tilt === 'number' ? detail.tilt : mapPlotData.tilt,
+    });
+  };
+
+  const clearOutline = () => {
+    setLastAutoMapOutline(null);
+    updateMapPlotData({ outlinePoints: [] });
+  };
+
+  useEffect(() => {
+    if (!mapPlotData.isViewSet && autoMapArmed) {
+      setAutoMapArmed(false);
+    }
+  }, [mapPlotData.isViewSet, autoMapArmed]);
+
+  const prepareAutoMapImage = useCallback(async (imageBlob: Blob, tapPoint: MapOutlinePoint) => {
+    const imageUrl = URL.createObjectURL(imageBlob);
+    try {
+      const loadedImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error('Failed to load satellite image.'));
+        img.src = imageUrl;
+      });
+
+      const sourceWidth = loadedImage.naturalWidth || loadedImage.width || 640;
+      const sourceHeight = loadedImage.naturalHeight || loadedImage.height || 640;
+      const baseSize = Math.min(sourceWidth, sourceHeight);
+      const cropSize = Math.max(220, Math.round(baseSize * 0.56));
+      const targetSize = 640;
+
+      const centerX = tapPoint.x * sourceWidth;
+      const centerY = tapPoint.y * sourceHeight;
+      const cropX = Math.max(0, Math.min(sourceWidth - cropSize, centerX - cropSize / 2));
+      const cropY = Math.max(0, Math.min(sourceHeight - cropSize, centerY - cropSize / 2));
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetSize;
+      canvas.height = targetSize;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        throw new Error('Canvas unavailable for auto-map image prep.');
+      }
+
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(
+        loadedImage,
+        cropX,
+        cropY,
+        cropSize,
+        cropSize,
+        0,
+        0,
+        targetSize,
+        targetSize
+      );
+
+      const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.92);
+      const croppedBase64 = croppedDataUrl.split(',')[1];
+      if (!croppedBase64) {
+        throw new Error('Failed to encode cropped auto-map image.');
+      }
+
+      return {
+        mimeType: 'image/jpeg',
+        base64: croppedBase64,
+        tapPoint: { x: 0.5, y: 0.5 } as MapOutlinePoint,
+      };
+    } finally {
+      URL.revokeObjectURL(imageUrl);
+    }
+  }, []);
+
+  const handleAutoMap = async (tapPoint: MapOutlinePoint) => {
+    if (!hasCoordinates || !companyId) return;
+    setAutoMapLoading(true);
+    setAutoMapError(null);
+
+    try {
+      const imageUrl = `/api/internal/street-view-image?latitude=${latitude}&longitude=${longitude}&width=640&height=640&type=satellite&zoom=${Math.round(mapPlotData.zoom)}&marker=false`;
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) throw new Error('Could not load satellite snapshot for auto-map.');
+
+      const imageBlob = await imageResponse.blob();
+      const imageBase64Raw = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const result = typeof reader.result === 'string' ? reader.result : '';
+          const base64 = result.split(',')[1];
+          if (!base64) {
+            reject(new Error('Failed to encode image for auto-map.'));
+            return;
+          }
+          resolve(base64);
+        };
+        reader.onerror = () => reject(new Error('Failed to read image for auto-map.'));
+        reader.readAsDataURL(imageBlob);
+      });
+
+      let preparedImage = {
+        mimeType: imageBlob.type || 'image/jpeg',
+        base64: imageBase64Raw,
+        tapPoint,
+      };
+
+      try {
+        preparedImage = await prepareAutoMapImage(imageBlob, tapPoint);
+      } catch {
+        // Fallback to raw snapshot if image preprocessing fails
+      }
+
+      const response = await fetch('/api/ai/auto-map-outline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          companyId,
+          image: {
+            mimeType: preparedImage.mimeType,
+            data: preparedImage.base64,
+          },
+          tapPoint: preparedImage.tapPoint,
+          existingAddress: mapPlotData.addressComponents?.formatted_address || mapPlotData.addressInput || '',
+        }),
+      });
+
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload.error || 'Auto-Map failed.');
+      }
+
+      const outlinePoints = Array.isArray(payload.outlinePoints)
+        ? payload.outlinePoints
+            .map((point: any) => ({
+              x: clampNormalized(Number(point.x)),
+              y: clampNormalized(Number(point.y)),
+            }))
+            .filter((point: MapOutlinePoint) => Number.isFinite(point.x) && Number.isFinite(point.y))
+        : [];
+
+      if (outlinePoints.length < 3) {
+        throw new Error('Auto-Map could not detect a reliable house outline. Try manual outline.');
+      }
+
+      setLastAutoMapOutline(mapPlotData.outlinePoints);
+      updateMapPlotData({
+        outlinePoints,
+        drawTool: 'outline',
+      });
+    } catch (error: any) {
+      setAutoMapError(error?.message || 'Auto-Map failed. You can still draw manually.');
+    } finally {
+      setAutoMapLoading(false);
+    }
+  };
+
+  const handleUndo = () => {
+    if (lastAutoMapOutline) {
+      updateMapPlotData({
+        outlinePoints: lastAutoMapOutline,
+        drawTool: 'outline',
+      });
+      setLastAutoMapOutline(null);
+      return;
+    }
+
+    if (mapPlotData.drawTool === 'outline') {
+      if (mapPlotData.outlinePoints.length === 0 && mapPlotData.stamps.length > 0) {
+        updateMapPlotData({ stamps: mapPlotData.stamps.slice(0, -1) });
+        return;
+      }
+      updateMapPlotData({ outlinePoints: mapPlotData.outlinePoints.slice(0, -1) });
+      return;
+    }
+
+    if (mapPlotData.stamps.length === 0 && mapPlotData.outlinePoints.length > 0) {
+      updateMapPlotData({ outlinePoints: mapPlotData.outlinePoints.slice(0, -1) });
+      return;
+    }
+
+    updateMapPlotData({ stamps: mapPlotData.stamps.slice(0, -1) });
+  };
+
+  const handleClear = () => {
+    if (mapPlotData.drawTool === 'outline') {
+      clearOutline();
+      return;
+    }
+
+    if (mapPlotData.stamps.length === 0 && mapPlotData.outlinePoints.length > 0) {
+      setLastAutoMapOutline(null);
+      updateMapPlotData({ outlinePoints: [] });
+      return;
+    }
+
+    setLastAutoMapOutline(null);
+    updateMapPlotData({ stamps: [] });
+  };
+
+  const hasUndo = !!lastAutoMapOutline || mapPlotData.outlinePoints.length > 0 || mapPlotData.stamps.length > 0;
+  const hasClear = mapPlotData.outlinePoints.length > 0 || mapPlotData.stamps.length > 0;
+
+  return (
+    <div className={styles.mapStepContent}>
+      <div className={styles.mapCanvasCard}>
+        <div ref={mapRef} className={styles.mapInteractiveCanvas}>
+          {mapsError && (
+            <div className={styles.mapEmptyState}>{mapsError}</div>
+          )}
+          {!mapsError && !googleMapsApiKey && (
+            <div className={styles.mapEmptyState}>Loading satellite map...</div>
+          )}
+          {!mapsError && googleMapsApiKey && hasCoordinates && (
+            <APIProvider apiKey={googleMapsApiKey}>
+              <Map
+                center={{ lat: latitude!, lng: longitude! }}
+                zoom={mapPlotData.zoom}
+                heading={mapPlotData.heading}
+                tilt={mapPlotData.tilt}
+                mapTypeId="satellite"
+                onCameraChanged={onCameraChanged}
+                gestureHandling={mapPlotData.isViewSet ? 'none' : 'greedy'}
+                zoomControl={false}
+                rotateControl={false}
+                mapTypeControl={false}
+                fullscreenControl={false}
+                streetViewControl={false}
+                keyboardShortcuts={!mapPlotData.isViewSet}
+                disableDefaultUI={true}
+                className={styles.mapGoogleCanvas}
+              />
+            </APIProvider>
+          )}
+          {!mapsError && googleMapsApiKey && !hasCoordinates && (
+            <div className={styles.mapEmptyState}>Missing coordinates. Go back and choose an address.</div>
+          )}
+
+          <div
+            className={`${styles.mapPlotOverlay} ${mapPlotData.isViewSet ? styles.mapPlotOverlayActive : ''}`}
+            onClick={handleOverlayClick}
+          >
+            <svg className={styles.mapSvgOverlay} viewBox="0 0 100 100" preserveAspectRatio="none">
+              {mapPlotData.outlinePoints.length >= 2 && (
+                <polyline
+                  points={mapPlotData.outlinePoints.map(point => `${point.x * 100},${point.y * 100}`).join(' ')}
+                  fill={mapPlotData.outlinePoints.length >= 3 ? 'rgba(59, 130, 246, 0.16)' : 'none'}
+                  stroke="#1d4ed8"
+                  strokeWidth="0.6"
+                  strokeDasharray={mapPlotData.outlinePoints.length >= 3 ? 'none' : '2 1'}
+                />
+              )}
+              {mapPlotData.outlinePoints.map((point, index) => (
+                <circle key={`outline-${index}`} cx={point.x * 100} cy={point.y * 100} r="0.8" fill="#1d4ed8" />
+              ))}
+            </svg>
+
+            {mapPlotData.stamps.map(stamp => {
+              const option = getMapStampOption(stamp.type);
+              return (
+                <button
+                  key={stamp.id}
+                  type="button"
+                  className={styles.mapStamp}
+                  style={{
+                    left: `${stamp.x * 100}%`,
+                    top: `${stamp.y * 100}%`,
+                    backgroundColor: option.color,
+                  }}
+                  title={option.label}
+                  onPointerDown={event => handleStampPointerDown(stamp.id, event)}
+                  onPointerMove={event => handleStampPointerMove(stamp.id, event)}
+                  onPointerUp={stopDragging}
+                  onPointerCancel={stopDragging}
+                >
+                  <span>{option.emoji}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          <div className={styles.mapToolbarDock}>
+            <div className={styles.mapIconToolbar}>
+              <button
+                type="button"
+                className={styles.mapIconBtn}
+                onClick={onBack}
+                title="Back"
+                aria-label="Back"
+              >
+                <ArrowLeft size={16} />
+              </button>
+
+              {!mapPlotData.isViewSet ? (
+                <button
+                  type="button"
+                  className={`${styles.mapIconBtn} ${styles.mapIconBtnActive}`}
+                  onClick={setView}
+                  disabled={!hasCoordinates}
+                  title="Set View"
+                  aria-label="Set View"
+                >
+                  <Lock size={16} />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className={styles.mapIconBtn}
+                  onClick={unsetView}
+                  title="Unset View"
+                  aria-label="Unset View"
+                >
+                  <Unlock size={16} />
+                </button>
+              )}
+
+              <button
+                type="button"
+                className={`${styles.mapIconBtn} ${mapPlotData.drawTool === 'stamp' ? styles.mapIconBtnActive : ''}`}
+                onClick={() => updateMapPlotData({ drawTool: 'stamp' })}
+                disabled={!mapPlotData.isViewSet}
+                title="Stamp Tool"
+                aria-label="Stamp Tool"
+              >
+                <MapPinned size={16} />
+              </button>
+
+              {mapPlotData.isViewSet && mapPlotData.drawTool === 'stamp' && (
+                <>
+                  {MAP_STAMP_OPTIONS.map(option => (
+                    <button
+                      key={option.type}
+                      type="button"
+                      className={`${styles.mapIconBtn} ${styles.mapStampTypeBtn} ${mapPlotData.selectedStampType === option.type ? styles.mapIconBtnActive : ''}`}
+                      onClick={() => updateMapPlotData({ selectedStampType: option.type })}
+                      title={option.label}
+                      aria-label={option.label}
+                    >
+                      <span>{option.emoji}</span>
+                    </button>
+                  ))}
+                </>
+              )}
+
+              <button
+                type="button"
+                className={`${styles.mapIconBtn} ${mapPlotData.drawTool === 'outline' ? styles.mapIconBtnActive : ''}`}
+                onClick={() => updateMapPlotData({ drawTool: 'outline' })}
+                disabled={!mapPlotData.isViewSet}
+                title="Outline Tool"
+                aria-label="Outline Tool"
+              >
+                <Move3d size={16} />
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.mapIconBtn} ${autoMapArmed ? styles.mapIconBtnActive : ''}`}
+                onClick={() => {
+                  if (!mapPlotData.isViewSet) return;
+                  setAutoMapError(null);
+                  setAutoMapArmed(v => !v);
+                }}
+                disabled={!mapPlotData.isViewSet || autoMapLoading}
+                title="Auto Plot"
+                aria-label="Auto Plot"
+              >
+                <WandSparkles size={16} className={autoMapLoading ? styles.mapIconSpin : ''} />
+              </button>
+
+              <button
+                type="button"
+                className={styles.mapIconBtn}
+                onClick={handleUndo}
+                disabled={!mapPlotData.isViewSet || !hasUndo}
+                title="Undo"
+                aria-label="Undo"
+              >
+                <Undo2 size={16} />
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.mapIconBtn} ${styles.mapIconBtnWarn}`}
+                onClick={handleClear}
+                disabled={!mapPlotData.isViewSet || !hasClear}
+                title="Clear"
+                aria-label="Clear"
+              >
+                <Trash2 size={16} />
+              </button>
+
+              <button
+                type="button"
+                className={`${styles.mapIconBtn} ${styles.mapIconBtnPrimary}`}
+                onClick={onNext}
+                disabled={!canNext}
+                title="Next"
+                aria-label="Next"
+              >
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </div>
+
+          {autoMapArmed && !autoMapLoading && (
+            <div className={styles.mapArmedBadge}>
+              <WandSparkles size={14} />
+            </div>
+          )}
+
+          {autoMapError && (
+            <div className={styles.mapFloatingError}>
+              {autoMapError}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1661,6 +2584,8 @@ function StepServiceTodayConfirm({
 
 function StepReview({
   leadType,
+  newLeadPathMode,
+  mapPlotData,
   photos,
   aiResult,
   notes,
@@ -1672,6 +2597,8 @@ function StepReview({
   selectedPlan,
 }: {
   leadType: LeadType;
+  newLeadPathMode: NewLeadPathMode | null;
+  mapPlotData: MapPlotData | null;
   photos: PhotoPreview[];
   aiResult: AIResult;
   notes: string;
@@ -1684,6 +2611,7 @@ function StepReview({
 }) {
   const addr = selectedCustomer ? getPrimaryAddress(selectedCustomer) : null;
   const trimmedOtherPest = otherPest.trim();
+  const mapSummaryLines = getMapPlotSummaryLines(mapPlotData);
 
   return (
     <div className={styles.stepContent}>
@@ -1712,6 +2640,21 @@ function StepReview({
           {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
         </p>
       </div>
+
+      {leadType === 'new-lead' && (
+        <div className={styles.reviewSection}>
+          <h3 className={styles.reviewSectionTitle}>Map &amp; Plot</h3>
+          {newLeadPathMode === 'map-plot' && mapSummaryLines.length > 0 ? (
+            <div className={styles.reviewMapSummary}>
+              {mapSummaryLines.map(line => (
+                <p key={line} className={styles.reviewRow}>{line}</p>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.reviewValueMuted}>Skipped for this lead.</p>
+          )}
+        </div>
+      )}
 
       <div className={styles.reviewSection}>
         <h3 className={styles.reviewSectionTitle}>Photos</h3>
@@ -1826,6 +2769,7 @@ export function NewOpportunityWizard() {
 
   // Wizard state
   const [leadType, setLeadType] = useState<LeadType>('new-lead');
+  const [newLeadPathMode, setNewLeadPathMode] = useState<NewLeadPathMode | null>(null);
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
@@ -1846,6 +2790,7 @@ export function NewOpportunityWizard() {
   const [selectedPestValue, setSelectedPestValue] = useState('');
   const [otherPest, setOtherPest] = useState('');
   const [hasManualPestSelection, setHasManualPestSelection] = useState(false);
+  const [mapPlotData, setMapPlotData] = useState<MapPlotData>(DEFAULT_MAP_PLOT_DATA);
 
   // Service plan selection
   const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
@@ -1876,16 +2821,26 @@ export function NewOpportunityWizard() {
   // Computed wizard steps based on lead type and PestPac availability
   const wizardSteps = useMemo((): StepId[] => {
     if (leadType === 'new-lead') {
-      return ['type-select', 'photos', 'ai-review', 'new-customer', 'review'];
+      const steps: StepId[] = ['type-select', 'new-lead-path'];
+      if (newLeadPathMode === 'map-plot') {
+        steps.push('map-address', 'map-plot');
+      }
+      steps.push('photos', 'ai-review', 'new-customer', 'review');
+      return steps;
     }
     if (isPestPacEnabled) {
       return ['type-select', 'photos', 'ai-review', 'select-site', 'service-details', 'review', 'service-today-confirm'];
     }
     return ['type-select', 'photos', 'ai-review', 'select-site', 'service-plan-select', 'review', 'service-today-confirm'];
-  }, [leadType, isPestPacEnabled]);
+  }, [leadType, newLeadPathMode, isPestPacEnabled]);
 
   const currentStepId = wizardSteps[stepIndex];
   const draftKey = companyId ? `techleads_draft_${companyId}` : null;
+
+  useEffect(() => {
+    if (stepIndex <= wizardSteps.length - 1) return;
+    setStepIndex(Math.max(0, wizardSteps.length - 1));
+  }, [stepIndex, wizardSteps]);
 
   // Restore draft from localStorage when companyId becomes available
   useEffect(() => {
@@ -1898,6 +2853,7 @@ export function NewOpportunityWizard() {
         setLeadType(d.leadType);
         setWizardTitle(d.leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity');
       }
+      if (d.newLeadPathMode) setNewLeadPathMode(d.newLeadPathMode);
       if (d.aiResult) setAIResult(d.aiResult);
       if (d.notes) setNotes(d.notes);
       if (d.customerMentioned) setCustomerMentioned(d.customerMentioned);
@@ -1908,6 +2864,54 @@ export function NewOpportunityWizard() {
       if (d.selectedCustomer) setSelectedCustomer(d.selectedCustomer);
       if (d.selectedPestPacClient) setSelectedPestPacClient(d.selectedPestPacClient);
       if (d.selectedServicePlan) setSelectedServicePlan(d.selectedServicePlan);
+      if (d.mapPlotData) {
+        const restoredMapPlot = d.mapPlotData as Partial<MapPlotData> & {
+          stamps?: Array<Partial<MapPlotStamp>>;
+          outlinePoints?: Array<Partial<MapOutlinePoint>>;
+        };
+
+        const restoredStampType =
+          typeof restoredMapPlot.selectedStampType === 'string' &&
+          MAP_STAMP_OPTIONS.some(option => option.type === restoredMapPlot.selectedStampType)
+            ? restoredMapPlot.selectedStampType
+            : DEFAULT_MAP_PLOT_DATA.selectedStampType;
+
+        setMapPlotData({
+          ...DEFAULT_MAP_PLOT_DATA,
+          ...restoredMapPlot,
+          addressComponents: restoredMapPlot.addressComponents ?? null,
+          centerLat: typeof restoredMapPlot.centerLat === 'number' ? restoredMapPlot.centerLat : null,
+          centerLng: typeof restoredMapPlot.centerLng === 'number' ? restoredMapPlot.centerLng : null,
+          zoom: typeof restoredMapPlot.zoom === 'number' ? restoredMapPlot.zoom : DEFAULT_MAP_PLOT_DATA.zoom,
+          heading: typeof restoredMapPlot.heading === 'number' ? restoredMapPlot.heading : DEFAULT_MAP_PLOT_DATA.heading,
+          tilt: typeof restoredMapPlot.tilt === 'number' ? restoredMapPlot.tilt : DEFAULT_MAP_PLOT_DATA.tilt,
+          isViewSet: restoredMapPlot.isViewSet === true,
+          drawTool: restoredMapPlot.drawTool === 'outline' ? 'outline' : 'stamp',
+          selectedStampType: restoredStampType,
+          stamps: Array.isArray(restoredMapPlot.stamps)
+            ? restoredMapPlot.stamps
+                .map(stamp => ({
+                  id: typeof stamp.id === 'string' ? stamp.id : crypto.randomUUID(),
+                  type:
+                    typeof stamp.type === 'string' &&
+                    MAP_STAMP_OPTIONS.some(option => option.type === stamp.type)
+                      ? stamp.type
+                      : restoredStampType,
+                  x: clampNormalized(Number(stamp.x)),
+                  y: clampNormalized(Number(stamp.y)),
+                }))
+                .filter(stamp => Number.isFinite(stamp.x) && Number.isFinite(stamp.y))
+            : [],
+          outlinePoints: Array.isArray(restoredMapPlot.outlinePoints)
+            ? restoredMapPlot.outlinePoints
+                .map(point => ({
+                  x: clampNormalized(Number(point.x)),
+                  y: clampNormalized(Number(point.y)),
+                }))
+                .filter(point => Number.isFinite(point.x) && Number.isFinite(point.y))
+            : [],
+        });
+      }
       if (d.newCustomerForm) {
         setNewCustomerForm(prev => ({ ...prev, ...d.newCustomerForm, addressComponents: null }));
       }
@@ -1926,9 +2930,9 @@ export function NewOpportunityWizard() {
     if (!draftKey || stepIndex === 0) return;
     try {
       localStorage.setItem(draftKey, JSON.stringify({
-        leadType, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
+        leadType, newLeadPathMode, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
         selectedPestValue, otherPest, hasManualPestSelection,
-        selectedCustomer, selectedPestPacClient, selectedServicePlan,
+        selectedCustomer, selectedPestPacClient, selectedServicePlan, mapPlotData,
         savedAt: new Date().toISOString(),
         newCustomerForm: {
           firstName: newCustomerForm.firstName,
@@ -1942,9 +2946,9 @@ export function NewOpportunityWizard() {
       // localStorage full or unavailable — silently skip
     }
   }, [
-    draftKey, leadType, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
+    draftKey, leadType, newLeadPathMode, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
     selectedPestValue, otherPest, hasManualPestSelection,
-    selectedCustomer, selectedPestPacClient, selectedServicePlan, newCustomerForm,
+    selectedCustomer, selectedPestPacClient, selectedServicePlan, mapPlotData, newCustomerForm,
   ]);
 
   const clearDraft = () => {
@@ -2025,6 +3029,24 @@ export function NewOpportunityWizard() {
   }, [companyId]);
 
   useEffect(() => {
+    if (newLeadPathMode !== 'map-plot') return;
+    if (!mapPlotData.addressComponents) return;
+
+    const street = `${mapPlotData.addressComponents.street_number ? `${mapPlotData.addressComponents.street_number} ` : ''}${mapPlotData.addressComponents.route ?? ''}`.trim();
+    const fallbackAddress = street || mapPlotData.addressComponents.formatted_address || '';
+    if (!fallbackAddress) return;
+
+    setNewCustomerForm(prev => {
+      if (prev.addressInput.trim()) return prev;
+      return {
+        ...prev,
+        addressInput: fallbackAddress,
+        addressComponents: mapPlotData.addressComponents,
+      };
+    });
+  }, [newLeadPathMode, mapPlotData.addressComponents]);
+
+  useEffect(() => {
     if (hasManualPestSelection || selectedPestValue || pestOptions.length === 0) return;
 
     const match = findBestPestMatch(aiResult, pestOptions);
@@ -2037,6 +3059,7 @@ export function NewOpportunityWizard() {
     clearDraft();
     setStepIndex(0);
     setLeadType('new-lead');
+    setNewLeadPathMode(null);
     setWizardTitle(null);
     setPhotos([]);
     setAIResult({ issue_detected: '', service_category: '', ai_summary: '', suggested_pest_type: null, matched_pest_option: null, severity: null });
@@ -2046,6 +3069,7 @@ export function NewOpportunityWizard() {
     setNotes('');
     setCustomerMentioned(false);
     setIsHighPriority(false);
+    setMapPlotData({ ...DEFAULT_MAP_PLOT_DATA });
     setSelectedCustomer(null);
     setSelectedPestPacClient(null);
     setSelectedServicePlan(null);
@@ -2127,7 +3151,38 @@ export function NewOpportunityWizard() {
         : null;
 
       const trimmedTechNotes = notes.trim();
-      const combinedNotes = [trimmedTechNotes, serviceTodayNote].filter(Boolean).join('\n\n');
+      const mapPlotNote =
+        leadType === 'new-lead' && newLeadPathMode === 'map-plot'
+          ? buildMapPlotNote(mapPlotData)
+          : null;
+      const combinedNotes = [trimmedTechNotes, mapPlotNote, serviceTodayNote].filter(Boolean).join('\n\n');
+
+      const mapPlotPayload =
+        leadType === 'new-lead' && newLeadPathMode === 'map-plot' && mapPlotData.addressComponents
+          ? {
+              addressInput: mapPlotData.addressInput,
+              addressComponents: mapPlotData.addressComponents,
+              centerLat: getMapLatitude(mapPlotData),
+              centerLng: getMapLongitude(mapPlotData),
+              zoom: mapPlotData.zoom,
+              heading: mapPlotData.heading,
+              tilt: mapPlotData.tilt,
+              isViewSet: mapPlotData.isViewSet,
+              drawTool: mapPlotData.drawTool,
+              selectedStampType: mapPlotData.selectedStampType,
+              outlinePoints: mapPlotData.outlinePoints.map(point => ({
+                x: Number(point.x.toFixed(5)),
+                y: Number(point.y.toFixed(5)),
+              })),
+              stamps: mapPlotData.stamps.map(stamp => ({
+                id: stamp.id,
+                type: stamp.type,
+                x: Number(stamp.x.toFixed(5)),
+                y: Number(stamp.y.toFixed(5)),
+              })),
+              updatedAt: mapPlotData.updatedAt,
+            }
+          : null;
 
       const body: Record<string, unknown> = {
         companyId,
@@ -2139,6 +3194,19 @@ export function NewOpportunityWizard() {
         leadType: 'manual',
         serviceType: aiResult.service_category || undefined,
       };
+
+      if (mapPlotPayload) {
+        body.mapPlotData = mapPlotPayload;
+
+        const mapAddress = mapPlotData.addressComponents;
+        if (mapAddress) {
+          const streetAddress = `${mapAddress.street_number ? `${mapAddress.street_number} ` : ''}${mapAddress.route ?? ''}`.trim();
+          if (streetAddress) body.streetAddress = streetAddress;
+          if (mapAddress.locality) body.city = mapAddress.locality;
+          if (mapAddress.administrative_area_level_1) body.state = mapAddress.administrative_area_level_1;
+          if (mapAddress.postal_code) body.zip = mapAddress.postal_code;
+        }
+      }
 
       if (mode === 'schedule' || mode === 'service-today') {
         body.leadStatus = 'scheduling';
@@ -2295,11 +3363,18 @@ export function NewOpportunityWizard() {
   }
 
   const canGoNext = (): boolean => {
+    if (currentStepId === 'new-lead-path') return false;
+    if (currentStepId === 'map-address') {
+      return !!mapPlotData.addressComponents && getMapLatitude(mapPlotData) !== null && getMapLongitude(mapPlotData) !== null;
+    }
     if (currentStepId === 'photos' && photos.length === 0) return false;
     if (currentStepId === 'ai-review' && selectedPestValue === OTHER_PEST_OPTION_VALUE && !otherPest.trim()) return false;
     if (currentStepId === 'select-site' && isPestPacEnabled && !selectedPestPacClient && !selectedCustomer) return false;
     if (currentStepId === 'new-customer') {
       return !!(newCustomerForm.firstName.trim() && newCustomerForm.lastName.trim() && newCustomerForm.phone.trim());
+    }
+    if (currentStepId === 'map-plot') {
+      return getMapLatitude(mapPlotData) !== null && getMapLongitude(mapPlotData) !== null && mapPlotData.isViewSet;
     }
     if (currentStepId === 'service-plan-select') return selectedServicePlan !== null;
     if (currentStepId === 'service-details') return selectedServicePlan !== null;
@@ -2415,14 +3490,16 @@ export function NewOpportunityWizard() {
   const isNextLoading = isSyncingCustomer || isCreatingCustomer;
   const nextLoadingLabel = isCreatingCustomer ? 'Creating customer…' : 'Syncing customer…';
 
-  // Steps visible in progress bar (exclude 'type-select' and 'service-today-confirm')
-  const progressSteps = wizardSteps.filter(s => s !== 'type-select' && s !== 'service-today-confirm');
-  const progressIndex = stepIndex - 1; // offset since type-select is step 0
+  // Steps visible in progress bar
+  const progressSteps: StepId[] = wizardSteps.filter(
+    s => s !== 'type-select' && s !== 'service-today-confirm' && s !== 'new-lead-path'
+  ) as StepId[];
+  const progressIndex = progressSteps.indexOf(currentStepId);
 
   return (
     <div className={styles.wizardContainer} ref={wizardContainerRef}>
       {/* Progress indicator — only show after type selection */}
-      {stepIndex > 0 && (
+      {stepIndex > 0 && currentStepId !== 'new-lead-path' && (
         <div className={styles.progressSection}>
           <p className={styles.progressLeadType}>
             {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
@@ -2471,13 +3548,27 @@ export function NewOpportunityWizard() {
       )}
 
       {/* Step content */}
-      <div className={styles.stepWrapper}>
+      <div className={`${styles.stepWrapper} ${currentStepId === 'map-plot' ? styles.stepWrapperNoScroll : ''}`}>
         {currentStepId === 'type-select' && (
           <StepTypeSelect
             onSelect={type => {
               setLeadType(type);
+              setNewLeadPathMode(null);
+              setMapPlotData({ ...DEFAULT_MAP_PLOT_DATA });
               setWizardTitle(type === 'new-lead' ? 'New Lead' : 'Upsell Opportunity');
               setStepIndex(1);
+            }}
+          />
+        )}
+
+        {currentStepId === 'new-lead-path' && (
+          <StepNewLeadPath
+            onSelect={mode => {
+              setNewLeadPathMode(mode);
+              if (mode === 'standard') {
+                setMapPlotData({ ...DEFAULT_MAP_PLOT_DATA });
+              }
+              setStepIndex(i => i + 1);
             }}
           />
         )}
@@ -2528,6 +3619,26 @@ export function NewOpportunityWizard() {
           />
         )}
 
+        {currentStepId === 'map-address' && (
+          <StepMapAddress
+            mapPlotData={mapPlotData}
+            onChange={setMapPlotData}
+          />
+        )}
+
+        {currentStepId === 'map-plot' && (
+          <StepMapPlot
+            companyId={companyId}
+            mapPlotData={mapPlotData}
+            onChange={setMapPlotData}
+            onBack={handleBack}
+            onNext={() => {
+              void handleNext();
+            }}
+            canNext={canGoNext()}
+          />
+        )}
+
         {currentStepId === 'select-site' && (
           <StepSelectSite
             companyId={companyId}
@@ -2565,6 +3676,8 @@ export function NewOpportunityWizard() {
         {currentStepId === 'review' && (
           <StepReview
             leadType={leadType}
+            newLeadPathMode={newLeadPathMode}
+            mapPlotData={newLeadPathMode === 'map-plot' ? mapPlotData : null}
             photos={photos}
             aiResult={aiResult}
             notes={notes}
@@ -2588,6 +3701,7 @@ export function NewOpportunityWizard() {
       </div>
 
       {/* Bottom action bar */}
+      {currentStepId !== 'map-plot' && (
       <div className={styles.actionBar}>
         {stepIndex > 0 ? (
           <button className={styles.backBtn} onClick={handleBack}>
@@ -2619,7 +3733,7 @@ export function NewOpportunityWizard() {
           </button>
         )}
 
-        {currentStepId !== 'type-select' && currentStepId !== 'photos' && currentStepId !== 'review' && currentStepId !== 'service-today-confirm' && (
+        {currentStepId !== 'type-select' && currentStepId !== 'new-lead-path' && currentStepId !== 'photos' && currentStepId !== 'review' && currentStepId !== 'service-today-confirm' && (
           <button
             className={styles.nextBtn}
             onClick={handleNext}
@@ -2687,6 +3801,7 @@ export function NewOpportunityWizard() {
           </button>
         )}
       </div>
+      )}
 
       {syncError && <p className={styles.submitError}>{syncError}</p>}
       {submitError && <p className={styles.submitError}>{submitError}</p>}

@@ -45,6 +45,7 @@ import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendEvent } from '@/lib/inngest/client';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress, extractAddressData } from '@/lib/service-addresses';
 import { generateQuoteToken, generateQuoteUrl } from '@/lib/quote-utils';
+import { resolveDefaultBranchId } from '@/lib/branch-filter';
 
 // Helper function to check if auto-calling is enabled for a company
 async function shouldAutoCall(companyId: string): Promise<boolean> {
@@ -620,6 +621,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Resolve branch: from matched service area, or fall back to primary branch
+    const widgetBranchId = await resolveDefaultBranchId(
+      supabase,
+      submission.companyId,
+      serviceAreaValidation?.primaryArea?.id ?? null
+    );
+
     // Create lead with enhanced attribution data
     const { data: lead, error: leadError } = await supabase
       .from('leads')
@@ -654,6 +662,7 @@ export async function POST(request: NextRequest) {
           utm_content: finalAttributionData.utm_content || null,
           gclid: finalAttributionData.gclid || null,
           attribution_data: finalAttributionData,
+          branch_id: widgetBranchId,
         },
       ])
       .select('id')

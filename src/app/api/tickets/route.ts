@@ -13,6 +13,7 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { getUserBranchFilter } from '@/lib/branch-filter';
 
 /**
  * Helper function to get ticket counts for all tabs
@@ -77,6 +78,7 @@ export async function GET(request: NextRequest) {
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const search = searchParams.get('search') || '';
     const tabFilter = searchParams.get('tab') || 'all';
+    const branchId = searchParams.get('branchId');
 
     if (!companyId) {
       return createErrorResponse('Company ID is required', 400);
@@ -130,7 +132,8 @@ export async function GET(request: NextRequest) {
           last_name,
           email,
           avatar_url
-        )
+        ),
+        branch:branches(id, name)
       `,
         { count: 'exact' }
       )
@@ -141,6 +144,14 @@ export async function GET(request: NextRequest) {
     } else {
       query = query
         .or('archived.is.null,archived.eq.false');
+    }
+
+    // Apply branch filter: explicit branchId param OR user restriction
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    } else {
+      const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+      if (branchFilter) query = query.or(branchFilter);
     }
 
     // Apply tab filter with status exclusions

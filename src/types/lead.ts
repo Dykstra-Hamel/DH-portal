@@ -119,6 +119,10 @@ export interface Lead {
     [key: string]: any;
   };
 
+  // Branch assignment
+  branch_id?: string | null;
+  branch?: { id: string; name: string } | null;
+
   // Joined data from related tables
   customer?: {
     id: string;

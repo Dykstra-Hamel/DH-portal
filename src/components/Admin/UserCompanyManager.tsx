@@ -5,6 +5,7 @@ import { adminAPI } from '@/lib/api-client';
 import { useCompanyDepartments, useUserDepartments } from '@/hooks/useUserDepartments';
 import { DepartmentSelector, DepartmentBadges } from '@/components/Common/DepartmentSelector';
 import { Department, canHaveDepartments } from '@/types/user';
+import BranchSelector from '@/components/Common/BranchSelector/BranchSelector';
 import styles from './AdminManager.module.scss';
 
 interface UserCompany {
@@ -47,6 +48,12 @@ export default function UserCompanyManager() {
     useState<UserCompany | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingDepartments, setEditingDepartments] = useState<{
+    userId: string;
+    companyId: string;
+    userName: string;
+    companyName: string;
+  } | null>(null);
+  const [editingBranches, setEditingBranches] = useState<{
     userId: string;
     companyId: string;
     userName: string;
@@ -123,6 +130,17 @@ export default function UserCompanyManager() {
     } catch (error) {
       console.error('Error deleting relationship:', error);
     }
+  };
+
+  const handleEditBranches = (relationship: UserCompany) => {
+    setEditingBranches({
+      userId: relationship.user_id,
+      companyId: relationship.company_id,
+      userName: relationship.profiles
+        ? `${relationship.profiles.first_name} ${relationship.profiles.last_name}`
+        : 'Unknown User',
+      companyName: relationship.companies?.name || 'Unknown Company',
+    });
   };
 
   const handleEditDepartments = (relationship: UserCompany) => {
@@ -337,6 +355,17 @@ export default function UserCompanyManager() {
         />
       )}
 
+      {/* Branch Management Modal */}
+      {editingBranches && (
+        <BranchManagementModal
+          userId={editingBranches.userId}
+          companyId={editingBranches.companyId}
+          userName={editingBranches.userName}
+          companyName={editingBranches.companyName}
+          onClose={() => setEditingBranches(null)}
+        />
+      )}
+
       <div className={styles.table}>
         <table>
           <thead>
@@ -346,6 +375,7 @@ export default function UserCompanyManager() {
               <th>Company</th>
               <th>Role</th>
               <th>Departments</th>
+              <th>Branches</th>
               <th>Primary</th>
               <th>Joined</th>
               <th>Actions</th>
@@ -377,6 +407,12 @@ export default function UserCompanyManager() {
                     canHaveDepartments={canHaveDepartments(relationship.role as any)}
                   />
                 </td>
+                <td>
+                  <UserBranchDisplay
+                    userId={relationship.user_id}
+                    companyId={relationship.company_id}
+                  />
+                </td>
                 <td>{relationship.is_primary ? '✓' : '-'}</td>
                 <td>{new Date(relationship.joined_at).toLocaleDateString()}</td>
                 <td>
@@ -397,6 +433,13 @@ export default function UserCompanyManager() {
                       </button>
                     )}
                     <button
+                      className={styles.departmentButton}
+                      onClick={() => handleEditBranches(relationship)}
+                      title="Manage Branches"
+                    >
+                      Branches
+                    </button>
+                    <button
                       className={styles.deleteButton}
                       onClick={() => handleDeleteRelationship(relationship.id)}
                     >
@@ -411,6 +454,36 @@ export default function UserCompanyManager() {
       </div>
     </div>
   );
+}
+
+// Helper component to display user branch count
+function UserBranchDisplay({
+  userId,
+  companyId,
+}: {
+  userId: string;
+  companyId: string;
+}) {
+  const [count, setCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    import('@/lib/supabase/client')
+      .then(m => m.createClient())
+      .then(async c => {
+        const { data: session } = await c.auth.getSession();
+        const token = session.session?.access_token;
+        const res = await fetch(`/api/users/${userId}/branches?companyId=${companyId}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+        const d = await res.json();
+        setCount((d.assignments ?? []).length);
+      })
+      .catch(() => setCount(null));
+  }, [userId, companyId]);
+
+  if (count === null) return <span className={styles.loading}>...</span>;
+  if (count === 0) return <span className={styles.noDepartments}>All</span>;
+  return <span>{count} branch{count !== 1 ? 'es' : ''}</span>;
 }
 
 // Helper component to display user departments
@@ -438,6 +511,43 @@ function UserDepartmentDisplay({
   }
 
   return <DepartmentBadges departments={departments} size="small" maxDisplay={2} />;
+}
+
+// Branch Management Modal Component
+function BranchManagementModal({
+  userId,
+  companyId,
+  userName,
+  companyName,
+  onClose,
+}: {
+  userId: string;
+  companyId: string;
+  userName: string;
+  companyName: string;
+  onClose: () => void;
+}) {
+  return (
+    <div className={styles.modal}>
+      <div className={styles.modalContent}>
+        <h3>Manage Branch Access</h3>
+        <div className={styles.modalHeader}>
+          <p>
+            <strong>User:</strong> {userName}
+          </p>
+          <p>
+            <strong>Company:</strong> {companyName}
+          </p>
+        </div>
+        <BranchSelector userId={userId} companyId={companyId} />
+        <div className={styles.formActions}>
+          <button type="button" className={styles.cancelButton} onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // Department Management Modal Component

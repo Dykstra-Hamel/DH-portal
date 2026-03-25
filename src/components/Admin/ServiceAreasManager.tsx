@@ -21,6 +21,12 @@ interface Company {
   widget_config?: any;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
 export default function ServiceAreasManager({ companyId }: ServiceAreasManagerProps) {
   const [serviceAreaInput, setServiceAreaInput] = useState('');
   const [serviceAreas, setServiceAreas] = useState<any[]>([]);
@@ -30,8 +36,11 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
   const [saving, setSaving] = useState(false);
   const [zipCodes, setZipCodes] = useState<string[]>([]);
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [branchAssignments, setBranchAssignments] = useState<Record<string, string>>({});
 
   // Create stable callback for ServiceAreaMap to prevent infinite loop
+  // Preserve any branch assignments when map updates areas
   const handleAreasChange = useCallback((areas: any[]) => {
     setServiceAreas(areas);
   }, []);
@@ -51,6 +60,15 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
     };
     fetchGoogleApiKey();
   }, []);
+
+  // Fetch branches for this company
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/branches?companyId=${companyId}`)
+      .then(r => r.json())
+      .then(d => setBranches((d.branches ?? []).filter((b: Branch) => b.is_active)))
+      .catch(() => setBranches([]));
+  }, [companyId]);
 
   // Load service areas and geocode company address
   useEffect(() => {
@@ -103,6 +121,12 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
             const geographic = areas.filter((a: any) => a.type !== 'zip_code');
             const zipCodeAreas = areas.filter((a: any) => a.type === 'zip_code');
             setServiceAreas(geographic);
+            // Populate branch assignments from loaded areas
+            const assignments: Record<string, string> = {};
+            geographic.forEach((a: any) => {
+              if (a.id && a.branchId) assignments[a.id] = a.branchId;
+            });
+            setBranchAssignments(assignments);
             // Extract zip codes from zip code areas
             const allZipCodes = zipCodeAreas.flatMap((a: any) => a.zipCodes || []);
             setZipCodes(allZipCodes);
@@ -123,12 +147,17 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
   const saveServiceAreas = async (areas: any[]) => {
     try {
       setSaving(true);
+      // Merge branch assignments into areas at save time
+      const areasWithBranch = areas.map(a => ({
+        ...a,
+        branchId: branchAssignments[a.id] ?? a.branchId ?? null,
+      }));
       const response = await fetch(`/api/service-areas/${companyId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ serviceAreas: areas }),
+        body: JSON.stringify({ serviceAreas: areasWithBranch }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -197,6 +226,14 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
       console.error('Error saving zip codes:', error);
       alert('Failed to save zip codes. Please try again.');
     }
+  };
+
+  const handleBranchAssignment = (areaId: string, branchId: string) => {
+    setBranchAssignments(prev => ({ ...prev, [areaId]: branchId }));
+  };
+
+  const saveBranchAssignments = async () => {
+    await saveServiceAreas(serviceAreas);
   };
 
   if (loading) {
@@ -282,6 +319,40 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
                 Please add NEXT_PUBLIC_GOOGLE_PLACES_API_KEY to your environment
                 variables.
               </p>
+            </div>
+          )}
+
+          {serviceAreas.length > 0 && branches.length > 0 && (
+            <div className={styles.branchAssignmentPanel}>
+              <h3 className={styles.branchAssignmentTitle}>Branch Assignment</h3>
+              <p className={styles.branchAssignmentSubtitle}>
+                Assign a branch to each service area. Save changes after updating.
+              </p>
+              <div className={styles.branchAssignmentList}>
+                {serviceAreas.map(area => (
+                  <div key={area.id || area.name} className={styles.branchAssignmentRow}>
+                    <span className={styles.areaName}>{area.name}</span>
+                    <select
+                      className={styles.branchSelect}
+                      value={branchAssignments[area.id] ?? ''}
+                      onChange={e => handleBranchAssignment(area.id, e.target.value)}
+                      disabled={saving}
+                    >
+                      <option value="">No branch</option>
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                ))}
+              </div>
+              <button
+                className={styles.saveBranchButton}
+                onClick={saveBranchAssignments}
+                disabled={saving}
+              >
+                {saving ? 'Saving...' : 'Save Branch Assignments'}
+              </button>
             </div>
           )}
         </div>

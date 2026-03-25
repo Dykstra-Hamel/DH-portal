@@ -24,6 +24,12 @@ interface Profile {
   role?: string;
 }
 
+interface Branch {
+  id: string;
+  name: string;
+  is_active: boolean;
+}
+
 export default function LeadsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -31,6 +37,8 @@ export default function LeadsPage() {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
+  const [branches, setBranches] = useState<Branch[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const router = useRouter();
 
   // Use global company context
@@ -88,7 +96,7 @@ export default function LeadsPage() {
     return () => subscription.unsubscribe();
   }, [router]);
 
-  const fetchLeads = useCallback(async () => {
+  const fetchLeads = useCallback(async (branchId?: string) => {
     if (!isAdmin && !selectedCompany) return;
 
     try {
@@ -104,9 +112,10 @@ export default function LeadsPage() {
         setLeads(leadsData || []);
       } else {
         // Regular user gets all leads (active and archived) for their selected company
+        const branchFilter = branchId ? { branchId } : {};
         const [activeLeads, archivedLeads] = await Promise.all([
-          adminAPI.getUserLeads(selectedCompany!.id),
-          adminAPI.getUserArchivedLeads(selectedCompany!.id),
+          adminAPI.getUserLeads(selectedCompany!.id, branchFilter),
+          adminAPI.getUserArchivedLeads(selectedCompany!.id, branchFilter),
         ]);
         setLeads([...(activeLeads || []), ...(archivedLeads || [])]);
       }
@@ -122,12 +131,22 @@ export default function LeadsPage() {
     router.push(`/tickets/leads/${lead.id}?edit=true`);
   };
 
+  // Fetch branches when company changes
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
+    setSelectedBranchId('');
+    fetch(`/api/branches?companyId=${selectedCompany.id}`)
+      .then(r => r.json())
+      .then(d => setBranches((d.branches ?? []).filter((b: Branch) => b.is_active)))
+      .catch(() => setBranches([]));
+  }, [selectedCompany?.id]);
+
   // Fetch leads when selectedCompany changes or isAdmin changes
   useEffect(() => {
     if (selectedCompany?.id) {
-      fetchLeads();
+      fetchLeads(selectedBranchId || undefined);
     }
-  }, [selectedCompany, isAdmin, fetchLeads]);
+  }, [selectedCompany, isAdmin, fetchLeads, selectedBranchId]);
 
   // Real-time subscription for lead updates
   useEffect(() => {
@@ -230,12 +249,27 @@ export default function LeadsPage() {
 
   return (
     <div style={{ width: '100%' }}>
+      {selectedCompany && branches.length > 0 && (
+        <div style={{ padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Branch:</label>
+          <select
+            value={selectedBranchId}
+            onChange={e => setSelectedBranchId(e.target.value)}
+            style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}
+          >
+            <option value="">All Branches</option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
       {selectedCompany && (
         <LeadsList
           leads={leads}
           loading={leadsLoading}
           onLeadUpdated={() => {
-            fetchLeads();
+            fetchLeads(selectedBranchId || undefined);
           }}
           onEdit={handleEditLead}
           showCompanyColumn={isAdmin && !selectedCompany}

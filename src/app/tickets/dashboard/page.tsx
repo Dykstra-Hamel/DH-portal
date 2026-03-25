@@ -385,6 +385,11 @@ function TicketsDashboardContent() {
   const [isQualifying, setIsQualifying] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // Branch filter state
+  const [branches, setBranches] = useState<Array<{ id: string; name: string; is_active: boolean }>>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const selectedBranchIdRef = useRef('');
+
   // Ref to track subscription state
   const subscriptionActiveRef = useRef(false);
   const currentChannelRef = useRef<ReturnType<typeof createTicketChannel> | null>(null);
@@ -402,6 +407,22 @@ function TicketsDashboardContent() {
   useEffect(() => {
     selectedCompanyRef.current = selectedCompany;
   }, [selectedCompany]);
+
+  // Keep branch ref in sync
+  useEffect(() => {
+    selectedBranchIdRef.current = selectedBranchId;
+  }, [selectedBranchId]);
+
+  // Fetch branches when company changes
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
+    setSelectedBranchId('');
+    selectedBranchIdRef.current = '';
+    fetch(`/api/branches?companyId=${selectedCompany.id}`)
+      .then(r => r.json())
+      .then(d => setBranches((d.branches ?? []).filter((b: { is_active: boolean }) => b.is_active)))
+      .catch(() => setBranches([]));
+  }, [selectedCompany?.id]);
 
   // User ref for realtime updates
   const userIdRef = useRef(user?.id);
@@ -575,6 +596,7 @@ function TicketsDashboardContent() {
               limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
               sortBy: 'created_at',
               sortOrder: 'asc',
+              ...(selectedBranchIdRef.current ? { branchId: selectedBranchIdRef.current } : {}),
             })}`
           );
 
@@ -601,6 +623,7 @@ function TicketsDashboardContent() {
               limit: TICKETS_FETCH_BATCH_SIZE.toString(),
               sortBy: 'created_at',
               sortOrder: 'asc',
+              ...(selectedBranchIdRef.current ? { branchId: selectedBranchIdRef.current } : {}),
             })}`
           );
 
@@ -706,6 +729,7 @@ function TicketsDashboardContent() {
             paginate: 'true',
             page: '1',
             limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+            ...(selectedBranchIdRef.current ? { branchId: selectedBranchIdRef.current } : {}),
           })}`
         );
 
@@ -739,6 +763,7 @@ function TicketsDashboardContent() {
             paginate: 'true',
             page: page.toString(),
             limit: LEADS_FETCH_BATCH_SIZE.toString(),
+            ...(selectedBranchIdRef.current ? { branchId: selectedBranchIdRef.current } : {}),
           })}`
         );
 
@@ -2144,6 +2169,30 @@ function TicketsDashboardContent() {
       {/* Tickets Table Section */}
       <section className={`${styles.section} ${styles.sectionNoGap}`}>
         <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Tickets</h2>
+
+        {/* Branch filter */}
+        {selectedCompany && branches.length > 0 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+            <label style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Branch:</label>
+            <select
+              value={selectedBranchId}
+              onChange={e => {
+                setSelectedBranchId(e.target.value);
+                selectedBranchIdRef.current = e.target.value;
+                if (selectedCompany?.id) {
+                  fetchTickets(selectedCompany.id, { showLoading: true });
+                  fetchLeads(selectedCompany.id);
+                }
+              }}
+              style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}
+            >
+              <option value="">All Branches</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className={styles.tabsRow}>
