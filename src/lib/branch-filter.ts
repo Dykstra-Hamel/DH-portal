@@ -2,9 +2,11 @@ import { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Returns a PostgREST-compatible `.or()` filter string that restricts a query
- * to the user's assigned branches (plus unassigned records with branch_id IS NULL).
+ * to the user's assigned branches only. Records with branch_id IS NULL are not
+ * shown to branch-restricted users.
  *
- * Returns null if the user is unrestricted (global admin, or no branch assignments).
+ * Returns null if the user is unrestricted (global admin, or no branch assignments),
+ * in which case all records are visible regardless of branch.
  * Usage: if (filter) query = query.or(filter);
  */
 export async function getUserBranchFilter(
@@ -26,7 +28,7 @@ export async function getUserBranchFilter(
   if (!data?.length) return null;
 
   const ids = data.map(r => r.branch_id).join(',');
-  return `branch_id.in.(${ids}),branch_id.is.null`;
+  return `branch_id.in.(${ids})`;
 }
 
 /**

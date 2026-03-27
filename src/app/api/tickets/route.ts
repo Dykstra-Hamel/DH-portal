@@ -21,7 +21,8 @@ import { getUserBranchFilter } from '@/lib/branch-filter';
  */
 async function getTicketTabCounts(
   companyId: string,
-  includeArchived: boolean
+  includeArchived: boolean,
+  branchFilter?: string | null
 ): Promise<{
   all: number;
   calls: number;
@@ -36,15 +37,18 @@ async function getTicketTabCounts(
     ? 'archived.eq.true'
     : 'archived.is.null,archived.eq.false';
 
+  // Helper to apply optional branch filter to a query
+  const withBranch = (q: any) => branchFilter ? q.or(branchFilter) : q;
+
   // Use parallel queries to get accurate counts
   const callTypes = ['phone_call', 'inbound_call', 'campaign_call'];
   const formTypes = ['web_form', 'website_form'];
   const [allCount, callsCount, incomingCount, outboundCount, formsCount] = await Promise.all([
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter),
-    adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', formTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter),
+    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
+    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
+    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
+    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
+    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', formTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
   ]);
 
   return {
@@ -92,7 +96,8 @@ export async function GET(request: NextRequest) {
 
     // If count only, return counts for all tabs using optimized helper
     if (countOnly) {
-      const counts = await getTicketTabCounts(companyId, includeArchived);
+      const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+      const counts = await getTicketTabCounts(companyId, includeArchived, branchFilter);
       return createSuccessResponse({ counts });
     }
 
@@ -234,7 +239,8 @@ export async function GET(request: NextRequest) {
     }
 
     // Always fetch tab counts so UI badges stay accurate, even when the current tab has no rows
-    const counts = await getTicketTabCounts(companyId, includeArchived);
+    const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+    const counts = await getTicketTabCounts(companyId, includeArchived, branchFilter);
 
     if (!tickets || tickets.length === 0) {
       return createSuccessResponse({

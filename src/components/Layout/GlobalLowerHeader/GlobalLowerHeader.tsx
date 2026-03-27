@@ -26,6 +26,12 @@ interface AssignedUser {
   avatar_url?: string | null;
 }
 
+interface BranchOption {
+  id: string;
+  name: string;
+  is_primary: boolean;
+}
+
 interface LeadAssignmentControls {
   leadType: string;
   leadStatus: string;
@@ -40,6 +46,9 @@ interface LeadAssignmentControls {
   onAssigneeChange: (id: string) => void;
   onSchedulerChange: (id: string) => void;
   onStatusChange: (status: string) => void;
+  currentBranchId?: string | null;
+  availableBranches?: BranchOption[];
+  onBranchChange?: (branchId: string | null) => void;
 }
 
 interface SupportCaseAssignmentControls {
@@ -50,6 +59,9 @@ interface SupportCaseAssignmentControls {
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onAssigneeChange: (id: string) => void;
   onStatusChange: (status: string) => void;
+  currentBranchId?: string | null;
+  availableBranches?: BranchOption[];
+  onBranchChange?: (branchId: string | null) => void;
 }
 
 interface GlobalLowerHeaderProps {
@@ -112,6 +124,7 @@ export function GlobalLowerHeader({
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [isBranchOpen, setIsBranchOpen] = useState(false);
   const [hasShadow, setHasShadow] = useState(false);
 
   const leadTypeRef = useRef<HTMLDivElement>(null);
@@ -119,6 +132,7 @@ export function GlobalLowerHeader({
   const statusRef = useRef<HTMLDivElement>(null);
   const supportAssignedToRef = useRef<HTMLDivElement>(null);
   const supportStatusRef = useRef<HTMLDivElement>(null);
+  const branchRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -152,6 +166,12 @@ export function GlobalLowerHeader({
         !supportStatusRef.current.contains(event.target as Node)
       ) {
         setIsStatusOpen(false);
+      }
+      if (
+        branchRef.current &&
+        !branchRef.current.contains(event.target as Node)
+      ) {
+        setIsBranchOpen(false);
       }
     };
 
@@ -689,6 +709,52 @@ export function GlobalLowerHeader({
                 </div>
               )}
             </div>
+
+            {/* Branch Dropdown (only rendered when company has branches) */}
+            {leadAssignmentControls.availableBranches && leadAssignmentControls.availableBranches.length > 0 && (
+              <div className={styles.controlGroup} ref={branchRef}>
+                <label className={styles.controlLabel}>Branch:</label>
+                <button
+                  className={styles.controlDropdown}
+                  onClick={() => setIsBranchOpen(!isBranchOpen)}
+                >
+                  <span className={styles.controlValue}>
+                    {leadAssignmentControls.availableBranches.find(
+                      b => b.id === leadAssignmentControls.currentBranchId
+                    )?.name ?? 'No Branch'}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
+                  />
+                </button>
+                {isBranchOpen && (
+                  <div className={styles.dropdownMenu}>
+                    <button
+                      className={`${styles.dropdownOption} ${!leadAssignmentControls.currentBranchId ? styles.selected : ''}`}
+                      onClick={() => {
+                        leadAssignmentControls.onBranchChange?.(null);
+                        setIsBranchOpen(false);
+                      }}
+                    >
+                      No Branch
+                    </button>
+                    {leadAssignmentControls.availableBranches.map(branch => (
+                      <button
+                        key={branch.id}
+                        className={`${styles.dropdownOption} ${leadAssignmentControls.currentBranchId === branch.id ? styles.selected : ''}`}
+                        onClick={() => {
+                          leadAssignmentControls.onBranchChange?.(branch.id);
+                          setIsBranchOpen(false);
+                        }}
+                      >
+                        {branch.name}{branch.is_primary ? ' (Primary)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -864,6 +930,52 @@ export function GlobalLowerHeader({
                 </div>
               )}
             </div>
+
+            {/* Branch Dropdown */}
+            {supportCaseAssignmentControls.availableBranches && supportCaseAssignmentControls.availableBranches.length > 0 && (
+              <div className={styles.controlGroup} ref={branchRef}>
+                <label className={styles.controlLabel}>Branch:</label>
+                <button
+                  className={styles.controlDropdown}
+                  onClick={() => setIsBranchOpen(!isBranchOpen)}
+                >
+                  <span className={styles.controlValue}>
+                    {supportCaseAssignmentControls.availableBranches.find(
+                      b => b.id === supportCaseAssignmentControls.currentBranchId
+                    )?.name ?? 'No Branch'}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
+                  />
+                </button>
+                {isBranchOpen && (
+                  <div className={styles.dropdownMenu}>
+                    <button
+                      className={`${styles.dropdownOption} ${!supportCaseAssignmentControls.currentBranchId ? styles.selected : ''}`}
+                      onClick={() => {
+                        supportCaseAssignmentControls.onBranchChange?.(null);
+                        setIsBranchOpen(false);
+                      }}
+                    >
+                      No Branch
+                    </button>
+                    {supportCaseAssignmentControls.availableBranches.map(branch => (
+                      <button
+                        key={branch.id}
+                        className={`${styles.dropdownOption} ${supportCaseAssignmentControls.currentBranchId === branch.id ? styles.selected : ''}`}
+                        onClick={() => {
+                          supportCaseAssignmentControls.onBranchChange?.(branch.id);
+                          setIsBranchOpen(false);
+                        }}
+                      >
+                        {branch.name}{branch.is_primary ? ' (Primary)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {((actionButtons && actionButtons?.length > 0) ||

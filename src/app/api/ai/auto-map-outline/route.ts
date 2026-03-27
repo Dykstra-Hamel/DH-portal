@@ -56,7 +56,7 @@ function extractJsonObject(text: string): string | null {
 
 async function generateWithRetry(parts: Part[]) {
   const model = genAI.getGenerativeModel({
-    model: process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite',
+    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
   });
 
   let lastError: unknown;
@@ -132,9 +132,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const prompt = `You are an assistant that maps house footprints from overhead satellite images.
+    const prompt = `You are a specialist in detecting building footprints from overhead satellite imagery.
 
-Analyze the single satellite image and detect the primary house/building outline.
+A RED CIRCLE has been drawn on the image at the exact location the user tapped.
+Detect the complete rooftop/footprint polygon of the PRIMARY BUILDING that contains or is nearest to the red circle.
 
 Return ONLY valid JSON with this exact schema:
 {
@@ -145,11 +146,11 @@ Return ONLY valid JSON with this exact schema:
 
 Rules:
 - Coordinates are normalized: (0,0) is top-left and (1,1) is bottom-right.
-- The polygon should represent the outer roof/home footprint only, not fences or driveway.
-- Prefer 8-24 points in clockwise order; minimum 3 points.
-- Keep all x/y values between 0 and 1.
-- If uncertain, return an empty outlinePoints array and explain why in summary.
-- Do not include markdown, prose, or code fences.`;
+- Trace the outer roof edge only — exclude driveways, fences, patios, and neighboring structures.
+- Return 10-20 points in clockwise order; minimum 3 points required.
+- Keep all x/y values strictly between 0.0 and 1.0.
+- If no clear building is visible near the red circle, return an empty outlinePoints array and explain in summary.
+- Return ONLY the JSON object. No markdown, no code fences, no prose.`;
 
     const addressHint =
       typeof existingAddress === 'string' && existingAddress.trim()

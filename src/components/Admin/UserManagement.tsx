@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '@/lib/api-client';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
 import { Department, canHaveDepartments } from '@/types/user';
-import BranchSelector from '@/components/Common/BranchSelector/BranchSelector';
+import BranchSelector, { BranchSelectorHandle } from '@/components/Common/BranchSelector/BranchSelector';
 import styles from './UserManagement.module.scss';
 
 interface UserWithProfile {
@@ -831,6 +831,16 @@ function BranchManagementModal({
   companyName: string;
   onClose: () => void;
 }) {
+  const branchRef = useRef<BranchSelectorHandle>(null);
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const success = await branchRef.current?.save();
+    setSaving(false);
+    if (success) onClose();
+  };
+
   return (
     <div className={`${styles.modal} ${styles.subModal}`}>
       <div className={styles.modalContent}>
@@ -842,9 +852,17 @@ function BranchManagementModal({
           <p className={styles.subModalMeta}>
             <strong>{userName}</strong> at <strong>{companyName}</strong>
           </p>
-          <BranchSelector userId={userId} companyId={companyId} />
+          <BranchSelector ref={branchRef} userId={userId} companyId={companyId} />
         </div>
         <div className={styles.modalFooter}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save Branch Access'}
+          </button>
           <button type="button" className={styles.cancelButton} onClick={onClose}>
             Close
           </button>
