@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { captureDeviceData } from '@/lib/device-utils';
 import { sendQuoteSignedNotification } from '@/lib/email/quote-notifications';
+import { sendQuoteSubmissionNotification } from '@/lib/email/company-submission-notifications';
 import { QuoteSignedEmailData } from '@/lib/email/types';
 import { logActivity } from '@/lib/activity-logger';
 import { inngest } from '@/lib/inngest/client';
@@ -438,6 +439,13 @@ export async function POST(
             // Send email notification
             await sendQuoteSignedNotification(emailData, leadData.company_id);
           }
+        }
+
+        // Send company-level quote submission notification regardless of assignment (non-blocking)
+        if (leadData) {
+          sendQuoteSubmissionNotification(leadData.id, leadData.company_id).catch((err) => {
+            console.error('Quote submission notification failed:', err);
+          });
         }
       } catch (emailError) {
         // Log error but don't fail the request - quote is already accepted

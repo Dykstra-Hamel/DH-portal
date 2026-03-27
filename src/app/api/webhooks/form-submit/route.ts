@@ -20,6 +20,7 @@ import {
   validateOrigin,
 } from '@/lib/cors';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
+import { sendCampaignSubmissionNotification } from '@/lib/email/company-submission-notifications';
 import { parseFormSubmission } from '@/lib/gemini/form-parser';
 import type { FormSubmissionResponse } from '@/types/form-submission';
 import {
@@ -612,6 +613,11 @@ export async function POST(request: NextRequest) {
         assignedUserId: undefined,
       }).catch(error => {
         console.error('Lead notification failed:', error);
+      });
+
+      // Send company-level campaign submission notification (non-blocking)
+      sendCampaignSubmissionNotification(lead.id, companyId).catch(error => {
+        console.error('Campaign submission notification failed:', error);
       });
     } else {
       // Non-campaign submission: Create a ticket (existing behavior)
