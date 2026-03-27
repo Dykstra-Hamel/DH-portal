@@ -9,6 +9,10 @@ import {
   generateCampaignSubmittedNotificationTemplate,
   type CampaignSubmittedNotificationData,
 } from '@/lib/email/templates/campaign-submitted-notification';
+import {
+  generateTicketCreatedNotificationTemplate,
+  type TicketCreatedNotificationData,
+} from '@/lib/email/templates/ticket-created-notification';
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -258,6 +262,73 @@ export async function sendCampaignSubmissionNotification(
         tags: ['campaign', 'submission', 'notification'],
       }).catch((err) =>
         console.error(`Campaign submission notification failed for ${to}:`, err)
+      )
+    )
+  );
+}
+
+export interface TicketNotificationInput {
+  ticketId: string;
+  companyId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  address?: string;
+  ticketType?: string;
+}
+
+/**
+ * Send ticket created notification emails to the company's configured email list.
+ * Only fires if ticket_created_notification_enabled is true.
+ */
+export async function sendTicketCreatedNotification(
+  input: TicketNotificationInput
+): Promise<void> {
+  const { ticketId, companyId, customerName, customerEmail, customerPhone, address, ticketType } = input;
+
+  const { enabled, emails } = await getCompanyNotificationSettings(
+    companyId,
+    'ticket_created_notification_enabled',
+    'ticket_created_notification_emails'
+  );
+
+  if (!enabled || emails.length === 0) return;
+
+  const ticketUrl = `${BASE_URL}/tickets/dashboard?ticketId=${ticketId}`;
+
+  const templateData: TicketCreatedNotificationData = {
+    customerName,
+    customerEmail,
+    customerPhone,
+    address,
+    ticketUrl,
+    submittedAt: new Date().toISOString(),
+    ticketType,
+  };
+
+  const [fromEmail, fromName, tenantName] = await Promise.all([
+    getCompanyFromEmail(companyId),
+    getCompanyName(companyId),
+    getCompanyTenantName(companyId),
+  ]);
+
+  const html = generateTicketCreatedNotificationTemplate(templateData);
+  const subject = `New Ticket - ${customerName}`;
+
+  await Promise.all(
+    emails.map((to) =>
+      sendEmailRouted({
+        tenantName,
+        from: fromEmail,
+        fromName,
+        to,
+        subject,
+        html,
+        companyId,
+        source: 'ticket_created_notification',
+        tags: ['ticket', 'created', 'notification'],
+      }).catch((err) =>
+        console.error(`Ticket created notification failed for ${to}:`, err)
       )
     )
   );

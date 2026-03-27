@@ -20,7 +20,7 @@ import {
   validateOrigin,
 } from '@/lib/cors';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
-import { sendCampaignSubmissionNotification } from '@/lib/email/company-submission-notifications';
+import { sendCampaignSubmissionNotification, sendTicketCreatedNotification } from '@/lib/email/company-submission-notifications';
 import { parseFormSubmission } from '@/lib/gemini/form-parser';
 import type { FormSubmissionResponse } from '@/types/form-submission';
 import {
@@ -661,6 +661,19 @@ export async function POST(request: NextRequest) {
       }
 
       ticketId = ticket.id;
+
+      // Send company-level ticket created notification (non-blocking)
+      sendTicketCreatedNotification({
+        ticketId: ticket.id,
+        companyId: companyId!,
+        customerName: `${normalized.first_name || ''} ${normalized.last_name || ''}`.trim() || normalized.email || 'Customer',
+        customerEmail: normalized.email || '',
+        customerPhone: normalized.phone_number || undefined,
+        address: [normalized.street_address, normalized.city, normalized.state, normalized.zip].filter(Boolean).join(', ') || undefined,
+        ticketType: 'web_form',
+      }).catch(error => {
+        console.error('Ticket created notification failed:', error);
+      });
     }
 
     // Campaign attribution: fire response event for existing customers with lead

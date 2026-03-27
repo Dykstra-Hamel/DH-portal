@@ -88,6 +88,7 @@ export default function CompanyNotificationSettingsManager() {
 
   const quoteEnabled = getBoolValue('quote_submission_notification_enabled');
   const campaignEnabled = getBoolValue('campaign_submission_notification_enabled');
+  const ticketEnabled = getBoolValue('ticket_created_notification_enabled');
 
   return (
     <div>
@@ -191,6 +192,51 @@ export default function CompanyNotificationSettingsManager() {
                     setSetting('campaign_submission_notification_emails', e.target.value, 'string')
                   }
                   placeholder="e.g. sales@company.com, manager@company.com"
+                />
+              </div>
+            )}
+          </div>
+
+          <div className={localStyles.settingsCard}>
+            <div className={localStyles.cardHeader}>
+              <Bell size={18} />
+              <h3>Ticket Created</h3>
+            </div>
+            <p className={localStyles.cardDescription}>
+              Send a notification email whenever a new ticket is created (via form submission or manually). Recipients receive customer info and a link to the ticket.
+            </p>
+
+            <div className={localStyles.toggleRow}>
+              <label className={localStyles.toggleLabel} htmlFor="ticket-notif-enabled">
+                Enable ticket created notifications
+              </label>
+              <label className={localStyles.toggle}>
+                <input
+                  id="ticket-notif-enabled"
+                  type="checkbox"
+                  checked={ticketEnabled}
+                  onChange={(e) =>
+                    setSetting('ticket_created_notification_enabled', e.target.checked, 'boolean')
+                  }
+                />
+                <span className={localStyles.toggleSlider}></span>
+              </label>
+            </div>
+
+            {ticketEnabled && (
+              <div className={localStyles.emailField}>
+                <label htmlFor="ticket-notif-emails" className={localStyles.emailLabel}>
+                  Notification email addresses <span className={localStyles.hint}>(comma-separated)</span>
+                </label>
+                <input
+                  id="ticket-notif-emails"
+                  type="text"
+                  className={localStyles.emailInput}
+                  value={getStringValue('ticket_created_notification_emails')}
+                  onChange={(e) =>
+                    setSetting('ticket_created_notification_emails', e.target.value, 'string')
+                  }
+                  placeholder="e.g. dispatch@company.com, manager@company.com"
                 />
               </div>
             )}
