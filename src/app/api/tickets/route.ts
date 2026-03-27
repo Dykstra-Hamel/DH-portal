@@ -13,6 +13,7 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import { sendTicketCreatedNotification } from '@/lib/email/company-submission-notifications';
 
 /**
  * Helper function to get ticket counts for all tabs
@@ -519,6 +520,17 @@ export async function POST(request: NextRequest) {
         serviceAddressError
       );
     }
+
+    // Send company-level ticket created notification (non-blocking)
+    sendTicketCreatedNotification({
+      ticketId: ticket.id,
+      companyId: ticket.company_id,
+      customerName: `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() || ticket.customer?.email || 'Customer',
+      customerEmail: ticket.customer?.email || '',
+      customerPhone: ticket.customer?.phone || undefined,
+      address: [ticket.customer?.address, ticket.customer?.city, ticket.customer?.state, ticket.customer?.zip_code].filter(Boolean).join(', ') || undefined,
+      ticketType: ticket.type || undefined,
+    }).catch((err) => console.error('Ticket created notification failed:', err));
 
     // Generate notifications for all company users
     try {

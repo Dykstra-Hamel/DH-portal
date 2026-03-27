@@ -23,6 +23,7 @@ import ExecutionManager from '../Automation/ExecutionManager';
 import InternalCategorySettings from '../ProjectManagement/CategorySettings/InternalCategorySettings';
 import InternalDepartmentSettings from '../ProjectManagement/DepartmentSettings/InternalDepartmentSettings';
 import PestManager from './PestManager';
+import CompanyNotificationSettingsManager from './CompanyNotificationSettingsManager';
 import styles from './AdminDashboard.module.scss';
 
 interface AdminDashboardProps {
@@ -50,7 +51,8 @@ type SystemSubsection =
   | 'pest-management'
   | 'calling'
   | 'sms-testing'
-  | 'project-settings';
+  | 'project-settings'
+  | 'company-notifications';
 
 type AdminSubsection =
   | UserSubsection
@@ -182,6 +184,7 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
       { id: 'sms-testing', label: 'SMS Testing', legacySection: 'sms-testing' },
       { id: 'project-settings', label: 'Project Management' },
       { id: 'pest-management', label: 'Pest Management' },
+      { id: 'company-notifications', label: 'Notification Emails' },
     ],
   },
 ];
@@ -292,6 +295,8 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
         );
       case 'pest-management':
         return <PestManager />;
+      case 'company-notifications':
+        return <CompanyNotificationSettingsManager />;
       default:
         return <UsersManager />;
     }
