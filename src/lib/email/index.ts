@@ -116,6 +116,43 @@ export async function getCompanyName(companyId: string): Promise<string> {
   }
 }
 
+/**
+ * Get the configured timezone for a company (defaults to America/New_York)
+ */
+export async function getCompanyTimezone(companyId: string): Promise<string> {
+  if (!companyId) return 'America/New_York';
+
+  try {
+    const supabase = createAdminClient();
+    const { data } = await supabase
+      .from('company_settings')
+      .select('setting_value')
+      .eq('company_id', companyId)
+      .eq('setting_key', 'company_timezone')
+      .single();
+
+    return data?.setting_value || 'America/New_York';
+  } catch {
+    return 'America/New_York';
+  }
+}
+
+/**
+ * Format an ISO date string for display in an email using the given timezone.
+ */
+export function formatDateForEmail(isoString: string, timezone: string): string {
+  return new Date(isoString).toLocaleString('en-US', {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+    timeZone: timezone,
+    timeZoneName: 'short',
+  });
+}
+
 // Re-export all email services
 export * from './project-notifications';
 export * from './lead-notifications';

@@ -9,6 +9,8 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import {
   sendLeadNotificationsWithDepartmentFiltering,
   LeadNotificationData,
+  getCompanyTimezone,
+  formatDateForEmail,
 } from '@/lib/email';
 
 /**
@@ -123,6 +125,7 @@ export async function notifyLeadCreated(
     const leadUrl = `${appUrl}/tickets/leads/${leadId}`;
 
     // Build notification data
+    const timezone = await getCompanyTimezone(companyId);
     const leadNotificationData: LeadNotificationData & { leadUrl?: string } = {
       leadId: lead.id,
       companyName: (lead.companies as any)?.name || 'Unknown Company',
@@ -134,6 +137,7 @@ export async function notifyLeadCreated(
       priority: (lead.priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
       autoCallEnabled: false,
       submittedAt: lead.created_at,
+      submittedAtDisplay: formatDateForEmail(lead.created_at, timezone),
       leadUrl,
     };
 
@@ -283,6 +287,7 @@ export async function notifyCustomerCommentAdded(
       priority: (lead.priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
       autoCallEnabled: false,
       submittedAt: lead.created_at,
+      submittedAtDisplay: formatDateForEmail(lead.created_at, await getCompanyTimezone(lead.company_id)),
       leadUrl,
       customerComment: commentText,
     };
@@ -431,6 +436,7 @@ export async function notifyLeadStatusChangedToScheduling(
       priority: (lead.priority as 'low' | 'medium' | 'high' | 'urgent') || 'medium',
       autoCallEnabled: false,
       submittedAt: lead.updated_at,
+      submittedAtDisplay: formatDateForEmail(lead.updated_at, await getCompanyTimezone(companyId)),
       leadUrl,
       requestedDate: (lead as any).requested_date,
       requestedTime: (lead as any).requested_time,
