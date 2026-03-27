@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { sendEmailRouted } from '@/lib/email/router';
-import { getCompanyFromEmail, getCompanyName, getCompanyTenantName } from '@/lib/email/index';
+import { getCompanyFromEmail, getCompanyName, getCompanyTenantName, getCompanyTimezone, formatDateForEmail } from '@/lib/email/index';
 import {
   generateQuoteSubmittedNotificationTemplate,
   type QuoteSubmittedNotificationData,
@@ -131,13 +131,17 @@ export async function sendQuoteSubmissionNotification(
 
   const leadUrl = `${BASE_URL}/tickets/leads/${leadId}`;
 
+  const now = new Date().toISOString();
+  const timezone = await getCompanyTimezone(companyId);
+
   const templateData: QuoteSubmittedNotificationData = {
     customerName,
     customerEmail,
     customerPhone,
     address,
     leadUrl,
-    submittedAt: new Date().toISOString(),
+    submittedAt: now,
+    submittedAtDisplay: formatDateForEmail(now, timezone),
   };
 
   const [fromEmail, fromName, tenantName] = await Promise.all([
@@ -227,13 +231,17 @@ export async function sendCampaignSubmissionNotification(
 
   const leadUrl = `${BASE_URL}/tickets/leads/${leadId}`;
 
+  const now = new Date().toISOString();
+  const timezone = await getCompanyTimezone(companyId);
+
   const templateData: CampaignSubmittedNotificationData = {
     customerName,
     customerEmail,
     customerPhone,
     address,
     leadUrl,
-    submittedAt: new Date().toISOString(),
+    submittedAt: now,
+    submittedAtDisplay: formatDateForEmail(now, timezone),
     campaignName,
   };
 
@@ -296,13 +304,17 @@ export async function sendTicketCreatedNotification(
 
   const ticketUrl = `${BASE_URL}/tickets/dashboard?ticketId=${ticketId}`;
 
+  const now = new Date().toISOString();
+  const timezone = await getCompanyTimezone(companyId);
+
   const templateData: TicketCreatedNotificationData = {
     customerName,
     customerEmail,
     customerPhone,
     address,
     ticketUrl,
-    submittedAt: new Date().toISOString(),
+    submittedAt: now,
+    submittedAtDisplay: formatDateForEmail(now, timezone),
     ticketType,
   };
 
@@ -332,4 +344,59 @@ export async function sendTicketCreatedNotification(
       )
     )
   );
+}
+
+/**
+ * Fetch-and-send variant for cases (e.g. Retell webhooks) where customer data
+ * isn't directly in scope. Looks up the ticket and customer from the DB.
+ */
+export async function sendTicketCreatedNotificationByTicketId(
+  ticketId: string,
+  companyId: string,
+  ticketType?: string
+): Promise<void> {
+  const supabase = createAdminClient();
+
+  const { data: ticket } = await supabase
+    .from('tickets')
+    .select(`
+      id,
+      type,
+      customers:customer_id (
+        first_name,
+        last_name,
+        email,
+        phone,
+        address,
+        city,
+        state,
+        zip_code
+      )
+    `)
+    .eq('id', ticketId)
+    .single();
+
+  if (!ticket) {
+    console.error(`sendTicketCreatedNotificationByTicketId: ticket ${ticketId} not found`);
+    return;
+  }
+
+  const customer = ticket.customers as any;
+  const customerName =
+    `${customer?.first_name || ''} ${customer?.last_name || ''}`.trim() ||
+    customer?.email ||
+    'Customer';
+  const address = [customer?.address, customer?.city, customer?.state, customer?.zip_code]
+    .filter(Boolean)
+    .join(', ') || undefined;
+
+  return sendTicketCreatedNotification({
+    ticketId,
+    companyId,
+    customerName,
+    customerEmail: customer?.email || '',
+    customerPhone: customer?.phone || undefined,
+    address,
+    ticketType: ticketType ?? ticket.type ?? undefined,
+  });
 }

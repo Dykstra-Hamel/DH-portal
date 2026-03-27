@@ -5,6 +5,7 @@ export interface CampaignSubmittedNotificationData {
   address?: string;
   leadUrl: string;
   submittedAt: string;
+  submittedAtDisplay?: string;
   campaignName?: string;
 }
 
@@ -12,6 +13,7 @@ export function generateCampaignSubmittedNotificationTemplate(
   data: CampaignSubmittedNotificationData
 ): string {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const displayDate = data.submittedAtDisplay ?? new Date(data.submittedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York', timeZoneName: 'short' });
 
   return `
     <!DOCTYPE html>
@@ -78,7 +80,7 @@ export function generateCampaignSubmittedNotificationTemplate(
                           </p>
                           <a href="${data.leadUrl}" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Open Lead</a>
                           <p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
-                            <strong>Submitted:</strong> ${new Date(data.submittedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })}
+                            <strong>Submitted:</strong> ${displayDate}
                           </p>
                         </td>
                       </tr>

@@ -7,6 +7,7 @@ import {
   findCompanyAndDirectionByAgentId,
 } from '@/lib/agent-utils';
 import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
+import { sendTicketCreatedNotificationByTicketId } from '@/lib/email/company-submission-notifications';
 import { CallSummaryEmailData } from '@/lib/email/types';
 import {
   createOrFindServiceAddress,
@@ -877,6 +878,13 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         }
       }
     }
+  }
+
+  // Send ticket created notification email to company's configured list (non-blocking)
+  if (ticketId) {
+    sendTicketCreatedNotificationByTicketId(ticketId, callRecord.company_id, 'inbound_call').catch((err) => {
+      console.error('[Ticket Created Notification] Failed:', err);
+    });
   }
 
   // Send ticket notification emails if enabled, action_required is true, and not a campaign lead
