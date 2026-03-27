@@ -25,11 +25,11 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { name, companyId } = body;
+    const { name, companyId, dueDate } = body;
 
-    if (!name || !companyId) {
+    if (!name || !companyId || !dueDate) {
       return NextResponse.json(
-        { error: 'name and companyId are required' },
+        { error: 'name, companyId, and dueDate are required' },
         { status: 400 }
       );
     }
@@ -294,7 +294,7 @@ export async function POST(
         assigned_to: sourceProject.assigned_to,
         status: 'new',
         priority: sourceProject.priority || 'medium',
-        due_date: null,
+        due_date: dueDate,
         start_date: sourceProject.start_date,
         is_billable: !!sourceProject.is_billable,
         quoted_price: sourceProject.quoted_price,

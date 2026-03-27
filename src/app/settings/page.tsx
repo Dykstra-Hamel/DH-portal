@@ -22,6 +22,7 @@ import AccountLinking from '@/components/AccountLinking/AccountLinking';
 import AutomationSettings from '@/components/Automation/AutomationSettings';
 import NotificationPreferences from '@/components/NotificationPreferences/NotificationPreferences';
 import AnnouncementsManager from '@/components/Admin/AnnouncementsManager';
+import CompanyNotificationSettingsManager from '@/components/Admin/CompanyNotificationSettingsManager';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -68,7 +69,7 @@ export default function SettingsPage() {
     text: string;
   } | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'knowledge-base' | 'automation' | 'announcements' | 'project-management'
+    'knowledge-base' | 'automation' | 'announcements' | 'project-management' | 'notifications'
   >('automation');
   const [activeSection, setActiveSection] = useState<'user' | 'company'>(
     'user'
@@ -335,6 +336,12 @@ export default function SettingsPage() {
                   >
                     Announcements
                   </button>
+                  <button
+                    className={`${styles.tabButton} ${activeTab === 'notifications' ? styles.active : ''}`}
+                    onClick={() => setActiveTab('notifications')}
+                  >
+                    Notifications
+                  </button>
                 </div>
 
                 {settingsLoading ? (
@@ -383,6 +390,13 @@ export default function SettingsPage() {
                     {activeTab === 'announcements' && (
                       <div className={styles.announcementsSection}>
                         <AnnouncementsManager companyId={selectedCompany.id} />
+                      </div>
+                    )}
+
+                    {/* Notifications Tab */}
+                    {activeTab === 'notifications' && (
+                      <div className={styles.notificationsSection}>
+                        <CompanyNotificationSettingsManager />
                       </div>
                     )}
                   </div>

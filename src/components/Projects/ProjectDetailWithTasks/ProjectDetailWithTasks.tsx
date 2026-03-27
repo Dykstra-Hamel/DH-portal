@@ -645,13 +645,13 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
   }, [project?.id, project?.name, router, project]);
 
-  const handleDuplicateProject = useCallback(async (name: string, companyId: string) => {
+  const handleDuplicateProject = useCallback(async (name: string, companyId: string, dueDate: string) => {
     if (!project) return;
 
     const response = await fetch(`/api/admin/projects/${project.id}/duplicate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, companyId }),
+      body: JSON.stringify({ name, companyId, dueDate }),
     });
 
     if (!response.ok) {

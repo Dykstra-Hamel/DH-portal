@@ -1,0 +1,181 @@
+export interface TicketCreatedNotificationData {
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  address?: string;
+  ticketUrl: string;
+  submittedAt: string;
+  submittedAtDisplay?: string;
+  ticketType?: string;
+}
+
+const TICKET_TYPE_LABELS: Record<string, string> = {
+  inbound_call: 'Inbound Call',
+  outbound_call: 'Outbound Call',
+  phone_call: 'Phone Call',
+  website_form: 'Website Form',
+  widget_form: 'Widget Form',
+  web_form: 'Web Form',
+  campaign_call: 'Campaign Call',
+  campaign_email: 'Campaign Email',
+  campaign_text: 'Campaign Text',
+  manual: 'Manual',
+  email_inbound: 'Inbound Email',
+  email: 'Email',
+  chat: 'Chat',
+  social_media: 'Social Media',
+  in_person: 'In Person',
+  internal_task: 'Internal Task',
+  bug_report: 'Bug Report',
+  feature_request: 'Feature Request',
+};
+
+function formatTicketType(type?: string): string {
+  if (!type) return 'New Ticket';
+  return TICKET_TYPE_LABELS[type] ?? type.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+export function generateTicketCreatedNotificationTemplate(
+  data: TicketCreatedNotificationData
+): string {
+  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const ticketTypeLabel = formatTicketType(data.ticketType);
+  const displayDate = data.submittedAtDisplay ?? new Date(data.submittedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York', timeZoneName: 'short' });
+
+  return `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>New Ticket Created</title>
+        <style>
+          @media only screen and (max-width: 768px) {
+            .section-outer {
+              padding: 0 14px 14px 14px !important;
+            }
+            .section-inner {
+              padding: 18px !important;
+            }
+            .section-table {
+              width: 100% !important;
+              max-width: 100% !important;
+            }
+            .footer-section {
+              padding: 18px !important;
+            }
+          }
+        </style>
+      </head>
+      <body style="margin: 0; padding: 0; font-family: Helvetica, Arial, sans-serif;">
+        <table role="presentation" style="width: 100%;">
+          <tr>
+            <td align="center" style="padding: 0;">
+              <table role="presentation" style="width: 600px; max-width: 100%; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+
+                <!-- Header -->
+                <tr>
+                  <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center;">
+                    <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">New Ticket Created</h1>
+                    <img src="${baseUrl}/images/email/header-logo.png" alt="PMP CENTRAL" style="width: 110px; height: auto; opacity: 0.56;" />
+                  </td>
+                </tr>
+
+                <!-- Alert Message -->
+                <tr>
+                  <td class="section-outer" style="padding: 30px 30px 30px 30px;">
+                    <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                      <strong>A new ticket has been created.</strong> Review the details below and follow up with the customer as needed.
+                    </p>
+                  </td>
+                </tr>
+
+                <!-- CTA Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: 4px;">
+                      <tr>
+                        <td class="section-inner" style="text-align: center; padding: 20px;">
+                          <img src="${baseUrl}/images/email/phone-icon.png" alt="Ticket" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
+                          <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">
+                            ${ticketTypeLabel}
+                          </h2>
+                          <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                            A new ticket has been submitted and is awaiting review.
+                          </p>
+                          <a href="${data.ticketUrl}" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Open Ticket</a>
+                          <p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
+                            <strong>Created:</strong> ${displayDate}
+                          </p>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Customer Information Section -->
+                <tr>
+                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: 4px;">
+                      <tr>
+                        <td class="section-inner" style="padding: 20px;">
+                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
+                            <tr>
+                              <td style="width: 15px; vertical-align: middle; padding: 0 10px 0 0;">
+                                <img src="${baseUrl}/images/email/customer-icon.png" alt="Customer" style="width: 15px; height: auto; display: block;" />
+                              </td>
+                              <td style="vertical-align: middle; padding: 0;">
+                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Customer Information</h3>
+                              </td>
+                            </tr>
+                          </table>
+                          <table role="presentation" style="width: 100%;">
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Name:</strong> <span style="color: #020618;">${data.customerName}</span></p>
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Email:</strong> <a href="mailto:${data.customerEmail}" style="color: #020618; text-decoration: underline;">${data.customerEmail}</a></p>
+                              </td>
+                            </tr>
+                            ${data.customerPhone ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Phone:</strong> <a href="tel:${data.customerPhone}" style="color: #020618; text-decoration: underline;">${data.customerPhone}</a></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                            ${data.address ? `
+                            <tr>
+                              <td style="padding: 5px 0;">
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Address:</strong> <span style="color: #020618;">${data.address}</span></p>
+                              </td>
+                            </tr>
+                            ` : ''}
+                          </table>
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                  <td class="footer-section" style="padding: 30px; text-align: center;">
+                    <img src="${baseUrl}/images/email/footer-logo.png" alt="PMP CENTRAL" style="width: 179px; height: auto; margin-bottom: 15px; display: block; margin-left: auto; margin-right: auto;" />
+                    <p style="margin: 0; font-size: 12px; color: #9ca3af;">
+                      This notification was generated automatically by PMPCENTRAL - A Dykstra | Hamel Company
+                    </p>
+                  </td>
+                </tr>
+
+              </table>
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+  `;
+}

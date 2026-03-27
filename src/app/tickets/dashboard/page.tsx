@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef, Suspense, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
   Ticket,
@@ -300,6 +300,7 @@ const DashboardSkeleton = () => (
 
 function TicketsDashboardContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile } = useUser();
   const { setPageHeader, registerPageAction, unregisterPageAction } = usePageActions();
   const { selectedCompany, isLoading: companyLoading } = useCompany();
@@ -1552,6 +1553,22 @@ function TicketsDashboardContent() {
     setShowTicketModal(false);
     setSelectedTicket(null);
   }, []);
+
+  // Open a specific ticket via ?ticketId= URL param
+  useEffect(() => {
+    const ticketId = searchParams.get('ticketId');
+    if (!ticketId) return;
+
+    fetch(`/api/tickets/${ticketId}`)
+      .then((res) => res.ok ? res.json() : null)
+      .then((data) => {
+        if (data) {
+          setSelectedTicket(data);
+          setShowTicketModal(true);
+        }
+      })
+      .catch(() => {/* silently ignore — ticket may not exist or user lacks access */});
+  }, [searchParams]);
 
   // Handle ticket qualification
   const handleQualify = useCallback(
