@@ -13,7 +13,7 @@ interface Company {
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onDuplicate: (name: string, companyId: string) => Promise<void>;
+  onDuplicate: (name: string, companyId: string, dueDate: string) => Promise<void>;
   defaultName: string;
   defaultCompanyId: string;
 }
@@ -28,6 +28,7 @@ export default function DuplicateProjectModal({
   const [name, setName] = useState(defaultName);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [selectedCompanyId, setSelectedCompanyId] = useState(defaultCompanyId);
+  const [dueDate, setDueDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +37,7 @@ export default function DuplicateProjectModal({
     if (isOpen) {
       setName(defaultName);
       setSelectedCompanyId(defaultCompanyId);
+      setDueDate('');
       setError(null);
     }
   }, [isOpen, defaultName, defaultCompanyId]);
@@ -73,12 +75,16 @@ export default function DuplicateProjectModal({
       setError('Please select a company');
       return;
     }
+    if (!dueDate) {
+      setError('Due date is required');
+      return;
+    }
 
     setLoading(true);
     setError(null);
 
     try {
-      await onDuplicate(name.trim(), selectedCompanyId);
+      await onDuplicate(name.trim(), selectedCompanyId, dueDate);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to duplicate project');
       setLoading(false);
@@ -117,6 +123,17 @@ export default function DuplicateProjectModal({
             ))}
           </select>
         </div>
+        <div className={styles.field}>
+          <label htmlFor="duplicate-due-date">Due Date</label>
+          <input
+            id="duplicate-due-date"
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            className={styles.input}
+            disabled={loading}
+          />
+        </div>
         {error && <div className={styles.error}>{error}</div>}
       </ModalMiddle>
       <ModalBottom>
@@ -132,7 +149,7 @@ export default function DuplicateProjectModal({
           type="button"
           className={styles.duplicateButton}
           onClick={handleSubmit}
-          disabled={loading || !name.trim() || !selectedCompanyId}
+          disabled={loading || !name.trim() || !selectedCompanyId || !dueDate}
         >
           {loading ? 'Duplicating...' : 'Duplicate'}
         </button>

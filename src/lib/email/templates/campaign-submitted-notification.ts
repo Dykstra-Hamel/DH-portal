@@ -1,10 +1,19 @@
-import { LeadNotificationData } from '../types';
+export interface CampaignSubmittedNotificationData {
+  customerName: string;
+  customerEmail: string;
+  customerPhone?: string;
+  address?: string;
+  leadUrl: string;
+  submittedAt: string;
+  submittedAtDisplay?: string;
+  campaignName?: string;
+}
 
-export function generateLeadCreatedEmailTemplate(
-  recipientName: string,
-  leadData: LeadNotificationData
+export function generateCampaignSubmittedNotificationTemplate(
+  data: CampaignSubmittedNotificationData
 ): string {
   const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const displayDate = data.submittedAtDisplay ?? new Date(data.submittedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York', timeZoneName: 'short' });
 
   return `
     <!DOCTYPE html>
@@ -12,7 +21,7 @@ export function generateLeadCreatedEmailTemplate(
       <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>New Customer Lead</title>
+        <title>Campaign Page Submitted</title>
         <style>
           @media only screen and (max-width: 768px) {
             .section-outer {
@@ -44,41 +53,34 @@ export function generateLeadCreatedEmailTemplate(
                 <!-- Header -->
                 <tr>
                   <td style="background-color: #020618; padding: 50px 20px 30px 20px; text-align: center; border-radius: var(--border-radius);">
-                    <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">New Customer Lead</h1>
+                    <h1 style="margin: 0 0 20px 0; font-size: 30px; font-weight: 700; line-height: 30px; color: #ffffff;">Campaign Page Submitted</h1>
                     <img src="${baseUrl}/images/email/header-logo.png" alt="PMP CENTRAL" style="width: 110px; height: auto; opacity: 0.56;" />
-                  </td>
-                </tr>
-
-                <!-- Greeting -->
-                <tr>
-                  <td class="greeting-section" style="padding: 30px 30px 20px 30px;">
-                    <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">Hi ${recipientName},</p>
                   </td>
                 </tr>
 
                 <!-- Alert Message -->
                 <tr>
-                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
+                  <td class="section-outer" style="padding: 30px 30px 30px 30px;">
                     <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
-                      <strong>This lead needs immediate follow-up.</strong> Please contact the customer promptly to maximize conversion potential.
+                      <strong>A customer submitted a campaign landing page form.</strong> Please follow up to convert this lead.
                     </p>
                   </td>
                 </tr>
 
-                <!-- Manual Follow-Up Section -->
+                <!-- CTA Section -->
                 <tr>
                   <td class="section-outer" style="padding: 0 30px 30px 30px;">
                     <table role="presentation" class="section-table" style="width: 100%; background-color: #F0F7FF; border: 1px solid #85C2FF; border-radius: var(--border-radius);">
                       <tr>
                         <td class="section-inner" style="text-align: center; padding: 20px;">
-                          <img src="${baseUrl}/images/email/phone-icon.png" alt="Phone" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
-                          <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Manual Follow-Up Required</h2>
+                          <img src="${baseUrl}/images/email/phone-icon.png" alt="Campaign" style="width: 26px; height: auto; margin-bottom: 20px; display: block; margin-left: auto; margin-right: auto;" />
+                          <h2 style="margin: 0 0 20px 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">New Campaign Response</h2>
                           <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
-                            This is a new lead that requires manual follow-up. Please contact the customer as soon as possible.
+                            ${data.campaignName ? `A customer responded to the <strong>${data.campaignName}</strong> campaign. Contact them promptly to maximize conversion.` : 'A customer responded to a campaign landing page. Contact them promptly to maximize conversion.'}
                           </p>
-                          <a href="${leadData.leadUrl || '#'}" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Open Lead Ticket</a>
+                          <a href="${data.leadUrl}" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Open Lead</a>
                           <p style="margin: 20px 0 0 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
-                            <strong>Submitted:</strong> ${leadData.submittedAtDisplay ?? new Date(leadData.submittedAt).toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/New_York', timeZoneName: 'short' })}
+                            <strong>Submitted:</strong> ${displayDate}
                           </p>
                         </td>
                       </tr>
@@ -92,7 +94,6 @@ export function generateLeadCreatedEmailTemplate(
                     <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: var(--border-radius);">
                       <tr>
                         <td class="section-inner" style="padding: 20px;">
-                          <!-- Section Header with Icon (table-based for compatibility) -->
                           <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
                             <tr>
                               <td style="width: 15px; vertical-align: middle; padding: 0 10px 0 0;">
@@ -106,58 +107,34 @@ export function generateLeadCreatedEmailTemplate(
                           <table role="presentation" style="width: 100%;">
                             <tr>
                               <td style="padding: 5px 0;">
-                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Name:</strong> <span style="color: #020618;">${leadData.customerName}</span></p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Name:</strong> <span style="color: #020618;">${data.customerName}</span></p>
                               </td>
                             </tr>
                             <tr>
                               <td style="padding: 5px 0;">
-                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Email:</strong> <a href="mailto:${leadData.customerEmail}" style="color: #020618; text-decoration: underline;">${leadData.customerEmail}</a></p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Email:</strong> <a href="mailto:${data.customerEmail}" style="color: #020618; text-decoration: underline;">${data.customerEmail}</a></p>
                               </td>
                             </tr>
+                            ${data.customerPhone ? `
                             <tr>
                               <td style="padding: 5px 0;">
-                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Phone:</strong> <a href="tel:${leadData.customerPhone}" style="color: #020618; text-decoration: underline;">${leadData.customerPhone}</a></p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Phone:</strong> <a href="tel:${data.customerPhone}" style="color: #020618; text-decoration: underline;">${data.customerPhone}</a></p>
                               </td>
                             </tr>
+                            ` : ''}
+                            ${data.address ? `
                             <tr>
                               <td style="padding: 5px 0;">
-                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Address:</strong> <span style="color: #020618;">${leadData.address}</span></p>
+                                <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;"><strong style="color: #4A5565;">Address:</strong> <span style="color: #020618;">${data.address}</span></p>
                               </td>
                             </tr>
+                            ` : ''}
                           </table>
                         </td>
                       </tr>
                     </table>
                   </td>
                 </tr>
-
-                ${leadData.pestType ? `
-                <!-- Service Request Section (conditional) -->
-                <tr>
-                  <td class="section-outer" style="padding: 0 30px 30px 30px;">
-                    <table role="presentation" class="section-table" style="width: 100%; border: 1px solid #e5e7eb; border-radius: var(--border-radius);">
-                      <tr>
-                        <td class="section-inner" style="padding: 20px;">
-                          <!-- Section Header with Icon (table-based for compatibility) -->
-                          <table role="presentation" style="width: 100%; margin-bottom: 15px; border-bottom: 1px solid #D1D5DB;">
-                            <tr>
-                              <td style="width: 19px; vertical-align: middle; padding: 0 10px 0 0;">
-                                <img src="${baseUrl}/images/email/service-request-icon.png" alt="Service" style="width: 19px; height: auto; display: block;" />
-                              </td>
-                              <td style="vertical-align: middle; padding: 0;">
-                                <h3 style="margin: 0; font-size: 18px; font-weight: 700; line-height: 30px; color: #000000;">Service Request</h3>
-                              </td>
-                            </tr>
-                          </table>
-                          <p style="margin: 0; font-size: 16px; font-weight: 400; line-height: 22px;">
-                            <strong style="color: #4A5565;">Pest Type:</strong> <span style="color: #020618;">${leadData.pestType}</span>
-                          </p>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-                ` : ''}
 
                 <!-- Footer -->
                 <tr>

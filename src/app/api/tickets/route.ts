@@ -6,7 +6,7 @@ import {
   getSupabaseClient,
   verifyCompanyAccess,
   createErrorResponse,
-  createSuccessResponse
+  createSuccessResponse,
 } from '@/lib/api-utils';
 import {
   createOrFindServiceAddress,
@@ -14,6 +14,7 @@ import {
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
 import { getUserBranchFilter } from '@/lib/branch-filter';
+import { sendTicketCreatedNotification } from '@/lib/email/company-submission-notifications';
 
 /**
  * Helper function to get ticket counts for all tabs
@@ -38,18 +39,65 @@ async function getTicketTabCounts(
     : 'archived.is.null,archived.eq.false';
 
   // Helper to apply optional branch filter to a query
-  const withBranch = (q: any) => branchFilter ? q.or(branchFilter) : q;
+  const withBranch = (q: any) => (branchFilter ? q.or(branchFilter) : q);
 
   // Use parallel queries to get accurate counts
   const callTypes = ['phone_call', 'inbound_call', 'campaign_call'];
   const formTypes = ['web_form', 'website_form'];
-  const [allCount, callsCount, incomingCount, outboundCount, formsCount] = await Promise.all([
-    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
-    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
-    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'inbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
-    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', callTypes).eq('call_direction', 'outbound').neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
-    withBranch(adminSupabase.from('tickets').select('id', { count: 'exact', head: true }).eq('company_id', companyId).in('type', formTypes).neq('status', 'live').neq('status', 'closed').or(archivedFilter)),
-  ]);
+  const [allCount, callsCount, incomingCount, outboundCount, formsCount] =
+    await Promise.all([
+      withBranch(
+        adminSupabase
+          .from('tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .neq('status', 'live')
+          .neq('status', 'closed')
+          .or(archivedFilter)
+      ),
+      withBranch(
+        adminSupabase
+          .from('tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .in('type', callTypes)
+          .neq('status', 'live')
+          .neq('status', 'closed')
+          .or(archivedFilter)
+      ),
+      withBranch(
+        adminSupabase
+          .from('tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .in('type', callTypes)
+          .eq('call_direction', 'inbound')
+          .neq('status', 'live')
+          .neq('status', 'closed')
+          .or(archivedFilter)
+      ),
+      withBranch(
+        adminSupabase
+          .from('tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .in('type', callTypes)
+          .eq('call_direction', 'outbound')
+          .neq('status', 'live')
+          .neq('status', 'closed')
+          .or(archivedFilter)
+      ),
+      withBranch(
+        adminSupabase
+          .from('tickets')
+          .select('id', { count: 'exact', head: true })
+          .eq('company_id', companyId)
+          .in('type', formTypes)
+          .neq('status', 'live')
+          .neq('status', 'closed')
+          .or(archivedFilter)
+      ),
+    ]);
 
   return {
     all: allCount.count || 0,
@@ -89,15 +137,29 @@ export async function GET(request: NextRequest) {
     }
 
     // Verify user has access to this company
-    const accessCheck = await verifyCompanyAccess(supabase, user.id, companyId, isGlobalAdmin);
+    const accessCheck = await verifyCompanyAccess(
+      supabase,
+      user.id,
+      companyId,
+      isGlobalAdmin
+    );
     if (accessCheck instanceof NextResponse) {
       return accessCheck;
     }
 
     // If count only, return counts for all tabs using optimized helper
     if (countOnly) {
-      const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
-      const counts = await getTicketTabCounts(companyId, includeArchived, branchFilter);
+      const branchFilter = await getUserBranchFilter(
+        supabase,
+        user.id,
+        companyId,
+        isGlobalAdmin
+      );
+      const counts = await getTicketTabCounts(
+        companyId,
+        includeArchived,
+        branchFilter
+      );
       return createSuccessResponse({ counts });
     }
 
@@ -147,15 +209,19 @@ export async function GET(request: NextRequest) {
     if (includeArchived) {
       query = query.eq('archived', true);
     } else {
-      query = query
-        .or('archived.is.null,archived.eq.false');
+      query = query.or('archived.is.null,archived.eq.false');
     }
 
     // Apply branch filter: explicit branchId param OR user restriction
     if (branchId) {
       query = query.eq('branch_id', branchId);
     } else {
-      const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+      const branchFilter = await getUserBranchFilter(
+        supabase,
+        user.id,
+        companyId,
+        isGlobalAdmin
+      );
       if (branchFilter) query = query.or(branchFilter);
     }
 
@@ -185,9 +251,7 @@ export async function GET(request: NextRequest) {
         .neq('status', 'live')
         .neq('status', 'closed');
     } else if (tabFilter === 'all') {
-      query = query
-        .neq('status', 'live')
-        .neq('status', 'closed');
+      query = query.neq('status', 'live').neq('status', 'closed');
     }
 
     // Apply search filter
@@ -198,19 +262,22 @@ export async function GET(request: NextRequest) {
       const escapedSearch = search.replace(/[%_]/g, '\\$&'); // Escape SQL wildcards
 
       // First, find customer IDs that match the search
-      const { data: matchingCustomers, error: customerSearchError } = await queryClient
-        .from('customers')
-        .select('id')
-        .eq('company_id', companyId)
-        .or(
-          `first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%`
-        );
+      const { data: matchingCustomers, error: customerSearchError } =
+        await queryClient
+          .from('customers')
+          .select('id')
+          .eq('company_id', companyId)
+          .or(
+            `first_name.ilike.%${escapedSearch}%,last_name.ilike.%${escapedSearch}%,email.ilike.%${escapedSearch}%,phone.ilike.%${escapedSearch}%`
+          );
 
       if (customerSearchError) {
         console.error('Error searching customers:', customerSearchError);
       }
 
-      const matchingCustomerIds = (matchingCustomers || []).map((c: { id: string }) => c.id);
+      const matchingCustomerIds = (matchingCustomers || []).map(
+        (c: { id: string }) => c.id
+      );
 
       // Apply filter by matching customer IDs
       if (matchingCustomerIds.length > 0) {
@@ -239,8 +306,17 @@ export async function GET(request: NextRequest) {
     }
 
     // Always fetch tab counts so UI badges stay accurate, even when the current tab has no rows
-    const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
-    const counts = await getTicketTabCounts(companyId, includeArchived, branchFilter);
+    const branchFilter = await getUserBranchFilter(
+      supabase,
+      user.id,
+      companyId,
+      isGlobalAdmin
+    );
+    const counts = await getTicketTabCounts(
+      companyId,
+      includeArchived,
+      branchFilter
+    );
 
     if (!tickets || tickets.length === 0) {
       return createSuccessResponse({
@@ -267,14 +343,16 @@ export async function GET(request: NextRequest) {
       ticket_id: string;
     }> = [];
     const ticketIds = tickets.map((ticket: { id: string }) => ticket.id);
-    
+
     if (ticketIds.length > 0) {
       // Use admin client to query call_records for consistent access
       const adminSupabase = createAdminClient();
-      
-      const { data: callRecordsData, error: callRecordsError } = await adminSupabase
-        .from('call_records')
-        .select(`
+
+      const { data: callRecordsData, error: callRecordsError } =
+        await adminSupabase
+          .from('call_records')
+          .select(
+            `
           id,
           call_id,
           call_status,
@@ -282,8 +360,9 @@ export async function GET(request: NextRequest) {
           end_timestamp,
           duration_seconds,
           ticket_id
-        `)
-        .in('ticket_id', ticketIds);
+        `
+          )
+          .in('ticket_id', ticketIds);
 
       if (callRecordsError) {
         console.error('Error fetching call_records:', callRecordsError);
@@ -304,20 +383,25 @@ export async function GET(request: NextRequest) {
 
     // Fetch primary service addresses for ticket customers
     const customerIds = new Set<string>();
-    tickets.forEach((ticket: { customer_id?: string; customer?: { id?: string } }) => {
-      const customerId = ticket.customer_id || ticket.customer?.id;
-      if (customerId) {
-        customerIds.add(customerId);
+    tickets.forEach(
+      (ticket: { customer_id?: string; customer?: { id?: string } }) => {
+        const customerId = ticket.customer_id || ticket.customer?.id;
+        if (customerId) {
+          customerIds.add(customerId);
+        }
       }
-    });
+    );
 
     let primaryServiceAddressMap = new Map<string, any>();
     if (customerIds.size > 0) {
       const adminSupabase = createAdminClient();
-      const { data: primaryServiceAddresses, error: primaryServiceAddressError } =
-        await adminSupabase
-          .from('customer_service_addresses')
-          .select(`
+      const {
+        data: primaryServiceAddresses,
+        error: primaryServiceAddressError,
+      } = await adminSupabase
+        .from('customer_service_addresses')
+        .select(
+          `
             customer_id,
             service_address:service_addresses(
               id,
@@ -332,12 +416,16 @@ export async function GET(request: NextRequest) {
               latitude,
               longitude
             )
-          `)
-          .eq('is_primary_address', true)
-          .in('customer_id', Array.from(customerIds));
+          `
+        )
+        .eq('is_primary_address', true)
+        .in('customer_id', Array.from(customerIds));
 
       if (primaryServiceAddressError) {
-        console.error('Error fetching primary service addresses:', primaryServiceAddressError);
+        console.error(
+          'Error fetching primary service addresses:',
+          primaryServiceAddressError
+        );
       } else {
         primaryServiceAddressMap = new Map(
           (primaryServiceAddresses || []).map(address => [
@@ -347,7 +435,6 @@ export async function GET(request: NextRequest) {
         );
       }
     }
-
 
     // Get all unique user IDs from tickets (assigned_to field)
     const userIds = new Set<string>();
@@ -377,27 +464,35 @@ export async function GET(request: NextRequest) {
     const profileMap = new Map(profiles.map(p => [p.id, p]));
 
     // Enhance tickets with profile data and call_records
-    const enhancedTickets = tickets.map((ticket: { id: string; assigned_to?: string; customer_id?: string; customer?: { id?: string }; [key: string]: any }) => {
-      const customerId = ticket.customer_id || ticket.customer?.id;
-      const primaryServiceAddress = customerId
-        ? primaryServiceAddressMap.get(customerId) || null
-        : null;
-      const customer = ticket.customer
-        ? {
-            ...ticket.customer,
-            primary_service_address: primaryServiceAddress,
-          }
-        : ticket.customer;
+    const enhancedTickets = tickets.map(
+      (ticket: {
+        id: string;
+        assigned_to?: string;
+        customer_id?: string;
+        customer?: { id?: string };
+        [key: string]: any;
+      }) => {
+        const customerId = ticket.customer_id || ticket.customer?.id;
+        const primaryServiceAddress = customerId
+          ? primaryServiceAddressMap.get(customerId) || null
+          : null;
+        const customer = ticket.customer
+          ? {
+              ...ticket.customer,
+              primary_service_address: primaryServiceAddress,
+            }
+          : ticket.customer;
 
-      return {
-        ...ticket,
-        customer,
-        assigned_user: ticket.assigned_to
-          ? profileMap.get(ticket.assigned_to) || null
-          : null,
-        call_records: callRecordsMap.get(ticket.id) || [],
-      };
-    });
+        return {
+          ...ticket,
+          customer,
+          assigned_user: ticket.assigned_to
+            ? profileMap.get(ticket.assigned_to) || null
+            : null,
+          call_records: callRecordsMap.get(ticket.id) || [],
+        };
+      }
+    );
 
     return createSuccessResponse({
       tickets: enhancedTickets,
@@ -408,7 +503,7 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil((totalCount || 0) / limit),
         hasMore: page < Math.ceil((totalCount || 0) / limit),
       },
-      counts
+      counts,
     });
   } catch (error) {
     console.error('Error in tickets API:', error);
@@ -427,10 +522,16 @@ export async function POST(request: NextRequest) {
     const { user, supabase, isGlobalAdmin } = authResult;
     const queryClient = getSupabaseClient(isGlobalAdmin, supabase);
 
-    const ticketData: TicketFormData & { company_id: string } = await request.json();
+    const ticketData: TicketFormData & { company_id: string } =
+      await request.json();
 
     // Verify user has access to this company (admins bypass this check)
-    const accessCheck = await verifyCompanyAccess(supabase, user.id, ticketData.company_id, isGlobalAdmin);
+    const accessCheck = await verifyCompanyAccess(
+      supabase,
+      user.id,
+      ticketData.company_id,
+      isGlobalAdmin
+    );
     if (accessCheck instanceof NextResponse) {
       return accessCheck;
     }
@@ -439,7 +540,8 @@ export async function POST(request: NextRequest) {
     const { data: ticket, error: insertError } = await queryClient
       .from('tickets')
       .insert([ticketData])
-      .select(`
+      .select(
+        `
         *,
         customer:customers!tickets_customer_id_fkey(
           id,
@@ -465,7 +567,8 @@ export async function POST(request: NextRequest) {
           home_size_range,
           yard_size_range
         )
-      `)
+      `
+      )
       .single();
 
     if (insertError) {
@@ -478,7 +581,8 @@ export async function POST(request: NextRequest) {
       const companyId = ticket.company_id || ticketData.company_id;
 
       if (customerId && companyId) {
-        const primaryResult = await getCustomerPrimaryServiceAddress(customerId);
+        const primaryResult =
+          await getCustomerPrimaryServiceAddress(customerId);
         const hasPrimary = Boolean(primaryResult.serviceAddress);
 
         if (!hasPrimary) {
@@ -537,6 +641,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Send company-level ticket created notification (non-blocking)
+    sendTicketCreatedNotification({
+      ticketId: ticket.id,
+      companyId: ticket.company_id,
+      customerName:
+        `${ticket.customer?.first_name || ''} ${ticket.customer?.last_name || ''}`.trim() ||
+        ticket.customer?.email ||
+        'Customer',
+      customerEmail: ticket.customer?.email || '',
+      customerPhone: ticket.customer?.phone || undefined,
+      address:
+        [
+          ticket.customer?.address,
+          ticket.customer?.city,
+          ticket.customer?.state,
+          ticket.customer?.zip_code,
+        ]
+          .filter(Boolean)
+          .join(', ') || undefined,
+      ticketType: ticket.type || undefined,
+    }).catch(err => console.error('Ticket created notification failed:', err));
+
     // Generate notifications for all company users
     try {
       const adminSupabase = createAdminClient();
@@ -544,9 +670,10 @@ export async function POST(request: NextRequest) {
         p_company_id: ticketData.company_id,
         p_type: 'new_ticket',
         p_title: 'New Ticket Created',
-        p_message: `A new ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
+        p_message:
+          `A new ticket has been created from ${ticket.customer?.first_name || 'Customer'} ${ticket.customer?.last_name || ''}`.trim(),
         p_reference_id: ticket.id,
-        p_reference_type: 'ticket'
+        p_reference_type: 'ticket',
       });
     } catch (notificationError) {
       console.error('Error creating ticket notifications:', notificationError);

@@ -11,6 +11,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server';
 import { captureDeviceData } from '@/lib/device-utils';
 import { inngest } from '@/lib/inngest/client';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
+import { sendCampaignSubmissionNotification } from '@/lib/email/company-submission-notifications';
 
 interface RedeemRequest {
   customerId: string;
@@ -913,6 +914,11 @@ export async function POST(
       assignedUserId: undefined, // Campaign leads are unassigned
     }).catch(error => {
       console.error('Campaign lead notification failed:', error);
+    });
+
+    // Send company-level campaign submission notification (non-blocking)
+    sendCampaignSubmissionNotification(lead.id, campaign.company_id).catch(error => {
+      console.error('Campaign submission notification failed:', error);
     });
 
     // If updating existing lead status, trigger status-changed event
