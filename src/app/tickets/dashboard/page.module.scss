@@ -403,3 +403,59 @@
   object-fit: contain;
   pointer-events: none;
 }
+
+// Header action buttons
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headerBtnGhost {
+  display: flex;
+  height: 36px;
+  padding: 0 16px;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--border-radius);
+  background: transparent;
+  color: var(--gray-700);
+  border: 1.5px solid var(--gray-400);
+  cursor: pointer;
+  font-family: 'Satoshi Variable', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease;
+
+  &:hover {
+    background: var(--gray-100);
+    border-color: var(--gray-500);
+    color: var(--gray-800);
+  }
+}
+
+.headerBtnPrimary {
+  display: flex;
+  height: 36px;
+  padding: 0 16px;
+  align-items: center;
+  gap: 4px;
+  border-radius: var(--border-radius);
+  background: var(--blue-500);
+  color: var(--white);
+  border: none;
+  cursor: pointer;
+  font-family: 'Satoshi Variable', 'Segoe UI', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background: var(--blue-600);
+  }
+}

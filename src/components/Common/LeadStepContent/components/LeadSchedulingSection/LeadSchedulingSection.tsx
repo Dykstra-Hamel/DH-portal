@@ -102,6 +102,31 @@ export function LeadSchedulingSection({
               )}
             </div>
           )}
+          {(lead.requested_date || lead.requested_time) && (
+            <div className={styles.preferenceRow}>
+              <span className={styles.preferenceLabel}>Customer Preference:</span>
+              {lead.requested_date && (
+                <span className={styles.preferenceValue}>
+                  {new Date(lead.requested_date + 'T00:00:00').toLocaleDateString(undefined, {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </span>
+              )}
+              {lead.requested_time && (
+                <span className={styles.preferenceValue}>
+                  {lead.requested_time === 'morning'
+                    ? 'Morning (8am–12pm)'
+                    : lead.requested_time === 'afternoon'
+                      ? 'Afternoon (12pm–5pm)'
+                      : lead.requested_time === 'evening'
+                        ? 'Evening (5pm–8pm)'
+                        : lead.requested_time}
+                </span>
+              )}
+            </div>
+          )}
           <div className={styles.confirmationForm}>
             <div className={styles.formRow}>
               <div className={styles.formGroup}>
