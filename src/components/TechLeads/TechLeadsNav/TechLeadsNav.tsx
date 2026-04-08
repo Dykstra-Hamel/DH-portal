@@ -4,12 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import styles from './TechLeadsNav.module.scss';
 
-export function TechLeadsNav() {
+interface TechLeadsNavProps {
+  basePath?: string;
+}
+
+export function TechLeadsNav({ basePath = '/tech-leads' }: TechLeadsNavProps) {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
-    if (href === '/tech-leads') {
-      return pathname === '/tech-leads';
+    if (href === basePath) {
+      return pathname === basePath;
     }
     return pathname.startsWith(href);
   };
@@ -19,8 +23,8 @@ export function TechLeadsNav() {
       <div className={styles.navInner}>
         {/* Home */}
         <Link
-          href="/tech-leads"
-          className={`${styles.navItem} ${isActive('/tech-leads') ? styles.active : ''}`}
+          href={basePath}
+          className={`${styles.navItem} ${isActive(basePath) ? styles.active : ''}`}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
@@ -42,7 +46,7 @@ export function TechLeadsNav() {
         </Link>
 
         {/* New — raised center button */}
-        <Link href="/tech-leads/new" className={styles.newItem}>
+        <Link href={`${basePath}/new`} className={styles.newItem}>
           <div className={styles.newBtn}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
@@ -55,8 +59,8 @@ export function TechLeadsNav() {
 
         {/* My Opps */}
         <Link
-          href="/tech-leads/opportunities"
-          className={`${styles.navItem} ${isActive('/tech-leads/opportunities') ? styles.active : ''}`}
+          href={`${basePath}/opportunities`}
+          className={`${styles.navItem} ${isActive(`${basePath}/opportunities`) ? styles.active : ''}`}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path

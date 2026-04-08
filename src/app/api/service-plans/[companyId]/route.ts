@@ -13,10 +13,21 @@ export async function GET(
     const { companyId } = await params;
     const supabase = await createClient();
 
-    // Fetch all active service plans for the company
+    // Fetch all active service plans for the company, including pest coverage
     const { data: plans, error } = await supabase
       .from('service_plans')
-      .select('*')
+      .select(`
+        *,
+        plan_pest_coverage (
+          pest_id,
+          coverage_level,
+          pest_types (
+            id,
+            name,
+            slug
+          )
+        )
+      `)
       .eq('company_id', companyId)
       .eq('is_active', true)
       .order('plan_name', { ascending: true });
@@ -29,9 +40,20 @@ export async function GET(
       );
     }
 
+    const transformedPlans = (plans || []).map((plan: any) => ({
+      ...plan,
+      pest_coverage: (plan.plan_pest_coverage ?? []).map((coverage: any) => ({
+        pest_id: coverage.pest_id,
+        coverage_level: coverage.coverage_level ?? null,
+        pest_name: coverage.pest_types?.name ?? '',
+        pest_slug: coverage.pest_types?.slug ?? null,
+      })),
+      plan_pest_coverage: undefined,
+    }));
+
     return NextResponse.json({
       success: true,
-      plans: plans || [],
+      plans: transformedPlans,
     });
   } catch (error) {
     console.error('Error in GET /api/service-plans/[companyId]:', error);

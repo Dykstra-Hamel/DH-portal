@@ -84,6 +84,8 @@ export const adminAPI = {
     company_id: string;
     role: string;
     departments?: string[];
+    sendEmail?: boolean;
+    password?: string;
   }) {
     return authenticatedFetch('/api/admin/users/invite', {
       method: 'POST',

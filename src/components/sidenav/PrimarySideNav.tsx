@@ -41,6 +41,9 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const isTechnicianOnly =
     departments.length > 0 && departments.every(d => d === 'technician');
   const isTechnician = departments.includes('technician');
+  const isInspector = departments.includes('inspector');
+  const isInspectorOnly =
+    departments.length > 0 && departments.every(d => d === 'inspector');
 
   const menuItems: Array<{
     id: PrimaryNavItem;
@@ -209,11 +212,11 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Tracker',
     },
     {
-      id: 'tech-leads' as PrimaryNavItem,
-      href: '/tech-leads',
+      id: 'field-ops' as PrimaryNavItem,
+      href: '/field-ops/dashboard',
       disabled: false,
       icon: <Truck size={24} />,
-      text: 'TechLeads',
+      text: 'FieldOps',
     },
     {
       id: 'brand' as PrimaryNavItem,
@@ -296,19 +299,26 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
         pathname.startsWith('/admin/content-calendar') ||
         pathname.startsWith('/admin/content-pieces');
     }
+    if (href === '/field-ops/dashboard') {
+      return pathname.startsWith('/field-ops');
+    }
     return pathname.startsWith(href);
   };
 
   // Filter menu items based on super admin status and feature access
   // Hide super-admin-only items by default until we confirm user is admin
   const visibleMenuItems = menuItems.filter(item => {
-    // Technician-only users only see tech-leads and customers
+    // Technician-only users only see field-ops and customers
     if (isTechnicianOnly) {
-      return item.id === 'tech-leads' || item.id === 'customers';
+      return item.id === 'field-ops' || item.id === 'customers';
     }
-    // Tech-leads is only visible to technician users and admins
-    if (item.id === 'tech-leads') {
-      return isTechnician || (!isHydrating && isAdmin);
+    // Inspector-only users only see field-ops and customers
+    if (isInspectorOnly) {
+      return item.id === 'field-ops' || item.id === 'customers';
+    }
+    // FieldOps is visible to technicians, inspectors, and admins
+    if (item.id === 'field-ops') {
+      return isTechnician || isInspector || (!isHydrating && isAdmin);
     }
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {

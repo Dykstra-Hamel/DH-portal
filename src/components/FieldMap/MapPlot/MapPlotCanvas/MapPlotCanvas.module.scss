@@ -1,0 +1,528 @@
+.mapStepContent {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.mapCanvasCard {
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  background: #d9dde3;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.mapInteractiveCanvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background-color: #d9dde3;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.mapCanvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: #d9dde3;
+  background-size: cover;
+  background-position: center;
+  touch-action: none;
+}
+
+.mapEmptyState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  color: var(--gray-600);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-satoshi);
+  z-index: 8;
+}
+
+.mapGoogleCanvas {
+  width: 100%;
+  height: 100%;
+}
+
+.mapBlankCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #ffffff;
+}
+
+.mapGridOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.32) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.32) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.mapViewAdjustLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.mapLegendControls {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.mapLegendBtn {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  background: rgba(249, 250, 251, 0.94);
+  color: var(--gray-700);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  pointer-events: auto;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+}
+
+.mapLegendBtnActive {
+  background: var(--blue-500);
+  border-color: var(--blue-500);
+  color: var(--white);
+}
+
+.mapViewControls {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.mapViewControlGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+  background: rgba(249, 250, 251, 0.94);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  height: 36px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+
+  .mapIconBtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+.mapPlotOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mapPlotOverlayActive {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.mapSvgOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.mapStamp {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid var(--white);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  color: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  z-index: 4;
+  cursor: grab;
+  touch-action: none;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+}
+
+.mapStampPest {
+  width: auto;
+  height: auto;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  padding: 0;
+
+  svg {
+    width: 36px;
+    height: 36px;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.9));
+  }
+}
+
+.mapStampObject {
+  width: 44px;
+  height: 44px;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+
+  svg {
+    width: 40px;
+    height: 40px;
+    overflow: visible;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.92));
+  }
+}
+
+.mapToolbarDock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px calc(50px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0) 0%, rgba(15, 23, 42, 0.18) 82%);
+  pointer-events: none;
+  z-index: 9;
+}
+
+.mapStampPicker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: min(92vw, 360px);
+  pointer-events: auto;
+  background: rgba(249, 250, 251, 0.94);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+}
+
+.mapStampPickerPest {
+  max-width: min(92vw, 420px);
+}
+
+.mapIconToolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  pointer-events: auto;
+  background: rgba(249, 250, 251, 0.94);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 14px;
+  padding: 4px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.mapIconBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--gray-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.15s ease, opacity 0.15s ease;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.mapIconBtnActive {
+  background: var(--blue-500);
+  color: var(--white);
+}
+
+.mapIconBtnPrimary {
+  background: var(--blue-500);
+  color: var(--white);
+}
+
+.mapIconBtnWarn {
+  color: var(--error-700);
+  background: color-mix(in srgb, var(--error-100) 85%, var(--white));
+}
+
+.mapStampTypeBtn {
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.mapPickerBtn {
+  width: 42px;
+  height: 42px;
+}
+
+.mapStampPickerPest .mapPickerBtn {
+  width: 52px;
+  height: 52px;
+
+  svg {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.mapSnapRing {
+  animation: mapSnapPulse 0.75s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.mapHomeFootprintText {
+  fill: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  font-family: var(--font-satoshi);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 3px;
+}
+
+.mapDimensionText {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  font-family: var(--font-satoshi);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 3px;
+}
+
+.mapDimensionBubble {
+  fill: rgba(255, 255, 255, 0.96);
+  stroke: rgba(148, 163, 184, 0.7);
+  stroke-width: 1px;
+  pointer-events: none;
+}
+
+.mapToolToggle {
+  display: flex;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  overflow: hidden;
+  gap: 0;
+  flex-shrink: 0;
+
+  .mapIconBtn {
+    border-radius: 0;
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+}
+
+.mapToolToggleDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.mapToggleFirst {
+  border-radius: 9px 0 0 9px !important;
+}
+
+.mapToggleLast {
+  border-radius: 0 9px 9px 0 !important;
+}
+
+@keyframes mapSnapPulse {
+  0%, 100% { opacity: 0.75; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(1.5); }
+}
+
+.readOnlyThumbnail {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  background: var(--gray-100);
+  position: relative;
+  padding: 0;
+  transition: opacity 0.15s ease;
+
+  &:hover {
+    opacity: 0.9;
+  }
+
+  &:active {
+    opacity: 0.8;
+  }
+}
+
+.readOnlyMapImg {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  display: block;
+}
+
+.readOnlyPlaceholder {
+  height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--gray-400);
+  font-size: 13px;
+}
+
+.readOnlyBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+
+  span {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+}
+
+.readOnlyBadgeHint {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.75;
+  background: none !important;
+  padding: 0 !important;
+}
+
+.readOnlyModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+}
+
+.readOnlyModalClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1600;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.85);
+  }
+}
+
+.readOnlyModalInner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}

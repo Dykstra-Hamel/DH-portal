@@ -18,6 +18,7 @@ interface UserWithProfile {
     first_name: string;
     last_name: string;
     email: string;
+    role?: string;
   };
 }
 
@@ -28,6 +29,7 @@ interface UserCompany {
   role: string;
   is_primary: boolean;
   joined_at: string;
+  pestpac_employee_id?: string | null;
   profiles?: { first_name: string; last_name: string; email: string };
   companies?: { name: string };
 }
@@ -53,6 +55,8 @@ export default function UserManagement() {
     company_id: '',
     role: 'member',
     departments: [] as Department[],
+    sendEmail: true,
+    password: '',
   });
 
   useEffect(() => {
@@ -96,15 +100,12 @@ export default function UserManagement() {
       setError('Company is required');
       return;
     }
-    if (canHaveDepartments(inviteFormData.role as any) && inviteFormData.departments.length === 0) {
-      setError('At least one department must be selected for Member and Manager roles');
-      return;
-    }
+    // Departments are optional — users can have them assigned later
     try {
       setSubmitting(true);
       setError(null);
       await adminAPI.inviteUser(inviteFormData);
-      setInviteFormData({ email: '', first_name: '', last_name: '', company_id: '', role: 'member', departments: [] });
+      setInviteFormData({ email: '', first_name: '', last_name: '', company_id: '', role: 'member', departments: [], sendEmail: true, password: '' });
       setShowInviteForm(false);
       await loadData();
     } catch (err) {
@@ -147,6 +148,12 @@ export default function UserManagement() {
                   {user.profiles
                     ? `${user.profiles.first_name} ${user.profiles.last_name}`
                     : 'No profile'}
+                  {user.profiles?.role === 'admin' && (
+                    <span className={styles.globalAdminBadge}>Global Admin</span>
+                  )}
+                  {!user.email_confirmed_at && (
+                    <span className={styles.pendingBadge}>Pending</span>
+                  )}
                 </span>
                 <span className={styles.userEmail}>{user.email}</span>
               </div>
@@ -268,6 +275,12 @@ function EditUserModal({
     userId: string;
     companyId: string;
     companyName: string;
+  } | null>(null);
+  const [editingPestPacId, setEditingPestPacId] = useState<{
+    userCompanyId: string;
+    userName: string;
+    companyName: string;
+    currentValue: string | null;
   } | null>(null);
 
   // Sync pending roles when relationships prop changes
@@ -553,6 +566,20 @@ function EditUserModal({
                       </button>
                       <button
                         type="button"
+                        className={styles.actionLink}
+                        onClick={() =>
+                          setEditingPestPacId({
+                            userCompanyId: rel.id,
+                            userName: displayName,
+                            companyName: rel.companies?.name || '',
+                            currentValue: rel.pestpac_employee_id ?? null,
+                          })
+                        }
+                      >
+                        PestPac ID
+                      </button>
+                      <button
+                        type="button"
                         className={styles.removeButton}
                         onClick={() => handleRemoveFromCompany(rel.id)}
                       >
@@ -592,6 +619,20 @@ function EditUserModal({
           onClose={() => setEditingBranches(null)}
         />
       )}
+
+      {editingPestPacId && (
+        <PestPacIdModal
+          userCompanyId={editingPestPacId.userCompanyId}
+          userName={editingPestPacId.userName}
+          companyName={editingPestPacId.companyName}
+          currentValue={editingPestPacId.currentValue}
+          onClose={() => setEditingPestPacId(null)}
+          onSaved={newValue => {
+            setEditingPestPacId(null);
+            onRelationshipsChange();
+          }}
+        />
+      )}
     </>
   );
 }
@@ -615,8 +656,19 @@ function InviteUserModal({
     company_id: string;
     role: string;
     departments: Department[];
+    sendEmail: boolean;
+    password: string;
   };
-  setFormData: React.Dispatch<React.SetStateAction<typeof formData>>;
+  setFormData: React.Dispatch<React.SetStateAction<{
+    email: string;
+    first_name: string;
+    last_name: string;
+    company_id: string;
+    role: string;
+    departments: Department[];
+    sendEmail: boolean;
+    password: string;
+  }>>;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
 }) {
@@ -624,13 +676,47 @@ function InviteUserModal({
     <div className={styles.modal}>
       <div className={styles.modalContent}>
         <div className={styles.modalHeader}>
-          <h3>Invite New User</h3>
+          <h3>{formData.sendEmail ? 'Invite New User' : 'Add New User'}</h3>
           <button className={styles.closeButton} type="button" onClick={onClose}>
             ×
           </button>
         </div>
         <form onSubmit={onSubmit}>
           <div className={styles.inviteFormBody}>
+            <div className={styles.sendEmailToggle}>
+              <button
+                type="button"
+                className={`${styles.toggleOption} ${formData.sendEmail ? styles.toggleOptionActive : ''}`}
+                onClick={() => setFormData(p => ({ ...p, sendEmail: true }))}
+              >
+                Send Invite Email
+              </button>
+              <button
+                type="button"
+                className={`${styles.toggleOption} ${!formData.sendEmail ? styles.toggleOptionActive : ''}`}
+                onClick={() => setFormData(p => ({ ...p, sendEmail: false }))}
+              >
+                Add Without Email
+              </button>
+            </div>
+            {!formData.sendEmail && (
+              <>
+                <p className={styles.noEmailNote}>
+                  The user will be added directly. Set a temporary password below, or leave blank to allow login via magic link or Google OAuth only.
+                </p>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Password <span className={styles.fieldOptional}>(optional)</span></label>
+                  <input
+                    className={styles.input}
+                    type="password"
+                    value={formData.password}
+                    onChange={e => setFormData(p => ({ ...p, password: e.target.value }))}
+                    placeholder="Leave blank to skip"
+                    autoComplete="new-password"
+                  />
+                </div>
+              </>
+            )}
             <div className={styles.formGroup}>
               <label className={styles.label}>Email</label>
               <input
@@ -699,7 +785,7 @@ function InviteUserModal({
             </div>
             {canHaveDepartments(formData.role as any) && (
               <div className={styles.formGroup}>
-                <label className={styles.label}>Departments *</label>
+                <label className={styles.label}>Departments <span className={styles.fieldOptional}>(optional)</span></label>
                 <DepartmentSelector
                   selectedDepartments={formData.departments}
                   onDepartmentChange={departments => setFormData(p => ({ ...p, departments }))}
@@ -708,7 +794,7 @@ function InviteUserModal({
                   size="medium"
                 />
                 <small className={styles.fieldHelp}>
-                  Select the departments this user will have access to
+                  Can be assigned later through Edit User
                 </small>
               </div>
             )}
@@ -719,7 +805,9 @@ function InviteUserModal({
               className={styles.saveButton}
               disabled={submitting}
             >
-              {submitting ? 'Sending Invite...' : 'Send Invitation'}
+              {submitting
+              ? (formData.sendEmail ? 'Sending Invite...' : 'Adding User...')
+              : (formData.sendEmail ? 'Send Invitation' : 'Add User')}
             </button>
             <button
               type="button"
@@ -865,6 +953,94 @@ function BranchManagementModal({
           </button>
           <button type="button" className={styles.cancelButton} onClick={onClose}>
             Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PestPac Employee ID Modal ─────────────────────────────────────────────────
+
+function PestPacIdModal({
+  userCompanyId,
+  userName,
+  companyName,
+  currentValue,
+  onClose,
+  onSaved,
+}: {
+  userCompanyId: string;
+  userName: string;
+  companyName: string;
+  currentValue: string | null;
+  onClose: () => void;
+  onSaved: (newValue: string | null) => void;
+}) {
+  const [value, setValue] = useState(currentValue ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/user-companies/${userCompanyId}/pestpac-employee-id`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pestpac_employee_id: value.trim() || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? 'Failed to save');
+        return;
+      }
+      onSaved(value.trim() || null);
+    } catch {
+      setError('Failed to connect to server');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={`${styles.modal} ${styles.subModal}`}>
+      <div className={styles.modalContent}>
+        <div className={styles.modalHeader}>
+          <h3>PestPac Employee ID</h3>
+          <button className={styles.closeButton} type="button" onClick={onClose}>×</button>
+        </div>
+        <div className={styles.modalSection}>
+          <p className={styles.subModalMeta}>
+            <strong>{userName}</strong> at <strong>{companyName}</strong>
+          </p>
+          <p style={{ fontSize: 13, color: 'var(--gray-500)', margin: '0 0 12px' }}>
+            The PestPac employee ID used to fetch this inspector&apos;s daily route.
+          </p>
+          <div className={styles.formGroup}>
+            <label className={styles.label}>Employee ID</label>
+            <input
+              className={styles.input}
+              type="text"
+              value={value}
+              onChange={e => setValue(e.target.value)}
+              placeholder="e.g. 12345"
+              disabled={saving}
+            />
+          </div>
+          {error && <p style={{ color: 'var(--error-600)', fontSize: 13, margin: '8px 0 0' }}>{error}</p>}
+        </div>
+        <div className={styles.modalFooter}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button type="button" className={styles.cancelButton} onClick={onClose} disabled={saving}>
+            Cancel
           </button>
         </div>
       </div>

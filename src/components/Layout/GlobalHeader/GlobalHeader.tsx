@@ -25,8 +25,11 @@ export function GlobalHeader({
   const router = useRouter();
   const { wizardTitle, backInterceptor } = useWizard();
   const isTechLeads = pathname.startsWith('/tech-leads');
+  const isFieldMap = pathname.startsWith('/field-map');
+  const isFieldOps = pathname.startsWith('/field-ops');
+  const isAppShell = isTechLeads || isFieldMap || isFieldOps;
   const hideSearch =
-    isTechLeads ||
+    isAppShell ||
     pathname === '/project-management' ||
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
@@ -45,7 +48,7 @@ export function GlobalHeader({
     pathname.startsWith('/admin/project-management/') ||
     pathname.startsWith('/admin/monthly-services') ||
     pathname.startsWith('/admin/content-pieces/') ||
-    pathname.startsWith('/tech-leads');
+    isAppShell;
 
   return (
     <header className={styles.globalHeader}>
@@ -60,7 +63,7 @@ export function GlobalHeader({
               <Menu size={24} />
             </button>
           )}
-          {isTechLeads && (
+          {isAppShell && (
             <button
               type="button"
               className={styles.backButton}
