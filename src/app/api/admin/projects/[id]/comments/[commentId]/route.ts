@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { sendMentionSlackNotifications, sendEditedCommentSlackNotifications } from '@/lib/slack/mention-notifications';
 
 function extractMentionedUserIds(html: string): string[] {
@@ -36,7 +36,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -175,7 +175,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

@@ -55,7 +55,7 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
           return;
         }
 
-        const adminStatus = isAuthorizedAdminSync(profileData);
+        const adminStatus = isAuthorizedAdminSync(profileData) || profileData?.role === 'project_manager';
         setIsAdmin(adminStatus);
 
         if (!adminStatus) {
@@ -157,8 +157,12 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     };
   }, [projectId, supabase]);
 
-  const handleProjectUpdate = () => {
-    setRefreshKey(prev => prev + 1);
+  const handleProjectUpdate = (updates?: Partial<Project>) => {
+    if (updates) {
+      setProject(prev => prev ? { ...prev, ...updates } : prev);
+    } else {
+      setRefreshKey(prev => prev + 1);
+    }
   };
 
   // Show loading state while checking auth

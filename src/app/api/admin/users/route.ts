@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { verifyAuth, isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 
 export async function GET(request: NextRequest) {
   try {
     // Verify authentication
     const { user, error: authError } = await verifyAuth(request);
-    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+    if (authError || !user || !(await isAuthorizedAdminOrPM(user))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('role', 'admin');
+      .in('role', ['admin', 'project_manager']);
 
     if (profilesError) {
       return NextResponse.json(

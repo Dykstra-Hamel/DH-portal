@@ -18,7 +18,7 @@ interface PrimarySideNavProps {
 export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
-  const { isAdmin, isHydrating, selectedCompany } = useCompany();
+  const { isAdmin, isProjectManager, isHydrating, selectedCompany } = useCompany();
   const {
     hasAccess: hasProjectManagement,
     loading: featureLoading,
@@ -306,6 +306,12 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     if (isTechnicianOnly) {
       return item.id === 'tech-leads' || item.id === 'customers';
     }
+
+    // Project managers only see the Tracker nav item
+    if (isProjectManager) {
+      return !isHydrating && item.id === 'project-management';
+    }
+
     // Tech-leads is only visible to technician users and admins
     if (item.id === 'tech-leads') {
       return isTechnician || (!isHydrating && isAdmin);

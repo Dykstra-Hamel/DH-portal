@@ -10,6 +10,17 @@ export async function getHomeRoute(
   userId: string
 ): Promise<string> {
   try {
+    // Check if user is a project_manager — route directly to PM section
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userId)
+      .single();
+
+    if (profileData?.role === 'project_manager') {
+      return '/admin/project-management';
+    }
+
     // Prefer the primary company; fall back to any company the user belongs to
     let { data: userCompany } = await supabase
       .from('user_companies')

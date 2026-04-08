@@ -130,7 +130,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({
 
   const shouldUseTwoStep = mode === 'full' && !editingProject;
 
-  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+  const isAdminRole = (role?: string | null) =>
+    role === 'admin' || role === 'super_admin' || role === 'project_manager';
 
   const getUserRole = (user: any) => {
     if (user?.profiles?.role) return user.profiles.role;

@@ -91,6 +91,25 @@ export function isAuthorizedAdminSync(profile: any): boolean {
   return profile?.role === 'admin';
 }
 
+export function isProjectManagerSync(profile: any): boolean {
+  return profile?.role === 'project_manager';
+}
+
+export async function isAuthorizedAdminOrPM(user: any): Promise<boolean> {
+  if (!user) return false;
+  const supabase = createAdminClient();
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single();
+  return profile?.role === 'admin' || profile?.role === 'project_manager';
+}
+
+export function isAuthorizedAdminOrPMSync(profile: any): boolean {
+  return profile?.role === 'admin' || profile?.role === 'project_manager';
+}
+
 // Interface for UserCompany data
 interface UserCompany {
   id: string;
