@@ -43,7 +43,7 @@ interface ProjectDetailProps {
   user: User;
   users: ProjectUser[];
   tasks: ProjectTask[];
-  onProjectUpdate?: () => void;
+  onProjectUpdate?: (updates?: Partial<Project>) => void;
   isSidebarExpanded: boolean;
   setIsSidebarExpanded: Dispatch<SetStateAction<boolean>>;
 }
@@ -266,7 +266,12 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     lastSavedDataRef.current = JSON.stringify(newFormData);
     hasUserEditedRef.current = false;
 
-    setEditFormData(newFormData);
+    // Only update state (and trigger re-render) if values actually changed
+    setEditFormData(prev => {
+      const serialized = JSON.stringify(newFormData);
+      if (JSON.stringify(prev) === serialized) return prev;
+      return newFormData;
+    });
   }, []);
 
   React.useEffect(() => {
@@ -344,7 +349,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     fetchSubtypes();
   }, [editFormData.project_type]);
 
-  const handleSaveEdit = React.useCallback(async () => {
+  const handleSaveEdit = React.useCallback(async (overrideData?: typeof editFormData) => {
+    const d = overrideData ?? editFormData;
 
     try {
       const response = await fetch(`/api/admin/projects/${project.id}`, {
@@ -353,24 +359,24 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          name: editFormData.name,
-          description: editFormData.description,
-          notes: editFormData.notes,
-          status: editFormData.status,
-          priority: editFormData.priority,
-          assigned_to: editFormData.assigned_to || null,
-          requested_by: editFormData.requested_by || null,
-          due_date: editFormData.due_date,
-          start_date: editFormData.start_date || null,
-          completion_date: editFormData.completion_date || null,
-          project_type: editFormData.project_type,
-          project_subtype: editFormData.project_subtype || null,
-          project_subtype_id: editFormData.project_subtype_id || null,
-          is_billable: editFormData.is_billable,
-          quoted_price: editFormData.quoted_price ? parseFloat(editFormData.quoted_price) : null,
-          scope: editFormData.scope || null,
-          category_ids: editFormData.category_ids,
-          company_id: editFormData.company_id,
+          name: d.name,
+          description: d.description,
+          notes: d.notes,
+          status: d.status,
+          priority: d.priority,
+          assigned_to: d.assigned_to || null,
+          requested_by: d.requested_by || null,
+          due_date: d.due_date,
+          start_date: d.start_date || null,
+          completion_date: d.completion_date || null,
+          project_type: d.project_type,
+          project_subtype: d.project_subtype || null,
+          project_subtype_id: d.project_subtype_id || null,
+          is_billable: d.is_billable,
+          quoted_price: d.quoted_price ? parseFloat(d.quoted_price) : null,
+          scope: d.scope || null,
+          category_ids: d.category_ids,
+          company_id: d.company_id,
         }),
       });
 
@@ -378,9 +384,16 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         throw new Error('Failed to update project');
       }
 
-      // Call callback to refresh project data
-      if (onProjectUpdate) {
-        onProjectUpdate();
+      const data = await response.json();
+
+      const categoriesChanged =
+        JSON.stringify([...d.category_ids].sort()) !==
+        JSON.stringify([...(project.categories || []).map(c => c.category_id)].sort());
+
+      if (categoriesChanged) {
+        onProjectUpdate?.();
+      } else {
+        onProjectUpdate?.(data);
       }
       setToastMessage('Project updated.');
       setToastType('success');
@@ -391,7 +404,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       setToastType('error');
       setShowToast(true);
     }
-  }, [editFormData, onProjectUpdate, project.id]);
+  }, [editFormData, onProjectUpdate, project.id, project.categories]);
 
   React.useEffect(() => {
     if (saveTimeoutRef.current) {
@@ -424,13 +437,34 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     };
   }, [editFormData, handleSaveEdit]);
 
-  // Helper to mark form as edited when user changes a field
+  // Helper to mark form as edited when user changes a field (debounced — for text inputs)
   const handleFieldChange = <K extends keyof typeof editFormData>(
     field: K,
     value: typeof editFormData[K]
   ) => {
     hasUserEditedRef.current = true;
     setEditFormData({ ...editFormData, [field]: value });
+  };
+
+  // Save immediately without debounce — use for selects, checkboxes, date pickers
+  const saveImmediately = React.useCallback((newFormData: typeof editFormData) => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
+    }
+    const { notes: _n, ...dataWithoutNotes } = newFormData;
+    lastSavedDataRef.current = JSON.stringify(dataWithoutNotes);
+    handleSaveEdit(newFormData);
+  }, [handleSaveEdit]);
+
+  const handleImmediateFieldChange = <K extends keyof typeof editFormData>(
+    field: K,
+    value: typeof editFormData[K]
+  ) => {
+    hasUserEditedRef.current = true;
+    const newFormData = { ...editFormData, [field]: value };
+    setEditFormData(newFormData);
+    saveImmediately(newFormData);
   };
 
   // Special handler for notes that doesn't trigger autosave
@@ -474,10 +508,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
         throw new Error('Failed to update notes');
       }
 
-      // Call callback to refresh project data
-      if (onProjectUpdate) {
-        onProjectUpdate();
-      }
+      onProjectUpdate?.({ notes: editFormData.notes });
       setHasUnsavedNotes(false);
       setToastMessage('Notes saved successfully.');
       setToastType('success');
@@ -816,7 +847,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               <select
                 className={styles.editSelect}
                 value={editFormData.company_id}
-                onChange={(e) => handleFieldChange('company_id', e.target.value)}
+                onChange={(e) => handleImmediateFieldChange('company_id', e.target.value)}
               >
                 <option value="">Select Company</option>
                 {sortedCompanies.map(company => (
@@ -843,11 +874,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 value={editFormData.project_type}
                 onChange={(e) => {
                   hasUserEditedRef.current = true;
-                  setEditFormData({
-                    ...editFormData,
-                    project_type: e.target.value,
-                    project_subtype: '',
-                  });
+                  const newFormData = { ...editFormData, project_type: e.target.value, project_subtype: '' };
+                  setEditFormData(newFormData);
+                  saveImmediately(newFormData);
                 }}
               >
                 <option value="">Select Project Type</option>
@@ -869,11 +898,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 onChange={(e) => {
                   const selectedSubtype = availableSubtypes.find(s => s.name === e.target.value);
                   hasUserEditedRef.current = true;
-                  setEditFormData({
+                  const newFormData = {
                     ...editFormData,
                     project_subtype: e.target.value,
                     project_subtype_id: selectedSubtype?.id || null,
-                  });
+                  };
+                  setEditFormData(newFormData);
+                  saveImmediately(newFormData);
                 }}
                 disabled={isFetchingSubtypes}
               >
@@ -895,7 +926,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               <select
                 className={styles.editSelect}
                 value={editFormData.scope}
-                onChange={(e) => handleFieldChange('scope', e.target.value)}
+                onChange={(e) => handleImmediateFieldChange('scope', e.target.value)}
               >
                 <option value="">Not set</option>
                 <option value="internal">Internal Only</option>
@@ -921,7 +952,9 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                           const newCategoryIds = e.target.checked
                             ? [...editFormData.category_ids, category.id]
                             : editFormData.category_ids.filter((id) => id !== category.id);
-                          setEditFormData({ ...editFormData, category_ids: newCategoryIds });
+                          const newFormData = { ...editFormData, category_ids: newCategoryIds };
+                          setEditFormData(newFormData);
+                          saveImmediately(newFormData);
                         }}
                       />
                       <span>{category.name}</span>
@@ -951,7 +984,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               <select
                 className={styles.editSelect}
                 value={editFormData.priority}
-                onChange={(e) => handleFieldChange('priority', e.target.value as typeof editFormData.priority)}
+                onChange={(e) => handleImmediateFieldChange('priority', e.target.value as typeof editFormData.priority)}
               >
                 {priorityOptions.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -973,11 +1006,13 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     checked={editFormData.is_billable}
                     onChange={(e) => {
                       hasUserEditedRef.current = true;
-                      setEditFormData({
+                      const newFormData = {
                         ...editFormData,
                         is_billable: e.target.checked,
                         quoted_price: e.target.checked ? editFormData.quoted_price : '',
-                      });
+                      };
+                      setEditFormData(newFormData);
+                      saveImmediately(newFormData);
                     }}
                     aria-label="Is billable"
                   />
@@ -1119,7 +1154,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 type="date"
                 className={styles.editInput}
                 value={editFormData.due_date || ''}
-                onChange={(e) => handleFieldChange('due_date', e.target.value)}
+                onChange={(e) => handleImmediateFieldChange('due_date', e.target.value)}
               />
             </div>
           </div>
@@ -1131,7 +1166,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 type="date"
                 className={styles.editInput}
                 value={editFormData.start_date || ''}
-                onChange={(e) => handleFieldChange('start_date', e.target.value)}
+                onChange={(e) => handleImmediateFieldChange('start_date', e.target.value)}
               />
             </div>
           </div>
@@ -1143,7 +1178,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                 type="date"
                 className={styles.editInput}
                 value={editFormData.completion_date || ''}
-                onChange={(e) => handleFieldChange('completion_date', e.target.value)}
+                onChange={(e) => handleImmediateFieldChange('completion_date', e.target.value)}
               />
             </div>
           </div>
@@ -1193,7 +1228,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                   className={styles.editSelect}
                   value={editFormData.requested_by || ''}
                   onChange={(e) => {
-                    handleFieldChange('requested_by', e.target.value);
+                    handleImmediateFieldChange('requested_by', e.target.value);
                     setIsChangingRequestedBy(false);
                   }}
                 >
@@ -1235,7 +1270,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
               <select
                 className={styles.editSelect}
                 value={editFormData.assigned_to || ''}
-                onChange={(e) => handleFieldChange('assigned_to', e.target.value)}
+                onChange={(e) => handleImmediateFieldChange('assigned_to', e.target.value)}
               >
                 <option value="">Unassigned</option>
                 {assignableUsers.map((projectUser) => (

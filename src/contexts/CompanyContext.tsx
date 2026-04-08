@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { adminAPI } from '@/lib/api-client';
-import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
+import { isAuthorizedAdminSync, isProjectManagerSync } from '@/lib/auth-helpers';
 import { BrandData } from '@/types/branding';
 import { getCached, setCached, clearCache, clearCacheByPrefix, CACHE_KEYS } from '@/lib/cache-utils';
 
@@ -36,6 +36,7 @@ interface CompanyContextType {
   selectedCompany: Company | null;
   availableCompanies: Company[];
   isAdmin: boolean;
+  isProjectManager: boolean;
   isLoading: boolean;
   isHydrating: boolean;
   setSelectedCompany: (company: Company | null) => void;
@@ -57,6 +58,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
   );
   const [availableCompanies, setAvailableCompanies] = useState<Company[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isProjectManager, setIsProjectManager] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isHydrating, setIsHydrating] = useState(true);
   const [user, setUser] = useState<any>(null);
@@ -301,7 +303,9 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         if (cachedProfile && cachedCompanies && cachedCompanies.length > 0) {
           // Hydrate immediately from cache
           const userIsAdmin = isAuthorizedAdminSync(cachedProfile);
+          const userIsProjectManager = isProjectManagerSync(cachedProfile);
           setIsAdmin(userIsAdmin);
+          setIsProjectManager(userIsProjectManager);
           setAvailableCompanies(cachedCompanies);
 
           // Set selected company from cache if available
@@ -331,12 +335,19 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
               if (freshProfile) {
                 setCached(CACHE_KEYS.USER_PROFILE, freshProfile);
                 const freshIsAdmin = isAuthorizedAdminSync(freshProfile);
+                const freshIsProjectManager = isProjectManagerSync(freshProfile);
 
                 setIsAdmin(prevIsAdmin => {
                   if (prevIsAdmin !== freshIsAdmin) {
                     return freshIsAdmin;
                   }
                   return prevIsAdmin;
+                });
+                setIsProjectManager(prev => {
+                  if (prev !== freshIsProjectManager) {
+                    return freshIsProjectManager;
+                  }
+                  return prev;
                 });
               }
             })
@@ -363,9 +374,11 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         setCached(CACHE_KEYS.USER_PROFILE, profile);
 
         const userIsAdmin = isAuthorizedAdminSync(profile);
+        const userIsProjectManager = isProjectManagerSync(profile);
         setIsAdmin(userIsAdmin);
+        setIsProjectManager(userIsProjectManager);
 
-        if (userIsAdmin) {
+        if (userIsAdmin || userIsProjectManager) {
           await loadAllCompanies(true);
         } else {
           await loadUserCompanies(userId);
@@ -462,7 +475,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
 
     setIsLoading(true);
     try {
-      if (isAdmin) {
+      if (isAdmin || isProjectManager) {
         await loadAllCompanies();
       } else {
         await loadUserCompanies(user.id);
@@ -472,7 +485,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, isAdmin, loadAllCompanies, loadUserCompanies]);
+  }, [user, isAdmin, isProjectManager, loadAllCompanies, loadUserCompanies]);
 
   const refreshBranding = useCallback(
     async (companyId?: string) => {
@@ -517,6 +530,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
         setSelectedCompanyState(null);
         setAvailableCompanies([]);
         setIsAdmin(false);
+        setIsProjectManager(false);
         setIsLoading(false);
         isLoadingCompaniesRef.current = false;
 
@@ -541,6 +555,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
       selectedCompany,
       availableCompanies,
       isAdmin,
+      isProjectManager,
       isLoading,
       isHydrating,
       setSelectedCompany,
@@ -551,6 +566,7 @@ export function CompanyProvider({ children }: CompanyProviderProps) {
       selectedCompany,
       availableCompanies,
       isAdmin,
+      isProjectManager,
       isLoading,
       isHydrating,
       setSelectedCompany,

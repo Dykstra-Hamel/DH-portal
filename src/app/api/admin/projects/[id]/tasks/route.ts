@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 
 // GET /api/admin/projects/[id]/tasks - List all tasks for a project
 export async function GET(
@@ -21,7 +22,7 @@ export async function GET(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -33,8 +34,10 @@ export async function GET(
     const isCompleted = searchParams.get('is_completed');
     const parentTaskId = searchParams.get('parent_task_id');
 
+    const adminDb = createAdminClient();
+
     // Fetch unread mention notifications for the current user (to mark tasks)
-    const { data: mentionNotifications } = await supabase
+    const { data: mentionNotifications } = await adminDb
       .from('notifications')
       .select('reference_id')
       .eq('user_id', user.id)
@@ -47,7 +50,7 @@ export async function GET(
     );
 
     // Build query
-    let query = supabase
+    let query = adminDb
       .from('project_tasks')
       .select(
         `
@@ -152,10 +155,12 @@ export async function POST(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const adminDb = createAdminClient();
 
     // Parse request body
     const body = await request.json();
@@ -163,7 +168,7 @@ export async function POST(
     let displayOrder = body.display_order;
 
     if (displayOrder === undefined || displayOrder === null) {
-      const { data: lastTask, error: lastTaskError } = await supabase
+      const { data: lastTask, error: lastTaskError } = await adminDb
         .from('project_tasks')
         .select('display_order')
         .eq('project_id', projectId)
@@ -204,7 +209,7 @@ export async function POST(
     };
 
     // Insert task
-    const { data: task, error } = await supabase
+    const { data: task, error } = await adminDb
       .from('project_tasks')
       .insert(taskData)
       .select(
@@ -232,7 +237,7 @@ export async function POST(
         category_type: 'internal', // Admin routes always use internal categories
       }));
 
-      const { error: categoryError } = await supabase
+      const { error: categoryError } = await adminDb
         .from('project_task_category_assignments')
         .insert(categoryAssignments);
 
@@ -243,7 +248,7 @@ export async function POST(
     }
 
     // Fetch task with categories
-    const { data: taskWithCategories } = await supabase
+    const { data: taskWithCategories } = await adminDb
       .from('project_tasks')
       .select(
         `

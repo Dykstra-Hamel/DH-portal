@@ -32,6 +32,7 @@ import {
   ProjectCategory,
   ProjectDepartment,
 } from '@/types/project';
+import CommentReactions from '@/components/shared/CommentReactions/CommentReactions';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { formatProjectShortcode } from '@/lib/formatProjectShortcode';
 import { useNotificationContext } from '@/contexts/NotificationContext';
@@ -77,6 +78,8 @@ interface ProjectTaskDetailProps {
   currentUserId?: string; // Current user's ID for checking comment ownership
   onTaskCommentMentionsRead?: (commentIds: string[]) => void;
   hideContentPieceLink?: boolean;
+  onToggleReaction?: (commentId: string, emoji: string) => void;
+  reactionUserMap?: Record<string, string>;
 }
 
 type UploadProgressState = {
@@ -112,6 +115,8 @@ export default function ProjectTaskDetail({
   currentUserId,
   onTaskCommentMentionsRead,
   hideContentPieceLink,
+  onToggleReaction,
+  reactionUserMap,
 }: ProjectTaskDetailProps) {
   const [newComment, setNewComment] = useState('');
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -2080,6 +2085,14 @@ export default function ProjectTaskDetail({
                             );
                           })()}
                         </>
+                      )}
+                      {onToggleReaction && currentUserId && (
+                        <CommentReactions
+                          reactions={comment.reactions || []}
+                          currentUserId={currentUserId}
+                          onToggle={(emoji) => onToggleReaction(comment.id, emoji)}
+                          userMap={reactionUserMap}
+                        />
                       )}
                     </div>
                   );

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 
 // PUT /api/admin/project-categories/[id]/subtypes/[subtypeId] - Update a subtype
 export async function PUT(
@@ -21,7 +21,7 @@ export async function PUT(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -77,7 +77,7 @@ export async function DELETE(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

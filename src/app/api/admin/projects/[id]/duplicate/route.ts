@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 
 // POST /api/admin/projects/[id]/duplicate
 export async function POST(
@@ -19,7 +19,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

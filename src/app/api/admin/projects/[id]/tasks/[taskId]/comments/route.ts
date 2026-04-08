@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
 import { sendMentionSlackNotifications } from '@/lib/slack/mention-notifications';
 
@@ -23,18 +24,20 @@ export async function GET(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const adminDb = createAdminClient();
+
     // Fetch comments with attachments
-    const { data: comments, error } = await supabase
+    const { data: comments, error } = await adminDb
       .from('project_task_comments')
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email),
+        user_profile:profiles(id, first_name, last_name, email, avatar_url),
         attachments:comment_attachments(id, file_path, file_name, file_size, mime_type, created_at)
       `
       )
@@ -46,7 +49,21 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Add public URLs to attachments
+    // Fetch reactions separately so the main query doesn't fail if the table doesn't exist yet
+    const reactionsMap: Record<string, { id: string; user_id: string; emoji: string; created_at: string }[]> = {};
+    const commentIds = (comments || []).map((c) => c.id);
+    if (commentIds.length > 0) {
+      const { data: reactions } = await adminDb
+        .from('comment_reactions')
+        .select('id, user_id, emoji, created_at, task_comment_id')
+        .in('task_comment_id', commentIds);
+      (reactions || []).forEach((r: { id: string; user_id: string; emoji: string; created_at: string; task_comment_id: string }) => {
+        if (!reactionsMap[r.task_comment_id]) reactionsMap[r.task_comment_id] = [];
+        reactionsMap[r.task_comment_id].push({ id: r.id, user_id: r.user_id, emoji: r.emoji, created_at: r.created_at });
+      });
+    }
+
+    // Add public URLs to attachments and attach reactions
     const commentsWithUrls = (comments || []).map((comment) => ({
       ...comment,
       attachments: (comment.attachments || []).map((attachment: { file_path: string; id: string; file_name: string; file_size: number; mime_type: string; created_at: string }) => {
@@ -58,6 +75,7 @@ export async function GET(
           url: urlData.publicUrl,
         };
       }),
+      reactions: reactionsMap[comment.id] || [],
     }));
 
     return NextResponse.json(commentsWithUrls);
@@ -85,9 +103,6 @@ function extractMentionedUserIds(html: string): string[] {
     }
   }
 
-  console.log('Extracting mentions from HTML:', html);
-  console.log('Found mentioned user IDs:', userIds);
-
   return userIds;
 }
 
@@ -110,10 +125,12 @@ export async function POST(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const adminDb = createAdminClient();
 
     // Parse request body
     const body = await request.json();
@@ -126,7 +143,7 @@ export async function POST(
     }
 
     // Get task and project details for company_id and names
-    const { data: task, error: taskError } = await supabase
+    const { data: task, error: taskError } = await adminDb
       .from('project_tasks')
       .select('id, title, project_id, projects(id, name, company_id, company:companies(name))')
       .eq('id', taskId)
@@ -145,7 +162,7 @@ export async function POST(
     } | null;
 
     // Get commenter's profile for notification message
-    const { data: commenterProfile } = await supabase
+    const { data: commenterProfile } = await adminDb
       .from('profiles')
       .select('first_name, last_name')
       .eq('id', user.id)
@@ -156,7 +173,7 @@ export async function POST(
       : 'Someone';
 
     // Create comment
-    const { data: comment, error } = await supabase
+    const { data: comment, error } = await adminDb
       .from('project_task_comments')
       .insert({
         task_id: taskId,
@@ -166,7 +183,7 @@ export async function POST(
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email)
+        user_profile:profiles(id, first_name, last_name, email, avatar_url)
       `
       )
       .single();
@@ -178,7 +195,7 @@ export async function POST(
 
     // Update project's updated_at timestamp if task has a project
     if (projectId) {
-      await supabase
+      await adminDb
         .from('projects')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', projectId);
@@ -202,7 +219,7 @@ export async function POST(
         }));
 
       if (notificationsToCreate.length > 0) {
-        const { error: notificationError } = await supabase
+        const { error: notificationError } = await adminDb
           .from('notifications')
           .insert(notificationsToCreate);
 

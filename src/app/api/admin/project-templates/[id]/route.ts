@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 
 // GET /api/admin/project-templates/[id] - Get single template
 export async function GET(
@@ -21,7 +21,7 @@ export async function GET(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -105,7 +105,7 @@ export async function PUT(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -423,7 +423,7 @@ export async function DELETE(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

@@ -87,8 +87,8 @@ export default function AdminProjectManagementDashboard() {
   const isFetchingRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Admin-only access check
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  // Admin and project_manager access check
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'project_manager';
 
   // Redirect non-admins
   useEffect(() => {

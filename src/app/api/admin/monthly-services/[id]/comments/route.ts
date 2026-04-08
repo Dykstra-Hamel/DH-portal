@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
 import { sendMentionSlackNotifications } from '@/lib/slack/mention-notifications';
 
@@ -23,7 +23,7 @@ export async function GET(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -39,7 +39,7 @@ export async function GET(
       );
     }
 
-    // Fetch comments with attachments filtered by month
+    // Fetch comments filtered by month
     const { data: comments, error } = await supabase
       .from('monthly_service_comments')
       .select(
@@ -55,6 +55,20 @@ export async function GET(
     if (error) {
       console.error('Error fetching monthly service comments:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    // Fetch reactions separately so the query doesn't fail if the table doesn't exist yet
+    const reactionsMap: Record<string, { id: string; user_id: string; emoji: string; created_at: string }[]> = {};
+    const commentIds = (comments || []).map((c) => c.id);
+    if (commentIds.length > 0) {
+      const { data: reactions } = await supabase
+        .from('comment_reactions')
+        .select('id, user_id, emoji, created_at, monthly_service_comment_id')
+        .in('monthly_service_comment_id', commentIds);
+      (reactions || []).forEach((r: { id: string; user_id: string; emoji: string; created_at: string; monthly_service_comment_id: string }) => {
+        if (!reactionsMap[r.monthly_service_comment_id]) reactionsMap[r.monthly_service_comment_id] = [];
+        reactionsMap[r.monthly_service_comment_id].push({ id: r.id, user_id: r.user_id, emoji: r.emoji, created_at: r.created_at });
+      });
     }
 
     // Fetch attachments separately for each comment
@@ -79,6 +93,7 @@ export async function GET(
         return {
           ...comment,
           attachments: attachmentsWithUrls,
+          reactions: reactionsMap[comment.id] || [],
         };
       })
     );
@@ -133,7 +148,7 @@ export async function POST(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
