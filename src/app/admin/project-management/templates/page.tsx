@@ -25,8 +25,8 @@ export default function ProjectTemplatesPage() {
   const [filterIsActive, setFilterIsActive] = useState<boolean | null>(null);
   const [users, setUsers] = useState<any[]>([]);
 
-  // Admin-only access check
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin';
+  // Admin and project_manager access check
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'project_manager';
 
   // Redirect non-admins
   useEffect(() => {

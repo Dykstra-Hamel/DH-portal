@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { sendMentionSlackNotifications, sendEditedCommentSlackNotifications } from '@/lib/slack/mention-notifications';
 
 function extractMentionedUserIds(html: string): string[] {
@@ -36,10 +37,12 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const adminDb = createAdminClient();
 
     const body = await request.json();
     if (!body.comment || !body.comment.trim()) {
@@ -51,9 +54,9 @@ export async function PATCH(
 
     // Fetch original comment and context data in parallel
     const [{ data: originalComment }, { data: task }, { data: commenterProfile }] = await Promise.all([
-      supabase.from('project_task_comments').select('comment').eq('id', commentId).single(),
-      supabase.from('project_tasks').select('id, title, projects(id, name, company_id, company:companies(name))').eq('id', taskId).single(),
-      supabase.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
+      adminDb.from('project_task_comments').select('comment').eq('id', commentId).single(),
+      adminDb.from('project_tasks').select('id, title, projects(id, name, company_id, company:companies(name))').eq('id', taskId).single(),
+      adminDb.from('profiles').select('first_name, last_name').eq('id', user.id).single(),
     ]);
 
     const originalMentions = originalComment ? extractMentionedUserIds(originalComment.comment) : [];
@@ -62,7 +65,7 @@ export async function PATCH(
       ? `${commenterProfile.first_name || ''} ${commenterProfile.last_name || ''}`.trim() || 'Someone'
       : 'Someone';
 
-    const { data: updatedComment, error } = await supabase
+    const { data: updatedComment, error } = await adminDb
       .from('project_task_comments')
       .update({ comment: body.comment })
       .eq('id', commentId)
@@ -71,7 +74,7 @@ export async function PATCH(
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email)
+        user_profile:profiles(id, first_name, last_name, email, avatar_url)
       `
       )
       .single();
@@ -107,7 +110,7 @@ export async function PATCH(
           reference_id: commentId,
           reference_type: 'task_comment',
         }));
-        supabase.from('notifications').insert(editNotifications).then(({ error: notifError }) => {
+        adminDb.from('notifications').insert(editNotifications).then(({ error: notifError }) => {
           if (notifError) console.error('Error creating edit notifications:', notifError);
         });
 
@@ -132,7 +135,7 @@ export async function PATCH(
           reference_id: commentId,
           reference_type: 'task_comment',
         }));
-        supabase.from('notifications').insert(newTagNotifications).then(({ error: notifError }) => {
+        adminDb.from('notifications').insert(newTagNotifications).then(({ error: notifError }) => {
           if (notifError) console.error('Error creating mention notifications:', notifError);
         });
 
@@ -175,12 +178,14 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { data, error } = await supabase
+    const adminDb = createAdminClient();
+
+    const { data, error } = await adminDb
       .from('project_task_comments')
       .delete()
       .eq('id', commentId)

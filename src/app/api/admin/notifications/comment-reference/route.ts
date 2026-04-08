@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,11 +14,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const adminDb = createAdminClient();
     const { searchParams } = new URL(request.url);
     const type = searchParams.get('type');
     const referenceId = searchParams.get('referenceId') || searchParams.get('commentId');
@@ -30,7 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === 'project_comment') {
-      const { data: comment, error } = await supabase
+      const { data: comment, error } = await adminDb
         .from('project_comments')
         .select('id, project_id')
         .eq('id', referenceId)
@@ -44,7 +46,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === 'task_comment') {
-      const { data: taskComment, error } = await supabase
+      const { data: taskComment, error } = await adminDb
         .from('project_task_comments')
         .select('id, task_id')
         .eq('id', referenceId)
@@ -54,7 +56,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Comment not found' }, { status: 404 });
       }
 
-      const { data: task, error: taskError } = await supabase
+      const { data: task, error: taskError } = await adminDb
         .from('project_tasks')
         .select('id, project_id')
         .eq('id', taskComment.task_id)
@@ -68,7 +70,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (type === 'monthly_service_comment') {
-      const { data: comment, error } = await supabase
+      const { data: comment, error } = await adminDb
         .from('monthly_service_comments')
         .select('id, monthly_service_id')
         .eq('id', referenceId)
@@ -83,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     if (type === 'proof') {
       // First try resolving as proof feedback ID
-      const { data: feedback } = await supabase
+      const { data: feedback } = await adminDb
         .from('proof_feedback')
         .select('id, project_id, proof_id')
         .eq('id', referenceId)
@@ -98,7 +100,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Fallback: resolve as proof ID
-      const { data: proof, error: proofError } = await supabase
+      const { data: proof, error: proofError } = await adminDb
         .from('project_proofs')
         .select('id, project_id')
         .eq('id', referenceId)

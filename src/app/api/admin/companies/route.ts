@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { verifyAuth, isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateSlug } from '@/lib/slug-utils';
 
@@ -7,7 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     // Verify authentication and admin authorization
     const { user, error: authError } = await verifyAuth(request);
-    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+    if (authError || !user || !(await isAuthorizedAdminOrPM(user))) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 

@@ -410,6 +410,7 @@ export interface ProjectTaskComment {
     avatar_url?: string | null;
   };
   attachments?: ProjectCommentAttachment[];
+  reactions?: CommentReaction[];
 }
 
 export interface ProjectTaskActivity {
@@ -537,6 +538,13 @@ export interface ProofFeedbackActivity {
   proof?: { id: string; file_name: string; version: number; is_current: boolean; mime_type: string };
 }
 
+export interface CommentReaction {
+  id: string;
+  user_id: string;
+  emoji: string;
+  created_at: string;
+}
+
 export interface ProjectComment {
   id: string;
   project_id: string;
@@ -552,6 +560,7 @@ export interface ProjectComment {
     avatar_url?: string | null;
   };
   attachments?: ProjectCommentAttachment[];
+  reactions?: CommentReaction[];
 }
 
 export interface ProjectActivity {

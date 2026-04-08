@@ -28,7 +28,7 @@ export default function ContentCalendarPage() {
         .eq('id', session.user.id)
         .single();
 
-      if (profile?.role !== 'admin') {
+      if (profile?.role !== 'admin' && profile?.role !== 'project_manager') {
         router.push('/dashboard');
         return;
       }
