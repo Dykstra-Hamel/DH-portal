@@ -34,13 +34,14 @@ export async function GET(
   try {
     const { id: projectId } = await params;
     const supabase = await createClient();
+    const adminClient = createAdminClient();
 
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: groups, error: groupsError } = await supabase
+    const { data: groups, error: groupsError } = await adminClient
       .from('proof_groups')
       .select('*')
       .eq('project_id', projectId)
@@ -50,7 +51,7 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch proof groups' }, { status: 500 });
     }
 
-    const { data: proofs, error: proofsError } = await supabase
+    const { data: proofs, error: proofsError } = await adminClient
       .from('project_proofs')
       .select(`
         *,
@@ -63,7 +64,7 @@ export async function GET(
       return NextResponse.json({ error: 'Failed to fetch proofs' }, { status: 500 });
     }
 
-    const { data: feedbackRows, error: feedbackError } = await supabase
+    const { data: feedbackRows, error: feedbackError } = await adminClient
       .from('proof_feedback')
       .select('proof_id, is_resolved')
       .eq('project_id', projectId);

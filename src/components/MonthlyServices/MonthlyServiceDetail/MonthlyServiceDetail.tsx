@@ -791,10 +791,13 @@ export function MonthlyServiceDetail({
         setServiceData(data.service);
       }
 
-      // Update selected task if it's the one being edited
-      if (selectedTask?.id === taskId) {
-        setSelectedTask({ ...selectedTask, ...updates });
-      }
+      // Update selected task if it's the one being edited.
+      // Use functional updater to avoid overwriting state set by concurrent async operations
+      // (e.g. onAddComment setting comments before this refresh completes).
+      setSelectedTask(prev => {
+        if (!prev || prev.id !== taskId) return prev;
+        return { ...prev, ...updates };
+      });
     } catch (error) {
       console.error('Error updating task:', error);
       throw error;
@@ -2334,6 +2337,8 @@ export function MonthlyServiceDetail({
                 throw new Error('Failed to add comment');
               }
 
+              const createdComment = await response.json();
+
               // Fetch the updated task with the real comment
               const updatedTaskResponse = await fetch(`/api/admin/tasks/${selectedTask.id}`, {
                 headers,
@@ -2347,6 +2352,8 @@ export function MonthlyServiceDetail({
 
               // Refresh service data to show new comment in the list
               onServiceUpdate();
+
+              return createdComment;
             } catch (error) {
               console.error('Error adding comment:', error);
               // On error, remove the temporary comment

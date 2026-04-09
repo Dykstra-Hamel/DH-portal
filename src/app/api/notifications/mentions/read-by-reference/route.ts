@@ -24,19 +24,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => null);
     const referenceType =
       typeof body?.referenceType === 'string' ? body.referenceType : '';
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     const referenceIds = Array.isArray(body?.referenceIds)
       ? body.referenceIds.filter(
-          (value: unknown): value is string => typeof value === 'string' && value.length > 0
+          (value: unknown): value is string => typeof value === 'string' && UUID_REGEX.test(value)
         )
-      : typeof body?.referenceId === 'string' && body.referenceId
+      : typeof body?.referenceId === 'string' && UUID_REGEX.test(body.referenceId)
         ? [body.referenceId]
         : [];
 
-    if (!referenceType || referenceIds.length === 0) {
-      return createErrorResponse(
-        'referenceType and at least one referenceId are required',
-        400
-      );
+    if (!referenceType) {
+      return createErrorResponse('referenceType is required', 400);
+    }
+
+    if (referenceIds.length === 0) {
+      return createSuccessResponse({ markedNotificationIds: [], markedCount: 0 });
     }
 
     if (!ALLOWED_REFERENCE_TYPES.has(referenceType)) {
