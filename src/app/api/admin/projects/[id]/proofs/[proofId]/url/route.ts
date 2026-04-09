@@ -19,8 +19,10 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // RLS on project_proofs enforces access
-    const { data: proof, error: proofError } = await supabase
+    const adminClient = createAdminClient();
+
+    // Use adminClient for the DB lookup so RLS doesn't block project_manager role
+    const { data: proof, error: proofError } = await adminClient
       .from('project_proofs')
       .select('file_path')
       .eq('id', proofId)
@@ -30,8 +32,6 @@ export async function GET(
     if (proofError || !proof) {
       return NextResponse.json({ error: 'Proof not found' }, { status: 404 });
     }
-
-    const adminClient = createAdminClient();
     const { data, error } = await adminClient.storage
       .from('project-files')
       .createSignedUrl(proof.file_path, 3600);

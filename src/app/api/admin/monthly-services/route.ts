@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateTasksForMonth } from '@/lib/monthly-services/generate-tasks';
 
 // GET /api/admin/monthly-services - Fetch all monthly services with progress
@@ -27,12 +28,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const adminDb = createAdminClient();
+
     // Get month filter from query params (default to current month)
     const searchParams = request.nextUrl.searchParams;
     const month = searchParams.get('month') || new Date().toISOString().slice(0, 7); // YYYY-MM format
 
     // Fetch monthly services with company info
-    const { data: services, error: servicesError } = await supabase
+    const { data: services, error: servicesError } = await adminDb
       .from('monthly_services')
       .select(
         `
@@ -71,7 +74,7 @@ export async function GET(request: NextRequest) {
     const servicesWithProgress = await Promise.all(
       (services || []).map(async service => {
         // Fetch task templates
-        const { data: templates } = await supabase
+        const { data: templates } = await adminDb
           .from('monthly_service_task_templates')
           .select('*')
           .eq('monthly_service_id', service.id)
@@ -83,7 +86,7 @@ export async function GET(request: NextRequest) {
         const endDate = new Date(year, monthNum, 0); // Day 0 = last day of previous month (which is monthNum - 1)
 
         // Fetch generated tasks for this service in the current month
-        const { data: tasks, error: tasksError } = await supabase
+        const { data: tasks, error: tasksError } = await adminDb
           .from('project_tasks')
           .select('id, is_completed, due_date')
           .eq('monthly_service_id', service.id)
@@ -168,6 +171,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const adminDb = createAdminClient();
     const body = await request.json();
     const {
       company_id,
@@ -192,7 +196,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create service
-    const { data: service, error: insertError } = await supabase
+    const { data: service, error: insertError } = await adminDb
       .from('monthly_services')
       .insert({
         company_id,
@@ -230,7 +234,7 @@ export async function POST(request: NextRequest) {
         display_order: template.display_order !== undefined ? template.display_order : index,
       }));
 
-      const { error: templatesError } = await supabase
+      const { error: templatesError } = await adminDb
         .from('monthly_service_task_templates')
         .insert(templatesWithServiceId);
 
@@ -250,7 +254,7 @@ export async function POST(request: NextRequest) {
       // Generate tasks for the current month
       try {
         const currentMonth = new Date().toISOString().slice(0, 7);
-        await generateTasksForMonth(supabase, service.id, {
+        await generateTasksForMonth(adminDb, service.id, {
           month: currentMonth,
           createdBy: user.id,
         });

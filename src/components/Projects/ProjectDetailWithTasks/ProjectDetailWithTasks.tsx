@@ -3,16 +3,16 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { User } from '@supabase/supabase-js';
+import { RealtimeChannel, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeFileName } from '@/lib/storage-utils';
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, FileText, Loader, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
-import { CommentReaction, Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, ProofFeedbackActivity, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { CommentReaction, Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectCommentAttachment, ProjectDepartment, ProjectTask, ProofFeedbackActivity, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
 import CommentReactions from '@/components/shared/CommentReactions/CommentReactions';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
@@ -142,6 +142,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
   const commentComposerDragCounterRef = React.useRef(0);
   const recentlyPostedCommentIdsRef = useRef<Set<string>>(new Set());
+  const commentsChannelRef = useRef<RealtimeChannel | null>(null);
+  const [pendingAttachmentCommentIds, setPendingAttachmentCommentIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
@@ -618,7 +620,27 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         { event: 'DELETE', schema: 'public', table: 'project_comments', filter: `project_id=eq.${project.id}` },
         () => { fetchComments(); }
       )
+      .on('broadcast', { event: 'attachment-uploading' }, (msg) => {
+        const { commentId } = msg.payload as { commentId: string };
+        setPendingAttachmentCommentIds(prev => new Set([...prev, commentId]));
+      })
+      .on('broadcast', { event: 'attachments-ready' }, (msg) => {
+        const { commentId, attachments } = msg.payload as {
+          commentId: string;
+          attachments: ProjectCommentAttachment[];
+        };
+        setPendingAttachmentCommentIds(prev => {
+          const next = new Set(prev);
+          next.delete(commentId);
+          return next;
+        });
+        setComments(prev =>
+          prev.map(c => c.id === commentId ? { ...c, attachments } : c)
+        );
+      })
       .subscribe();
+
+    commentsChannelRef.current = commentsChannel;
 
     const proofFeedbackChannel = supabase
       .channel(`project-proof-feedback-activity:${project.id}`)
@@ -679,6 +701,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       .subscribe();
 
     return () => {
+      commentsChannelRef.current = null;
       supabase.removeChannel(commentsChannel);
       supabase.removeChannel(proofFeedbackChannel);
       supabase.removeChannel(reactionsChannel);
@@ -1658,8 +1681,17 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
       const comment = await response.json();
 
+      // Register before attachment upload so the Realtime INSERT event (which fires
+      // as soon as the row is written) sees this ID and skips the refetch.
+      recentlyPostedCommentIdsRef.current.add(comment.id);
+
       // If there are attachments, upload them directly to storage
       if (pendingAttachments.length > 0) {
+        commentsChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'attachment-uploading',
+          payload: { commentId: comment.id },
+        });
         const supabase = createClient();
         const MAX_FILE_SIZE = 50 * 1024 * 1024;
         setProjectCommentUploadProgress({
@@ -1749,6 +1781,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
         if (attachmentResponse.ok) {
           const uploadedAttachments = await attachmentResponse.json();
+          commentsChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'attachments-ready',
+            payload: { commentId: comment.id, attachments: uploadedAttachments },
+          });
           comment.attachments = uploadedAttachments;
         } else {
           // Clean up uploaded files if metadata save fails
@@ -1759,7 +1796,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         }
       }
 
-      recentlyPostedCommentIdsRef.current.add(comment.id);
       setComments(prev => [...prev, comment]);
       setNewComment('');
       setPendingAttachments([]);
@@ -3279,6 +3315,12 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                   className={styles.commentText}
                                   dangerouslySetInnerHTML={{ __html: getCommentHtml(comment.comment) }}
                                 />
+                                {pendingAttachmentCommentIds.has(comment.id) && (
+                                  <div className={styles.attachmentUploading}>
+                                    <Loader size={12} />
+                                    <span>Attachment uploading&hellip;</span>
+                                  </div>
+                                )}
                                 {comment.attachments && comment.attachments.length > 0 && (() => {
                                   const imageAttachments = comment.attachments.filter(
                                     (attachment: { mime_type?: string | null }) =>
