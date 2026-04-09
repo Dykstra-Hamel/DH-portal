@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 export async function GET(
   request: NextRequest,
@@ -36,6 +37,7 @@ export async function POST(
   try {
     const { id: projectId } = await params;
     const supabase = await createClient();
+    const adminDb = createAdminClient();
     const { user_id } = await request.json();
 
     if (!user_id) {
@@ -49,7 +51,7 @@ export async function POST(
     }
 
     // Add member
-    const { data: member, error } = await supabase
+    const { data: member, error } = await adminDb
       .from('project_members')
       .insert({
         project_id: projectId,
