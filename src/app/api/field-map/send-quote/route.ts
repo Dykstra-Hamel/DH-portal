@@ -49,6 +49,7 @@ export async function POST(request: NextRequest) {
       discountTarget,
       discountAmount,
       discountType,
+      companyId: bodyCompanyId,
     } = body;
 
     // Derive totals from line items
@@ -88,13 +89,20 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient();
 
-    // Resolve company for the logged-in user
-    const { data: userCompany } = await adminClient
+    // Resolve company — prefer the companyId sent from the client (selected company),
+    // fall back to the user's primary company
+    let companyQuery = adminClient
       .from('user_companies')
       .select('company_id')
-      .eq('user_id', user.id)
-      .eq('is_primary', true)
-      .single();
+      .eq('user_id', user.id);
+
+    if (bodyCompanyId) {
+      companyQuery = companyQuery.eq('company_id', bodyCompanyId);
+    } else {
+      companyQuery = companyQuery.eq('is_primary', true);
+    }
+
+    const { data: userCompany } = await companyQuery.single();
 
     if (!userCompany?.company_id) {
       return NextResponse.json({ error: 'Company not found' }, { status: 400 });
