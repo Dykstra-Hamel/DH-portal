@@ -214,16 +214,23 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') ?? toIsoDateUTC(new Date());
+    const requestedCompanyId = searchParams.get('companyId');
     const { weekStart, weekEnd } = getWeekRange(date);
 
     const adminSupabase = createAdminClient();
 
-    const { data: userCompany } = await adminSupabase
+    let companyQuery = adminSupabase
       .from('user_companies')
       .select('company_id, pestpac_employee_id')
-      .eq('user_id', user.id)
-      .eq('is_primary', true)
-      .single();
+      .eq('user_id', user.id);
+
+    if (requestedCompanyId) {
+      companyQuery = companyQuery.eq('company_id', requestedCompanyId);
+    } else {
+      companyQuery = companyQuery.eq('is_primary', true);
+    }
+
+    const { data: userCompany } = await companyQuery.single();
 
     if (!userCompany) {
       return NextResponse.json({ error: 'No company found' }, { status: 404 });

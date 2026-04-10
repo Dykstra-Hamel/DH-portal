@@ -75,7 +75,7 @@ function RouteMapPreview({ stops }: { stops: RouteStop[] }) {
   );
 }
 
-export function FieldMapDashboard() {
+export function FieldMapDashboard({ companyId = '' }: { companyId?: string }) {
   const [stops, setStops] = useState<RouteStop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,9 +85,13 @@ export function FieldMapDashboard() {
   const dateParam = today.toISOString().split('T')[0];
 
   useEffect(() => {
+    if (!companyId) return;
+    setLoading(true);
+    setError(null);
+    setNeedsSetup(false);
     async function fetchRoute() {
       try {
-        const res = await fetch(`/api/field-map/route?date=${dateParam}`);
+        const res = await fetch(`/api/field-map/route?date=${dateParam}&companyId=${companyId}`);
         const data = await res.json();
         if (data.needsSetup) { setNeedsSetup(true); return; }
         if (!res.ok) { setError(data.error ?? 'Failed to load route'); return; }
@@ -99,7 +103,7 @@ export function FieldMapDashboard() {
       }
     }
     fetchRoute();
-  }, [dateParam]);
+  }, [dateParam, companyId]);
 
   const completed = stops.filter(s => s.serviceStatus.toLowerCase().includes('complete')).length;
   const remaining = stops.length - completed;
@@ -200,7 +204,7 @@ export function FieldMapDashboard() {
         {!loading && !needsSetup && !error && stops.length > 0 && (
           <div className={styles.stopList}>
             {stops.map(stop => (
-              <RouteStopCard key={stop.stopId} stop={stop} />
+              <RouteStopCard key={stop.stopId} stop={stop} companyId={companyId} />
             ))}
           </div>
         )}

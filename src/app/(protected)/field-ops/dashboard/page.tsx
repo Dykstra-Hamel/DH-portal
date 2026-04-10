@@ -28,7 +28,7 @@ export default function FieldOpsDashboard() {
     <div className={styles.wrapper}>
       {isInspector && (
         <div className={styles.section}>
-          <FieldMapDashboard />
+          <FieldMapDashboard companyId={selectedCompany?.id ?? ''} />
         </div>
       )}
       {isTechnician && (

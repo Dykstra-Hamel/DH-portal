@@ -280,6 +280,7 @@ export function ReviewStep({
         address, pestTypes, quoteLineItems: submittedLineItems, notes, mapPlotData,
         inspectorName, companyName, sendEmail,
         discountTarget, discountAmount, discountType,
+        companyId,
       }),
     });
     const data = await res.json();
@@ -328,6 +329,7 @@ export function ReviewStep({
           quoteLineItems: submittedLineItems, notes, mapPlotData,
           signatureData, signedBy, scheduleOption: option, assignedTo,
           discountTarget, discountAmount, discountType,
+          companyId,
         }),
       });
       const data = await res.json();
