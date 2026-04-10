@@ -309,6 +309,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   // Filter menu items based on super admin status and feature access
   // Hide super-admin-only items by default until we confirm user is admin
   const visibleMenuItems = menuItems.filter(item => {
+    // Global admins always see everything — skip department-based restrictions
+    if (!isHydrating && isAdmin) return true;
     // Technician-only users only see field-ops and customers
     if (isTechnicianOnly) {
       return item.id === 'field-ops' || item.id === 'customers';

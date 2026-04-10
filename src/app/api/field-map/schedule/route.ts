@@ -42,6 +42,7 @@ export async function POST(request: NextRequest) {
       discountTarget,
       discountAmount,
       discountType,
+      companyId: bodyCompanyId,
     } = body;
 
     if (!clientName || !address) {
@@ -50,12 +51,18 @@ export async function POST(request: NextRequest) {
 
     const adminClient = createAdminClient();
 
-    const { data: userCompany } = await adminClient
+    let companyQuery = adminClient
       .from('user_companies')
       .select('company_id')
-      .eq('user_id', user.id)
-      .eq('is_primary', true)
-      .single();
+      .eq('user_id', user.id);
+
+    if (bodyCompanyId) {
+      companyQuery = companyQuery.eq('company_id', bodyCompanyId);
+    } else {
+      companyQuery = companyQuery.eq('is_primary', true);
+    }
+
+    const { data: userCompany } = await companyQuery.single();
 
     if (!userCompany?.company_id) {
       return NextResponse.json({ error: 'Company not found' }, { status: 400 });

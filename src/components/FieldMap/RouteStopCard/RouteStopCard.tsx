@@ -21,6 +21,7 @@ export interface RouteStop {
 
 interface RouteStopCardProps {
   stop: RouteStop;
+  companyId?: string;
 }
 
 function formatTime(time: string | null): string {
@@ -40,13 +41,13 @@ function getStatusStyle(status: string): string {
   return styles.statusScheduled;
 }
 
-export function RouteStopCard({ stop }: RouteStopCardProps) {
+export function RouteStopCard({ stop, companyId }: RouteStopCardProps) {
   const status = stop.serviceStatus.toLowerCase();
   const showStatus = !status.includes('scheduled');
 
   return (
     <Link
-      href={`/field-ops/field-map/service/${stop.stopId}?routeId=${stop.routeId}`}
+      href={`/field-ops/field-map/service/${stop.stopId}?routeId=${stop.routeId}${companyId ? `&companyId=${companyId}` : ''}`}
       className={styles.card}
     >
       <div className={styles.timeCol}>
