@@ -142,6 +142,7 @@ export default function ProjectTaskDetail({
     task?.assigned_to || ''
   );
   const [dueDateDraft, setDueDateDraft] = useState('');
+  const [, setStartDateDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState(
     task?.description || ''
   );
