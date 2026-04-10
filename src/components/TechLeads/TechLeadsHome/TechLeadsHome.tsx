@@ -48,7 +48,12 @@ function useCountUp(target: number, duration = 800): number {
   return display;
 }
 
-export function TechLeadsHome() {
+interface TechLeadsHomeProps {
+  showNav?: boolean;
+  newPath?: string;
+}
+
+export function TechLeadsHome({ showNav = true, newPath = '/tech-leads/new' }: TechLeadsHomeProps) {
   const router = useRouter();
   const { selectedCompany } = useCompany();
   const [stats, setStats] = useState<Stats>({ submitted: 0, won: 0, lost: 0, scheduled: 0 });
@@ -100,7 +105,7 @@ export function TechLeadsHome() {
         <div className={styles.ctaSection}>
           <button
             className={styles.newOpportunityBtn}
-            onClick={() => router.push('/tech-leads/new')}
+            onClick={() => router.push(newPath)}
           >
             <span className={styles.plusIcon}>+</span>
             New Opportunity
@@ -126,7 +131,7 @@ export function TechLeadsHome() {
           </div>
         </div>
       </div>
-      <TechLeadsNav />
+      {showNav && <TechLeadsNav />}
     </>
   );
 }

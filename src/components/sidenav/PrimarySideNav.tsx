@@ -18,11 +18,10 @@ interface PrimarySideNavProps {
 export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
-  const { isAdmin, isProjectManager, isHydrating, selectedCompany } = useCompany();
-  const {
-    hasAccess: hasProjectManagement,
-    loading: featureLoading,
-  } = useFeatureAccess('project_management');
+  const { isAdmin, isProjectManager, isHydrating, selectedCompany } =
+    useCompany();
+  const { hasAccess: hasProjectManagement, loading: featureLoading } =
+    useFeatureAccess('project_management');
 
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
 
@@ -41,6 +40,9 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const isTechnicianOnly =
     departments.length > 0 && departments.every(d => d === 'technician');
   const isTechnician = departments.includes('technician');
+  const isInspector = departments.includes('inspector');
+  const isInspectorOnly =
+    departments.length > 0 && departments.every(d => d === 'inspector');
 
   const menuItems: Array<{
     id: PrimaryNavItem;
@@ -209,11 +211,11 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Tracker',
     },
     {
-      id: 'tech-leads' as PrimaryNavItem,
-      href: '/tech-leads',
+      id: 'field-ops' as PrimaryNavItem,
+      href: '/field-ops/dashboard',
       disabled: false,
       icon: <Truck size={24} />,
-      text: 'TechLeads',
+      text: 'FieldOps',
     },
     {
       id: 'brand' as PrimaryNavItem,
@@ -290,11 +292,16 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       return pathname.startsWith('/campaigns');
     }
     if (href === '/admin/project-management') {
-      return pathname.startsWith('/admin/project-management') ||
+      return (
+        pathname.startsWith('/admin/project-management') ||
         pathname.startsWith('/project-management') ||
         pathname.startsWith('/admin/monthly-services') ||
         pathname.startsWith('/admin/content-calendar') ||
-        pathname.startsWith('/admin/content-pieces');
+        pathname.startsWith('/admin/content-pieces')
+      );
+    }
+    if (href === '/field-ops/dashboard') {
+      return pathname.startsWith('/field-ops');
     }
     return pathname.startsWith(href);
   };
@@ -302,11 +309,18 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   // Filter menu items based on super admin status and feature access
   // Hide super-admin-only items by default until we confirm user is admin
   const visibleMenuItems = menuItems.filter(item => {
-    // Technician-only users only see tech-leads and customers
+    // Technician-only users only see field-ops and customers
     if (isTechnicianOnly) {
-      return item.id === 'tech-leads' || item.id === 'customers';
+      return item.id === 'field-ops' || item.id === 'customers';
     }
-
+    // Inspector-only users only see field-ops and customers
+    if (isInspectorOnly) {
+      return item.id === 'field-ops' || item.id === 'customers';
+    }
+    // FieldOps is visible to technicians, inspectors, and admins
+    if (item.id === 'field-ops') {
+      return isTechnician || isInspector || (!isHydrating && isAdmin);
+    }
     // Project managers only see the Tracker nav item
     if (isProjectManager) {
       return !isHydrating && item.id === 'project-management';

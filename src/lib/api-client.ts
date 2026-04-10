@@ -84,6 +84,8 @@ export const adminAPI = {
     company_id: string;
     role: string;
     departments?: string[];
+    sendEmail?: boolean;
+    password?: string;
   }) {
     return authenticatedFetch('/api/admin/users/invite', {
       method: 'POST',
@@ -411,12 +413,13 @@ export const adminAPI = {
   // Non-admin leads endpoints
   async getUserLeads(
     companyId: string,
-    filters: { dateFrom?: string; dateTo?: string } = {}
+    filters: { dateFrom?: string; dateTo?: string; branchId?: string } = {}
   ) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', companyId);
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.branchId) queryParams.append('branchId', filters.branchId);
 
     const response = await authenticatedFetch(
       `/api/leads?${queryParams.toString()}`
@@ -427,13 +430,14 @@ export const adminAPI = {
 
   async getUserArchivedLeads(
     companyId: string,
-    filters: { dateFrom?: string; dateTo?: string } = {}
+    filters: { dateFrom?: string; dateTo?: string; branchId?: string } = {}
   ) {
     const queryParams = new URLSearchParams();
     queryParams.append('companyId', companyId);
     queryParams.append('includeArchived', 'true');
     if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
     if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+    if (filters.branchId) queryParams.append('branchId', filters.branchId);
 
     return authenticatedFetch(`/api/leads?${queryParams.toString()}`);
   },

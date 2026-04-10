@@ -46,6 +46,7 @@ export async function GET(request: NextRequest) {
           id,
           customer_id,
           company_id,
+          branch_id,
           customers (
             id,
             first_name,
@@ -157,6 +158,23 @@ export async function GET(request: NextRequest) {
             userCompanies.includes(leadCompanyId) ||
             userCompanies.includes(customerCompanyId)
           );
+        });
+      }
+    }
+
+    // Branch filtering: restrict to user's assigned branches (via lead's branch_id)
+    if (!isAdmin && companyIdFilter && companyIdFilter !== 'all') {
+      const { data: assignments } = await supabase
+        .from('user_branch_assignments')
+        .select('branch_id')
+        .eq('user_id', user.id)
+        .eq('company_id', companyIdFilter);
+
+      if (assignments && assignments.length > 0) {
+        const allowedBranchIds = assignments.map((a: { branch_id: string }) => a.branch_id);
+        filteredCalls = filteredCalls.filter(call => {
+          const leadBranchId = call.leads?.branch_id;
+          return leadBranchId == null || allowedBranchIds.includes(leadBranchId);
         });
       }
     }

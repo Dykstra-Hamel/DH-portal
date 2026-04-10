@@ -39,16 +39,22 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // Handle invite confirmation flow
+  // Handle invite / OTP confirmation flow (token_hash + type in URL)
   if (token_hash && type) {
-    const { error } = await supabase.auth.verifyOtp({
-      type: type as any,
-      token_hash,
-    });
-    if (!error) {
-      const { data: { user } } = await supabase.auth.getUser();
-      const destination = next ?? (user ? await getHomeRoute(supabase, user.id) : '/tickets/dashboard');
-      return NextResponse.redirect(`${origin}${destination}`);
+    const allowedTypes = ['invite', 'signup', 'recovery', 'magiclink', 'email', 'email_change'];
+    if (allowedTypes.includes(type)) {
+      const { error } = await supabase.auth.verifyOtp({
+        // EmailOtpType covers: invite, signup, recovery, magiclink, email, email_change
+        type: type as 'invite' | 'signup' | 'recovery' | 'magiclink' | 'email' | 'email_change',
+        token_hash,
+      });
+      if (!error) {
+        const { data: { user } } = await supabase.auth.getUser();
+        const destination = next ?? (user ? await getHomeRoute(supabase, user.id) : '/tickets/dashboard');
+        return NextResponse.redirect(`${origin}${destination}`);
+      }
+      // verifyOtp failed — token likely expired or already used
+      return NextResponse.redirect(`${origin}/login?error=invite-expired`);
     }
   }
 

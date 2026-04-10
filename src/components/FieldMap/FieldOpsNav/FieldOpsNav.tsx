@@ -1,0 +1,172 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { useRouter, usePathname } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
+import { useCompany } from '@/contexts/CompanyContext';
+import { useUserDepartments } from '@/hooks/useUserDepartments';
+import styles from './FieldOpsNav.module.scss';
+
+export function FieldOpsNav() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const { selectedCompany, isAdmin } = useCompany();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [showPopup, setShowPopup] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null);
+    });
+  }, []);
+
+  const { departments } = useUserDepartments(userId ?? '', selectedCompany?.id ?? '');
+
+  const isTechnician = departments.includes('technician');
+  const isInspector = departments.includes('inspector');
+  const showBothOptions = isAdmin || (isTechnician && isInspector);
+
+  const isActive = (href: string) => {
+    if (href === '/field-ops/dashboard') {
+      return pathname === '/field-ops/dashboard';
+    }
+    return pathname.startsWith(href);
+  };
+
+  const handleNewPress = () => {
+    if (showBothOptions) {
+      setShowPopup(true);
+    } else if (isInspector) {
+      router.push('/field-ops/field-map/new');
+    } else {
+      router.push('/field-ops/tech-leads/new');
+    }
+  };
+
+  const thirdHref = isInspector
+    ? '/field-ops/field-map/history'
+    : '/field-ops/tech-leads/opportunities';
+
+  const thirdLabel = isInspector ? 'History' : 'My Opps';
+
+  return (
+    <>
+      {showPopup && (
+        <div className={styles.overlay} onClick={() => setShowPopup(false)}>
+          <div className={styles.sheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.sheetTitle}>What would you like to create?</p>
+            <button
+              className={styles.sheetOption}
+              onClick={() => { setShowPopup(false); router.push('/field-ops/field-map/new'); }}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>New Inspection</strong>
+                <span>Start a new field map service stop</span>
+              </span>
+            </button>
+            <button
+              className={styles.sheetOption}
+              onClick={() => { setShowPopup(false); router.push('/field-ops/tech-leads/new'); }}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                  <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>New Lead</strong>
+                <span>Capture a new tech leads opportunity</span>
+              </span>
+            </button>
+            <button className={styles.sheetCancel} onClick={() => setShowPopup(false)}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      <nav className={styles.nav}>
+        <div className={styles.navInner}>
+          {/* Home */}
+          <Link
+            href="/field-ops/dashboard"
+            className={`${styles.navItem} ${isActive('/field-ops/dashboard') ? styles.active : ''}`}
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path
+                d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M9 21V12h6v9"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className={styles.label}>Home</span>
+          </Link>
+
+          {/* New — raised center button */}
+          <button type="button" className={styles.newItem} onClick={handleNewPress}>
+            <div className={styles.newBtn}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                <line x1="12" y1="8" x2="12" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="8" y1="12" x2="16" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+            <span className={styles.newLabel}>New</span>
+          </button>
+
+          {/* Third item: History (inspector) or My Opps (technician) */}
+          <Link
+            href={thirdHref}
+            className={`${styles.navItem} ${isActive(thirdHref) ? styles.active : ''}`}
+          >
+            {isInspector ? (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="2" />
+                <line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="9" y1="16" x2="13" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path
+                  d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <rect x="9" y="3" width="6" height="4" rx="1" stroke="currentColor" strokeWidth="2" />
+                <line x1="9" y1="12" x2="15" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <line x1="9" y1="16" x2="13" y2="16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            )}
+            <span className={styles.label}>{thirdLabel}</span>
+          </Link>
+        </div>
+      </nav>
+    </>
+  );
+}

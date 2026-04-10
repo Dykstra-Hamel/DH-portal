@@ -3,13 +3,51 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Pencil, X, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
+import { Pencil, X, ChevronLeft, ChevronRight, Truck, MapPin } from 'lucide-react';
 import { Lead, LeadSource } from '@/types/lead';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { authenticatedFetch } from '@/lib/api-client';
+import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
+import type { MapPlotData } from '@/components/FieldMap/MapPlot/types';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
+
+// Fetches the field_map activity for a lead and renders a read-only MapPlotCanvas
+function FieldMapPlotSection({ leadId }: { leadId: string }) {
+  const [mapPlotData, setMapPlotData] = useState<MapPlotData | null>(null);
+
+  useEffect(() => {
+    fetch(`/api/leads/${leadId}/activities`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (!data) return;
+        const activities: any[] = data.data ?? [];
+        const fieldMapActivity = activities.find(
+          (a: any) => a.metadata?.source === 'field_map' && a.metadata?.map_plot
+        );
+        if (fieldMapActivity?.metadata?.map_plot) {
+          setMapPlotData(fieldMapActivity.metadata.map_plot as MapPlotData);
+        }
+      })
+      .catch(() => null);
+  }, [leadId]);
+
+  if (!mapPlotData) return null;
+
+  return (
+    <div className={styles.transcriptSection}>
+      <div className={styles.transcriptHeader}>
+        <h4 className={cardStyles.dataLabel}>Field Map Plot</h4>
+      </div>
+      <MapPlotCanvas
+        mapPlotData={mapPlotData}
+        onChange={() => {}}
+        isReadOnly
+      />
+    </div>
+  );
+}
 
 interface LeadCallFormInfoProps {
   lead: Lead;
@@ -243,6 +281,30 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             </div>,
             portalContainer ?? document.body
           )}
+        </div>
+      ) : lead.lead_source === 'inspector' ? (
+        <div className={styles.cardContent}>
+          <div className={styles.callInsightsGrid}>
+            <div className={styles.callDetailItem}>
+              <span className={cardStyles.dataLabel}>Source</span>
+              <span className={cardStyles.dataText} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={16} strokeWidth={1.5} />
+                FieldMap
+              </span>
+            </div>
+            {renderSubmittedBy()}
+          </div>
+          {lead.comments && (
+            <div className={styles.transcriptSection}>
+              <div className={styles.transcriptHeader}>
+                <h4 className={cardStyles.dataLabel}>Inspection Notes</h4>
+              </div>
+              <div className={styles.summaryPlainContent}>
+                <span className={cardStyles.transcriptText}>{lead.comments}</span>
+              </div>
+            </div>
+          )}
+          <FieldMapPlotSection leadId={lead.id} />
         </div>
       ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>

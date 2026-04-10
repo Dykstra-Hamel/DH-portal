@@ -26,6 +26,8 @@ export async function POST(request: NextRequest) {
       company_id: sanitizeString(body.company_id || ''),
       role: sanitizeString(body.role || 'member'),
       departments: Array.isArray(body.departments) ? body.departments.map((dept: string) => sanitizeString(dept)).filter(Boolean) : [],
+      sendEmail: body.sendEmail !== false, // default true
+      password: typeof body.password === 'string' ? body.password.trim() : '',
     };
 
     // Validate required fields
@@ -49,17 +51,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate departments for member/manager roles
+    // Departments are optional — assign them if provided, skip silently if not
     const canHaveDepartments = ['member', 'manager'].includes(userData.role);
-    if (canHaveDepartments && userData.departments.length === 0) {
-      return NextResponse.json(
-        { error: 'At least one department must be selected for Member and Manager roles' },
-        { status: 400 }
-      );
-    }
 
     // Validate department values
-    const validDepartments = ['sales', 'support', 'scheduling'];
+    const validDepartments = ['sales', 'support', 'scheduling', 'technician', 'inspector'];
     const invalidDepartments = userData.departments.filter((dept: string) => !validDepartments.includes(dept));
     if (invalidDepartments.length > 0) {
       return NextResponse.json(
@@ -79,10 +75,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Company not found' }, { status: 400 });
     }
 
-    // Send invitation using Supabase auth admin
-    const { data, error } = await supabase.auth.admin.inviteUserByEmail(
-      userData.email,
-      {
+    // Send invitation or create user directly depending on sendEmail flag
+    let inviteData: { user: { id: string; email?: string | null } | null } = { user: null };
+    let inviteError: { message: string } | null = null;
+
+    if (userData.sendEmail) {
+      const { data, error } = await supabase.auth.admin.inviteUserByEmail(userData.email, {
         redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/auth/callback`,
         data: {
           first_name: userData.first_name,
@@ -91,62 +89,75 @@ export async function POST(request: NextRequest) {
           company_name: company.name,
           role: userData.role,
         },
-      }
-    );
+      });
+      inviteData = data ?? { user: null };
+      inviteError = error;
+    } else {
+      // Create user directly — use provided password or fall back to a random one
+      const crypto = await import('crypto');
+      const password = userData.password || crypto.randomBytes(24).toString('base64').slice(0, 24);
+      const { data, error } = await supabase.auth.admin.createUser({
+        email: userData.email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          first_name: userData.first_name,
+          last_name: userData.last_name,
+        },
+      });
+      inviteData = { user: data.user ?? null };
+      inviteError = error;
+    }
 
-    if (error) {
-      console.error('Error sending invitation:', error);
+    if (inviteError) {
+      console.error('Error creating user:', inviteError);
       return NextResponse.json(
-        { error: 'Failed to send invitation' },
+        { error: userData.sendEmail ? 'Failed to send invitation' : 'Failed to create user' },
         { status: 500 }
       );
     }
 
-    // If user was successfully invited, create a profile and company relationship
-    if (data.user) {
-      // Create profile
+    // Create profile and company relationship for the new user
+    const newUser = inviteData.user;
+    if (newUser) {
       await supabase.from('profiles').insert({
-        id: data.user.id,
+        id: newUser.id,
         first_name: userData.first_name,
         last_name: userData.last_name,
         email: userData.email,
       });
 
-      // Create user-company relationship
       await supabase.from('user_companies').insert({
-        user_id: data.user.id,
+        user_id: newUser.id,
         company_id: userData.company_id,
         role: userData.role,
-        is_primary: true, // First company is primary
+        is_primary: true,
       });
 
-      // Assign departments if user has member/manager role and departments were specified
       if (canHaveDepartments && userData.departments.length > 0) {
         const departmentInserts = userData.departments.map((department: string) => ({
-          user_id: data.user.id,
+          user_id: newUser.id,
           company_id: userData.company_id,
-          department
+          department,
         }));
-
         const { error: departmentError } = await supabase
           .from('user_departments')
           .insert(departmentInserts);
-
         if (departmentError) {
-          console.error('Error assigning departments during invite:', departmentError);
-          // Don't fail the entire invitation if department assignment fails
-          // The departments can be assigned later through the UI
+          console.error('Error assigning departments:', departmentError);
         }
       }
     }
 
     return NextResponse.json({
       success: true,
-      message: `Invitation sent to ${userData.email}`,
-      user: data.user
+      message: userData.sendEmail
+        ? `Invitation sent to ${userData.email}`
+        : `User ${userData.email} added successfully`,
+      user: newUser
         ? {
-            id: data.user.id,
-            email: data.user.email,
+            id: newUser.id,
+            email: newUser.email,
             company: company.name,
             role: userData.role,
             departments: canHaveDepartments ? userData.departments : [],

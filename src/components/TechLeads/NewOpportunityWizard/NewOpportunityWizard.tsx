@@ -1,7 +1,12 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { UserPlus, TrendingUp, ChevronDown, X } from 'lucide-react';
+import {
+  UserPlus,
+  TrendingUp,
+  ChevronDown,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -17,6 +22,7 @@ type LeadType = 'new-lead' | 'upsell';
 
 type StepId =
   | 'type-select'
+  | 'map-address'
   | 'photos'
   | 'ai-review'
   | 'new-customer'
@@ -28,6 +34,7 @@ type StepId =
 
 const STEP_ID_LABELS: Record<StepId, string> = {
   'type-select': 'Type',
+  'map-address': 'Address',
   'photos': 'Photos',
   'ai-review': 'AI Review',
   'new-customer': 'Customer',
@@ -37,6 +44,7 @@ const STEP_ID_LABELS: Record<StepId, string> = {
   'review': 'Review',
   'service-today-confirm': 'Confirm',
 };
+
 
 interface NewCustomerForm {
   firstName: string;
@@ -326,6 +334,7 @@ function StepTypeSelect({
     </div>
   );
 }
+
 
 function StepPhotos({
   photos,
@@ -1887,6 +1896,11 @@ export function NewOpportunityWizard() {
   const currentStepId = wizardSteps[stepIndex];
   const draftKey = companyId ? `techleads_draft_${companyId}` : null;
 
+  useEffect(() => {
+    if (stepIndex <= wizardSteps.length - 1) return;
+    setStepIndex(Math.max(0, wizardSteps.length - 1));
+  }, [stepIndex, wizardSteps]);
+
   // Restore draft from localStorage when companyId becomes available
   useEffect(() => {
     if (!draftKey || stepIndex > 0) return;
@@ -2415,9 +2429,11 @@ export function NewOpportunityWizard() {
   const isNextLoading = isSyncingCustomer || isCreatingCustomer;
   const nextLoadingLabel = isCreatingCustomer ? 'Creating customer…' : 'Syncing customer…';
 
-  // Steps visible in progress bar (exclude 'type-select' and 'service-today-confirm')
-  const progressSteps = wizardSteps.filter(s => s !== 'type-select' && s !== 'service-today-confirm');
-  const progressIndex = stepIndex - 1; // offset since type-select is step 0
+  // Steps visible in progress bar
+  const progressSteps: StepId[] = wizardSteps.filter(
+    s => s !== 'type-select' && s !== 'service-today-confirm'
+  ) as StepId[];
+  const progressIndex = progressSteps.indexOf(currentStepId);
 
   return (
     <div className={styles.wizardContainer} ref={wizardContainerRef}>

@@ -10,6 +10,7 @@ import {
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { logCreation } from '@/lib/activity-logger';
+import { getUserBranchFilter } from '@/lib/branch-filter';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
     const unassigned = searchParams.get('unassigned') === 'true';
     const unassignedScheduler = searchParams.get('unassignedScheduler') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const branchId = searchParams.get('branchId');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const paginate = searchParams.get('paginate') === 'true';
@@ -101,8 +103,10 @@ export async function GET(request: NextRequest) {
         furthest_completed_stage,
         scheduled_date,
         scheduled_time,
+        branch_id,
         created_at,
         updated_at,
+        branch:branches(id, name),
         customer:customers(
           id,
           first_name,
@@ -124,6 +128,14 @@ export async function GET(request: NextRequest) {
       query = query
         .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling'])
         .or('archived.is.null,archived.eq.false');
+    }
+
+    // Apply branch filter: explicit branchId param OR user restriction
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    } else {
+      const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+      if (branchFilter) query = query.or(branchFilter);
     }
 
     // Apply additional filters
@@ -360,9 +372,73 @@ export async function POST(request: NextRequest) {
       selectedPlanId,
       recommendedPlanName,
       photoUrls,
+      mapPlotData,
+      branchId,
     } = body;
 
     const normalizedLeadNotes = typeof notes === 'string' ? notes.trim() : '';
+    const normalizedMapPlotData = (() => {
+      if (!mapPlotData || typeof mapPlotData !== 'object') {
+        return null;
+      }
+
+      const payload = mapPlotData as {
+        addressInput?: string;
+        addressComponents?: Record<string, unknown> | null;
+        centerLat?: number | null;
+        centerLng?: number | null;
+        zoom?: number;
+        heading?: number;
+        tilt?: number;
+        isViewSet?: boolean;
+        drawTool?: string;
+        selectedStampType?: string;
+        outlinePoints?: Array<Record<string, unknown>>;
+        stamps?: Array<Record<string, unknown>>;
+        updatedAt?: string | null;
+      };
+
+      const safeOutlinePoints = Array.isArray(payload.outlinePoints)
+        ? payload.outlinePoints
+            .slice(0, 500)
+            .map(point => ({
+              x: typeof point.x === 'number' ? Number(point.x.toFixed(5)) : null,
+              y: typeof point.y === 'number' ? Number(point.y.toFixed(5)) : null,
+            }))
+            .filter(point => point.x !== null && point.y !== null)
+        : [];
+
+      const safeStamps = Array.isArray(payload.stamps)
+        ? payload.stamps
+            .slice(0, 250)
+            .map(stamp => ({
+              id: typeof stamp.id === 'string' ? stamp.id : null,
+              type: typeof stamp.type === 'string' ? stamp.type : null,
+              x: typeof stamp.x === 'number' ? Number(stamp.x.toFixed(5)) : null,
+              y: typeof stamp.y === 'number' ? Number(stamp.y.toFixed(5)) : null,
+            }))
+            .filter(stamp => stamp.type && stamp.x !== null && stamp.y !== null)
+        : [];
+
+      return {
+        addressInput: typeof payload.addressInput === 'string' ? payload.addressInput : null,
+        addressComponents:
+          payload.addressComponents && typeof payload.addressComponents === 'object'
+            ? payload.addressComponents
+            : null,
+        centerLat: typeof payload.centerLat === 'number' ? Number(payload.centerLat.toFixed(6)) : null,
+        centerLng: typeof payload.centerLng === 'number' ? Number(payload.centerLng.toFixed(6)) : null,
+        zoom: typeof payload.zoom === 'number' ? payload.zoom : null,
+        heading: typeof payload.heading === 'number' ? payload.heading : null,
+        tilt: typeof payload.tilt === 'number' ? payload.tilt : null,
+        isViewSet: payload.isViewSet === true,
+        drawTool: payload.drawTool === 'outline' || payload.drawTool === 'stamp' ? payload.drawTool : null,
+        selectedStampType: typeof payload.selectedStampType === 'string' ? payload.selectedStampType : null,
+        outlinePoints: safeOutlinePoints,
+        stamps: safeStamps,
+        updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : null,
+      };
+    })();
 
     // Auto-set submitted_by to the authenticated user for technician leads
     const submittedBy = leadSource === 'technician' ? user.id : (body.submittedBy ?? null);
@@ -534,6 +610,7 @@ export async function POST(request: NextRequest) {
           estimated_value: estimatedValue,
           assigned_to: assignedTo || null,
           submitted_by: submittedBy,
+          branch_id: branchId ?? null,
           created_at: new Date().toISOString(),
         },
       ])
@@ -556,8 +633,9 @@ export async function POST(request: NextRequest) {
       userId: submittedBy ?? user.id,
     });
 
-    // Capture initial technician notes in the lead Notes activity feed
-    if (normalizedLeadNotes) {
+    // Capture initial technician notes and optional map/plot payload in the lead Notes activity feed
+    if (normalizedLeadNotes || normalizedMapPlotData) {
+      const noteText = normalizedLeadNotes || 'Map & Plot data captured from TechLeads wizard.';
       const { error: noteError } = await supabase
         .from('activity_log')
         .insert({
@@ -566,9 +644,10 @@ export async function POST(request: NextRequest) {
           entity_id: newLead.id,
           activity_type: 'note_added',
           user_id: user.id,
-          notes: normalizedLeadNotes,
+          notes: noteText,
           metadata: {
             source: 'techleads',
+            ...(normalizedMapPlotData ? { map_plot: normalizedMapPlotData } : {}),
           },
         });
 

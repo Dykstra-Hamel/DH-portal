@@ -8,6 +8,7 @@ interface ServiceAreaFromDB {
   type: 'polygon' | 'radius' | 'zip_code';
   priority: number;
   is_active: boolean;
+  branch_id?: string | null;
   polygon_geojson?: string;
   center_lat?: string;
   center_lng?: string;
@@ -24,6 +25,7 @@ interface ServiceAreaInput {
   zipCodes?: string[];
   priority?: number;
   isActive?: boolean;
+  branchId?: string | null;
 }
 
 // Get all service areas for a company
@@ -61,6 +63,16 @@ export async function GET(
       );
     }
 
+    // Fetch branch_id for each area (not returned by the RPC)
+    const { data: branchRows } = await supabase
+      .from('service_areas')
+      .select('id, branch_id')
+      .eq('company_id', companyId);
+    const branchMap: Record<string, string | null> = {};
+    (branchRows || []).forEach((r: { id: string; branch_id: string | null }) => {
+      branchMap[r.id] = r.branch_id;
+    });
+
     // Transform the data from the database function to the expected format
     const formattedAreas = (serviceAreas || []).map((area: ServiceAreaFromDB) => {
       const formatted: any = {
@@ -69,6 +81,7 @@ export async function GET(
         type: area.type,
         priority: area.priority,
         isActive: area.is_active,
+        branchId: branchMap[area.id] ?? null,
       };
 
       if (area.type === 'polygon' && area.polygon_geojson) {
@@ -131,7 +144,7 @@ export async function POST(
       );
     }
 
-    const { name, type, polygon, center, radius, zipCodes, priority = 0 } = body;
+    const { name, type, polygon, center, radius, zipCodes, priority = 0, branchId } = body;
 
     if (!name || !type) {
       return NextResponse.json(
@@ -149,6 +162,7 @@ export async function POST(
       type,
       priority,
       is_active: true,
+      branch_id: branchId ?? null,
     };
 
     if (type === 'polygon') {
@@ -276,6 +290,7 @@ export async function PUT(
           type: area.type,
           priority: area.priority || 0,
           is_active: area.isActive !== undefined ? area.isActive : true,
+          branch_id: area.branchId ?? null,
         };
 
         if (area.type === 'polygon' && area.polygon) {

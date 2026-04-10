@@ -443,7 +443,7 @@
         opacity: 0;
         transition: opacity 0.3s ease;
 
-        @media (max-width: 768px) {
+        @media (max-width: 490px) {
           display: none;
         }
       }
@@ -466,7 +466,7 @@
   transition: all 0.3s;
   gap: 16px;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     position: relative;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -481,7 +481,7 @@
   font-weight: 700;
   color: var(--brand-primary) !important;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     font-size: 22px !important;
     text-align: left;
     flex: 1;
@@ -500,14 +500,14 @@
   margin-left: auto;
   flex-shrink: 0;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     flex-basis: 100%;
     margin-left: 0;
     padding-left: 38px;
   }
 
   &.addonHeaderRightWithPill {
-    @media (max-width: 768px) {
+    @media (max-width: 490px) {
       padding-left: 0;
     }
   }
@@ -535,7 +535,7 @@
   font-weight: 400;
   color: #9ca3af;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     font-size: 14px;
   }
 }
@@ -566,7 +566,7 @@
   transition: transform 0.3s ease;
   flex-shrink: 0;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     position: absolute;
     top: 20px;
     right: 24px;
@@ -1209,7 +1209,6 @@
   gap: 0;
 
   @media (max-width: 768px) {
-    flex-direction: column;
     align-items: flex-end;
     gap: 2px;
   }
@@ -1927,21 +1926,6 @@
   border-radius: 0 0 16px 16px;
   position: relative;
   overflow-x: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: var(--accent-color);
-    border-radius: 0 0 16px 16px;
-    opacity: 0.05;
-    pointer-events: none;
-
-    @media (max-width: 768px) {
-      background: var(--accent-color);
-      background: linear-gradient(180deg, var(--accent-color) 0%, #fff 100%);
-    }
-  }
 
   @media (max-width: 768px) {
     padding: 10px 0;

@@ -5,9 +5,8 @@ import Link from 'next/link';
 import { User } from '@supabase/supabase-js';
 import { adminAPI } from '@/lib/api-client';
 import { Users, Building, BarChart3, Bot, Settings } from 'lucide-react';
-import UsersManager from './UsersManager';
+import UserManagement from './UserManagement';
 import CompaniesManager from './CompaniesManager';
-import UserCompanyManager from './UserCompanyManager';
 import BrandManager from './BrandManager';
 import ProjectsManager from './ProjectsManager';
 import WidgetManager from './WidgetManager';
@@ -37,7 +36,7 @@ type AdminCategory =
   | 'automation'
   | 'system';
 
-type UserSubsection = 'users' | 'relationships';
+type UserSubsection = 'users';
 type CompanySubsection = 'companies' | 'projects' | 'brands';
 type AnalyticsSubsection =
   | 'attribution'
@@ -65,7 +64,6 @@ type AdminSubsection =
 type AdminSection =
   | 'users'
   | 'companies'
-  | 'relationships'
   | 'brands'
   | 'projects'
   | 'widgets'
@@ -107,11 +105,6 @@ const ADMIN_CATEGORIES: CategoryConfig[] = [
     icon: Users,
     subsections: [
       { id: 'users', label: 'Users', legacySection: 'users' },
-      {
-        id: 'relationships',
-        label: 'User-Company Links',
-        legacySection: 'relationships',
-      },
     ],
   },
   {
@@ -236,11 +229,9 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
   const renderSection = () => {
     switch (activeSubsection) {
       case 'users':
-        return <UsersManager />;
+        return <UserManagement />;
       case 'companies':
         return <CompaniesManager />;
-      case 'relationships':
-        return <UserCompanyManager />;
       case 'brands':
         return <BrandManager />;
       case 'projects':
@@ -298,7 +289,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps) {
       case 'company-notifications':
         return <CompanyNotificationSettingsManager />;
       default:
-        return <UsersManager />;
+        return <UserManagement />;
     }
   };
 

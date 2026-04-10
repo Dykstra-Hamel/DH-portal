@@ -1,0 +1,912 @@
+.mapStepContent {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.mapCanvasCard {
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+  background: #d9dde3;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  position: relative;
+}
+
+@keyframes fadeInOverlay {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.mapInteractiveCanvasOverlay {
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    background: rgba(0, 0, 0, 0.45);
+    pointer-events: none;
+    animation: fadeInOverlay 0.2s ease;
+  }
+}
+
+.mapInteractiveCanvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background-color: #d9dde3;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.mapCanvas {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  background-color: #d9dde3;
+  background-size: cover;
+  background-position: center;
+  touch-action: none;
+}
+
+.mapEmptyState {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 16px;
+  color: var(--gray-600);
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-satoshi);
+  z-index: 8;
+}
+
+.mapGoogleCanvas {
+  width: 100%;
+  height: 100%;
+}
+
+.mapBlankCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: #ffffff;
+}
+
+.mapGridOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(148, 163, 184, 0.32) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(148, 163, 184, 0.32) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.mapViewAdjustLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: auto;
+  touch-action: none;
+  cursor: grab;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.mapLegendControls {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  left: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.mapLegendBtn {
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  background: rgba(249, 250, 251, 0.94);
+  color: var(--gray-700);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+  pointer-events: auto;
+
+  svg {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+  }
+}
+
+.mapLegendBtnActive {
+  background: var(--blue-500);
+  border-color: var(--blue-500);
+  color: var(--white);
+}
+
+.mapViewControls {
+  position: absolute;
+  top: calc(12px + env(safe-area-inset-top, 0px));
+  right: 12px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.mapViewControlGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  pointer-events: auto;
+  background: rgba(249, 250, 251, 0.94);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 12px;
+  height: 36px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+
+  .mapIconBtn {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+  }
+}
+
+.mapPlotOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.mapPlotOverlayActive {
+  pointer-events: auto;
+  cursor: crosshair;
+}
+
+.mapSvgOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.mapStamp {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid var(--white);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  color: var(--white);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  z-index: 4;
+  cursor: grab;
+  touch-action: none;
+
+  svg {
+    width: 16px;
+    height: 16px;
+    pointer-events: none;
+  }
+}
+
+.mapStampPest {
+  width: 42px;
+  height: 42px;
+  background: #ffffff;
+  border: none;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  padding: 0;
+  color: var(--blue-500, #0075de);
+  opacity: 0.85;
+
+  svg {
+    width: 22px;
+    height: 22px;
+    filter: none;
+  }
+
+  img {
+    width: 22px;
+    height: 22px;
+  }
+}
+
+.mapStampDynamicIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+
+  svg {
+    width: 24px !important;
+    height: 24px !important;
+    fill: var(--blue-500, #0075de) !important;
+
+    *,
+    path,
+    circle,
+    rect,
+    polygon,
+    ellipse,
+    polyline,
+    line {
+      fill: var(--blue-500, #0075de) !important;
+      stroke: none !important;
+    }
+  }
+}
+
+// Picker menu buttons — icons are gray by default, blue only when active
+.mapPickerBtn .mapStampDynamicIcon svg,
+.mapPickerBtn .mapStampDynamicIcon svg *,
+.mapPickerBtn .mapStampDynamicIcon svg path,
+.mapPickerBtn .mapStampDynamicIcon svg circle,
+.mapPickerBtn .mapStampDynamicIcon svg rect,
+.mapPickerBtn .mapStampDynamicIcon svg polygon,
+.mapPickerBtn .mapStampDynamicIcon svg ellipse,
+.mapPickerBtn .mapStampDynamicIcon svg polyline,
+.mapPickerBtn .mapStampDynamicIcon svg line {
+  fill: var(--gray-500) !important;
+}
+
+.mapStampActive {
+  background: var(--blue-500, #0075de) !important;
+  border: 2px solid #ffffff !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+  box-shadow:
+    0 0 0 3px rgba(0, 117, 222, 0.35),
+    0 3px 8px rgba(0, 0, 0, 0.25) !important;
+  z-index: 5;
+
+  svg,
+  path,
+  circle,
+  rect,
+  polygon,
+  ellipse,
+  polyline,
+  line {
+    fill: #ffffff !important;
+    stroke: none !important;
+  }
+
+  // Lucide icons use stroke
+  svg[stroke] {
+    stroke: #ffffff !important;
+    fill: none !important;
+
+    path,
+    circle,
+    rect,
+    polygon,
+    polyline,
+    line {
+      stroke: #ffffff !important;
+      fill: none !important;
+    }
+  }
+
+  span {
+    svg,
+    path,
+    circle,
+    rect,
+    polygon,
+    ellipse,
+    polyline,
+    line {
+      fill: #ffffff !important;
+      stroke: none !important;
+    }
+  }
+}
+
+.mapStampObject {
+  width: 38px;
+  height: 38px;
+  border: none;
+  box-shadow: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+
+  svg {
+    width: 34px;
+    height: 34px;
+    overflow: visible;
+    filter: drop-shadow(0 1px 2px rgba(15, 23, 42, 0.92));
+  }
+}
+
+.mapToolbarDock {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px calc(50px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(
+    180deg,
+    rgba(15, 23, 42, 0) 0%,
+    rgba(15, 23, 42, 0.18) 82%
+  );
+  pointer-events: none;
+  z-index: 9;
+}
+
+.mapStampPicker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+  gap: 8px;
+  width: min(92vw, 520px);
+  pointer-events: auto;
+  background: rgba(249, 250, 251, 0.94);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 18px;
+  padding: 14px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+}
+
+.mapStampPickerCondition {
+  max-width: min(92vw, 380px);
+}
+
+.mapStampCondition {
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  border: 2px solid var(--white);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.25);
+  color: var(--white);
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.mapPickerBtnLabeled {
+  width: auto !important;
+  min-width: 75px;
+  height: auto !important;
+  min-height: 80px;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 6px;
+
+  svg,
+  img {
+    width: 60% !important;
+    height: auto !important;
+    max-width: 48px !important;
+    aspect-ratio: 1;
+    flex-shrink: 0;
+  }
+
+  .mapStampDynamicIcon {
+    width: 35px;
+    height: 35px;
+
+    svg {
+      width: 35px !important;
+      height: 35px !important;
+      max-width: unset !important;
+    }
+  }
+}
+
+.mapPickerBtnLabel {
+  font-size: 10px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  color: #3d3d3d;
+  text-align: center;
+  line-height: 1.2;
+  max-width: 72px;
+  white-space: normal;
+  word-break: break-word;
+}
+
+.mapIconToolbar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  pointer-events: auto;
+  background: rgba(249, 250, 251, 0.94);
+  border: 1px solid rgba(209, 213, 219, 0.95);
+  border-radius: 14px;
+  padding: 4px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.mapIconBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: none;
+  background: transparent;
+  color: var(--gray-600);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition:
+    transform 0.12s ease,
+    background 0.15s ease,
+    opacity 0.15s ease;
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.mapIconBtnActive {
+  background: var(--blue-500);
+  color: var(--white);
+
+  img {
+    filter: brightness(0) invert(1);
+  }
+
+  // Inline SVG pest icons on blue active background need to be white
+  .mapStampDynamicIcon svg,
+  .mapStampDynamicIcon svg *,
+  .mapStampDynamicIcon svg path,
+  .mapStampDynamicIcon svg circle,
+  .mapStampDynamicIcon svg rect,
+  .mapStampDynamicIcon svg ellipse,
+  .mapStampDynamicIcon svg polygon,
+  .mapStampDynamicIcon svg g {
+    fill: white !important;
+  }
+}
+
+// Picker buttons override the default active style (no blue bg, blue icon instead)
+.mapPickerBtn.mapIconBtnActive {
+  background: #f0f0f0 !important;
+  color: #0069e0 !important;
+}
+
+.mapIconBtnPrimary {
+  background: var(--blue-500);
+  color: var(--white);
+}
+
+.mapIconBtnWarn {
+  color: var(--error-700);
+  background: color-mix(in srgb, var(--error-100) 85%, var(--white));
+}
+
+.mapStampTypeBtn {
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .mapStampDynamicIcon {
+    width: 18px;
+    height: 18px;
+
+    svg {
+      width: 18px !important;
+      height: 18px !important;
+    }
+  }
+}
+
+.mapPickerBtn {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px !important;
+  border: 1px solid var(--gray-500) !important;
+  background: #f0f0f0 !important;
+  color: var(--gray-800);
+
+  svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  &.mapIconBtnActive {
+    border-color: #0069e0 !important;
+    background: #f0f0f0 !important;
+    color: #0069e0 !important;
+
+    // Force color cascade on all descendants so fill="currentColor" resolves to blue
+    * {
+      color: #0069e0 !important;
+    }
+
+    // Directly set fill on all SVG shape elements
+    svg,
+    svg *,
+    svg path,
+    svg circle,
+    svg rect,
+    svg ellipse,
+    svg polygon,
+    svg line,
+    svg polyline,
+    svg g {
+      fill: #0069e0 !important;
+      color: #0069e0 !important;
+    }
+
+    // Images can't be recolored with fill — leave them
+    img {
+      filter: none;
+    }
+  }
+}
+
+.mapStampPickerPest .mapPickerBtn {
+  width: 64px;
+  height: 64px;
+}
+
+.mapSnapRing {
+  animation: mapSnapPulse 0.75s ease-in-out infinite;
+  transform-origin: center;
+  transform-box: fill-box;
+}
+
+.mapHomeFootprintText {
+  fill: #dc2626;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  font-family: var(--font-satoshi);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.75);
+  stroke-width: 3px;
+}
+
+.mapDimensionText {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  font-family: var(--font-satoshi);
+  paint-order: stroke;
+  stroke: rgba(255, 255, 255, 0.88);
+  stroke-width: 3px;
+}
+
+.mapDimensionBubble {
+  fill: rgba(255, 255, 255, 0.96);
+  stroke: rgba(148, 163, 184, 0.7);
+  stroke-width: 1px;
+  pointer-events: none;
+}
+
+.mapToolToggle {
+  display: flex;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  overflow: hidden;
+  gap: 0;
+  flex-shrink: 0;
+
+  .mapIconBtn {
+    border-radius: 0;
+    border-right: 1px solid rgba(0, 0, 0, 0.1);
+
+    &:last-child {
+      border-right: none;
+    }
+  }
+}
+
+.mapToolToggleDisabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.mapToggleFirst {
+  border-radius: 9px 0 0 9px !important;
+}
+
+.mapToggleLast {
+  border-radius: 0 9px 9px 0 !important;
+}
+
+@keyframes mapSnapPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.25;
+    transform: scale(1.5);
+  }
+}
+
+.readOnlyThumbnail {
+  display: block;
+  width: 100%;
+  border: 1px solid var(--gray-200);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--gray-100);
+  position: relative;
+  padding: 0;
+}
+
+.readOnlyMapFrame {
+  position: relative;
+  width: 100%;
+  height: 500px;
+  overflow: hidden;
+  background: var(--gray-100);
+}
+
+.readOnlyMapImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.readOnlyDarkOverlay {
+  position: absolute;
+  inset: 0;
+  background: #fff;
+  opacity: 0.84;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.readOnlyMapOverlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.readOnlySvgOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.readOnlyStampLayer {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  z-index: 3;
+}
+
+.readOnlyStamp {
+  pointer-events: auto;
+  cursor: pointer;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+
+  /* Restore the pest stamp circle styling when in read-only mode */
+  &.mapStampPest {
+    background: #ffffff;
+    border: none;
+  }
+}
+
+.readOnlyPlaceholder {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--gray-400);
+  font-size: 13px;
+}
+
+.readOnlyBadge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.6);
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+
+  span {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    padding: 2px 8px;
+  }
+}
+
+.readOnlyBadgeHint {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.75;
+  background: none !important;
+  padding: 0 !important;
+}
+
+.readOnlyStampModal {
+  position: fixed;
+  inset: 0;
+  z-index: 1800;
+  background: rgba(15, 23, 42, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.readOnlyStampModalCard {
+  width: min(560px, 100%);
+  max-height: min(80vh, 700px);
+  overflow-y: auto;
+  background: var(--white);
+  border-radius: 14px;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.35);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.readOnlyStampModalHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.readOnlyStampModalTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-satoshi);
+}
+
+.readOnlyStampModalClose {
+  margin-left: auto;
+  border: 1px solid var(--gray-200);
+  background: var(--white);
+  color: var(--gray-700);
+  border-radius: 10px;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+}
+
+.readOnlyStampModalNotes {
+  margin: 0;
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.55;
+  font-family: var(--font-satoshi);
+}
+
+.readOnlyStampModalEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+.readOnlyStampPhotoGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.readOnlyStampPhoto {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+
+.readOnlyModal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 1500;
+  display: flex;
+  flex-direction: column;
+}
+
+.readOnlyModalClose {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 1600;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 20px;
+  padding: 6px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.85);
+  }
+}
+
+.readOnlyModalInner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}

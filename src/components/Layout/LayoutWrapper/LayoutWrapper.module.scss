@@ -46,8 +46,25 @@
   scrollbar-gutter: auto;
 }
 
+.fieldMapWizardMainContent {
+  padding: 0 !important;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
 
 :global(.pageWrapper).techLeadsPageWrapper {
+  width: 100%;
+  max-width: 1309px;
+  margin: 0 auto;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+:global(.pageWrapper).fieldMapWizardPageWrapper {
   width: 100%;
   max-width: 1309px;
   margin: 0 auto;

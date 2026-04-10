@@ -1,0 +1,651 @@
+/* ── Full-screen overlay ── */
+/* Covers the app shell so the review step looks like the public quote page */
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow-y: auto;
+  background: #ffffff;
+}
+
+/* ── Loading spinner ── */
+.loadingSpinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #e5e7eb;
+  border-top-color: var(--brand-primary, #0052cc);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Review header (with back button + logo) ── */
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  background: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.reviewHeaderScrolled {
+  border-bottom-color: #e5e5e5;
+  box-shadow: 0 4px 6px color-mix(in srgb, #d1d5db 60%, transparent);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: #f3f4f6;
+  color: #374151;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s;
+
+  &:hover { background: #e5e7eb; }
+}
+
+.reviewHeaderLogo {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.reviewHeaderName {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-primary, #111827);
+  font-family: var(--primary-font, var(--font-satoshi));
+  letter-spacing: -0.01em;
+}
+
+/* .reviewHeaderDate removed — date no longer shown in header */
+
+/* ── Hero extras ── */
+.heroEyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-secondary, #6b7280);
+  margin: 0 0 12px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.heroPests {
+  margin-top: 24px;
+}
+
+.heroPestsLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #9ca3af;
+  margin: 0 0 10px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+/* Map in the hero right column — match heroImage sizing */
+.heroMapWrap {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  min-height: 320px;
+  width: 100%;
+
+  @media (max-width: 768px) {
+    min-height: 220px;
+    border-radius: 0;
+    margin: 0 -20px;
+    width: calc(100% + 40px);
+  }
+}
+
+/* ── Service section ── */
+.serviceSection {
+  margin-bottom: 32px;
+}
+
+.sectionHeading {
+  /* Uses quoteContainer h2 styles — just add margin */
+  margin-bottom: 24px !important;
+}
+
+.lineItemsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Total pricing header with edit button ── */
+.totalPricingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+  }
+}
+
+.editSaveBtn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+/* ── Editable price inputs in the totals list ── */
+.priceEditGroup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.priceEditField {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+
+  &:focus-within {
+    border-color: var(--brand-primary, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.priceEditPrefix {
+  padding: 0 3px 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.priceEditInput {
+  width: 56px;
+  padding: 4px 4px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #111827;
+  text-align: right;
+
+  &:focus { outline: none; }
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+}
+
+.priceEditSuffix {
+  padding: 0 6px 0 2px;
+  font-size: 11px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+/* ── Discount $ / % toggle ── */
+.discountTypeToggle {
+  display: flex;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.discountTypeBtn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #6b7280;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+
+  &:first-child {
+    border-right: 1px solid #d1d5db;
+  }
+}
+
+.discountTypeBtnActive {
+  background: var(--brand-primary, #3b82f6);
+  color: #fff;
+}
+
+/* ── Discount item in the list ── */
+.discountItem {
+  color: #16a34a !important;
+}
+
+/* ── Discount controls (inside totalPricing card) ── */
+.discountRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 4px;
+  flex-wrap: wrap;
+}
+
+.discountLabel {
+  font-size: 14px;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  margin: 0;
+}
+
+.discountControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discountSelect {
+  padding: 7px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #374151;
+  background: #fff;
+  appearance: auto;
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.discountInputWrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+  width: 110px;
+
+  &:focus-within {
+    border-color: var(--brand-primary, #3b82f6);
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+  }
+}
+
+.discountSign {
+  padding: 0 4px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.discountInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px 7px 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #111827;
+
+  &::placeholder { color: #d1d5db; }
+  &:focus { outline: none; }
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+}
+
+/* ── Notes ── */
+.notesSection {
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+}
+
+.notesLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin: 0 0 8px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.notesText {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+/* ── Spacer for sticky bar ── */
+.actionSpacer {
+  height: 100px;
+}
+
+/* ── Sticky action bar ── */
+.stickyActions {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+}
+
+.stickyActionsInner {
+  max-width: 1215px;
+  margin: 0 auto;
+  display: flex;
+  gap: 12px;
+}
+
+.sendBtn {
+  flex: 1;
+  padding: 15px 20px;
+  background: var(--brand-primary, #0052cc);
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--primary-font, var(--font-satoshi));
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.1s ease;
+  letter-spacing: -0.2px;
+
+  &:hover:not(:disabled) { opacity: 0.88; }
+  &:active:not(:disabled) { transform: scale(0.98); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+.scheduleBtn {
+  flex: 1;
+  padding: 15px 20px;
+  background: #fff;
+  color: var(--brand-primary, #0052cc);
+  border: 2px solid var(--brand-primary, #0052cc);
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--primary-font, var(--font-satoshi));
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.1s ease;
+  letter-spacing: -0.2px;
+
+  &:hover:not(:disabled) { background: color-mix(in srgb, var(--brand-primary, #0052cc) 8%, white); }
+  &:active:not(:disabled) { transform: scale(0.98); }
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+/* ── Error / email capture ── */
+.errorMsg {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #dc2626;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.emailCapture {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.emailInput {
+  flex: 1;
+  padding: 11px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #111827;
+  background: #fff;
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary, #0052cc);
+    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+  }
+  &::placeholder { color: #9ca3af; }
+}
+
+.emailSendBtn {
+  padding: 0 18px;
+  background: var(--brand-primary, #0052cc);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:disabled { opacity: 0.5; cursor: not-allowed; }
+}
+
+/* ── Success screen ── */
+.successPage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 48px 24px;
+  gap: 16px;
+  text-align: center;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.successTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--brand-primary, #111827);
+  letter-spacing: -0.5px;
+  font-family: var(--primary-font, var(--font-satoshi));
+}
+
+.successSub {
+  margin: 0;
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+.successBtn {
+  margin-top: 8px;
+  padding: 14px 36px;
+  background: var(--brand-primary, #0052cc);
+  color: #fff;
+  border: none;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--primary-font, var(--font-satoshi));
+  cursor: pointer;
+}
+
+/* ── Signature modal ── */
+.sigOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10001;
+  padding: 0;
+}
+
+.sigSheet {
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sigTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+  font-family: var(--primary-font, var(--font-satoshi));
+}
+
+.sigSub {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.sigLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  display: block;
+  margin-bottom: 6px;
+}
+
+.sigNameInput {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 15px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #111827;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary, #0052cc);
+    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+  }
+}
+
+.sigCanvasWrap {
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.sigClear {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  text-align: left;
+}
+
+.sigDate {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  margin: 0;
+}
+
+.sigFooter {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sigCancelBtn {
+  padding: 11px 20px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  background: #fff;
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+}
+
+.sigConfirmBtn {
+  padding: 11px 24px;
+  background: var(--brand-primary, #0052cc);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+}
