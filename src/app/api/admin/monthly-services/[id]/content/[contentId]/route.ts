@@ -32,18 +32,19 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { content_type, title, publish_date, link, topic } = body;
+    const { content_type, title, publish_date, link, topic, sort_order } = body;
 
     if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
       return NextResponse.json({ error: 'Invalid content_type' }, { status: 400 });
     }
 
-    const updateData: Record<string, string | null> = {};
+    const updateData: Record<string, string | number | null> = {};
     if ('content_type' in body) updateData.content_type = content_type || null;
     if ('title' in body) updateData.title = title || null;
     if ('publish_date' in body) updateData.publish_date = publish_date || null;
     if ('link' in body) updateData.link = link || null;
     if ('topic' in body) updateData.topic = topic || null;
+    if ('sort_order' in body) updateData.sort_order = typeof sort_order === 'number' ? sort_order : null;
 
     const { data: contentPiece, error: updateError } = await supabase
       .from('monthly_service_content_pieces')

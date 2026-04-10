@@ -371,6 +371,9 @@ export interface ProjectTask {
     assigned_to: string | null;
     due_date: string | null;
   } | null; // The ONE task blocking this task
+  monthly_service_task_department_assignments?: Array<{
+    department: { name: string } | null;
+  }> | null;
   hasUnreadComments?: boolean; // Whether there are comments newer than user's last view
   hasUnreadMentions?: boolean; // Whether there are unread comments that mention the current user
   comment_count?: number; // Total number of comments (from list API)
