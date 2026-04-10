@@ -45,6 +45,7 @@ import {
 } from '@/components/Common/Modal/Modal';
 import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import TicketForm from '@/components/Tickets/TicketForm/TicketForm';
+import QuickQuoteModal from '@/components/QuickQuote/QuickQuoteModal';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { AnnouncementsModal } from '@/components/Common/AnnouncementsModal/AnnouncementsModal';
 import ActionsTasksQuickView from '@/components/Common/ActionsTasksQuickView/ActionsTasksQuickView';
@@ -365,6 +366,9 @@ function TicketsDashboardContent() {
   // Announcements modal state
   const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
 
+  // Quick Quote modal state
+  const [showQuickQuote, setShowQuickQuote] = useState(false);
+
   // Create ticket modal state
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -454,6 +458,24 @@ function TicketsDashboardContent() {
     setPageHeader({
       title: `${firstName}'s Ticket Dashboard`,
       description: '',
+      customActions: (
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.headerBtnGhost}
+            onClick={() => setShowCreateForm(true)}
+          >
+            New Ticket
+          </button>
+          <button
+            type="button"
+            className={styles.headerBtnPrimary}
+            onClick={() => setShowQuickQuote(true)}
+          >
+            Quick Quote
+          </button>
+        </div>
+      ),
     });
 
     return () => {
@@ -2378,6 +2400,16 @@ function TicketsDashboardContent() {
           <Loader2 size={32} className={styles.redirectSpinner} />
           <span>Opening record&hellip;</span>
         </div>
+      )}
+
+      {/* Quick Quote Modal */}
+      {showQuickQuote && selectedCompany && user && (
+        <QuickQuoteModal
+          companyId={selectedCompany.id}
+          companyName={selectedCompany.name || ''}
+          userId={user.id}
+          onClose={() => setShowQuickQuote(false)}
+        />
       )}
     </div>
   );

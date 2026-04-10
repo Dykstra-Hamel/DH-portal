@@ -3,16 +3,17 @@
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
-import { User } from '@supabase/supabase-js';
+import { RealtimeChannel, User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import { sanitizeFileName } from '@/lib/storage-utils';
-import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, FileText, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ChevronDown, ChevronUp, Copy, Download, FileText, Loader, Pencil, Trash2, X } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Toast } from '@/components/Common/Toast';
 import RichTextEditor from '@/components/Common/RichTextEditor/RichTextEditor';
 import { StarButton } from '@/components/Common/StarButton/StarButton';
 import { ImageLightbox } from '@/components/Common/ImageLightbox/ImageLightbox';
-import { Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectDepartment, ProjectTask, ProofFeedbackActivity, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import { CommentReaction, Project, ProjectAttachment, ProjectCategory, ProjectComment, ProjectCommentAttachment, ProjectDepartment, ProjectTask, ProofFeedbackActivity, User as ProjectUser, priorityOptions, statusOptions } from '@/types/project';
+import CommentReactions from '@/components/shared/CommentReactions/CommentReactions';
 import { useProjectTasks } from '@/hooks/useProjectTasks';
 import { useUser } from '@/hooks/useUser';
 import { useStarredItems } from '@/hooks/useStarredItems';
@@ -40,7 +41,7 @@ interface ProjectDetailWithTasksProps {
   project: Project | null;
   projectLoading?: boolean;
   user: User;
-  onProjectUpdate?: () => void;
+  onProjectUpdate?: (updates?: Partial<Project>) => void;
 }
 
 const COMMENTS_INITIAL_VISIBLE_COUNT = 10;
@@ -117,6 +118,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   const [isUpdatingHeaderDepartment, setIsUpdatingHeaderDepartment] = useState(false);
   const headerStatusRef = useRef<HTMLDivElement>(null);
   const headerDepartmentRef = useRef<HTMLDivElement>(null);
+  const projectRef = useRef(project);
   const [users, setUsers] = useState<ProjectUser[]>([]);
   const [departments, setDepartments] = useState<ProjectDepartment[]>([]);
   const [allInternalCategories, setAllInternalCategories] = useState<ProjectCategory[]>([]);
@@ -139,6 +141,9 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     useState<UploadProgressState>(EMPTY_UPLOAD_PROGRESS);
   const [isDraggingOverCommentComposer, setIsDraggingOverCommentComposer] = useState(false);
   const commentComposerDragCounterRef = React.useRef(0);
+  const recentlyPostedCommentIdsRef = useRef<Set<string>>(new Set());
+  const commentsChannelRef = useRef<RealtimeChannel | null>(null);
+  const [pendingAttachmentCommentIds, setPendingAttachmentCommentIds] = useState<Set<string>>(new Set());
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState<'success' | 'error'>('success');
   const [showToast, setShowToast] = useState(false);
@@ -304,6 +309,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       return false;
     }
   }, [project?.id, project?.members]);
+
+  // Keep projectRef in sync so stable callbacks always see the latest project
+  React.useEffect(() => {
+    projectRef.current = project;
+  });
 
   // Fetch tasks, users, and departments on mount
   React.useEffect(() => {
@@ -518,7 +528,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       }
       return true;
     });
-  }, [project?.categories, project?.is_billable, project]);
+  }, [project?.categories, project?.is_billable]);
 
   const fetchComments = useCallback(async () => {
     if (!project?.id) return;
@@ -532,7 +542,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } catch (error) {
       console.error('Error fetching comments:', error);
     }
-  }, [project?.id, project]);
+  }, [project?.id]);
 
   const fetchProofActivity = useCallback(async () => {
     if (!project?.id) return;
@@ -588,15 +598,49 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       .channel(`project-comments:${project.id}`)
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'project_comments',
-          filter: `project_id=eq.${project.id}`,
-        },
+        { event: 'INSERT', schema: 'public', table: 'project_comments', filter: `project_id=eq.${project.id}` },
+        (payload) => {
+          const newId = (payload.new as { id?: string })?.id;
+          if (newId && recentlyPostedCommentIdsRef.current.has(newId)) {
+            // Own comment — already added optimistically, skip refetch
+            recentlyPostedCommentIdsRef.current.delete(newId);
+          } else {
+            // Another user's comment — fetch to get joined user_profile data
+            fetchComments();
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'project_comments', filter: `project_id=eq.${project.id}` },
         () => { fetchComments(); }
       )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'project_comments', filter: `project_id=eq.${project.id}` },
+        () => { fetchComments(); }
+      )
+      .on('broadcast', { event: 'attachment-uploading' }, (msg) => {
+        const { commentId } = msg.payload as { commentId: string };
+        setPendingAttachmentCommentIds(prev => new Set([...prev, commentId]));
+      })
+      .on('broadcast', { event: 'attachments-ready' }, (msg) => {
+        const { commentId, attachments } = msg.payload as {
+          commentId: string;
+          attachments: ProjectCommentAttachment[];
+        };
+        setPendingAttachmentCommentIds(prev => {
+          const next = new Set(prev);
+          next.delete(commentId);
+          return next;
+        });
+        setComments(prev =>
+          prev.map(c => c.id === commentId ? { ...c, attachments } : c)
+        );
+      })
       .subscribe();
+
+    commentsChannelRef.current = commentsChannel;
 
     const proofFeedbackChannel = supabase
       .channel(`project-proof-feedback-activity:${project.id}`)
@@ -612,9 +656,55 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       )
       .subscribe();
 
+    const reactionsChannel = supabase
+      .channel(`comment-reactions:${project.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comment_reactions' }, (payload) => {
+        const r = payload.new as CommentReaction & { project_comment_id?: string; task_comment_id?: string };
+        const newReaction = { id: r.id, user_id: r.user_id, emoji: r.emoji, created_at: r.created_at };
+        if (r.project_comment_id) {
+          setComments(prev => prev.map(c => {
+            if (c.id !== r.project_comment_id) return c;
+            if (c.reactions?.some(x => x.id === r.id)) return c;
+            return { ...c, reactions: [...(c.reactions || []), newReaction] };
+          }));
+        } else if (r.task_comment_id) {
+          setSelectedTask(prev => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              comments: (prev.comments || []).map(c => {
+                if (c.id !== r.task_comment_id) return c;
+                if (c.reactions?.some(x => x.id === r.id)) return c;
+                return { ...c, reactions: [...(c.reactions || []), newReaction] };
+              }),
+            };
+          });
+        }
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comment_reactions' }, (payload) => {
+        const deletedId = payload.old.id as string;
+        setComments(prev => prev.map(c => ({
+          ...c,
+          reactions: (c.reactions || []).filter(x => x.id !== deletedId),
+        })));
+        setSelectedTask(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            comments: (prev.comments || []).map(c => ({
+              ...c,
+              reactions: (c.reactions || []).filter(x => x.id !== deletedId),
+            })),
+          };
+        });
+      })
+      .subscribe();
+
     return () => {
+      commentsChannelRef.current = null;
       supabase.removeChannel(commentsChannel);
       supabase.removeChannel(proofFeedbackChannel);
+      supabase.removeChannel(reactionsChannel);
     };
   }, [project?.id, fetchComments, fetchProofActivity]);
 
@@ -675,24 +765,25 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
   }, [router]);
 
   const updateProjectFields = useCallback(async (updates: Partial<Project> & { assigned_to?: string | null; requested_by?: string | null; current_department_id?: string | null }) => {
-    if (!project) return;
+    const proj = projectRef.current;
+    if (!proj) return;
     const payload: Record<string, any> = {
-      name: updates.name ?? project.name,
-      description: updates.description ?? project.description,
-      project_type: updates.project_type ?? project.project_type,
-      project_subtype: updates.project_subtype ?? project.project_subtype,
-      assigned_to: updates.assigned_to ?? project.assigned_to_profile?.id ?? null,
-      status: updates.status ?? project.status,
-      priority: updates.priority ?? project.priority,
-      due_date: updates.due_date ?? project.due_date,
-      start_date: updates.start_date ?? project.start_date,
-      completion_date: updates.completion_date ?? project.completion_date,
-      is_billable: updates.is_billable ?? project.is_billable,
-      quoted_price: updates.quoted_price ?? project.quoted_price,
-      tags: updates.tags ?? project.tags,
-      notes: updates.notes ?? project.notes,
-      primary_file_path: updates.primary_file_path ?? project.primary_file_path,
-      scope: updates.scope ?? project.scope,
+      name: updates.name ?? proj.name,
+      description: updates.description ?? proj.description,
+      project_type: updates.project_type ?? proj.project_type,
+      project_subtype: updates.project_subtype ?? proj.project_subtype,
+      assigned_to: updates.assigned_to ?? proj.assigned_to_profile?.id ?? null,
+      status: updates.status ?? proj.status,
+      priority: updates.priority ?? proj.priority,
+      due_date: updates.due_date ?? proj.due_date,
+      start_date: updates.start_date ?? proj.start_date,
+      completion_date: updates.completion_date ?? proj.completion_date,
+      is_billable: updates.is_billable ?? proj.is_billable,
+      quoted_price: updates.quoted_price ?? proj.quoted_price,
+      tags: updates.tags ?? proj.tags,
+      notes: updates.notes ?? proj.notes,
+      primary_file_path: updates.primary_file_path ?? proj.primary_file_path,
+      scope: updates.scope ?? proj.scope,
     };
 
     if (Object.prototype.hasOwnProperty.call(updates, 'requested_by')) {
@@ -703,7 +794,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       payload.current_department_id = updates.current_department_id ?? null;
     }
 
-    const response = await fetch(`/api/admin/projects/${project.id}`, {
+    const response = await fetch(`/api/admin/projects/${proj.id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -714,10 +805,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     if (!response.ok) {
       throw new Error('Failed to update project');
     }
-  }, [project]);
+  }, []);
 
   const handleHeaderStatusChange = useCallback(async (status: Project['status']) => {
-    if (!project || status === project.status) {
+    const proj = projectRef.current;
+    if (!proj || status === proj.status) {
       setIsHeaderStatusOpen(false);
       return;
     }
@@ -739,7 +831,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setToastMessage('Project status updated.');
       setToastType('success');
       setShowToast(true);
-      onProjectUpdate?.();
+      onProjectUpdate?.({ status, completion_date: null });
     } catch (error) {
       console.error('Error updating project status:', error);
       setToastMessage('Failed to update project status.');
@@ -748,10 +840,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } finally {
       setIsUpdatingHeaderStatus(false);
     }
-  }, [onProjectUpdate, project?.status, updateProjectFields, project]);
+  }, [onProjectUpdate, updateProjectFields]);
 
   const handleHeaderDepartmentChange = useCallback(async (departmentId: string | null) => {
-    if (!project || departmentId === project.current_department_id) {
+    const proj = projectRef.current;
+    if (!proj || departmentId === proj.current_department_id) {
       setIsHeaderDepartmentOpen(false);
       return;
     }
@@ -762,7 +855,8 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setToastMessage('Project department updated.');
       setToastType('success');
       setShowToast(true);
-      onProjectUpdate?.();
+      const updatedDepartment = departments.find(d => d.id === departmentId);
+      onProjectUpdate?.({ current_department_id: departmentId, current_department: updatedDepartment });
     } catch (error) {
       console.error('Error updating project department:', error);
       setToastMessage('Failed to update project department.');
@@ -771,7 +865,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } finally {
       setIsUpdatingHeaderDepartment(false);
     }
-  }, [onProjectUpdate, project?.current_department_id, updateProjectFields, project]);
+  }, [onProjectUpdate, updateProjectFields, departments]);
 
   const handleCompleteProject = useCallback(async () => {
     if (!project || isCompletingProject) return;
@@ -871,7 +965,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setToastMessage('Project marked incomplete.');
       setToastType('success');
       setShowToast(true);
-      onProjectUpdate?.();
+      onProjectUpdate?.({ status: 'in_progress', completion_date: null });
     } catch (error) {
       console.error('Error uncompleting project:', error);
       setToastMessage('Failed to mark project incomplete.');
@@ -1102,7 +1196,15 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       ),
     });
   }, [
-    project,
+    // Use specific project fields rather than the whole object so the header
+    // only rebuilds when something visually relevant to it actually changes.
+    project?.name,
+    project?.status,
+    project?.current_department_id,
+    project?.due_date,
+    project?.updated_at,
+    project?.company?.branding,
+    project?.company?.name,
     projectLoading,
     handleBackToProjects,
     handleDeleteProject,
@@ -1199,6 +1301,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
 
     if (taskId) {
+      if (!project?.id) return;
       setHighlightedTaskCommentId(commentId);
       if (!selectedTask || selectedTask.id !== taskId) {
         openTaskDetailById(taskId);
@@ -1210,7 +1313,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     }
 
     processedCommentRef.current = key;
-  }, [deepLinkCommentId, deepLinkTaskId, markMentionReferenceAsRead, openTaskDetailById, selectedTask]);
+  }, [deepLinkCommentId, deepLinkTaskId, markMentionReferenceAsRead, openTaskDetailById, selectedTask, project?.id]);
 
   React.useEffect(() => {
     if (!highlightedProjectCommentId) return;
@@ -1531,10 +1634,9 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     handleCreateTask();
   };
 
-  const handleProjectUpdate = () => {
-    // Trigger refresh of project data if callback provided
+  const handleProjectUpdate = (updates?: Partial<Project>) => {
     if (onProjectUpdate) {
-      onProjectUpdate();
+      onProjectUpdate(updates);
     }
   };
 
@@ -1579,8 +1681,17 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
       const comment = await response.json();
 
+      // Register before attachment upload so the Realtime INSERT event (which fires
+      // as soon as the row is written) sees this ID and skips the refetch.
+      recentlyPostedCommentIdsRef.current.add(comment.id);
+
       // If there are attachments, upload them directly to storage
       if (pendingAttachments.length > 0) {
+        commentsChannelRef.current?.send({
+          type: 'broadcast',
+          event: 'attachment-uploading',
+          payload: { commentId: comment.id },
+        });
         const supabase = createClient();
         const MAX_FILE_SIZE = 50 * 1024 * 1024;
         setProjectCommentUploadProgress({
@@ -1670,6 +1781,11 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
 
         if (attachmentResponse.ok) {
           const uploadedAttachments = await attachmentResponse.json();
+          commentsChannelRef.current?.send({
+            type: 'broadcast',
+            event: 'attachments-ready',
+            payload: { commentId: comment.id, attachments: uploadedAttachments },
+          });
           comment.attachments = uploadedAttachments;
         } else {
           // Clean up uploaded files if metadata save fails
@@ -1688,7 +1804,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       window.requestAnimationFrame(() => {
         scrollCommentsToBottom('smooth');
       });
-      onProjectUpdate?.();
     } catch (error) {
       console.error('Error posting comment:', error);
       setToastMessage('Failed to post comment.');
@@ -1789,6 +1904,16 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     return converted;
   }, [users]);
 
+  // Map userId -> display name for reaction tooltips
+  const userMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    mentionUsers.forEach(u => {
+      const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || '';
+      if (u.id && name) map[u.id] = name;
+    });
+    return map;
+  }, [mentionUsers]);
+
   // Merged comment feed: project comments + proof feedback activity, sorted by created_at
   const mergedFeed = useMemo(() => {
     const commentItems = comments.map((c) => ({ ...c, _type: 'comment' as const }));
@@ -1882,7 +2007,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setToastMessage('Project description updated.');
       setToastType('success');
       setShowToast(true);
-      onProjectUpdate?.();
+      onProjectUpdate?.({ description: projectDescriptionDraft });
     } catch (error) {
       console.error('Error updating project description:', error);
       setToastMessage('Failed to update project description.');
@@ -1985,6 +2110,120 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setDeletingCommentId(null);
     }
   }, [editingCommentId, project?.id, project]);
+
+  const handleToggleProjectCommentReaction = useCallback(async (commentId: string, emoji: string) => {
+    if (!project?.id) return;
+    const prevReaction = comments.find(c => c.id === commentId)?.reactions?.find(r => r.user_id === user.id && r.emoji === emoji);
+
+    // Optimistic update
+    setComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c;
+      if (prevReaction) {
+        return { ...c, reactions: (c.reactions || []).filter(r => r.id !== prevReaction.id) };
+      }
+      const tempReaction: CommentReaction = { id: `temp-${Date.now()}`, user_id: user.id, emoji, created_at: new Date().toISOString() };
+      return { ...c, reactions: [...(c.reactions || []), tempReaction] };
+    }));
+
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/comments/${commentId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!response.ok) throw new Error('Failed to toggle reaction');
+      const result = await response.json();
+
+      // Replace temp reaction with real one
+      if (result.action === 'added') {
+        setComments(prev => prev.map(c => {
+          if (c.id !== commentId) return c;
+          return {
+            ...c,
+            reactions: [
+              ...(c.reactions || []).filter(r => !r.id.startsWith('temp-')),
+              { id: result.reaction.id, user_id: user.id, emoji, created_at: result.reaction.created_at },
+            ],
+          };
+        }));
+      }
+    } catch {
+      // Revert on error
+      setComments(prev => prev.map(c => {
+        if (c.id !== commentId) return c;
+        if (prevReaction) {
+          return { ...c, reactions: [...(c.reactions || []), prevReaction] };
+        }
+        return { ...c, reactions: (c.reactions || []).filter(r => !r.id.startsWith('temp-')) };
+      }));
+    }
+  }, [project?.id, comments, user.id]);
+
+  const handleToggleTaskCommentReaction = useCallback(async (taskId: string, commentId: string, emoji: string) => {
+    if (!project?.id) return;
+    const taskComments = selectedTask?.comments || [];
+    const prevReaction = taskComments.find(c => c.id === commentId)?.reactions?.find(r => r.user_id === user.id && r.emoji === emoji);
+
+    // Optimistic update
+    setSelectedTask(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        comments: (prev.comments || []).map(c => {
+          if (c.id !== commentId) return c;
+          if (prevReaction) {
+            return { ...c, reactions: (c.reactions || []).filter(r => r.id !== prevReaction.id) };
+          }
+          const tempReaction: CommentReaction = { id: `temp-${Date.now()}`, user_id: user.id, emoji, created_at: new Date().toISOString() };
+          return { ...c, reactions: [...(c.reactions || []), tempReaction] };
+        }),
+      };
+    });
+
+    try {
+      const response = await fetch(`/api/admin/projects/${project.id}/tasks/${taskId}/comments/${commentId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!response.ok) throw new Error('Failed to toggle reaction');
+      const result = await response.json();
+
+      if (result.action === 'added') {
+        setSelectedTask(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            comments: (prev.comments || []).map(c => {
+              if (c.id !== commentId) return c;
+              return {
+                ...c,
+                reactions: [
+                  ...(c.reactions || []).filter(r => !r.id.startsWith('temp-')),
+                  { id: result.reaction.id, user_id: user.id, emoji, created_at: result.reaction.created_at },
+                ],
+              };
+            }),
+          };
+        });
+      }
+    } catch {
+      // Revert on error
+      setSelectedTask(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          comments: (prev.comments || []).map(c => {
+            if (c.id !== commentId) return c;
+            if (prevReaction) {
+              return { ...c, reactions: [...(c.reactions || []), prevReaction] };
+            }
+            return { ...c, reactions: (c.reactions || []).filter(r => !r.id.startsWith('temp-')) };
+          }),
+        };
+      });
+    }
+  }, [project?.id, selectedTask, user.id]);
 
   // Project Attachments Handlers
   const canEditProject = useMemo(() => {
@@ -2218,7 +2457,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         setToastMessage('Attachment deleted.');
         setToastType('success');
         setShowToast(true);
-        onProjectUpdate?.();
       } catch (error) {
         console.error('Error deleting comment attachment:', error);
         setToastMessage('Failed to delete attachment.');
@@ -2226,7 +2464,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         setShowToast(true);
       }
     },
-    [onProjectUpdate, project?.id]
+    [project?.id]
   );
 
   const handleDeleteProjectAttachment = useCallback((attachmentId: string) => {
@@ -2253,7 +2491,6 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
       setToastMessage('Attachment deleted.');
       setToastType('success');
       setShowToast(true);
-      onProjectUpdate?.();
     } catch (error) {
       console.error('Error deleting attachment:', error);
       setToastMessage('Failed to delete attachment.');
@@ -2262,7 +2499,7 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
     } finally {
       setAttachmentToDelete(null);
     }
-  }, [project?.id, attachmentToDelete, onProjectUpdate, project]);
+  }, [project?.id, attachmentToDelete]);
 
   const handleProjectDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -3078,6 +3315,12 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                   className={styles.commentText}
                                   dangerouslySetInnerHTML={{ __html: getCommentHtml(comment.comment) }}
                                 />
+                                {pendingAttachmentCommentIds.has(comment.id) && (
+                                  <div className={styles.attachmentUploading}>
+                                    <Loader size={12} />
+                                    <span>Attachment uploading&hellip;</span>
+                                  </div>
+                                )}
                                 {comment.attachments && comment.attachments.length > 0 && (() => {
                                   const imageAttachments = comment.attachments.filter(
                                     (attachment: { mime_type?: string | null }) =>
@@ -3222,6 +3465,12 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                 })()}
                               </>
                             )}
+                            <CommentReactions
+                              reactions={comment.reactions || []}
+                              currentUserId={user.id}
+                              onToggle={(emoji) => handleToggleProjectCommentReaction(comment.id, emoji)}
+                              userMap={userMap}
+                            />
                             </div>
                           );
                         })}
@@ -3407,6 +3656,10 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
         availableTasks={tasks}
         departments={departments}
         currentUserId={user.id}
+        reactionUserMap={userMap}
+        onToggleReaction={(commentId, emoji) =>
+          selectedTask ? handleToggleTaskCommentReaction(selectedTask.id, commentId, emoji) : undefined
+        }
       />
 
       {/* Duplicate Project Modal */}

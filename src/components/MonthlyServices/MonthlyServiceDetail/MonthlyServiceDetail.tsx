@@ -19,6 +19,8 @@ import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import dayjs, { Dayjs } from 'dayjs';
 import { ArrowLeft, Settings, ChevronDown, Check, Pencil, Trash2, X } from 'lucide-react';
+import CommentReactions from '@/components/shared/CommentReactions/CommentReactions';
+import { CommentReaction } from '@/types/project';
 import { MonthlyServiceForm } from '@/components/MonthlyServices/MonthlyServiceForm/MonthlyServiceForm';
 import { BudgetCard } from '@/components/MonthlyServices/BudgetCard/BudgetCard';
 import ProjectTaskList from '@/components/Projects/ProjectTaskList/ProjectTaskList';
@@ -154,6 +156,7 @@ interface MonthlyServiceComment {
     avatar_url?: string | null;
   };
   attachments?: CommentAttachment[];
+  reactions?: CommentReaction[];
 }
 
 interface WeekProgress {
@@ -296,6 +299,16 @@ export function MonthlyServiceDetail({
       };
     });
   }, [users]);
+
+  // Map userId -> display name for reaction tooltips
+  const reactionUserMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    mentionUsers.forEach(u => {
+      const name = [u.first_name, u.last_name].filter(Boolean).join(' ') || u.email || '';
+      if (u.id && name) map[u.id] = name;
+    });
+    return map;
+  }, [mentionUsers]);
 
   // Helper to get auth headers
   const getAuthHeaders = async () => {
@@ -468,6 +481,35 @@ export function MonthlyServiceDetail({
     setNewComment('');
     setPendingAttachments([]);
   }, [fetchComments]);
+
+  // Real-time subscription for comment reactions
+  useEffect(() => {
+    const supabase = createClient();
+    const reactionsChannel = supabase
+      .channel(`monthly-service-reactions:${service.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'comment_reactions' }, (payload) => {
+        const r = payload.new as CommentReaction & { monthly_service_comment_id?: string };
+        if (!r.monthly_service_comment_id) return;
+        const newReaction = { id: r.id, user_id: r.user_id, emoji: r.emoji, created_at: r.created_at };
+        setComments(prev => prev.map(c => {
+          if (c.id !== r.monthly_service_comment_id) return c;
+          if (c.reactions?.some(x => x.id === r.id)) return c;
+          return { ...c, reactions: [...(c.reactions || []), newReaction] };
+        }));
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'comment_reactions' }, (payload) => {
+        const deletedId = payload.old.id as string;
+        setComments(prev => prev.map(c => ({
+          ...c,
+          reactions: (c.reactions || []).filter(x => x.id !== deletedId),
+        })));
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(reactionsChannel);
+    };
+  }, [service.id]);
 
   const markMentionReferenceAsRead = useCallback(
     async (referenceId: string) => {
@@ -749,10 +791,13 @@ export function MonthlyServiceDetail({
         setServiceData(data.service);
       }
 
-      // Update selected task if it's the one being edited
-      if (selectedTask?.id === taskId) {
-        setSelectedTask({ ...selectedTask, ...updates });
-      }
+      // Update selected task if it's the one being edited.
+      // Use functional updater to avoid overwriting state set by concurrent async operations
+      // (e.g. onAddComment setting comments before this refresh completes).
+      setSelectedTask(prev => {
+        if (!prev || prev.id !== taskId) return prev;
+        return { ...prev, ...updates };
+      });
     } catch (error) {
       console.error('Error updating task:', error);
       throw error;
@@ -1109,6 +1154,52 @@ export function MonthlyServiceDetail({
     },
     [editingCommentId, service.id]
   );
+
+  const handleToggleReaction = useCallback(async (commentId: string, emoji: string) => {
+    const prevReaction = comments.find(c => c.id === commentId)?.reactions?.find(r => r.user_id === user.id && r.emoji === emoji);
+
+    // Optimistic update
+    setComments(prev => prev.map(c => {
+      if (c.id !== commentId) return c;
+      if (prevReaction) {
+        return { ...c, reactions: (c.reactions || []).filter(r => r.id !== prevReaction.id) };
+      }
+      const tempReaction: CommentReaction = { id: `temp-${Date.now()}`, user_id: user.id, emoji, created_at: new Date().toISOString() };
+      return { ...c, reactions: [...(c.reactions || []), tempReaction] };
+    }));
+
+    try {
+      const response = await fetch(`/api/admin/monthly-services/${service.id}/comments/${commentId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!response.ok) throw new Error('Failed to toggle reaction');
+      const result = await response.json();
+
+      if (result.action === 'added') {
+        setComments(prev => prev.map(c => {
+          if (c.id !== commentId) return c;
+          return {
+            ...c,
+            reactions: [
+              ...(c.reactions || []).filter(r => !r.id.startsWith('temp-')),
+              { id: result.reaction.id, user_id: user.id, emoji, created_at: result.reaction.created_at },
+            ],
+          };
+        }));
+      }
+    } catch {
+      // Revert on error
+      setComments(prev => prev.map(c => {
+        if (c.id !== commentId) return c;
+        if (prevReaction) {
+          return { ...c, reactions: [...(c.reactions || []), prevReaction] };
+        }
+        return { ...c, reactions: (c.reactions || []).filter(r => !r.id.startsWith('temp-')) };
+      }));
+    }
+  }, [comments, user.id, service.id]);
 
   const handleCommentFileSelect = (
     event: React.ChangeEvent<HTMLInputElement>
@@ -1895,6 +1986,12 @@ export function MonthlyServiceDetail({
                             })()}
                         </>
                       )}
+                      <CommentReactions
+                        reactions={comment.reactions || []}
+                        currentUserId={user.id}
+                        onToggle={(emoji) => handleToggleReaction(comment.id, emoji)}
+                        userMap={reactionUserMap}
+                      />
                     </div>
                   );
                 })}
@@ -2240,6 +2337,8 @@ export function MonthlyServiceDetail({
                 throw new Error('Failed to add comment');
               }
 
+              const createdComment = await response.json();
+
               // Fetch the updated task with the real comment
               const updatedTaskResponse = await fetch(`/api/admin/tasks/${selectedTask.id}`, {
                 headers,
@@ -2253,6 +2352,8 @@ export function MonthlyServiceDetail({
 
               // Refresh service data to show new comment in the list
               onServiceUpdate();
+
+              return createdComment;
             } catch (error) {
               console.error('Error adding comment:', error);
               // On error, remove the temporary comment

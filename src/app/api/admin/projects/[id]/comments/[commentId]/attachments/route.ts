@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
 
 // GET /api/admin/projects/[id]/comments/[commentId]/attachments - List attachments
@@ -20,7 +21,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
@@ -76,13 +77,15 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const adminDb = createAdminClient();
+
     // Verify the comment exists
-    const { data: comment, error: commentError } = await supabase
+    const { data: comment, error: commentError } = await adminDb
       .from('project_comments')
       .select('id')
       .eq('id', commentId)
@@ -148,7 +151,7 @@ export async function POST(
       uploaded_by: user.id,
     }));
 
-    const { data: attachments, error: insertError } = await supabase
+    const { data: attachments, error: insertError } = await adminDb
       .from('comment_attachments')
       .insert(recordsToInsert)
       .select();
@@ -199,7 +202,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }

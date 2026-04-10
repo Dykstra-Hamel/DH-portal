@@ -62,7 +62,8 @@ export default function ProjectTaskForm({
   const [isBlockedTaskDepartmentModalOpen, setIsBlockedTaskDepartmentModalOpen] = useState(false);
   const [blockedTaskDepartmentTouched, setBlockedTaskDepartmentTouched] = useState(false);
 
-  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+  const isAdminRole = (role?: string | null) =>
+    role === 'admin' || role === 'super_admin' || role === 'project_manager';
 
   const getUserRole = (user: any) => {
     if (user?.profiles?.role) return user.profiles.role;

@@ -1,6 +1,6 @@
 export type Department = 'sales' | 'support' | 'scheduling' | 'technician' | 'inspector';
 
-export type ProfileRole = 'admin' | 'super_admin' | 'user' | 'customer';
+export type ProfileRole = 'admin' | 'super_admin' | 'user' | 'customer' | 'project_manager';
 
 export type CompanyRole = 'admin' | 'manager' | 'owner' | 'member';
 

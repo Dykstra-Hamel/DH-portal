@@ -18,11 +18,10 @@ interface PrimarySideNavProps {
 export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
-  const { isAdmin, isHydrating, selectedCompany } = useCompany();
-  const {
-    hasAccess: hasProjectManagement,
-    loading: featureLoading,
-  } = useFeatureAccess('project_management');
+  const { isAdmin, isProjectManager, isHydrating, selectedCompany } =
+    useCompany();
+  const { hasAccess: hasProjectManagement, loading: featureLoading } =
+    useFeatureAccess('project_management');
 
   const [currentUserId, setCurrentUserId] = React.useState<string | null>(null);
 
@@ -293,11 +292,13 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       return pathname.startsWith('/campaigns');
     }
     if (href === '/admin/project-management') {
-      return pathname.startsWith('/admin/project-management') ||
+      return (
+        pathname.startsWith('/admin/project-management') ||
         pathname.startsWith('/project-management') ||
         pathname.startsWith('/admin/monthly-services') ||
         pathname.startsWith('/admin/content-calendar') ||
-        pathname.startsWith('/admin/content-pieces');
+        pathname.startsWith('/admin/content-pieces')
+      );
     }
     if (href === '/field-ops/dashboard') {
       return pathname.startsWith('/field-ops');
@@ -319,6 +320,15 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
     // FieldOps is visible to technicians, inspectors, and admins
     if (item.id === 'field-ops') {
       return isTechnician || isInspector || (!isHydrating && isAdmin);
+    }
+    // Project managers only see the Tracker nav item
+    if (isProjectManager) {
+      return !isHydrating && item.id === 'project-management';
+    }
+
+    // Tech-leads is only visible to technician users and admins
+    if (item.id === 'tech-leads') {
+      return isTechnician || (!isHydrating && isAdmin);
     }
     // For super-admin-only items, only show after hydration completes AND user is admin
     if (item.superAdminOnly) {

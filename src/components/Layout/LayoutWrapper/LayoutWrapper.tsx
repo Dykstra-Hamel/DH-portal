@@ -119,8 +119,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return {
             title: pageHeader.title,
             description: pageHeader.description,
-            showAddButton: true,
-            addButtonText: 'Add Ticket',
+            showAddButton: false,
+            customActions: pageHeader.customActions,
           };
         }
         return {

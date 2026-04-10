@@ -45,6 +45,12 @@ export default function AdminPage() {
       const adminStatus = isAuthorizedAdminSync(profileData);
       setIsAdmin(adminStatus);
 
+      // Redirect project managers to their section
+      if (profileData?.role === 'project_manager') {
+        router.push('/admin/project-management');
+        return;
+      }
+
       // Redirect non-admin users away from admin page
       if (!adminStatus) {
         router.push('/');

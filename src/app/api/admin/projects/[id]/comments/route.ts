@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { isAuthorizedAdmin } from '@/lib/auth-helpers';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { STORAGE_CONFIG } from '@/lib/storage-utils';
 import { sendMentionSlackNotifications } from '@/lib/slack/mention-notifications';
 
@@ -23,13 +24,15 @@ export async function GET(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
+    const adminDb = createAdminClient();
+
     // Fetch comments with attachments
-    const { data: comments, error } = await supabase
+    const { data: comments, error } = await adminDb
       .from('project_comments')
       .select(
         `
@@ -46,7 +49,21 @@ export async function GET(
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Add public URLs to attachments
+    // Fetch reactions separately so the main query doesn't fail if the table doesn't exist yet
+    const reactionsMap: Record<string, { id: string; user_id: string; emoji: string; created_at: string }[]> = {};
+    const commentIds = (comments || []).map((c) => c.id);
+    if (commentIds.length > 0) {
+      const { data: reactions } = await adminDb
+        .from('comment_reactions')
+        .select('id, user_id, emoji, created_at, project_comment_id')
+        .in('project_comment_id', commentIds);
+      (reactions || []).forEach((r: { id: string; user_id: string; emoji: string; created_at: string; project_comment_id: string }) => {
+        if (!reactionsMap[r.project_comment_id]) reactionsMap[r.project_comment_id] = [];
+        reactionsMap[r.project_comment_id].push({ id: r.id, user_id: r.user_id, emoji: r.emoji, created_at: r.created_at });
+      });
+    }
+
+    // Add public URLs to attachments and attach reactions
     const commentsWithUrls = (comments || []).map((comment) => ({
       ...comment,
       attachments: (comment.attachments || []).map((attachment: { file_path: string; id: string; file_name: string; file_size: number; mime_type: string; created_at: string }) => {
@@ -58,6 +75,7 @@ export async function GET(
           url: urlData.publicUrl,
         };
       }),
+      reactions: reactionsMap[comment.id] || [],
     }));
 
     return NextResponse.json(commentsWithUrls);
@@ -85,9 +103,6 @@ function extractMentionedUserIds(html: string): string[] {
     }
   }
 
-  console.log('Extracting mentions from HTML:', html);
-  console.log('Found mentioned user IDs:', userIds);
-
   return userIds;
 }
 
@@ -110,10 +125,12 @@ export async function POST(
     }
 
     // Check admin authorization
-    const adminAuthorized = await isAuthorizedAdmin(user);
+    const adminAuthorized = await isAuthorizedAdminOrPM(user);
     if (!adminAuthorized) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
+
+    const adminDb = createAdminClient();
 
     // Parse request body
     const body = await request.json();
@@ -126,7 +143,7 @@ export async function POST(
     }
 
     // Get project details for company_id and project name
-    const { data: project, error: projectError } = await supabase
+    const { data: project, error: projectError } = await adminDb
       .from('projects')
       .select('id, name, company_id, company:companies(name)')
       .eq('id', projectId)
@@ -138,7 +155,7 @@ export async function POST(
     }
 
     // Get commenter's profile for notification message
-    const { data: commenterProfile } = await supabase
+    const { data: commenterProfile } = await adminDb
       .from('profiles')
       .select('first_name, last_name')
       .eq('id', user.id)
@@ -149,7 +166,7 @@ export async function POST(
       : 'Someone';
 
     // Create comment
-    const { data: comment, error } = await supabase
+    const { data: comment, error } = await adminDb
       .from('project_comments')
       .insert({
         project_id: projectId,
@@ -170,16 +187,13 @@ export async function POST(
     }
 
     // Update project's updated_at timestamp
-    await supabase
+    await adminDb
       .from('projects')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', projectId);
 
     // Extract mentioned user IDs and create notifications
     const mentionedUserIds = extractMentionedUserIds(body.comment);
-
-    console.log('Current user ID:', user.id);
-    console.log('Project company_id:', project.company_id);
 
     if (mentionedUserIds.length > 0 && project.company_id) {
       // Create notifications for each mentioned user (except the commenter)
@@ -195,24 +209,16 @@ export async function POST(
           reference_type: 'project_comment',
         }));
 
-      console.log('Notifications to create:', notificationsToCreate);
-
       if (notificationsToCreate.length > 0) {
-        const { error: notificationError } = await supabase
+        const { error: notificationError } = await adminDb
           .from('notifications')
           .insert(notificationsToCreate);
 
         if (notificationError) {
           // Log but don't fail the request if notifications fail
           console.error('Error creating mention notifications:', notificationError);
-        } else {
-          console.log('Notifications created successfully');
         }
-      } else {
-        console.log('No notifications to create (mentioned yourself or empty list)');
       }
-    } else {
-      console.log('Skipping notifications - no mentions or no company_id');
     }
 
     if (mentionedUserIds.length > 0) {

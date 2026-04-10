@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
-import { createClient } from '@/lib/supabase/server';
 
 export async function GET(
   request: NextRequest,
@@ -119,8 +118,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Use authenticated client so auth.uid() works in triggers
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { id } = await params;
     const body = await request.json();
 
@@ -335,7 +333,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { id } = await params;
     const body = await request.json();
 

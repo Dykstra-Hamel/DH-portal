@@ -33,6 +33,11 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
     default_scheduling_followup_cadence_id: '',
   });
   const [savingDefaults, setSavingDefaults] = useState(false);
+  const [quickQuoteStep1Script, setQuickQuoteStep1Script] = useState('');
+  const [quickQuoteStep1Tips, setQuickQuoteStep1Tips] = useState('');
+  const [quickQuoteStep2Script, setQuickQuoteStep2Script] = useState('');
+  const [quickQuoteStep3Script, setQuickQuoteStep3Script] = useState('');
+  const [savingQuickQuote, setSavingQuickQuote] = useState(false);
 
   useEffect(() => {
     loadCadences();
@@ -49,8 +54,43 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
         default_quote_followup_cadence_id: settings?.default_quote_followup_cadence_id?.value ?? '',
         default_scheduling_followup_cadence_id: settings?.default_scheduling_followup_cadence_id?.value ?? '',
       });
+      setQuickQuoteStep1Script(settings?.quick_quote_step1_script?.value ?? '');
+      setQuickQuoteStep1Tips(settings?.quick_quote_step1_tips?.value ?? '');
+      setQuickQuoteStep2Script(settings?.quick_quote_step2_script?.value ?? '');
+      setQuickQuoteStep3Script(settings?.quick_quote_step3_script?.value ?? '');
     } catch {
       // Non-critical — silently ignore
+    }
+  };
+
+  const handleSaveQuickQuote = async () => {
+    try {
+      setSavingQuickQuote(true);
+      setError(null);
+
+      const response = await fetch(`/api/companies/${companyId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            quick_quote_step1_script: { value: quickQuoteStep1Script, type: 'string' },
+            quick_quote_step1_tips: { value: quickQuoteStep1Tips, type: 'string' },
+            quick_quote_step2_script: { value: quickQuoteStep2Script, type: 'string' },
+            quick_quote_step3_script: { value: quickQuoteStep3Script, type: 'string' },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const { error: errorMsg } = await response.json();
+        throw new Error(errorMsg || 'Failed to save Quick Quote settings');
+      }
+
+      setSuccess('Quick Quote settings saved successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save Quick Quote settings');
+    } finally {
+      setSavingQuickQuote(false);
     }
   };
 
@@ -181,6 +221,81 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
 
   return (
     <div className={styles.salesConfigManager}>
+      {/* Quick Quote Script Settings */}
+      <div className={styles.quickQuoteCard}>
+        <div className={styles.quickQuoteCardHeader}>
+          <h3>Quick Quote Script</h3>
+          <p>Customize the sales script and tips shown to reps during the Quick Quote flow. Leave blank to use the default text.</p>
+        </div>
+
+        <div className={styles.quickQuoteStepSection}>
+          <p className={styles.quickQuoteStepLabel}>Step 1 — Pest Selection</p>
+          <div className={styles.quickQuoteFormGroup}>
+            <label className={styles.quickQuoteLabel}>Sales Script</label>
+            <textarea
+              className={styles.quickQuoteTextarea}
+              rows={3}
+              value={quickQuoteStep1Script}
+              onChange={(e) => setQuickQuoteStep1Script(e.target.value)}
+              disabled={savingQuickQuote}
+              placeholder={`"Thank you for calling us today! My name is [Your Name] and I'd be happy to help you get a quote. Can I start by asking — what kind of pest issue are you dealing with?"`}
+            />
+          </div>
+          <div className={styles.quickQuoteFormGroup}>
+            <label className={styles.quickQuoteLabel}>Sales Tips</label>
+            <p className={styles.quickQuoteHint}>Enter one tip per line. Each line will appear as a bullet point.</p>
+            <textarea
+              className={styles.quickQuoteTextarea}
+              rows={5}
+              value={quickQuoteStep1Tips}
+              onChange={(e) => setQuickQuoteStep1Tips(e.target.value)}
+              disabled={savingQuickQuote}
+              placeholder={`Ask how long they've been noticing the problem — longer duration often signals a bigger issue.\nConfirm property ownership — owners are more likely to commit to recurring plans.\nMention that pest pressure is high in their area to build urgency.`}
+            />
+          </div>
+        </div>
+
+        <div className={styles.quickQuoteStepSection}>
+          <p className={styles.quickQuoteStepLabel}>Step 2 — Customer Info</p>
+          <div className={styles.quickQuoteFormGroup}>
+            <label className={styles.quickQuoteLabel}>Sales Script</label>
+            <textarea
+              className={styles.quickQuoteTextarea}
+              rows={3}
+              value={quickQuoteStep2Script}
+              onChange={(e) => setQuickQuoteStep2Script(e.target.value)}
+              disabled={savingQuickQuote}
+              placeholder={`"Great! I just need to gather a few details. Can I get your name and the best phone number to reach you?"`}
+            />
+          </div>
+        </div>
+
+        <div className={styles.quickQuoteStepSection}>
+          <p className={styles.quickQuoteStepLabel}>Step 3 — Plan Selection</p>
+          <div className={styles.quickQuoteFormGroup}>
+            <label className={styles.quickQuoteLabel}>Sales Script</label>
+            <textarea
+              className={styles.quickQuoteTextarea}
+              rows={3}
+              value={quickQuoteStep3Script}
+              onChange={(e) => setQuickQuoteStep3Script(e.target.value)}
+              disabled={savingQuickQuote}
+              placeholder={`"Based on what you've described, let me walk you through a few plan options. Our plans are designed to give you the right level of protection — I'd recommend starting with our most comprehensive option."`}
+            />
+          </div>
+        </div>
+
+        <div className={styles.quickQuoteCardFooter}>
+          <button
+            onClick={handleSaveQuickQuote}
+            className={styles.saveButton}
+            disabled={savingQuickQuote}
+          >
+            {savingQuickQuote ? 'Saving...' : 'Save Quick Quote Settings'}
+          </button>
+        </div>
+      </div>
+
       <div className={styles.defaultCadencesCard}>
         <div className={styles.defaultCadencesHeader}>
           <h3>Automation Default Cadences</h3>

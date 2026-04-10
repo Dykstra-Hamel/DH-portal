@@ -10,6 +10,7 @@ import { UserAvatar } from '../UserAvatar/UserAvatar';
 import { GlobalCompanyDropdown } from './CompanyDropdown/GlobalCompanyDropdown';
 import { MobileCompanySwitcher } from './CompanyDropdown/MobileCompanySwitcher';
 import { useWizard } from '@/contexts/WizardContext';
+import { useCompany } from '@/contexts/CompanyContext';
 import styles from './GlobalHeader.module.scss';
 
 interface GlobalHeaderProps {
@@ -24,6 +25,7 @@ export function GlobalHeader({
   const pathname = usePathname();
   const router = useRouter();
   const { wizardTitle, backInterceptor } = useWizard();
+  const { isProjectManager } = useCompany();
   const isTechLeads = pathname.startsWith('/tech-leads');
   const isFieldMap = pathname.startsWith('/field-map');
   const isFieldOps = pathname.startsWith('/field-ops');
@@ -37,6 +39,7 @@ export function GlobalHeader({
     pathname.startsWith('/admin/monthly-services') ||
     pathname.startsWith('/admin/content-pieces/');
   const hideCompany =
+    isProjectManager ||
     pathname === '/project-management' ||
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
