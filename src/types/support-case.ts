@@ -46,6 +46,9 @@ export interface SupportCase {
   resolution_action?: string;
   notes?: string;
 
+  // Branch assignment
+  branch_id?: string | null;
+
   // Workflow and assignment
   status: SupportCaseStatus;
   assigned_to?: string;
@@ -117,6 +120,7 @@ export interface SupportCase {
 export interface SupportCaseFormData {
   customer_id?: string;
   ticket_id?: string;
+  branch_id?: string | null;
   format?: SupportCaseFormat;
   source?: SupportCaseSource;
   issue_type: SupportCaseIssueType;

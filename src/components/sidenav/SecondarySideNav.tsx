@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GuardedLink } from '@/components/Common/GuardedLink/GuardedLink';
 import { usePathname } from 'next/navigation';
-import { Mails } from 'lucide-react';
+import { Mails, MapPinned, Truck } from 'lucide-react';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
@@ -134,11 +134,13 @@ export function SecondarySideNav({
   const { hasAccess: hasSchedulingAccess } =
     useCurrentUserPageAccess('scheduling');
   const { hasAccess: hasSupportAccess } = useCurrentUserPageAccess('support');
+  const { hasAccess: hasTechnicianAccess } = useCurrentUserPageAccess('technician');
 
   // Global admins see everything, otherwise check department access
   const shouldShowSales = isAdmin || hasSalesAccess;
   const shouldShowScheduling = isAdmin || hasSchedulingAccess;
   const shouldShowSupport = isAdmin || hasSupportAccess;
+  const shouldShowTechLeads = isAdmin || hasTechnicianAccess;
 
   // Handle client-side hydration
   useEffect(() => {
@@ -367,6 +369,12 @@ export function SecondarySideNav({
         );
       case 'campaigns':
         return <Mails size={24} />;
+      case 'tech-leads':
+        return <Truck size={24} />;
+      case 'field-map':
+        return <MapPinned size={24} />;
+      case 'field-ops':
+        return <Truck size={24} />;
       default:
         return null;
     }
@@ -610,6 +618,48 @@ export function SecondarySideNav({
             ],
           },
         ];
+      case 'tech-leads':
+        return [
+          {
+            items: [
+              { text: 'Dashboard', href: '/tech-leads' },
+              { text: 'New Opportunity', href: '/tech-leads/new' },
+              { text: 'My Opportunities', href: '/tech-leads/opportunities' },
+            ],
+          },
+        ];
+      case 'field-map':
+        return [
+          {
+            items: [
+              { text: 'Dashboard', href: '/field-map' },
+              { text: 'New Inspection', href: '/field-map/new' },
+              { text: 'History', href: '/field-map/history' },
+            ],
+          },
+        ];
+      case 'field-ops':
+        return [
+          {
+            items: [
+              { text: 'Dashboard', href: '/field-ops/dashboard' },
+            ],
+          },
+          ...(shouldShowTechLeads ? [{
+            title: 'Tech Leads',
+            items: [
+              { text: 'My Opportunities', href: '/field-ops/tech-leads/opportunities' },
+              { text: 'Reports', href: '/field-ops/tech-leads/reports' },
+            ],
+          }] : []),
+          {
+            title: 'Field Map',
+            items: [
+              { text: 'History', href: '/field-ops/field-map/history' },
+              { text: 'Reports', href: '/field-ops/field-map/reports' },
+            ],
+          },
+        ];
       case 'tickets':
       default:
         return [
@@ -744,6 +794,8 @@ export function SecondarySideNav({
           <h2 className={styles.sectionTitle}>
             {activePrimaryNav === 'project-management'
               ? 'Tracker'
+              : activePrimaryNav === 'field-ops'
+              ? 'FieldOps'
               : activePrimaryNav.charAt(0).toUpperCase() +
                 activePrimaryNav.slice(1)}
           </h2>
@@ -774,7 +826,16 @@ export function SecondarySideNav({
                     (item.href === '/tickets/new' &&
                       (pathname.startsWith('/tickets/new') ||
                         pathname.startsWith('/tickets/calls-and-forms'))) ||
+                    (item.href === '/field-map' &&
+                      (pathname === '/field-map' ||
+                        pathname.startsWith('/field-map/service/'))) ||
                     (item.href.startsWith('/tickets/') &&
+                      pathname.startsWith(item.href)) ||
+                    (item.href.startsWith('/field-map/') &&
+                      pathname.startsWith(item.href)) ||
+                    (item.href.startsWith('/tech-leads/') &&
+                      pathname.startsWith(item.href)) ||
+                    (item.href.startsWith('/field-ops/') &&
                       pathname.startsWith(item.href));
 
                   return (

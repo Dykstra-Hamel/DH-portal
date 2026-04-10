@@ -2,7 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 /**
  * Determines the correct home route for a user after login.
- * Technician-only members (role=member, sole department=technician) → /tech-leads
+ * Technician or inspector members → /field-ops/dashboard
  * Everyone else → /tickets/dashboard
  */
 export async function getHomeRoute(
@@ -53,12 +53,12 @@ export async function getHomeRoute(
 
     const departments = (depts ?? []).map((d: { department: string }) => d.department);
 
-    // Only redirect to /tech-leads if the ONLY department is technician
+    // Technician or inspector members go to FieldOps dashboard
     if (
       departments.length > 0 &&
-      departments.every((d: string) => d === 'technician')
+      departments.every((d: string) => d === 'inspector' || d === 'technician')
     ) {
-      return '/tech-leads';
+      return '/field-ops/dashboard';
     }
   } catch {
     // Fall back to default on any error

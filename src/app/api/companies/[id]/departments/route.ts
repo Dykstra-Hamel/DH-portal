@@ -64,6 +64,7 @@ export async function GET(
       support: 0,
       scheduling: 0,
       technician: 0,
+      inspector: 0,
       total: 0
     };
 
@@ -72,7 +73,8 @@ export async function GET(
       sales: new Set<string>(),
       support: new Set<string>(),
       scheduling: new Set<string>(),
-      technician: new Set<string>()
+      technician: new Set<string>(),
+      inspector: new Set<string>()
     };
 
     userDepartments?.forEach(ud => {
@@ -86,11 +88,13 @@ export async function GET(
     stats.support = uniqueUsersPerDepartment.support.size;
     stats.scheduling = uniqueUsersPerDepartment.scheduling.size;
     stats.technician = uniqueUsersPerDepartment.technician.size;
+    stats.inspector = uniqueUsersPerDepartment.inspector.size;
     stats.total = new Set([
       ...uniqueUsersPerDepartment.sales,
       ...uniqueUsersPerDepartment.support,
       ...uniqueUsersPerDepartment.scheduling,
-      ...uniqueUsersPerDepartment.technician
+      ...uniqueUsersPerDepartment.technician,
+      ...uniqueUsersPerDepartment.inspector
     ]).size;
 
     // Group departments by user

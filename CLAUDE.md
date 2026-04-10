@@ -188,15 +188,141 @@ All email sending goes through:
 
 ## WorkWave PestPac API Integration
 
-Full documentation lives in `Agents.md`. Key points for development:
+Full documentation lives in `Agents.md`. Snapshot from your WorkWave portal captures (`2026-03-16`) is copied here so both files stay in sync.
 
-- **Base URL**: `https://api.workwave.com/pestpac/v1/`
-- **Auth Header**: `ApiKey: {key}` — store key in env as `PESTPAC_API_KEY`
-- **Tenant Header**: `tenant-id: {tenant_id}` — store as `PESTPAC_TENANT_ID`
-- **Content-Type**: Always `application/json`
-- All requests are RESTful — use GET/POST/PATCH/PUT/DELETE appropriately
-- Use PATCH for partial field updates (not PUT, which replaces the whole record)
-- Pagination: `$top` (page size) + `$skip` (offset) query params
-- Filtering: OData-style `$filter`, `$orderby`, `$select`, `$expand`
-- Do NOT store raw API keys in code — always use environment variables
-- The full endpoint reference is at `https://developer.workwave.com/documentation`
+### Authentication
+
+The docs and this codebase use a combined auth pattern:
+
+```
+Authorization: Bearer {oauth_access_token}   # used in this app
+ApiKey: {your_api_key}
+tenant-id: {your_tenant_id}
+Content-Type: application/json
+```
+
+- WorkWave docs examples commonly show `ApiKey` + `tenant-id`.
+- In DH Portal, PestPac calls are authenticated with OAuth token + `ApiKey` + `tenant-id`.
+- OAuth token endpoint used by this app: `https://is.workwave.com/oauth2/token?scope=openid`
+- Company credentials are stored in `company_settings` with keys:
+  - `pestpac_api_key`
+  - `pestpac_tenant_id`
+  - `pestpac_oauth_client_id`
+  - `pestpac_oauth_client_secret`
+  - `pestpac_wwid_username`
+  - `pestpac_wwid_password`
+
+### Base URL
+
+`https://api.workwave.com/pestpac/v1/`
+
+### Resource groups shown in docs
+
+`ActivityLog`, `AdjustmentReason`, `Areas`, `AreaTypes`, `AutoComplete`, `Automation`, `BillTos`, `Branches`, `Builders`, `Bundles`, `Calls`, `CancelReasons`, `CompanySetup`, `Conditions`, `ConditionsLookups`, `Contacts`, `Corporations`, `Counties`, `CreditCardBilling`, `Devices`, `DeviceTypes`, `Diagrams`, `DiscountCodes`, `Divisions`, `Documents`, `Email`, `Employees`, `FinancedInvoices`, `FormComments`, `Frequencies`, `GainLoss`, `GLCode`, `Invoices`, `Jobs`, `Leads`, `ListManagement`, `LocationAreaTypes`, `LocationBundles`, `Locations`, `NoteCodes`, `Notes`, `NotificationMessage`, `Notifications`, `NotServicedReasons`, `PaymentAccounts`, `Payments`, `PayOverTime`, `ProgramTypes`, `Routes`, `SalesEvents`, `Schedules`, `Scheduling`, `ServiceClasses`, `ServiceOrderAttributeCategories`, `ServiceOrderAttributes`, `ServiceOrderBatches`, `ServiceOrders`, `Services`, `ServiceSetups`, `Skills`, `SourceClasses`, `Sources`, `States`, `TargetEvidenceTypes`, `TargetPests`, `Tasks`, `TaskTypes`, `TaxCodes`, `TechnicianRegions`, `Thresholds`, `TimeBlocks`, `Types`, `UserDefChoice`, `UserDefFields`, `WebHooks`.
+
+### High-use endpoint patterns in this codebase
+
+#### Customers and locations
+```
+GET    /Locations
+GET    /Locations/{locationID}
+GET    /Clients/{clientID}
+GET    /Contacts
+```
+
+#### Service orders (important for FieldMap)
+```
+GET    /ServiceOrders
+GET    /ServiceOrders/{id}
+POST   /ServiceOrders
+PATCH  /ServiceOrders/{id}
+DELETE /ServiceOrders/{id}
+GET    /ServiceOrders/{id}/documents
+GET    /ServiceOrders/{id}/conditions
+POST   /ServiceOrders/{id}/notes
+GET    /ServiceOrders/{id}/inspectionReport
+POST   /ServiceOrders/{orderId}/lineItems
+PUT    /ServiceOrders/{orderId}/lineItems/{lineItemId}
+DELETE /ServiceOrders/{orderId}/lineItems/{lineItemId}
+POST   /ServiceOrders/{orderId}/materials
+PUT    /ServiceOrders/{orderId}/materials/{materialLineId}
+DELETE /ServiceOrders/{orderId}/materials/{materialLineId}
+POST   /ServiceOrders/{orderId}/targets
+DELETE /ServiceOrders/{orderId}/targets/{targetCode}
+GET    /ServiceOrders/{orderId}/attributes
+POST   /ServiceOrders/{orderId}/attributes
+DELETE /ServiceOrders/{orderId}/attributes/{attributeId}
+```
+
+#### Routes and schedule lookups
+```
+GET    /Routes
+GET    /Routes/{routeID}
+GET    /Routes/{routeID}/Stops     # supported for some tenants
+GET    /lookups/Routes
+GET    /lookups/Schedules
+POST   /Scheduling/availableTimeWindows
+```
+
+#### Service setup and service catalog
+```
+GET    /ServiceSetups/{id}
+PATCH  /ServiceSetups/{id}
+POST   /ServiceSetups
+GET    /lookups/Services
+GET    /lookups/ServiceClasses
+GET    /lookups/ServiceOrderAttributes
+GET    /lookups/ServiceOrderAttributeCategories
+```
+
+#### Billing and payments
+```
+GET    /BillTos
+GET    /Invoices
+GET    /Payments
+POST   /Payments
+GET    /PaymentAccounts
+POST   /PaymentAccounts/{cardId}/charge
+POST   /PaymentAccounts/{cardId}/authorize
+POST   /PaymentAccounts/return
+POST   /PaymentAccounts/capture
+```
+
+#### Webhooks and activity
+```
+POST   /ActivityLog
+GET    /WebHooks
+POST   /WebHooks
+PUT    /WebHooks/{id}
+DELETE /WebHooks/{id}
+```
+
+#### Tasks and operational lookups
+```
+GET    /Tasks
+POST   /Tasks
+PUT    /Tasks/{id}
+DELETE /Tasks/{id}
+GET    /lookups/TaskTypes
+GET    /lookups/TargetPests
+GET    /lookups/TaxCodes
+GET    /lookups/TechnicianRegions
+GET    /TimeBlocks
+```
+
+### Webhook entity/action support shown in docs
+
+- `Bill-To`: create, update, delete
+- `Branch`: create, update, delete
+- `Card On File`: create, update, delete
+- `Condition`: create, update, delete
+- `Contacts`: create, update, delete
+- `CreditMemo`: create, update, apply
+- `Employee`: create, update, delete
+- `Invoice`: create, update, void
+- `Lead`: create, update, delete
+- `Location`: create, update, delete
+- `Notes`: create, update, delete
+- `Payment`: create, update, apply
+- `Service Order`: create, update, post, delete
+- `Service Setup`: create, update, delete

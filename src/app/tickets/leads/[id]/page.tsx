@@ -48,6 +48,7 @@ import { usePageActions } from '@/contexts/PageActionsContext';
 import { formatHeaderDate } from '@/lib/date-utils';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
+import { useBranches } from '@/hooks/useBranches';
 import styles from './page.module.scss';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 
@@ -103,6 +104,8 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     departmentType: ticketType === 'support' ? 'support' : 'sales',
     enabled: ticketType !== 'junk',
   });
+  const { branches: availableBranches } = useBranches(lead?.company_id);
+  const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);
 
   // Create stable currentUser object to prevent infinite loops
   const stableCurrentUser = useMemo(() => {
@@ -972,6 +975,33 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     [leadId, lead, isAdmin, handleShowToast]
   );
 
+  // Sync branch state when lead loads
+  useEffect(() => {
+    if (lead?.branch_id !== undefined) {
+      setCurrentBranchId(lead.branch_id ?? null);
+    }
+  }, [lead?.branch_id]);
+
+  // Handle branch change
+  const handleBranchChange = useCallback(
+    async (branchId: string | null) => {
+      if (!leadId) return;
+      try {
+        if (isAdmin) {
+          await adminAPI.updateLead(leadId, { branch_id: branchId });
+        } else {
+          await adminAPI.updateUserLead(leadId, { branch_id: branchId });
+        }
+        setCurrentBranchId(branchId);
+        handleShowToast('Branch updated successfully!', 'success');
+      } catch (error) {
+        console.error('Error updating lead branch:', error);
+        handleShowToast('Failed to update branch. Please try again.', 'error');
+      }
+    },
+    [leadId, isAdmin, handleShowToast]
+  );
+
   // Update page header when lead data changes
   useEffect(() => {
     if (lead && lead.customer && stableCurrentUser) {
@@ -1011,6 +1041,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
           onAssigneeChange: handleAssigneeChange,
           onSchedulerChange: handleSchedulerChange,
           onStatusChange: handleStatusChange,
+          currentBranchId,
+          availableBranches,
+          onBranchChange: handleBranchChange,
         },
       });
     }
@@ -1037,6 +1070,9 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
     handleAssigneeChange,
     handleSchedulerChange,
     handleStatusChange,
+    currentBranchId,
+    availableBranches,
+    handleBranchChange,
   ]);
 
   const handleToastClose = () => {

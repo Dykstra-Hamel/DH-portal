@@ -24,6 +24,7 @@ import {
   CheckSquare,
   Brain,
   Puzzle,
+  GitBranch,
 } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
@@ -32,11 +33,13 @@ import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
 import ServicePlansManager from './ServicePlansManager';
 import ServiceAreasManager from './ServiceAreasManager';
+import BranchesManager from './BranchesManager';
 import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
 import PestPacSettingsManager from './PestPacSettingsManager';
+import FieldMapSettingsManager from './FieldMapSettingsManager';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './CompanyManagement.module.scss';
@@ -93,6 +96,7 @@ type ActiveSection =
   | 'pest-management'
   | 'service-plans'
   | 'service-areas'
+  | 'branches'
   | 'pricing-settings'
   | 'sales-config'
   | 'discounts'
@@ -588,6 +592,7 @@ export default function CompanyManagement({
     { id: 'pest-management', label: 'Pest Management', icon: Bug },
     { id: 'service-plans', label: 'Service Plans', icon: FileText },
     { id: 'service-areas', label: 'Service Areas', icon: Map },
+    { id: 'branches', label: 'Branches', icon: GitBranch },
     { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
     { id: 'sales-config', label: 'Sales Config', icon: Target },
     { id: 'discounts', label: 'Discounts', icon: Tag },
@@ -699,6 +704,9 @@ export default function CompanyManagement({
           {activeSection === 'service-areas' && (
             <ServiceAreasManager companyId={companyId} />
           )}
+          {activeSection === 'branches' && (
+            <BranchesManager companyId={companyId} />
+          )}
           {activeSection === 'pricing-settings' && (
             <PricingSettingsManager companyId={companyId} />
           )}
@@ -733,7 +741,10 @@ export default function CompanyManagement({
             />
           )}
           {activeSection === 'integrations' && (
-            <PestPacSettingsManager companyId={companyId} />
+            <>
+              <PestPacSettingsManager companyId={companyId} />
+              <FieldMapSettingsManager companyId={companyId} />
+            </>
           )}
         </div>
       </div>

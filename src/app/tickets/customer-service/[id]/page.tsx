@@ -15,6 +15,7 @@ import { usePageActions } from '@/contexts/PageActionsContext';
 import { formatHeaderDate } from '@/lib/date-utils';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
+import { useBranches } from '@/hooks/useBranches';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -56,6 +57,8 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
     departmentType: 'support',
     enabled: true,
   });
+  const { branches: availableBranches } = useBranches(supportCase?.company_id);
+  const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);
 
   // Create stable currentUser object to prevent infinite loops
   const stableCurrentUser = useMemo(() => {
@@ -193,6 +196,39 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
     [supportCaseId, supportCase, isAdmin, fetchSupportCase]
   );
 
+  // Sync branch state when support case loads
+  useEffect(() => {
+    if (supportCase?.branch_id !== undefined) {
+      setCurrentBranchId(supportCase.branch_id ?? null);
+    }
+  }, [supportCase?.branch_id]);
+
+  const handleShowToast = useCallback((message: string, type: 'success' | 'error') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+  }, []);
+
+  // Handle branch change
+  const handleBranchChange = useCallback(
+    async (branchId: string | null) => {
+      if (!supportCaseId) return;
+      try {
+        if (isAdmin) {
+          await adminAPI.updateSupportCase(supportCaseId, { branch_id: branchId });
+        } else {
+          await adminAPI.updateUserSupportCase(supportCaseId, { branch_id: branchId });
+        }
+        setCurrentBranchId(branchId);
+        handleShowToast('Branch updated successfully!', 'success');
+      } catch (error) {
+        console.error('Error updating support case branch:', error);
+        handleShowToast('Failed to update branch. Please try again.', 'error');
+      }
+    },
+    [supportCaseId, isAdmin, handleShowToast]
+  );
+
   useEffect(() => {
     const resolveParams = async () => {
       const resolvedParams = await params;
@@ -275,6 +311,9 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
           currentUser: stableCurrentUser,
           onAssigneeChange: handleAssigneeChange,
           onStatusChange: handleStatusChange,
+          currentBranchId,
+          availableBranches,
+          onBranchChange: handleBranchChange,
         },
       });
     }
@@ -292,16 +331,13 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
     // setPageHeader is intentionally omitted - it's a stable context setter
     handleAssigneeChange,
     handleStatusChange,
+    currentBranchId,
+    availableBranches,
+    handleBranchChange,
   ]);
 
   const handleBack = () => {
     router.push('/tickets/customer-service');
-  };
-
-  const handleShowToast = (message: string, type: 'success' | 'error') => {
-    setToastMessage(message);
-    setToastType(type);
-    setShowToast(true);
   };
 
   const handleToastClose = () => {

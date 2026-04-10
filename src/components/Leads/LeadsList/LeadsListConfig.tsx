@@ -238,11 +238,18 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     sortable: true,
     sortKey: 'lead_source',
     render: (lead: Lead) => (
-      <div className={styles.formatCell}>
-        {getFormatIcon(lead)}
-        <span className={styles.sourceBadge}>
-          {getLeadSourceLabel(lead.lead_source)}
-        </span>
+      <div className={styles.formatCell} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {getFormatIcon(lead)}
+          <span className={styles.sourceBadge}>
+            {getLeadSourceLabel(lead.lead_source)}
+          </span>
+        </div>
+        {lead.branch?.name && (
+          <span style={{ fontSize: 11, padding: '1px 6px', background: '#eff6ff', color: '#1d4ed8', borderRadius: 10, fontWeight: 500, whiteSpace: 'nowrap' }}>
+            {lead.branch.name}
+          </span>
+        )}
       </div>
     ),
   },

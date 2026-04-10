@@ -10,6 +10,7 @@ export type LeadSource =
   | 'campaign'
   | 'widget'
   | 'technician'
+  | 'inspector'
   | 'other'
   // Legacy values (existing records only — do not use for new records)
   | 'organic'
@@ -118,6 +119,10 @@ export interface Lead {
     subdomain?: string;
     [key: string]: any;
   };
+
+  // Branch assignment
+  branch_id?: string | null;
+  branch?: { id: string; name: string } | null;
 
   // Joined data from related tables
   customer?: {
