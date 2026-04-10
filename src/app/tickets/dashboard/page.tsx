@@ -1218,7 +1218,7 @@ function TicketsDashboardContent() {
 
   // Fetch total counts for tabs (not affected by pagination)
   const fetchTotalCounts = useCallback(
-    async (companyId: string, userId?: string) => {
+    async (companyId: string, userId?: string, isGlobalAdmin?: boolean) => {
       if (!companyId) return;
 
       try {
