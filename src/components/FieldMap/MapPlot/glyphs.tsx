@@ -2,12 +2,18 @@
 
 import React from 'react';
 import {
+  Bug,
+  CircleAlert,
   DoorClosed,
   DoorOpen,
   AppWindow,
   Droplet,
+  Droplets,
+  EyeOff,
   Fence,
   Grid2x2,
+  TrendingDown,
+  TreePine,
   Warehouse,
   House,
 } from 'lucide-react';
@@ -176,15 +182,24 @@ function PestGlyph({ type, color }: { type: MapPestStampType; color?: string }) 
 // ─── Exported Glyphs ─────────────────────────────────────────────────────────
 
 export function MapStampGlyph({ type, size = 16 }: { type: MapStampType; size?: number }) {
+  // Dynamic company pest — generic fallback glyph
+  if (type === 'dynamic-pest') {
+    return <Bug size={size} strokeWidth={1.9} aria-hidden="true" />;
+  }
+
   if (isMapPestStampType(type)) {
     return <PestGlyph type={type} />;
   }
 
   switch (type) {
+    // Object stamps
     case 'door':
       return <DoorClosed size={size} strokeWidth={1.9} aria-hidden="true" />;
     case 'window':
       return <Grid2x2 size={size} strokeWidth={1.9} aria-hidden="true" />;
+    case 'sentricon-bait-station':
+      return <PlotObjectBlueprintGlyph type="sentricon-bait-station" />;
+    // Element stamps
     case 'house':
       return <House size={size} strokeWidth={1.9} aria-hidden="true" />;
     case 'garage':
@@ -197,9 +212,24 @@ export function MapStampGlyph({ type, size = 16 }: { type: MapStampType; size?: 
       return <Fence size={size} strokeWidth={1.9} aria-hidden="true" />;
     case 'water':
       return <Droplet size={size} strokeWidth={1.9} aria-hidden="true" />;
+    // Conducive condition stamps — all use the shared condition glyph
+    case 'excessive-moisture':
+    case 'faulty-grade':
+    case 'earth-wood-contact':
+    case 'inaccessible-areas':
+    case 'other-condition':
+      return <ConditionStampGlyph />;
     default:
       return null;
   }
+}
+
+export function ConditionStampGlyph() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 34 34" fill="currentColor" aria-hidden="true">
+      <path d="M32.6634 10.3823C31.8069 8.35787 30.5814 6.54004 29.0207 4.97933C27.46 3.41862 25.6421 2.19309 23.6177 1.33656C21.5206 0.449554 19.2941 0 17 0C14.7059 0 12.479 0.449554 10.3823 1.33656C8.35787 2.19267 6.54004 3.41862 4.97933 4.97933C3.41862 6.54004 2.19309 8.35787 1.33656 10.3823C0.449554 12.479 0 14.7055 0 17C0 19.2945 0.449554 21.521 1.33656 23.6177C2.19267 25.6421 3.41862 27.46 4.97933 29.0207C6.54004 30.5814 8.35787 31.8069 10.3823 32.6634C12.479 33.55 14.7055 34 17 34C19.2945 34 21.521 33.5504 23.6177 32.6634C25.6421 31.8069 27.46 30.5814 29.0207 29.0207C30.5814 27.46 31.8069 25.6421 32.6634 23.6177C33.55 21.521 34 19.2945 34 17C34 14.7055 33.5504 12.479 32.6634 10.3823ZM17 26.6698C15.7194 26.6698 14.6813 25.6317 14.6813 24.3511C14.6813 23.0704 15.7194 22.0323 17 22.0323C18.2806 22.0323 19.3187 23.0704 19.3187 24.3511C19.3187 25.6317 18.2806 26.6698 17 26.6698ZM19.6627 9.89646L18.7293 19.6618C18.6588 20.3982 17.8995 20.8828 16.9996 20.8828C16.1001 20.8828 15.3404 20.3982 15.2698 19.6618L14.3365 9.89646C14.1937 8.40212 15.4055 7.3302 16.9992 7.3302C18.5929 7.3302 19.805 8.40212 19.6618 9.89646H19.6627Z" />
+    </svg>
+  );
 }
 
 export function PlotObjectBlueprintGlyph({ type }: { type: MapObjectStampType }) {
@@ -209,6 +239,13 @@ export function PlotObjectBlueprintGlyph({ type }: { type: MapObjectStampType })
         <path d="M4 3V21" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         <path d="M4 19L16 19" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
         <path d="M4 19A12 12 0 0 1 16 7" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (type === 'sentricon-bait-station') {
+    return (
+      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="25" viewBox="0 0 40 25" fill="currentColor" aria-hidden="true">
+        <path d="M7.42148 6.03851C7.15851 5.76624 6.73971 5.55231 6.49623 5.55231C6.25274 5.55231 5.83394 5.76624 5.57098 6.03851L0.486973 11.1046C0.214268 11.3672 0 11.7853 0 12.0284C0 12.2715 0.224008 12.6896 0.486973 12.9522L12.0575 24.5041C12.3302 24.7764 12.8561 24.9903 13.2359 24.9903H18.1641C18.5439 24.9903 18.992 24.8541 19.1673 24.6791C19.3426 24.5041 19.4789 24.0568 19.4789 23.6776V18.7573C19.4789 18.3781 19.2549 17.853 18.992 17.5807L7.42148 6.03851ZM39.5033 11.1046L34.429 6.03851C34.1661 5.76624 33.7473 5.55231 33.5038 5.55231C33.2603 5.55231 32.8415 5.76624 32.5785 6.03851L21.008 17.5904C20.7353 17.8627 20.5211 18.3878 20.5211 18.767V23.6873C20.5211 24.0665 20.6672 24.5138 20.8327 24.6888C21.008 24.8639 21.4561 25 21.8359 25H26.7641C27.1439 25 27.6698 24.7764 27.9425 24.5138L39.513 12.9619C39.776 12.6896 40 12.2715 40 12.0381C40 11.8047 39.776 11.3769 39.513 11.1144M11.1712 8.42085C11.4439 8.69312 11.9698 8.90704 12.3496 8.90704H27.6406C28.0205 8.90704 28.5464 8.68339 28.8191 8.42085L31.7896 5.45508C32.0623 5.19253 32.2766 4.73551 32.2766 4.45352C32.2766 4.17153 32.0526 3.72423 31.7896 3.45196L28.8191 0.486192C28.5464 0.223648 28.0205 0 27.6406 0H12.3496C11.9698 0 11.4439 0.223648 11.1712 0.486192L8.11298 3.53948C7.84027 3.80202 7.626 4.22015 7.626 4.45352C7.626 4.68689 7.85001 5.10502 8.11298 5.36756L11.1712 8.42085Z" />
       </svg>
     );
   }

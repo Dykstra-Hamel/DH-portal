@@ -267,7 +267,7 @@ export function useDepartmentPermissions() {
 }
 
 // Page access types
-export type PageType = 'sales' | 'scheduling' | 'support';
+export type PageType = 'sales' | 'scheduling' | 'support' | 'technician';
 
 // Hook for page-level access control
 interface UsePageAccessReturn {
@@ -291,7 +291,8 @@ export function usePageAccess(
   const departmentMap: Record<PageType, Department> = {
     sales: 'sales',
     scheduling: 'scheduling',
-    support: 'support'
+    support: 'support',
+    technician: 'technician',
   };
 
   const requiredDepartment = departmentMap[pageType];
@@ -392,7 +393,8 @@ export function useCurrentUserPageAccess(pageType: PageType): UsePageAccessRetur
   const departmentMap: Record<PageType, Department> = {
     sales: 'sales',
     scheduling: 'scheduling',
-    support: 'support'
+    support: 'support',
+    technician: 'technician',
   };
 
   const requiredDepartment = departmentMap[pageType];

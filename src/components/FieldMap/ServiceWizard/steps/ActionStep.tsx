@@ -1,21 +1,21 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { ReadyToScheduleModal } from '@/components/Common/ReadyToScheduleModal/ReadyToScheduleModal';
 import styles from '../ServiceWizard.module.scss';
-import type { ServicePlan } from './PlanSelectStep';
-import type { PricingValues } from './PricingStep';
+import type { QuoteLineItem } from './QuoteBuildStep';
+import { formatCurrency, formatLineItemLabel, getQuoteTotals } from './QuoteBuildStep';
 import { MapPlotData } from '@/components/FieldMap/MapPlot/types';
 
 interface ActionStepProps {
   clientName: string;
   clientEmail: string;
+  clientPhone: string;
   address: string;
   pestTypes: string[];
-  plan: ServicePlan | null;
-  pricing: PricingValues;
+  quoteLineItems: QuoteLineItem[];
   notes: string;
   mapPlotData: MapPlotData;
   inspectorName: string;
@@ -23,21 +23,22 @@ interface ActionStepProps {
   companyId: string;
 }
 
-type ActionState = 'idle' | 'sending' | 'sent' | 'scheduled' | 'error';
+type ActionState = 'idle' | 'sending' | 'sent' | 'savingLead' | 'savedLead' | 'scheduled' | 'error';
 
 export function ActionStep({
   clientName,
   clientEmail,
+  clientPhone,
   address,
   pestTypes,
-  plan,
-  pricing,
+  quoteLineItems,
   notes,
   mapPlotData,
   inspectorName,
   companyName,
   companyId,
 }: ActionStepProps) {
+  const { totalInitial, totalRecurring, recurringByFrequency } = getQuoteTotals(quoteLineItems);
   const router = useRouter();
   const [actionState, setActionState] = useState<ActionState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -46,38 +47,67 @@ export function ActionStep({
   const [scheduleSuccessMessage, setScheduleSuccessMessage] = useState<string>('A lead has been created and is ready to be scheduled by the office.');
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [signedBy, setSignedBy] = useState(clientName || '');
+  const [isCustomerNameEditable, setIsCustomerNameEditable] = useState(!(clientName || '').trim());
+  const customerNameInputRef = useRef<HTMLInputElement | null>(null);
   const signatureRef = useRef<SignatureCanvas | null>(null);
 
+  // Email capture state for when no clientEmail is available
+  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [enteredEmail, setEnteredEmail] = useState('');
+  const todayLabel = new Date().toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  const callSendQuoteApi = useCallback(async (emailOverride: string | null, sendEmail: boolean) => {
+    const res = await fetch('/api/field-map/send-quote', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        clientName,
+        clientEmail: emailOverride ?? clientEmail,
+        clientPhone,
+        address,
+        pestTypes,
+        quoteLineItems,
+        notes,
+        mapPlotData,
+        inspectorName,
+        companyName,
+        sendEmail,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? 'Failed to send quote');
+    return data;
+  }, [clientName, clientEmail, clientPhone, address, pestTypes, quoteLineItems, notes, mapPlotData, inspectorName, companyName]);
+
   async function handleSendQuote() {
+    // If no email on file, show email capture input first
+    if (!clientEmail && !showEmailInput) {
+      setShowEmailInput(true);
+      return;
+    }
     setActionState('sending');
     setErrorMsg(null);
     try {
-      const res = await fetch('/api/field-map/send-quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientName,
-          clientEmail,
-          address,
-          pestTypes,
-          plan,
-          pricing,
-          notes,
-          inspectorName,
-          companyName,
-          stampCount: mapPlotData.stamps.length,
-          outlineCount: mapPlotData.outlines.length,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setErrorMsg(data.error ?? 'Failed to send quote');
-        setActionState('error');
-        return;
-      }
+      await callSendQuoteApi(enteredEmail || null, true);
       setActionState('sent');
-    } catch {
-      setErrorMsg('Failed to connect to server');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to connect to server');
+      setActionState('error');
+    }
+  }
+
+  async function handleSaveLead() {
+    setActionState('savingLead');
+    setErrorMsg(null);
+    try {
+      await callSendQuoteApi(null, false);
+      setActionState('savedLead');
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to connect to server');
       setActionState('error');
     }
   }
@@ -94,8 +124,7 @@ export function ActionStep({
           clientEmail,
           address,
           pestTypes,
-          plan,
-          pricing,
+          quoteLineItems,
           notes,
           mapPlotData,
           signatureData,
@@ -141,12 +170,25 @@ export function ActionStep({
 
     if (!signedBy.trim()) {
       setErrorMsg('Enter the customer name for the signature.');
+      setIsCustomerNameEditable(true);
+      requestAnimationFrame(() => customerNameInputRef.current?.focus());
       return;
     }
 
     setSignatureData(signatureRef.current.toDataURL());
     setShowCustomerReviewModal(false);
     setShowReadyToScheduleModal(true);
+  }
+
+  function handleEnableCustomerNameEdit() {
+    setIsCustomerNameEditable(true);
+    requestAnimationFrame(() => customerNameInputRef.current?.focus());
+  }
+
+  function handleLockCustomerName() {
+    if (signedBy.trim()) {
+      setIsCustomerNameEditable(false);
+    }
   }
 
   if (actionState === 'sent') {
@@ -159,12 +201,36 @@ export function ActionStep({
         </div>
         <h2 className={styles.successTitle}>Quote Sent!</h2>
         <p className={styles.successSub}>
-          The quote has been sent to the team for review.
+          A lead has been created and the quote email is on its way.
         </p>
         <button
           type="button"
           className={styles.nextBtn}
-          onClick={() => router.push('/field-map')}
+          onClick={() => router.push('/field-ops/field-map')}
+          style={{ marginTop: 8 }}
+        >
+          Back to Route
+        </button>
+      </div>
+    );
+  }
+
+  if (actionState === 'savedLead') {
+    return (
+      <div className={styles.successState}>
+        <div className={styles.successIcon}>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+            <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+        <h2 className={styles.successTitle}>Lead Saved!</h2>
+        <p className={styles.successSub}>
+          The lead has been created with a &ldquo;Quoted&rdquo; status. No email was sent.
+        </p>
+        <button
+          type="button"
+          className={styles.nextBtn}
+          onClick={() => router.push('/field-ops/field-map')}
           style={{ marginTop: 8 }}
         >
           Back to Route
@@ -190,7 +256,7 @@ export function ActionStep({
         <button
           type="button"
           className={styles.nextBtn}
-          onClick={() => router.push('/field-map')}
+          onClick={() => router.push('/field-ops/field-map')}
           style={{ marginTop: 8 }}
         >
           Back to Route
@@ -218,9 +284,9 @@ export function ActionStep({
             type="button"
             className={styles.quoteBtn}
             onClick={handleSendQuote}
-            disabled={isBusy || !plan}
+            disabled={isBusy}
           >
-            {isBusy ? 'Sending\u2026' : 'Send Quote'}
+            {actionState === 'sending' ? 'Sending\u2026' : 'Send Quote'}
           </button>
           <button
             type="button"
@@ -232,10 +298,32 @@ export function ActionStep({
           </button>
         </div>
 
-        {!plan && (
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--gray-400)', textAlign: 'center' }}>
-            Select a plan to enable Send Quote.
-          </p>
+        {showEmailInput && (
+          <div className={styles.section}>
+            <label className={styles.label} htmlFor="fieldmap-quote-email">
+              Customer Email
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <input
+                id="fieldmap-quote-email"
+                type="email"
+                className={styles.priceInput}
+                value={enteredEmail}
+                onChange={e => setEnteredEmail(e.target.value)}
+                placeholder="customer@example.com"
+                style={{ flex: 1 }}
+              />
+              <button
+                type="button"
+                className={styles.nextBtn}
+                style={{ padding: '0 16px', flexShrink: 0 }}
+                disabled={!enteredEmail.trim() || isBusy}
+                onClick={handleSendQuote}
+              >
+                Send
+              </button>
+            </div>
+          </div>
         )}
 
         {!companyId && (
@@ -296,32 +384,6 @@ export function ActionStep({
                 <span className={styles.reviewLabel}>Address</span>
                 <span className={styles.reviewValue}>{address || 'N/A'}</span>
               </div>
-              {plan && (
-                <div className={styles.reviewRow}>
-                  <span className={styles.reviewLabel}>Plan</span>
-                  <span className={styles.reviewValue}>{plan.plan_name}</span>
-                </div>
-              )}
-              <div className={styles.reviewRow}>
-                <span className={styles.reviewLabel}>Initial</span>
-                <span className={styles.reviewValue}>
-                  {pricing.initialPrice != null
-                    ? `$${pricing.initialPrice.toFixed(2)}`
-                    : plan?.initial_price != null
-                    ? `$${plan.initial_price.toFixed(2)}`
-                    : 'Not set'}
-                </span>
-              </div>
-              <div className={styles.reviewRow}>
-                <span className={styles.reviewLabel}>Recurring</span>
-                <span className={styles.reviewValue}>
-                  {pricing.recurringPrice != null
-                    ? `$${pricing.recurringPrice.toFixed(2)}${pricing.billingFrequency ? ` / ${pricing.billingFrequency}` : ''}`
-                    : plan?.recurring_price != null
-                    ? `$${plan.recurring_price.toFixed(2)}${plan.billing_frequency ? ` / ${plan.billing_frequency}` : ''}`
-                    : 'Not set'}
-                </span>
-              </div>
               {pestTypes.length > 0 && (
                 <div className={styles.reviewRow}>
                   <span className={styles.reviewLabel}>Pests</span>
@@ -330,16 +392,68 @@ export function ActionStep({
               )}
             </div>
 
+            {quoteLineItems.length > 0 && (
+              <div className={styles.reviewCard}>
+                <div className={styles.reviewRow}>
+                  <span className={styles.reviewLabel}>Quote</span>
+                </div>
+                {quoteLineItems.map((item, i) => (
+                  <div key={item.id} className={styles.reviewRow}>
+                    <span className={styles.reviewLabel}>{i + 1}. {formatLineItemLabel(item)}</span>
+                    <span className={styles.reviewValue}>
+                      {item.initialCost != null && formatCurrency(item.initialCost)}
+                      {item.initialCost != null && item.recurringCost != null && ' · '}
+                      {item.recurringCost != null && `${formatCurrency(item.recurringCost)}/${item.frequency ?? 'mo'}`}
+                    </span>
+                  </div>
+                ))}
+                <div className={styles.reviewRow} style={{ borderTop: '1px solid var(--gray-100)', paddingTop: 6, marginTop: 2 }}>
+                  <span className={styles.reviewLabel}>Total Initial</span>
+                  <span className={styles.reviewValue}>{formatCurrency(totalInitial)}</span>
+                </div>
+                {recurringByFrequency.map(({ frequency, total }) => (
+                  <div key={frequency} className={styles.reviewRow}>
+                    <span className={styles.reviewLabel}>Recurring / {frequency}</span>
+                    <span className={styles.reviewValue}>{formatCurrency(total)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
             <div className={styles.section}>
-              <label className={styles.label} htmlFor="fieldmap-customer-sign-name">
-                Customer Name
-              </label>
+              <div className={styles.customerNameHeader}>
+                <label className={styles.label} htmlFor="fieldmap-customer-sign-name">
+                  Customer Name
+                </label>
+                {isCustomerNameEditable ? (
+                  (clientName || '').trim() && (
+                    <button
+                      type="button"
+                      className={styles.inlineEditBtn}
+                      onClick={handleLockCustomerName}
+                    >
+                      Lock
+                    </button>
+                  )
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.inlineEditBtn}
+                    onClick={handleEnableCustomerNameEdit}
+                  >
+                    Edit
+                  </button>
+                )}
+              </div>
               <input
                 id="fieldmap-customer-sign-name"
-                className={styles.priceInput}
+                ref={customerNameInputRef}
+                className={`${styles.priceInput} ${!isCustomerNameEditable ? styles.readOnlyInput : ''}`}
                 value={signedBy}
                 onChange={event => setSignedBy(event.target.value)}
                 placeholder="Full name"
+                readOnly={!isCustomerNameEditable}
+                aria-readonly={!isCustomerNameEditable}
               />
             </div>
 
@@ -366,19 +480,11 @@ export function ActionStep({
               <button
                 type="button"
                 onClick={() => signatureRef.current?.clear()}
-                style={{
-                  marginTop: 8,
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'var(--gray-600)',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  padding: 0,
-                }}
+                className={styles.signatureMetaBtn}
               >
                 Clear signature
               </button>
+              <p className={styles.signatureDate}>Date: {todayLabel}</p>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>

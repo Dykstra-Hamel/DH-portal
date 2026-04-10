@@ -25,11 +25,12 @@ export interface ServicePlan {
 
 interface PlanSelectStepProps {
   pestTypes: string[];
+  plottedPestIds?: string[];
   selectedPlanId: string | null;
   onSelect: (plan: ServicePlan) => void;
 }
 
-export function PlanSelectStep({ pestTypes, selectedPlanId, onSelect }: PlanSelectStepProps) {
+export function PlanSelectStep({ pestTypes, plottedPestIds = [], selectedPlanId, onSelect }: PlanSelectStepProps) {
   const { selectedCompany } = useCompany();
   const selectedCompanyId = selectedCompany?.id ?? null;
   const [plans, setPlans] = useState<ServicePlan[]>([]);
@@ -50,12 +51,18 @@ export function PlanSelectStep({ pestTypes, selectedPlanId, onSelect }: PlanSele
   );
 
   const filteredPlans =
-    normalizedPestTypes.size === 0
+    normalizedPestTypes.size === 0 && plottedPestIds.length === 0
       ? plans
       : plans.filter(plan => {
           const coverage = plan.pest_coverage ?? [];
           if (coverage.length === 0) return true;
 
+          // ID match first (dynamic company pests)
+          if (plottedPestIds.length > 0 && coverage.some(item => plottedPestIds.includes(item.pest_id))) {
+            return true;
+          }
+
+          // Fallback: slug/name match (hardcoded pest types)
           return coverage.some(item => {
             const slug = (item.pest_slug ?? '')
               .trim()

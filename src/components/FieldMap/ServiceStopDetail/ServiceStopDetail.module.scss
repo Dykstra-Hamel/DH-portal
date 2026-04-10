@@ -1,9 +1,18 @@
 .page {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  height: 100%;
+  overflow: hidden;
   background: var(--gray-50);
-  padding-bottom: 100px; // above footer + FieldMapNav
+  padding-bottom: 64px; // reserve space for fixed FieldMapNav
+}
+
+// ─── Scrollable content area ──────────────────────────────────────────────────
+
+.scrollContent {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 // ─── Map Hero ───────────────────────────────────────────────────────────────
@@ -41,6 +50,18 @@
   color: #fff;
 }
 
+.mapHeroTextCard {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: min(92%, 560px);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(2px);
+}
+
 .heroFallback {
   padding: 20px 20px 16px;
   background: var(--blue-700);
@@ -48,33 +69,6 @@
 }
 
 // ─── Client + Address (shared) ───────────────────────────────────────────────
-
-.statusBadge {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  padding: 3px 10px;
-  border-radius: 20px;
-  margin-bottom: 8px;
-}
-
-.statusScheduled {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.35);
-}
-
-.statusInProgress {
-  background: #fffbeb;
-  color: #d97706;
-}
-
-.statusCompleted {
-  background: #f0fdf4;
-  color: #16a34a;
-}
 
 .clientName {
   font-size: 22px;
@@ -141,8 +135,8 @@
 // ─── Cards ────────────────────────────────────────────────────────────────────
 
 .cards {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
@@ -151,6 +145,10 @@
   border-radius: 14px;
   padding: 14px 16px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.cardFull {
+  grid-column: 1 / -1;
 }
 
 .cardLabel {
@@ -167,6 +165,117 @@
   color: var(--gray-800);
   margin: 0;
   line-height: 1.5;
+}
+
+.statusBadge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--gray-100);
+  color: var(--gray-600);
+
+  &.status_completed,
+  &.status_complete {
+    background: #dcfce7;
+    color: #15803d;
+  }
+
+  &.status_in_progress,
+  &.status_started {
+    background: #dbeafe;
+    color: #1d4ed8;
+  }
+
+  &.status_scheduled {
+    background: var(--gray-100);
+    color: var(--gray-600);
+  }
+}
+
+// ─── Tag / Chip List (pests, etc.) ────────────────────────────────────────────
+
+.tagList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.tag {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--blue-50);
+  color: var(--blue-700);
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+// ─── Line Item List ───────────────────────────────────────────────────────────
+
+.lineItemList {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lineItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.lineItemName {
+  font-size: 14px;
+  color: var(--gray-800);
+}
+
+.lineItemMeta {
+  font-size: 12px;
+  color: var(--gray-500);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+// ─── Attributes Grid ──────────────────────────────────────────────────────────
+
+.attrGrid {
+  margin: 4px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attrRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.attrLabel {
+  font-size: 13px;
+  color: var(--gray-600);
+  margin: 0;
+}
+
+.attrValue {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-800);
+  margin: 0;
+  text-align: right;
+}
+
+.balanceDue {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 .contactLink {
@@ -186,10 +295,7 @@
 // ─── Footer ───────────────────────────────────────────────────────────────────
 
 .footer {
-  position: fixed;
-  bottom: 64px; // above FieldMapNav
-  left: 0;
-  right: 0;
+  flex-shrink: 0;
   padding: 12px 16px;
   background: var(--white);
   border-top: 1px solid var(--border-color);

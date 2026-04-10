@@ -80,6 +80,11 @@ function AccessDeniedPage({ pageType }: AccessDeniedPageProps) {
       title: 'Customer Service',
       description: 'customer support and service',
       department: 'Customer Service'
+    },
+    technician: {
+      title: 'Field Operations',
+      description: 'field operations and technician tools',
+      department: 'Technician'
     }
   };
 

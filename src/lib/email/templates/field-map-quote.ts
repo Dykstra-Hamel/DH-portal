@@ -1,14 +1,32 @@
+interface QuoteLineItemEmailData {
+  type: string;
+  coveredPestLabels?: string[];
+  otherLabel?: string;
+  initialCost?: number | null;
+  recurringCost?: number | null;
+  frequency?: string | null;
+}
+
 export interface FieldMapQuoteData {
   inspectorName: string;
   clientName: string;
   clientAddress: string;
-  planName: string;
-  initialPrice: number | null;
-  recurringPrice: number | null;
+  quoteLineItems: QuoteLineItemEmailData[];
+  totalInitial: number;
+  totalRecurring: number;
   billingFrequency: string | null;
   pestTypes: string[];
   notes: string;
   companyName: string;
+}
+
+function fmt(val: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+}
+
+function lineItemLabel(item: QuoteLineItemEmailData): string {
+  if (item.type === 'other') return item.otherLabel || 'Other';
+  return (item.coveredPestLabels?.join(', ') || 'Pest Treatment') + ' Treatment';
 }
 
 export function generateFieldMapQuoteEmailTemplate(data: FieldMapQuoteData): string {
@@ -16,27 +34,56 @@ export function generateFieldMapQuoteEmailTemplate(data: FieldMapQuoteData): str
     inspectorName,
     clientName,
     clientAddress,
-    planName,
-    initialPrice,
-    recurringPrice,
+    quoteLineItems,
+    totalInitial,
+    totalRecurring,
     billingFrequency,
     pestTypes,
     notes,
     companyName,
   } = data;
 
-  const initialPriceDisplay = initialPrice != null ? `$${initialPrice.toFixed(2)}` : 'TBD';
-  const recurringDisplay =
-    recurringPrice != null && billingFrequency
-      ? `$${recurringPrice.toFixed(2)} ${billingFrequency}`
-      : recurringPrice != null
-      ? `$${recurringPrice.toFixed(2)}`
-      : 'TBD';
+  const pestList = pestTypes.length > 0 ? pestTypes.join(', ') : 'General pest control';
 
-  const pestList =
-    pestTypes.length > 0
-      ? pestTypes.join(', ')
-      : 'General pest control';
+  const lineItemsHtml = quoteLineItems.length > 0
+    ? quoteLineItems.map((item, i) => {
+        const label = lineItemLabel(item);
+        const freq = item.frequency ? ` &mdash; ${item.frequency.charAt(0).toUpperCase()}${item.frequency.slice(1)}` : '';
+        const pricing = [
+          item.initialCost != null ? `Initial: ${fmt(item.initialCost)}` : null,
+          item.recurringCost != null ? `Recurring: ${fmt(item.recurringCost)}${item.frequency ? `/${item.frequency}` : ''}` : null,
+        ].filter(Boolean).join(' &nbsp;&bull;&nbsp; ');
+        return `
+          <tr>
+            <td style="padding:10px 0;border-bottom:1px solid #f3f4f6;">
+              <p style="margin:0;font-size:14px;font-weight:600;color:#111827;">${i + 1}. ${label}${freq}</p>
+              ${pricing ? `<p style="margin:4px 0 0;font-size:13px;color:#6b7280;">${pricing}</p>` : ''}
+            </td>
+          </tr>`;
+      }).join('')
+    : `<tr><td style="padding:10px 0;font-size:14px;color:#6b7280;">No line items added.</td></tr>`;
+
+  const totalsHtml = `
+    <tr>
+      <td style="padding:12px 0 0;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="font-size:13px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;padding-bottom:4px;" colspan="2">Totals</td>
+          </tr>
+          <tr>
+            <td style="font-size:14px;color:#374151;">Total Initial</td>
+            <td align="right" style="font-size:15px;font-weight:700;color:#111827;">${fmt(totalInitial)}</td>
+          </tr>
+          ${totalRecurring > 0 ? `
+          <tr>
+            <td style="font-size:14px;color:#374151;padding-top:4px;">Total Recurring</td>
+            <td align="right" style="font-size:15px;font-weight:700;color:#111827;padding-top:4px;">
+              ${fmt(totalRecurring)}${billingFrequency ? ` / ${billingFrequency}` : ''}
+            </td>
+          </tr>` : ''}
+        </table>
+      </td>
+    </tr>`;
 
   return `<!doctype html>
 <html>
@@ -52,13 +99,11 @@ export function generateFieldMapQuoteEmailTemplate(data: FieldMapQuoteData): str
         <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
           <!-- Header -->
           <tr>
-            <td style="background:#8b5cf6;padding:28px 32px;">
+            <td style="background:#0075de;padding:28px 32px;">
               <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.3px;">
                 Field Inspection Quote
               </h1>
-              <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">
-                ${companyName}
-              </p>
+              <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${companyName}</p>
             </td>
           </tr>
 
@@ -81,7 +126,7 @@ export function generateFieldMapQuoteEmailTemplate(data: FieldMapQuoteData): str
                 </tr>
               </table>
 
-              <!-- Pest Types -->
+              <!-- Pests -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:20px;">
                 <tr>
                   <td>
@@ -91,23 +136,14 @@ export function generateFieldMapQuoteEmailTemplate(data: FieldMapQuoteData): str
                 </tr>
               </table>
 
-              <!-- Plan & Pricing -->
+              <!-- Quote Line Items -->
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:20px;margin-bottom:20px;">
                 <tr>
                   <td>
-                    <p style="margin:0 0 6px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Recommended Plan</p>
-                    <p style="margin:0 0 16px;font-size:16px;font-weight:600;color:#111827;">${planName}</p>
+                    <p style="margin:0 0 12px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Quote</p>
                     <table width="100%" cellpadding="0" cellspacing="0">
-                      <tr>
-                        <td width="50%" style="padding-right:12px;">
-                          <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Initial Price</p>
-                          <p style="margin:0;font-size:20px;font-weight:700;color:#111827;">${initialPriceDisplay}</p>
-                        </td>
-                        <td width="50%" style="padding-left:12px;">
-                          <p style="margin:0 0 4px;font-size:12px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:0.05em;">Recurring Price</p>
-                          <p style="margin:0;font-size:20px;font-weight:700;color:#111827;">${recurringDisplay}</p>
-                        </td>
-                      </tr>
+                      ${lineItemsHtml}
+                      ${totalsHtml}
                     </table>
                   </td>
                 </tr>

@@ -24,7 +24,25 @@ interface StopDetail {
   serviceType: string;
   serviceNotes?: string;
   accessInstructions?: string;
+  technician?: string;
+  technicianId?: string | null;
+  duration?: number | null;
+  serviceClass?: string;
+  programCode?: string;
+  locationNotes?: string;
+  serviceDate?: string | null;
+  timeIn?: string | null;
+  timeOut?: string | null;
+  amount?: number | null;
+  balanceDue?: number | null;
+  accountNumber?: string;
+  lastServiceDate?: string | null;
+  locationType?: string;
+  branch?: string;
   services?: any[];
+  targets?: any[];
+  attributes?: any[];
+  conditions?: any[];
 }
 
 function formatTime(time: string | null): string {
@@ -45,13 +63,6 @@ function formatDate(time: string | null): string {
   } catch {
     return '';
   }
-}
-
-function getStatusClass(status: string): string {
-  const s = status.toLowerCase();
-  if (s.includes('complete')) return styles.statusCompleted;
-  if (s.includes('progress') || s.includes('started')) return styles.statusInProgress;
-  return styles.statusScheduled;
 }
 
 interface ServiceStopDetailProps {
@@ -95,8 +106,9 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
       address: stop.address,
       clientName: stop.clientName ?? '',
       clientEmail: stop.clientEmail ?? '',
+      clientPhone: stop.clientPhone ?? '',
     });
-    router.push(`/field-map/service/${stopId}/wizard?${params.toString()}`);
+    router.push(`/field-ops/field-map/service/${stopId}/wizard?${params.toString()}`);
   }
 
   if (loading) {
@@ -121,11 +133,14 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
     ? `/api/internal/static-map?address=${encodeURIComponent(stop.address)}`
     : null;
 
-  const scheduledDate = formatDate(stop.scheduledTime);
-  const scheduledTime = formatTime(stop.scheduledTime);
+  const scheduledDate = formatDate(stop.scheduledTime ?? stop.serviceDate ?? null);
+  const scheduledTime = stop.timeIn
+    ? `${formatTime(stop.timeIn)}${stop.timeOut ? ` – ${formatTime(stop.timeOut)}` : ''}`
+    : formatTime(stop.scheduledTime);
 
   return (
     <div className={styles.page}>
+      <div className={styles.scrollContent}>
       {/* Map preview hero */}
       {mapSrc && (
         <div className={styles.mapHero}>
@@ -136,11 +151,10 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
           />
           <div className={styles.mapOverlay} />
           <div className={styles.mapHeroContent}>
-            <span className={`${styles.statusBadge} ${getStatusClass(stop.serviceStatus)}`}>
-              {stop.serviceStatus}
-            </span>
-            <h1 className={styles.clientName}>{stop.clientName || 'Unknown Client'}</h1>
-            <p className={styles.address}>{stop.address}</p>
+            <div className={styles.mapHeroTextCard}>
+              <h1 className={styles.clientName}>{stop.clientName || 'Unknown Client'}</h1>
+              <p className={styles.address}>{stop.address}</p>
+            </div>
           </div>
         </div>
       )}
@@ -148,9 +162,6 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
       {/* Fallback hero when no map */}
       {!mapSrc && (
         <div className={styles.heroFallback}>
-          <span className={`${styles.statusBadge} ${getStatusClass(stop.serviceStatus)}`}>
-            {stop.serviceStatus}
-          </span>
           <h1 className={styles.clientName}>{stop.clientName || 'Unknown Client'}</h1>
           <p className={styles.address}>{stop.address}</p>
         </div>
@@ -183,22 +194,137 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
             </div>
           )}
 
-          {stop.serviceNotes && (
+          {stop.serviceClass && (
             <div className={styles.card}>
+              <p className={styles.cardLabel}>Service Class</p>
+              <p className={styles.cardValue}>{stop.serviceClass}</p>
+            </div>
+          )}
+
+          {stop.programCode && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Program</p>
+              <p className={styles.cardValue}>{stop.programCode}</p>
+            </div>
+          )}
+
+          {stop.serviceStatus && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Status</p>
+              <span className={`${styles.statusBadge} ${styles[`status_${stop.serviceStatus.toLowerCase().replace(/\s+/g, '_')}`] ?? ''}`}>
+                {stop.serviceStatus}
+              </span>
+            </div>
+          )}
+
+          {stop.technician && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Assigned Technician</p>
+              <p className={styles.cardValue}>{stop.technician}</p>
+            </div>
+          )}
+
+          {stop.duration != null && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Estimated Duration</p>
+              <p className={styles.cardValue}>{stop.duration} min</p>
+            </div>
+          )}
+
+          {stop.targets && stop.targets.length > 0 && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
+              <p className={styles.cardLabel}>Target Pests</p>
+              <div className={styles.tagList}>
+                {stop.targets.map((t: any, i: number) => (
+                  <span key={i} className={styles.tag}>
+                    {t.TargetName ?? t.targetName ?? t.Name ?? t.name ?? t.TargetCode ?? t.targetCode ?? JSON.stringify(t)}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {stop.services && stop.services.length > 0 && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
+              <p className={styles.cardLabel}>Services / Line Items</p>
+              <ul className={styles.lineItemList}>
+                {stop.services.map((svc: any, i: number) => {
+                  const name = svc.ServiceDescription ?? svc.serviceDescription ?? svc.Description ?? svc.description ?? svc.ServiceCode ?? svc.serviceCode ?? svc.Name ?? svc.name ?? `Item ${i + 1}`;
+                  const qty = svc.Quantity ?? svc.quantity ?? null;
+                  const rate = svc.Rate ?? svc.rate ?? svc.Price ?? svc.price ?? null;
+                  return (
+                    <li key={i} className={styles.lineItem}>
+                      <span className={styles.lineItemName}>{name}</span>
+                      {(qty != null || rate != null) && (
+                        <span className={styles.lineItemMeta}>
+                          {qty != null ? `Qty: ${qty}` : ''}
+                          {qty != null && rate != null ? ' · ' : ''}
+                          {rate != null ? `$${Number(rate).toFixed(2)}` : ''}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {stop.conditions && stop.conditions.length > 0 && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
+              <p className={styles.cardLabel}>Conditions</p>
+              <ul className={styles.lineItemList}>
+                {stop.conditions.map((c: any, i: number) => (
+                  <li key={i} className={styles.lineItem}>
+                    <span className={styles.lineItemName}>
+                      {c.ConditionName ?? c.conditionName ?? c.Description ?? c.description ?? c.Name ?? c.name ?? JSON.stringify(c)}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {stop.attributes && stop.attributes.length > 0 && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
+              <p className={styles.cardLabel}>Order Attributes</p>
+              <dl className={styles.attrGrid}>
+                {stop.attributes.map((a: any, i: number) => {
+                  const label = a.AttributeName ?? a.attributeName ?? a.Name ?? a.name ?? `Attribute ${i + 1}`;
+                  const value = a.AttributeValue ?? a.attributeValue ?? a.Value ?? a.value ?? '—';
+                  return (
+                    <div key={i} className={styles.attrRow}>
+                      <dt className={styles.attrLabel}>{label}</dt>
+                      <dd className={styles.attrValue}>{String(value)}</dd>
+                    </div>
+                  );
+                })}
+              </dl>
+            </div>
+          )}
+
+          {stop.serviceNotes && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
               <p className={styles.cardLabel}>Service Notes</p>
               <p className={styles.cardValue}>{stop.serviceNotes}</p>
             </div>
           )}
 
+          {stop.locationNotes && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
+              <p className={styles.cardLabel}>Location Notes</p>
+              <p className={styles.cardValue}>{stop.locationNotes}</p>
+            </div>
+          )}
+
           {stop.accessInstructions && (
-            <div className={styles.card}>
+            <div className={`${styles.card} ${styles.cardFull}`}>
               <p className={styles.cardLabel}>Access Instructions</p>
               <p className={styles.cardValue}>{stop.accessInstructions}</p>
             </div>
           )}
 
           {(stop.clientPhone || stop.clientEmail) && (
-            <div className={styles.card}>
+            <div className={`${styles.card} ${styles.cardFull}`}>
               <p className={styles.cardLabel}>Contact</p>
               {stop.clientPhone && (
                 <a href={`tel:${stop.clientPhone}`} className={styles.contactLink}>
@@ -220,8 +346,52 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
             </div>
           )}
 
-          {stop.stopId && (
+          {stop.locationType && (
             <div className={styles.card}>
+              <p className={styles.cardLabel}>Property Type</p>
+              <p className={styles.cardValue}>{stop.locationType}</p>
+            </div>
+          )}
+
+          {stop.branch && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Branch</p>
+              <p className={styles.cardValue}>{stop.branch}</p>
+            </div>
+          )}
+
+          {stop.lastServiceDate && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Last Service</p>
+              <p className={styles.cardValue}>{formatDate(stop.lastServiceDate)}</p>
+            </div>
+          )}
+
+          {stop.amount != null && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Order Amount</p>
+              <p className={styles.cardValue}>${Number(stop.amount).toFixed(2)}</p>
+            </div>
+          )}
+
+          {stop.balanceDue != null && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Balance Due</p>
+              <p className={`${styles.cardValue} ${Number(stop.balanceDue) > 0 ? styles.balanceDue : ''}`}>
+                ${Number(stop.balanceDue).toFixed(2)}
+              </p>
+            </div>
+          )}
+
+          {stop.accountNumber && (
+            <div className={styles.card}>
+              <p className={styles.cardLabel}>Account #</p>
+              <p className={styles.cardValue}>{stop.accountNumber}</p>
+            </div>
+          )}
+
+          {stop.stopId && (
+            <div className={`${styles.card} ${styles.cardFull}`}>
               <p className={styles.cardLabel}>Order ID</p>
               <p className={styles.cardValue}>{stop.stopId}</p>
             </div>
@@ -229,12 +399,11 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
         </div>
       </div>
 
+      </div>
+
       <div className={styles.footer}>
         <button onClick={handleStartService} className={styles.startBtn}>
           Start Service
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M5 3l14 9-14 9V3z" fill="currentColor" />
-          </svg>
         </button>
       </div>
     </div>

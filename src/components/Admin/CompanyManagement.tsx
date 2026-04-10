@@ -39,6 +39,7 @@ import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
 import PestPacSettingsManager from './PestPacSettingsManager';
+import FieldMapSettingsManager from './FieldMapSettingsManager';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './CompanyManagement.module.scss';
@@ -740,7 +741,10 @@ export default function CompanyManagement({
             />
           )}
           {activeSection === 'integrations' && (
-            <PestPacSettingsManager companyId={companyId} />
+            <>
+              <PestPacSettingsManager companyId={companyId} />
+              <FieldMapSettingsManager companyId={companyId} />
+            </>
           )}
         </div>
       </div>

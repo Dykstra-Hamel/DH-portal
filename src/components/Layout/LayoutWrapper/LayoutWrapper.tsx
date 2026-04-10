@@ -544,7 +544,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           }
           return null;
         }
-        if (pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/)) {
+        if (
+          pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
+          pathname.match(/^\/field-ops\/field-map\/service\/[^\/]+\/wizard$/)
+        ) {
           return null;
         }
 

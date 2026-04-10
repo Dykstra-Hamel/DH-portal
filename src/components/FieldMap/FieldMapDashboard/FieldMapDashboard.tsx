@@ -52,8 +52,8 @@ function RouteMapPreview({ stops }: { stops: RouteStop[] }) {
   const stopNumber = stops.indexOf(nextStop) + 1;
   const allDone = !stops.some(s => !s.serviceStatus.toLowerCase().includes('complete'));
   const label = allDone
-    ? `All stops complete`
-    : `Stop ${stopNumber} of ${stops.length} — Up next`;
+    ? `Route Complete - Stop ${stopNumber} of ${stops.length}`
+    : `Up Next - Stop ${stopNumber} of ${stops.length}`;
 
   const src =
     `/api/internal/street-view-image` +
@@ -63,12 +63,13 @@ function RouteMapPreview({ stops }: { stops: RouteStop[] }) {
   return (
     <div className={styles.streetViewWrap}>
       <img src={src} alt={`Street view of ${nextStop.address}`} className={styles.map} />
-      <div className={styles.streetViewLabel}>
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" fill="currentColor"/>
-        </svg>
-        <span className={styles.streetViewStop}>{label}</span>
-        <span className={styles.streetViewAddress}>{nextStop.address}</span>
+      <div className={styles.mapOverlay} />
+      <div className={styles.mapHeroContent}>
+        <div className={styles.mapHeroTextCard}>
+          <p className={styles.heroEyebrow}>{label}</p>
+          <p className={styles.heroCustomerName}>{nextStop.clientName || 'Unknown Client'}</p>
+          <p className={styles.heroAddress}>{nextStop.address}</p>
+        </div>
       </div>
     </div>
   );
@@ -169,7 +170,7 @@ export function FieldMapDashboard() {
             <p className={styles.stateText}>
               Ask your admin to add your PestPac Employee ID in your profile settings to see your daily route here.
             </p>
-            <Link href="/field-map/new" className={styles.stateAction}>
+            <Link href="/field-ops/field-map/new" className={styles.stateAction}>
               Start a manual service stop
             </Link>
           </div>

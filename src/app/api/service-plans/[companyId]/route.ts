@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 
 /**
  * GET /api/service-plans/[companyId]
@@ -11,7 +12,16 @@ export async function GET(
 ) {
   try {
     const { companyId } = await params;
-    const supabase = await createClient();
+
+    // Verify the user is authenticated
+    const userClient = await createClient();
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+
+    // Use admin client so plan_pest_coverage rows are readable regardless of RLS policy gaps
+    const supabase = createAdminClient();
 
     // Fetch all active service plans for the company, including pest coverage
     const { data: plans, error } = await supabase

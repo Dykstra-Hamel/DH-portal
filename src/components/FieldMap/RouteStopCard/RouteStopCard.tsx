@@ -41,9 +41,12 @@ function getStatusStyle(status: string): string {
 }
 
 export function RouteStopCard({ stop }: RouteStopCardProps) {
+  const status = stop.serviceStatus.toLowerCase();
+  const showStatus = !status.includes('scheduled');
+
   return (
     <Link
-      href={`/field-map/service/${stop.stopId}?routeId=${stop.routeId}`}
+      href={`/field-ops/field-map/service/${stop.stopId}?routeId=${stop.routeId}`}
       className={styles.card}
     >
       <div className={styles.timeCol}>
@@ -52,9 +55,11 @@ export function RouteStopCard({ stop }: RouteStopCardProps) {
       <div className={styles.content}>
         <div className={styles.topRow}>
           <span className={styles.clientName}>{stop.clientName || 'Unknown Client'}</span>
-          <span className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}>
-            {stop.serviceStatus}
-          </span>
+          {showStatus && (
+            <span className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}>
+              {stop.serviceStatus}
+            </span>
+          )}
         </div>
         <p className={styles.address}>{stop.address}</p>
         {stop.serviceType && (

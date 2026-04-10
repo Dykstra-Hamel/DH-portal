@@ -10,6 +10,7 @@ export type LeadSource =
   | 'campaign'
   | 'widget'
   | 'technician'
+  | 'inspector'
   | 'other'
   // Legacy values (existing records only — do not use for new records)
   | 'organic'

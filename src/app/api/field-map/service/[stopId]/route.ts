@@ -203,6 +203,30 @@ export async function GET(
       }
     }
 
+    // Parallel fetch for additional order detail endpoints
+    const [targetsRes, attribsRes, conditionsRes] = await Promise.all([
+      fetch(`${PESTPAC_BASE_URL}/ServiceOrders/${encodeURIComponent(String(serviceOrderId))}/targets`, { headers }),
+      fetch(`${PESTPAC_BASE_URL}/ServiceOrders/${encodeURIComponent(String(serviceOrderId))}/attributes`, { headers }),
+      fetch(`${PESTPAC_BASE_URL}/ServiceOrders/${encodeURIComponent(String(serviceOrderId))}/conditions`, { headers }),
+    ]);
+
+    let targets: any[] = [];
+    let attributes: any[] = [];
+    let conditions: any[] = [];
+
+    if (targetsRes.ok) {
+      const data = await targetsRes.json();
+      targets = asArray<any>(data?.value ?? data);
+    }
+    if (attribsRes.ok) {
+      const data = await attribsRes.json();
+      attributes = asArray<any>(data?.value ?? data);
+    }
+    if (conditionsRes.ok) {
+      const data = await conditionsRes.json();
+      conditions = asArray<any>(data?.value ?? data);
+    }
+
     const address =
       [
         location.street ?? location.Address ?? stop.street ?? stop.Street ?? stop.address ?? stop.Address,
@@ -256,9 +280,16 @@ export async function GET(
         stop.ScheduledStart ??
         stop.startTime ??
         stop.StartTime ??
-        stop.serviceDate ??
-        stop.ServiceDate ??
         null,
+      serviceDate:
+        stop.ServiceDate ?? stop.serviceDate ??
+        stop.Date ?? stop.date ?? null,
+      timeIn:
+        stop.TimeIn ?? stop.timeIn ??
+        stop.StartTime ?? stop.startTime ?? null,
+      timeOut:
+        stop.TimeOut ?? stop.timeOut ??
+        stop.EndTime ?? stop.endTime ?? null,
       serviceStatus: stop.serviceStatus ?? stop.ServiceStatus ?? stop.status ?? stop.Status ?? 'Scheduled',
       serviceType:
         stop.serviceType ??
@@ -284,7 +315,48 @@ export async function GET(
         location.accessInstructions ??
         location.AccessInstructions ??
         '',
+      technician:
+        stop.TechnicianName ?? stop.technicianName ??
+        stop.Technician ?? stop.technician ?? '',
+      technicianId:
+        stop.TechnicianID ?? stop.technicianID ??
+        stop.TechnicianId ?? stop.technicianId ?? null,
+      duration:
+        stop.Duration ?? stop.duration ??
+        stop.EstimatedDuration ?? stop.estimatedDuration ?? null,
+      serviceClass:
+        stop.ServiceClass ?? stop.serviceClass ??
+        stop.ServiceClassName ?? stop.serviceClassName ?? '',
+      programCode:
+        stop.ProgramCode ?? stop.programCode ??
+        stop.Program ?? stop.program ?? '',
+      locationNotes:
+        location.Notes ?? location.notes ??
+        location.LocationNotes ?? location.locationNotes ?? '',
+      amount:
+        stop.Amount ?? stop.amount ??
+        stop.TotalAmount ?? stop.totalAmount ??
+        stop.OrderAmount ?? stop.orderAmount ?? null,
+      balanceDue:
+        client.BalanceDue ?? client.balanceDue ??
+        location.BalanceDue ?? location.balanceDue ?? null,
+      accountNumber:
+        client.AccountNumber ?? client.accountNumber ??
+        client.Account ?? client.account ?? '',
+      lastServiceDate:
+        location.LastServiceDate ?? location.lastServiceDate ??
+        stop.LastServiceDate ?? stop.lastServiceDate ?? null,
+      locationType:
+        location.LocationType ?? location.locationType ??
+        location.Type ?? location.type ?? '',
+      branch:
+        stop.Branch ?? stop.branch ??
+        stop.BranchCode ?? stop.branchCode ??
+        stop.BranchName ?? stop.branchName ?? '',
       services,
+      targets,
+      attributes,
+      conditions,
     });
   } catch (error) {
     console.error('FieldMap stop detail error:', error);

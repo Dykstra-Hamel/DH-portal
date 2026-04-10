@@ -1,11 +1,12 @@
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type MapPestStampType = 'ant' | 'termite' | 'cockroach' | 'spider' | 'mosquito' | 'rodent' | 'wasp' | 'bed-bug';
-export type MapObjectStampType = 'door' | 'window';
+export type MapPestStampType = 'ant' | 'termite' | 'cockroach' | 'spider' | 'mosquito' | 'rodent' | 'wasp' | 'bed-bug' | 'dynamic-pest';
+export type MapObjectStampType = 'door' | 'window' | 'sentricon-bait-station';
 export type MapElementStampType = 'house' | 'garage' | 'patio' | 'deck' | 'fence' | 'water';
-export type MapStampType = MapPestStampType | MapObjectStampType | MapElementStampType;
+export type MapConditionStampType = 'excessive-moisture' | 'faulty-grade' | 'earth-wood-contact' | 'inaccessible-areas' | 'other-condition';
+export type MapStampType = MapPestStampType | MapObjectStampType | MapElementStampType | MapConditionStampType;
 export type MapLegacyStampType = 'activity' | 'entry' | 'nest' | 'recommendation';
-export type MapStampCategory = 'pest' | 'object' | 'element';
+export type MapStampCategory = 'pest' | 'object' | 'element' | 'condition';
 export type MapDrawTool = 'stamp' | 'outline';
 export type MapBackgroundMode = 'satellite' | 'blank-grid';
 
@@ -21,6 +22,12 @@ export interface MapPlotStamp {
   rotation?: number;
   notes?: string;
   photoUrls?: string[];
+  // Dynamic pest metadata (set when type === 'dynamic-pest')
+  pestId?: string;
+  pestSlug?: string;
+  displayLabel?: string;
+  // Condition metadata (set for condition stamp types)
+  customConditionText?: string;
 }
 
 export interface MapOutlinePoint {
@@ -53,6 +60,7 @@ export interface MapPlotData {
   selectedPestType: MapPestStampType;
   selectedObjectType: MapObjectStampType;
   selectedElementType: MapElementStampType;
+  selectedConditionType: MapConditionStampType;
   backgroundMode: MapBackgroundMode;
   stamps: MapPlotStamp[];
   outlines: MapElementOutline[];
@@ -60,6 +68,7 @@ export interface MapPlotData {
   updatedAt: string | null;
   gridRefWidth: number | null;
   gridRefHeight: number | null;
+  housePhotos: string[];
 }
 
 export interface MapStampOption {
@@ -78,6 +87,7 @@ export const MAP_MIN_ZOOM = 16;
 export const DEFAULT_PEST_STAMP_TYPE: MapPestStampType = 'ant';
 export const DEFAULT_OBJECT_STAMP_TYPE: MapObjectStampType = 'door';
 export const DEFAULT_ELEMENT_STAMP_TYPE: MapElementStampType = 'house';
+export const DEFAULT_CONDITION_TYPE: MapConditionStampType = 'excessive-moisture';
 
 export const MAP_PEST_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'ant', label: 'Ant', category: 'pest', color: '#b91c1c' },
@@ -93,6 +103,7 @@ export const MAP_PEST_STAMP_OPTIONS: MapStampOption[] = [
 export const MAP_OBJECT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'door', label: 'Door', category: 'object', color: '#1d4ed8' },
   { type: 'window', label: 'Window', category: 'object', color: '#1d4ed8' },
+  { type: 'sentricon-bait-station', label: 'Sentricon Bait Station', category: 'object', color: '#0075de' },
 ];
 
 export const MAP_ELEMENT_STAMP_OPTIONS: MapStampOption[] = [
@@ -102,6 +113,14 @@ export const MAP_ELEMENT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'deck', label: 'Deck', category: 'element', color: '#7c3aed' },
   { type: 'fence', label: 'Fence', category: 'element', color: '#64748b' },
   { type: 'water', label: 'Body of Water', category: 'element', color: '#0284c7' },
+];
+
+export const MAP_CONDITION_STAMP_OPTIONS: MapStampOption[] = [
+  { type: 'excessive-moisture', label: 'Excessive Moisture', category: 'condition', color: '#0369a1' },
+  { type: 'faulty-grade', label: 'Faulty Grade', category: 'condition', color: '#92400e' },
+  { type: 'earth-wood-contact', label: 'Earth-Wood Contact', category: 'condition', color: '#65a30d' },
+  { type: 'inaccessible-areas', label: 'Inaccessible Areas', category: 'condition', color: '#6b7280' },
+  { type: 'other-condition', label: 'Other', category: 'condition', color: '#9333ea' },
 ];
 
 export const MAP_STAMP_OPTIONS: MapStampOption[] = [
@@ -131,6 +150,7 @@ export const DEFAULT_MAP_PLOT_DATA: MapPlotData = {
   selectedPestType: DEFAULT_PEST_STAMP_TYPE,
   selectedObjectType: DEFAULT_OBJECT_STAMP_TYPE,
   selectedElementType: DEFAULT_ELEMENT_STAMP_TYPE,
+  selectedConditionType: DEFAULT_CONDITION_TYPE,
   backgroundMode: 'satellite',
   stamps: [],
   outlines: [],
@@ -138,6 +158,7 @@ export const DEFAULT_MAP_PLOT_DATA: MapPlotData = {
   updatedAt: null,
   gridRefWidth: null,
   gridRefHeight: null,
+  housePhotos: [],
 };
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -204,7 +225,7 @@ export function hexToRgba(hex: string, alpha: number): string {
 }
 
 export function isMapPestStampType(value: unknown): value is MapPestStampType {
-  return typeof value === 'string' && MAP_PEST_STAMP_OPTIONS.some(o => o.type === value);
+  return typeof value === 'string' && (MAP_PEST_STAMP_OPTIONS.some(o => o.type === value) || value === 'dynamic-pest');
 }
 export function isMapObjectStampType(value: unknown): value is MapObjectStampType {
   return typeof value === 'string' && MAP_OBJECT_STAMP_OPTIONS.some(o => o.type === value);
@@ -212,8 +233,11 @@ export function isMapObjectStampType(value: unknown): value is MapObjectStampTyp
 export function isMapElementStampType(value: unknown): value is MapElementStampType {
   return typeof value === 'string' && MAP_ELEMENT_STAMP_OPTIONS.some(o => o.type === value);
 }
+export function isMapConditionStampType(value: unknown): value is MapConditionStampType {
+  return typeof value === 'string' && MAP_CONDITION_STAMP_OPTIONS.some(o => o.type === value);
+}
 export function isMapStampType(value: unknown): value is MapStampType {
-  return isMapPestStampType(value) || isMapObjectStampType(value) || isMapElementStampType(value);
+  return isMapPestStampType(value) || isMapObjectStampType(value) || isMapElementStampType(value) || isMapConditionStampType(value);
 }
 
 export function normalizeMapStampType(value: unknown): MapStampType | null {
@@ -225,7 +249,11 @@ export function normalizeMapStampType(value: unknown): MapStampType | null {
 }
 
 export function getMapStampOption(type: MapStampType): MapStampOption {
-  return MAP_STAMP_OPTIONS.find(o => o.type === type) ?? MAP_STAMP_OPTIONS[0];
+  return (
+    MAP_CONDITION_STAMP_OPTIONS.find(o => o.type === type) ??
+    MAP_STAMP_OPTIONS.find(o => o.type === type) ??
+    MAP_STAMP_OPTIONS[0]
+  );
 }
 
 export function getMapLatitude(data: MapPlotData | null): number | null {
@@ -244,10 +272,14 @@ export function getMapLongitude(data: MapPlotData | null): number | null {
 
 export function getMapPlotSummaryLines(data: MapPlotData | null): string[] {
   if (!data) return [];
-  const pestTypes = [...new Set(data.stamps.map(s => getMapStampOption(s.type).label))];
+  const pestLabels = [...new Set(
+    data.stamps
+      .filter(s => isMapPestStampType(s.type))
+      .map(s => s.displayLabel || getMapStampOption(s.type).label)
+  )];
   const elementTypes = [...new Set(data.outlines.map(o => MAP_ELEMENT_STAMP_OPTIONS.find(e => e.type === o.type)?.label ?? o.type))];
   const lines: string[] = [];
-  if (pestTypes.length > 0) lines.push(`Pests: ${pestTypes.join(', ')}`);
+  if (pestLabels.length > 0) lines.push(`Pests: ${pestLabels.join(', ')}`);
   if (elementTypes.length > 0) lines.push(`Elements: ${elementTypes.join(', ')}`);
   if (data.stamps.length > 0) lines.push(`${data.stamps.length} stamp${data.stamps.length !== 1 ? 's' : ''} placed`);
   if (data.outlines.length > 0) lines.push(`${data.outlines.length} outline${data.outlines.length !== 1 ? 's' : ''} drawn`);

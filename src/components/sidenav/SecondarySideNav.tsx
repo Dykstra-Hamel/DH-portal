@@ -134,11 +134,13 @@ export function SecondarySideNav({
   const { hasAccess: hasSchedulingAccess } =
     useCurrentUserPageAccess('scheduling');
   const { hasAccess: hasSupportAccess } = useCurrentUserPageAccess('support');
+  const { hasAccess: hasTechnicianAccess } = useCurrentUserPageAccess('technician');
 
   // Global admins see everything, otherwise check department access
   const shouldShowSales = isAdmin || hasSalesAccess;
   const shouldShowScheduling = isAdmin || hasSchedulingAccess;
   const shouldShowSupport = isAdmin || hasSupportAccess;
+  const shouldShowTechLeads = isAdmin || hasTechnicianAccess;
 
   // Handle client-side hydration
   useEffect(() => {
@@ -643,13 +645,13 @@ export function SecondarySideNav({
               { text: 'Dashboard', href: '/field-ops/dashboard' },
             ],
           },
-          {
+          ...(shouldShowTechLeads ? [{
             title: 'Tech Leads',
             items: [
               { text: 'My Opportunities', href: '/field-ops/tech-leads/opportunities' },
               { text: 'Reports', href: '/field-ops/tech-leads/reports' },
             ],
-          },
+          }] : []),
           {
             title: 'Field Map',
             items: [

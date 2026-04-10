@@ -31,37 +31,58 @@
   height: 100%;
 }
 
-.streetViewLabel {
+.mapOverlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.1) 0%,
+    rgba(0, 0, 0, 0.58) 100%
+  );
+}
+
+.mapHeroContent {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
-  padding: 24px 14px 12px;
-  background: linear-gradient(to top, rgba(0,0,0,0.7) 0%, transparent 100%);
-  color: #fff;
-  display: flex;
+  padding: 16px 20px 20px;
+}
+
+.mapHeroTextCard {
+  display: inline-flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
+  max-width: min(92%, 560px);
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(2, 6, 23, 0.38);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  backdrop-filter: blur(2px);
 }
 
-.streetViewStop {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 11px;
+.heroEyebrow {
+  margin: 0;
+  font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(255,255,255,0.75);
+  letter-spacing: 0.01em;
+  color: rgba(255, 255, 255, 0.78);
 }
 
-.streetViewAddress {
-  font-size: 14px;
-  font-weight: 600;
+.heroCustomerName {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
   color: #fff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.1;
+}
+
+.heroAddress {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.35;
 }
 
 .mapLoading {

@@ -6,16 +6,14 @@ import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
 import { DEFAULT_MAP_PLOT_DATA, getMapLatitude, getMapLongitude, MapPlotData } from '@/components/FieldMap/MapPlot/types';
 import { MapAddressStep } from './steps/MapAddressStep';
-import { MapPlotStep, getPlottedPestTypes } from './steps/MapPlotStep';
-import { PlanSelectStep } from './steps/PlanSelectStep';
-import type { ServicePlan } from './steps/PlanSelectStep';
-import { PricingStep } from './steps/PricingStep';
-import type { PricingValues } from './steps/PricingStep';
+import { HousePhotoStep } from './steps/HousePhotoStep';
+import { MapPlotStep, getPlottedPestTypes, getPlottedPests } from './steps/MapPlotStep';
+import { QuoteBuildStep } from './steps/QuoteBuildStep';
+import type { QuoteLineItem } from './steps/QuoteBuildStep';
 import { ReviewStep } from './steps/ReviewStep';
-import { ActionStep } from './steps/ActionStep';
 import styles from './ServiceWizard.module.scss';
 
-const STEP_LABELS = ['Address', 'Map & Plot', 'Select Plan', 'Pricing', 'Review', 'Finalize'];
+const STEP_LABELS = ['Address', 'Photos', 'Map', 'Quote', 'Review'];
 const STEP_COUNT = STEP_LABELS.length;
 
 interface ServiceWizardProps {
@@ -30,6 +28,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   const clientName = searchParams.get('clientName') ?? '';
   const clientEmail = searchParams.get('clientEmail') ?? '';
+  const clientPhone = searchParams.get('clientPhone') ?? '';
   const address = searchParams.get('address') ?? '';
 
   // When launched from a service order the address is already known — skip step 0
@@ -67,13 +66,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       .finally(() => setIsGeocoding(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [selectedPlan, setSelectedPlan] = useState<ServicePlan | null>(null);
-  const [pricing, setPricing] = useState<PricingValues>({
-    initialPrice: null,
-    recurringPrice: null,
-    billingFrequency: null,
-  });
+  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
   const [notes, setNotes] = useState('');
+  const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] = useState(false);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents && typeof mapPlotData.addressComponents.formatted_address === 'string'
@@ -82,6 +77,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const selectedAddress = selectedAddressFromComponents || mapPlotData.addressInput || '';
   const inspectionAddress = selectedAddress || address;
   const pestTypes = getPlottedPestTypes(mapPlotData);
+  const plottedPests = getPlottedPests(mapPlotData);
 
   const handleMapChange = useCallback((data: MapPlotData) => {
     setMapPlotData(data);
@@ -92,9 +88,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       case 0:
         return getMapLatitude(mapPlotData) !== null && getMapLongitude(mapPlotData) !== null;
       case 1:
-        return mapPlotData.isViewSet;
+        return mapPlotData.housePhotos.length >= 1;
       case 2:
-        return true;
+        return mapPlotData.isViewSet;
       case 3:
         return true;
       case 4:
@@ -105,10 +101,20 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   }
 
   function handleNext() {
+    if (currentStep === 2 && returnToReviewAfterMapEdit) {
+      setCurrentStep(4);
+      setReturnToReviewAfterMapEdit(false);
+      return;
+    }
     if (currentStep < STEP_COUNT - 1) setCurrentStep(s => s + 1);
   }
 
   function handleBack() {
+    if (currentStep === 2 && returnToReviewAfterMapEdit) {
+      setCurrentStep(4);
+      setReturnToReviewAfterMapEdit(false);
+      return;
+    }
     const firstStep = hasPrefilledAddress ? 1 : 0;
     if (currentStep > firstStep) {
       setCurrentStep(s => s - 1);
@@ -130,6 +136,16 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         );
       case 1:
         return (
+          <div className={styles.stepScrollable}>
+            <HousePhotoStep
+              photoUrls={mapPlotData.housePhotos}
+              onChange={urls => setMapPlotData(prev => ({ ...prev, housePhotos: urls }))}
+              companyId={selectedCompany?.id ?? ''}
+            />
+          </div>
+        );
+      case 2:
+        return (
           <div className={styles.stepFull}>
             <MapPlotStep
               address={inspectionAddress}
@@ -138,68 +154,37 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               onBack={handleBack}
               onNext={handleNext}
               canNext={canAdvance()}
-            />
-          </div>
-        );
-      case 2:
-        return (
-          <div className={styles.stepScrollable}>
-            <PlanSelectStep
-              pestTypes={pestTypes}
-              selectedPlanId={selectedPlan?.id ?? null}
-              onSelect={plan => {
-                setSelectedPlan(plan);
-                setPricing({
-                  initialPrice: plan.initial_price,
-                  recurringPrice: plan.recurring_price,
-                  billingFrequency: plan.billing_frequency,
-                });
-              }}
+              companyId={selectedCompany?.id ?? ''}
             />
           </div>
         );
       case 3:
         return (
           <div className={styles.stepScrollable}>
-            <PricingStep
-              plan={selectedPlan}
-              pricing={pricing}
-              onChange={setPricing}
+            <QuoteBuildStep
+              lineItems={quoteLineItems}
+              onChange={setQuoteLineItems}
+              plottedPests={plottedPests}
+              companyId={selectedCompany?.id ?? ''}
             />
           </div>
         );
       case 4:
         return (
-          <div className={styles.stepScrollable}>
-            <ReviewStep
-              clientName={clientName}
-              address={inspectionAddress}
-              pestTypes={pestTypes}
-              plan={selectedPlan}
-              pricing={pricing}
-              notes={notes}
-              onNotesChange={setNotes}
-              mapPlotData={mapPlotData}
-            />
-          </div>
-        );
-      case 5:
-        return (
-          <div className={styles.stepScrollable}>
-            <ActionStep
-              clientName={clientName}
-              clientEmail={clientEmail}
-              address={inspectionAddress}
-              pestTypes={pestTypes}
-              plan={selectedPlan}
-              pricing={pricing}
-              notes={notes}
-              mapPlotData={mapPlotData}
-              inspectorName={inspectorName}
-              companyName={companyName}
-              companyId={selectedCompany?.id ?? ''}
-            />
-          </div>
+          <ReviewStep
+            clientName={clientName}
+            clientEmail={clientEmail}
+            clientPhone={clientPhone}
+            address={inspectionAddress}
+            pestTypes={pestTypes}
+            quoteLineItems={quoteLineItems}
+            notes={notes}
+            mapPlotData={mapPlotData}
+            inspectorName={inspectorName}
+            companyName={companyName}
+            companyId={selectedCompany?.id ?? ''}
+            onBack={handleBack}
+          />
         );
       default:
         return null;
@@ -231,22 +216,24 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </button>
-        <div className={styles.headerInfo}>
-          <p className={styles.headerTitle}>{clientName || 'New Inspection'}</p>
-          {inspectionAddress && <p className={styles.headerSub}>{inspectionAddress}</p>}
-        </div>
-      </div>
-
-      {/* Step track */}
-      <div className={styles.stepTrack}>
-        {Array.from({ length: STEP_COUNT }).map((_, i) => (
-          <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < STEP_COUNT - 1 ? 1 : 0 }}>
-            <div
-              className={`${styles.stepDot} ${i === currentStep ? styles.stepDotActive : i < currentStep ? styles.stepDotDone : ''}`}
-            />
-            {i < STEP_COUNT - 1 && <div className={styles.stepLine} />}
+        <div className={styles.headerGrid}>
+          <div className={styles.headerInfo}>
+            <p className={styles.headerTitle}>{clientName || 'New Inspection'}</p>
+            {inspectionAddress && <p className={styles.headerSub}>{inspectionAddress}</p>}
           </div>
-        ))}
+          <div className={styles.stepTrack}>
+            {STEP_LABELS.map((label, i) => (
+              <div key={i} className={styles.stepTrackItem}>
+                <span
+                  className={`${styles.stepLabel} ${i === currentStep ? styles.stepLabelActive : i < currentStep ? styles.stepLabelDone : ''}`}
+                >
+                  {label}
+                </span>
+                {i < STEP_COUNT - 1 && <div className={styles.stepLine} />}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {/* Step content */}
@@ -279,7 +266,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       )}
 
       {/* Footer — hidden on map step (toolbar is inside canvas) and finalize step */}
-      {currentStep !== 0 && currentStep !== 1 && currentStep !== STEP_COUNT - 1 && (
+      {currentStep !== 0 && currentStep !== 2 && !isLastStep && (
         <div className={styles.footer}>
           <button
             type="button"

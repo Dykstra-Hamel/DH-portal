@@ -17,12 +17,13 @@ import {
   Map as MapIcon,
   MapPinned,
 } from 'lucide-react';
-import { MapStampGlyph, PlotObjectBlueprintGlyph } from '@/components/FieldMap/MapPlot/glyphs';
+import { MapStampGlyph, PlotObjectBlueprintGlyph, ConditionStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import { PestStampModal } from '@/components/FieldMap/MapPlot/PestStampModal/PestStampModal';
 import {
   BLANK_GRID_MAX_SCALE,
   BLANK_GRID_MIN_SCALE,
   clampNormalized,
+  DEFAULT_CONDITION_TYPE,
   DEFAULT_ELEMENT_STAMP_TYPE,
   DEFAULT_OBJECT_STAMP_TYPE,
   DEFAULT_PEST_STAMP_TYPE,
@@ -33,14 +34,17 @@ import {
   getPolygonAreaInPixels,
   getPolygonCentroidNormalized,
   hexToRgba,
+  isMapConditionStampType,
   isMapElementStampType,
   isMapObjectStampType,
   isMapPestStampType,
+  MAP_CONDITION_STAMP_OPTIONS,
   MAP_ELEMENT_STAMP_OPTIONS,
   MAP_MIN_ZOOM,
   MAP_OBJECT_STAMP_OPTIONS,
   MAP_PEST_STAMP_OPTIONS,
   OUTLINE_SNAP_GRID_PX,
+  type MapConditionStampType,
   type MapElementOutline,
   type MapElementStampType,
   type MapObjectStampType,
@@ -67,6 +71,15 @@ function MapInstanceBridge({
   return null;
 }
 
+interface CompanyPestOption {
+  id: string;
+  name: string;
+  slug: string;
+  custom_label: string;
+  icon_svg: string | null;
+  display_order: number;
+}
+
 function StepMapPlot({
   companyId,
   mapPlotData,
@@ -83,6 +96,7 @@ function StepMapPlot({
   canNext: boolean;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const toolbarDockRef = useRef<HTMLDivElement>(null);
   const [googleMapsApiKey, setGoogleMapsApiKey] = useState<string | null>(null);
   const [mapsError, setMapsError] = useState<string | null>(null);
   const [googleMapInstance, setGoogleMapInstance] = useState<google.maps.Map | null>(null);
@@ -94,6 +108,8 @@ function StepMapPlot({
   const [showLegendLabels, setShowLegendLabels] = useState(false);
   const [snapToFirst, setSnapToFirst] = useState(false);
   const [activeStampMenu, setActiveStampMenu] = useState<MapStampCategory | null>(null);
+  const [companyPestOptions, setCompanyPestOptions] = useState<CompanyPestOption[]>([]);
+  const [selectedDynamicPestOption, setSelectedDynamicPestOption] = useState<CompanyPestOption | null>(null);
   const [blankGridScale, setBlankGridScale] = useState(1);
   const [blankGridOffset, setBlankGridOffset] = useState({ x: 0, y: 0 });
   const mapPlotDataRef = useRef(mapPlotData);
@@ -145,6 +161,9 @@ function StepMapPlot({
   const selectedElementType = isMapElementStampType(mapPlotData.selectedElementType)
     ? mapPlotData.selectedElementType
     : DEFAULT_ELEMENT_STAMP_TYPE;
+  const selectedConditionType = isMapConditionStampType(mapPlotData.selectedConditionType)
+    ? mapPlotData.selectedConditionType
+    : DEFAULT_CONDITION_TYPE;
   const isBlankGridMode = mapPlotData.backgroundMode === 'blank-grid';
   const isSatelliteMode = !isBlankGridMode;
   const canSetView = isBlankGridMode || hasCoordinates;
@@ -182,6 +201,30 @@ function StepMapPlot({
     };
     void fetchApiKey();
   }, [googleMapsApiKey, isSatelliteMode, mapsError]);
+
+  // Fetch company-configured pest options to populate the dynamic picker
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/pest-options/${encodeURIComponent(companyId)}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && Array.isArray(data.data)) {
+          setCompanyPestOptions(data.data);
+          // Auto-select the first pest so the toggle shows a real icon immediately
+          if (data.data.length > 0) {
+            const firstOption = data.data[0];
+            setSelectedDynamicPestOption(firstOption);
+            updateMapPlotData({
+              drawTool: 'stamp',
+              selectedPestType: 'dynamic-pest',
+              selectedStampType: 'dynamic-pest',
+            });
+          }
+        }
+      })
+      .catch(() => { /* fallback to static options */ });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
 
   useEffect(() => {
     const container = mapRef.current;
@@ -687,16 +730,37 @@ function StepMapPlot({
   }, []);
 
   const addStampAtPoint = useCallback((point: { x: number; y: number }) => {
-    const nextStamp = createStamp(point, mapPlotData.selectedStampType);
+    let nextStamp = createStamp(point, mapPlotData.selectedStampType);
+
+    // Enrich dynamic pest stamps with company pest metadata
+    if (mapPlotData.selectedStampType === 'dynamic-pest' && selectedDynamicPestOption) {
+      nextStamp = {
+        ...nextStamp,
+        pestId: selectedDynamicPestOption.id,
+        pestSlug: selectedDynamicPestOption.slug,
+        displayLabel: selectedDynamicPestOption.custom_label,
+      };
+    }
+
+    // Enrich condition stamps with display label
+    if (isMapConditionStampType(mapPlotData.selectedStampType)) {
+      const condOpt = MAP_CONDITION_STAMP_OPTIONS.find(o => o.type === mapPlotData.selectedStampType);
+      if (condOpt) {
+        nextStamp = { ...nextStamp, displayLabel: condOpt.label };
+      }
+    }
 
     updateMapPlotData({
       stamps: [...mapPlotData.stamps, nextStamp],
     });
 
-    if (isMapPestStampType(nextStamp.type)) {
+    // Close the stamp picker menu after placing a stamp
+    setActiveStampMenu(null);
+
+    if (isMapPestStampType(nextStamp.type) || isMapConditionStampType(nextStamp.type)) {
       setPestModalStampId(nextStamp.id);
     }
-  }, [createStamp, mapPlotData.selectedStampType, mapPlotData.stamps, updateMapPlotData]);
+  }, [createStamp, mapPlotData.selectedStampType, mapPlotData.stamps, selectedDynamicPestOption, updateMapPlotData]);
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!mapPlotData.isViewSet) return;
@@ -719,17 +783,27 @@ function StepMapPlot({
     }
 
     if (mapPlotData.drawTool === 'outline') {
-      const closedHit = [...mapPlotData.outlines]
-        .reverse()
-        .find(outline => outline.isClosed && isPointInPolygon(point, outline.points));
-      if (closedHit) {
-        setSnapToFirst(false);
-        updateMapPlotData({
-          activeOutlineId: closedHit.id,
-          selectedElementType: closedHit.type,
-          selectedStampType: closedHit.type,
-        });
-        return;
+      // Only check for a closed-polygon hit when NOT actively drawing a new outline.
+      // While drawing, clicks must always add a point to the active outline, even
+      // if the tap lands inside or near a neighbouring closed shape.
+      const isDrawingActiveOutline =
+        !!mapPlotData.activeOutlineId &&
+        !!activeOutline &&
+        !activeOutline.isClosed;
+
+      if (!isDrawingActiveOutline) {
+        const closedHit = [...mapPlotData.outlines]
+          .reverse()
+          .find(outline => outline.isClosed && isPointInPolygon(point, outline.points));
+        if (closedHit) {
+          setSnapToFirst(false);
+          updateMapPlotData({
+            activeOutlineId: closedHit.id,
+            selectedElementType: closedHit.type,
+            selectedStampType: closedHit.type,
+          });
+          return;
+        }
       }
 
       if (activeOutline && activeOutline.isClosed) {
@@ -776,12 +850,27 @@ function StepMapPlot({
     const rect = container.getBoundingClientRect();
     const NODE_HIT_PX = 18;
 
-    // Search all outlines for the closest node within hit range
+    const isDrawingActiveOutline =
+      !!mapPlotData.activeOutlineId &&
+      !!activeOutline &&
+      !activeOutline.isClosed;
+
+    // No active outline → user intends to start a new one. Skip node hit detection
+    // entirely so a click near an existing node always begins a fresh outline.
+    // Active but open outline → only check the active outline's own nodes (for
+    // the close-gesture on its first node).
+    // Active and closed outline → check all outlines so nodes can be dragged.
+    if (!mapPlotData.activeOutlineId) return;
+
+    const outlinesToSearch = isDrawingActiveOutline
+      ? mapPlotData.outlines.filter(o => o.id === mapPlotData.activeOutlineId)
+      : mapPlotData.outlines;
+
     let hitOutlineId: string | null = null;
     let hitNodeIndex = -1;
     let hitDistance = Number.POSITIVE_INFINITY;
 
-    for (const outline of mapPlotData.outlines) {
+    for (const outline of outlinesToSearch) {
       outline.points.forEach((node, index) => {
         const dx = (point.x - node.x) * rect.width;
         const dy = (point.y - node.y) * rect.height;
@@ -819,20 +908,22 @@ function StepMapPlot({
         return;
       }
 
-      // Node drag gesture: any node on any outline
-      event.preventDefault();
-      event.stopPropagation();
-      setSnapToFirst(false);
-      outlineNodeGestureRef.current = {
-        mode: 'move-node',
-        outlineId: hitOutlineId,
-        nodeIndex: hitNodeIndex,
-        startClientX: event.clientX,
-        startClientY: event.clientY,
-        isDragging: false,
-      };
-      lastDragAtRef.current = Date.now();
-      event.currentTarget.setPointerCapture(event.pointerId);
+      // Node drag gesture — only for nodes on closed/inactive outlines (not while drawing)
+      if (!isDrawingActiveOutline) {
+        event.preventDefault();
+        event.stopPropagation();
+        setSnapToFirst(false);
+        outlineNodeGestureRef.current = {
+          mode: 'move-node',
+          outlineId: hitOutlineId,
+          nodeIndex: hitNodeIndex,
+          startClientX: event.clientX,
+          startClientY: event.clientY,
+          isDragging: false,
+        };
+        lastDragAtRef.current = Date.now();
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }
     }
   };
 
@@ -994,6 +1085,15 @@ function StepMapPlot({
     });
   }, [updateMapPlotData]);
 
+  const activateDynamicPestTool = useCallback((option: CompanyPestOption) => {
+    setSelectedDynamicPestOption(option);
+    updateMapPlotData({
+      drawTool: 'stamp',
+      selectedPestType: 'dynamic-pest',
+      selectedStampType: 'dynamic-pest',
+    });
+  }, [updateMapPlotData]);
+
   const activateObjectTool = useCallback((type: MapObjectStampType) => {
     updateMapPlotData({
       drawTool: 'stamp',
@@ -1008,6 +1108,14 @@ function StepMapPlot({
       selectedElementType: type,
       selectedStampType: type,
       activeOutlineId: null,
+    });
+  }, [updateMapPlotData]);
+
+  const activateConditionTool = useCallback((type: MapConditionStampType) => {
+    updateMapPlotData({
+      drawTool: 'stamp',
+      selectedConditionType: type,
+      selectedStampType: type,
     });
   }, [updateMapPlotData]);
 
@@ -1156,24 +1264,41 @@ function StepMapPlot({
   const canShowStampMenus = mapPlotData.isViewSet && mapPlotData.drawTool === 'stamp';
   const canShowPestMenu = canShowStampMenus;
   const canShowObjectMenu = canShowStampMenus;
+  const canShowConditionMenu = canShowStampMenus;
   const canShowElementMenu = mapPlotData.isViewSet && mapPlotData.drawTool === 'outline';
   const canRenderActiveStampMenu =
     (activeStampMenu === 'pest' && canShowPestMenu) ||
     (activeStampMenu === 'object' && canShowObjectMenu) ||
+    (activeStampMenu === 'condition' && canShowConditionMenu) ||
     (activeStampMenu === 'element' && canShowElementMenu);
   const isPestSelected = isMapPestStampType(mapPlotData.selectedStampType);
   const isObjectSelected = isMapObjectStampType(mapPlotData.selectedStampType);
+  const isConditionSelected = isMapConditionStampType(mapPlotData.selectedStampType);
   const isElementSelected = isMapElementStampType(mapPlotData.selectedStampType);
+  const satelliteStampScale = isSatelliteMode ? getSatelliteStampScale(mapPlotData.zoom) : 1;
 
   useEffect(() => {
     if (
       (activeStampMenu === 'pest' && !canShowPestMenu) ||
       (activeStampMenu === 'object' && !canShowObjectMenu) ||
+      (activeStampMenu === 'condition' && !canShowConditionMenu) ||
       (activeStampMenu === 'element' && !canShowElementMenu)
     ) {
       setActiveStampMenu(null);
     }
-  }, [activeStampMenu, canShowElementMenu, canShowObjectMenu, canShowPestMenu]);
+  }, [activeStampMenu, canShowConditionMenu, canShowElementMenu, canShowObjectMenu, canShowPestMenu]);
+
+  // Close stamp picker when clicking outside the toolbar dock
+  useEffect(() => {
+    if (!activeStampMenu) return;
+    const handler = (e: PointerEvent) => {
+      if (toolbarDockRef.current && !toolbarDockRef.current.contains(e.target as Node)) {
+        setActiveStampMenu(null);
+      }
+    };
+    document.addEventListener('pointerdown', handler, { capture: true });
+    return () => document.removeEventListener('pointerdown', handler, { capture: true });
+  }, [activeStampMenu]);
 
   useEffect(() => {
     if (!showDimensions) {
@@ -1201,7 +1326,7 @@ function StepMapPlot({
     <>
     <div className={styles.mapStepContent}>
       <div className={styles.mapCanvasCard}>
-        <div ref={mapRef} className={styles.mapInteractiveCanvas}>
+        <div ref={mapRef} className={`${styles.mapInteractiveCanvas} ${pestModalStampId ? styles.mapInteractiveCanvasOverlay : ''}`}>
           {isBlankGridMode && <div className={styles.mapBlankCanvas} />}
           {isSatelliteMode && mapsError && (
             <div className={styles.mapEmptyState}>{mapsError}</div>
@@ -1518,31 +1643,57 @@ function StepMapPlot({
               const option = getMapStampOption(stamp.type);
               const isPestStamp = option.category === 'pest';
               const isObjectStamp = option.category === 'object';
+              const isConditionStamp = option.category === 'condition';
+              const isBaitStation = stamp.type === 'sentricon-bait-station';
+              const isActiveStamp = stamp.id === pestModalStampId;
+              const stampScale = (isBlankGridMode ? (1 / blankGridScale) * BLANK_GRID_STAMP_SCALE : 1) * satelliteStampScale;
+
+              let stampIcon: React.ReactNode;
+              if (isBaitStation) {
+                stampIcon = <PlotObjectBlueprintGlyph type="sentricon-bait-station" />;
+              } else if (isConditionStamp) {
+                stampIcon = <ConditionStampGlyph />;
+              } else if (isObjectStamp) {
+                stampIcon = <PlotObjectBlueprintGlyph type={stamp.type as MapObjectStampType} />;
+              } else if (stamp.type === 'dynamic-pest') {
+                const pestOption = companyPestOptions.find(o => o.id === stamp.pestId);
+                if (pestOption?.icon_svg) {
+                  stampIcon = <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: pestOption.icon_svg }} />;
+                } else {
+                  stampIcon = <MapStampGlyph type={stamp.type} size={18} />;
+                }
+              } else {
+                stampIcon = <MapStampGlyph type={stamp.type} size={18} />;
+              }
+
               return (
                 <button
                   key={stamp.id}
                   type="button"
-                  className={`${styles.mapStamp} ${isPestStamp ? styles.mapStampPest : ''} ${isObjectStamp ? styles.mapStampObject : ''}`}
+                  className={`${styles.mapStamp} ${isPestStamp || isBaitStation || isConditionStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''} ${isActiveStamp ? styles.mapStampActive : ''}`}
                   style={{
                     left: `${stamp.x * 100}%`,
                     top: `${stamp.y * 100}%`,
-                    transform: isBlankGridMode
-                      ? `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${1 / blankGridScale})`
-                      : `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg)`,
-                    ...(isPestStamp
+                    transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${stampScale})`,
+                    ...(pestModalStampId && (isPestStamp || isBaitStation || isConditionStamp) ? { opacity: 1 } : {}),
+                    ...(!isActiveStamp && (isPestStamp || isBaitStation || isConditionStamp)
+                      ? { color: 'var(--blue-500, #0075de)' }
+                      : !isActiveStamp && isObjectStamp
                       ? { color: '#ffffff' }
-                      : isObjectStamp
-                      ? { color: '#1d4ed8' }
-                      : { backgroundColor: option.color, color: '#ffffff' }),
+                      : !isActiveStamp
+                      ? { backgroundColor: option.color, color: '#ffffff' }
+                      : {}),
                   }}
-                  title={isObjectStamp ? `${option.label} — click to rotate` : option.label}
+                  title={isObjectStamp ? `${option.label} — click to rotate` : (stamp.displayLabel || option.label)}
                   onPointerDown={event => handleStampPointerDown(stamp.id, event)}
                   onPointerMove={event => handleStampPointerMove(stamp.id, event)}
                   onPointerUp={stopDragging}
                   onPointerCancel={stopDragging}
-                  onClick={() => {
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
                     if (dragMovedRef.current) return;
-                    if (isObjectStamp) {
+                    if (isObjectStamp && !isBaitStation) {
                       updateMapPlotData({
                         stamps: mapPlotData.stamps.map(s =>
                           s.id === stamp.id
@@ -1550,61 +1701,94 @@ function StepMapPlot({
                             : s
                         ),
                       });
-                    } else if (isPestStamp) {
+                    } else if (isPestStamp || isConditionStamp || isBaitStation) {
                       setPestModalStampId(stamp.id);
                     }
                   }}
                 >
-                  {isObjectStamp ? (
-                    <PlotObjectBlueprintGlyph type={stamp.type as MapObjectStampType} />
-                  ) : (
-                    <MapStampGlyph type={stamp.type} size={isPestStamp ? 36 : 16} />
-                  )}
+                  {stampIcon}
                 </button>
               );
             })}
           </div>
 
-          <div className={styles.mapToolbarDock}>
+          <div className={styles.mapToolbarDock} ref={toolbarDockRef}>
             {canRenderActiveStampMenu && activeStampMenu && (
               <div
-                className={`${styles.mapStampPicker} ${activeStampMenu === 'pest' ? styles.mapStampPickerPest : ''}`}
+                className={`${styles.mapStampPicker} ${activeStampMenu === 'pest' ? styles.mapStampPickerPest : ''} ${activeStampMenu === 'condition' ? styles.mapStampPickerCondition : ''}`}
                 role="menu"
                 aria-label={
                   activeStampMenu === 'pest'
                     ? 'Pest stamps'
                     : activeStampMenu === 'object'
                     ? 'Object stamps'
+                    : activeStampMenu === 'condition'
+                    ? 'Condition stamps'
                     : 'Element stamps'
                 }
               >
-                {(
-                  activeStampMenu === 'pest'
-                    ? MAP_PEST_STAMP_OPTIONS
-                    : activeStampMenu === 'object'
-                    ? MAP_OBJECT_STAMP_OPTIONS
-                    : MAP_ELEMENT_STAMP_OPTIONS
-                ).map(option => (
-                  <button
-                    key={option.type}
-                    type="button"
-                    className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${mapPlotData.selectedStampType === option.type ? styles.mapIconBtnActive : ''}`}
-                    onClick={() => {
-                      if (activeStampMenu === 'pest') {
-                        activatePestTool(option.type as MapPestStampType);
-                      } else if (activeStampMenu === 'object') {
-                        activateObjectTool(option.type as MapObjectStampType);
-                      } else {
-                        activateElementTool(option.type as MapElementStampType);
-                      }
-                      setActiveStampMenu(null);
-                    }}
-                    title={option.label}
-                    aria-label={option.label}
-                  >
-                    <MapStampGlyph type={option.type} size={18} />
-                  </button>
-                ))}
+                {activeStampMenu === 'pest' ? (
+                  companyPestOptions.length > 0 ? (
+                    companyPestOptions.map(option => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${styles.mapPickerBtnLabeled} ${mapPlotData.selectedStampType === 'dynamic-pest' && selectedDynamicPestOption?.id === option.id ? styles.mapIconBtnActive : ''}`}
+                        onClick={() => {
+                          activateDynamicPestTool(option);
+                          setActiveStampMenu(null);
+                        }}
+                        title={option.custom_label}
+                        aria-label={option.custom_label}
+                      >
+                        {option.icon_svg ? (
+                          <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: option.icon_svg }} />
+                        ) : (
+                          <MapStampGlyph type="dynamic-pest" size={18} />
+                        )}
+                        <span className={styles.mapPickerBtnLabel}>{option.custom_label}</span>
+                      </button>
+                    ))
+                  ) : (
+                    MAP_PEST_STAMP_OPTIONS.map(option => (
+                      <button
+                        key={option.type}
+                        type="button"
+                        className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${styles.mapPickerBtnLabeled} ${mapPlotData.selectedStampType === option.type ? styles.mapIconBtnActive : ''}`}
+                        onClick={() => {
+                          activatePestTool(option.type as MapPestStampType);
+                          setActiveStampMenu(null);
+                        }}
+                        title={option.label}
+                        aria-label={option.label}
+                      >
+                        <MapStampGlyph type={option.type} size={22} />
+                        <span className={styles.mapPickerBtnLabel}>{option.label}</span>
+                      </button>
+                    ))
+                  )
+                ) : (
+                  (activeStampMenu === 'object' ? MAP_OBJECT_STAMP_OPTIONS : MAP_ELEMENT_STAMP_OPTIONS).map(option => (
+                    <button
+                      key={option.type}
+                      type="button"
+                      className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${styles.mapPickerBtnLabeled} ${mapPlotData.selectedStampType === option.type ? styles.mapIconBtnActive : ''}`}
+                      onClick={() => {
+                        if (activeStampMenu === 'object') {
+                          activateObjectTool(option.type as MapObjectStampType);
+                        } else {
+                          activateElementTool(option.type as MapElementStampType);
+                        }
+                        setActiveStampMenu(null);
+                      }}
+                      title={option.label}
+                      aria-label={option.label}
+                    >
+                      <MapStampGlyph type={option.type} size={22} />
+                      <span className={styles.mapPickerBtnLabel}>{option.label}</span>
+                    </button>
+                  ))
+                )}
               </div>
             )}
 
@@ -1655,17 +1839,25 @@ function StepMapPlot({
                     type="button"
                     className={`${styles.mapIconBtn} ${styles.mapToggleFirst} ${styles.mapStampTypeBtn} ${isPestSelected || activeStampMenu === 'pest' ? styles.mapIconBtnActive : ''}`}
                     onClick={() => {
-                      activatePestTool(selectedPestType);
+                      if (selectedDynamicPestOption) {
+                        activateDynamicPestTool(selectedDynamicPestOption);
+                      } else {
+                        activatePestTool(selectedPestType);
+                      }
                       setActiveStampMenu(prev => (prev === 'pest' ? null : 'pest'));
                     }}
                     title="Pest Stamps"
                     aria-label="Pest Stamps"
                   >
-                    <MapStampGlyph type={selectedPestType} size={18} />
+                    {selectedDynamicPestOption?.icon_svg ? (
+                      <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: selectedDynamicPestOption.icon_svg }} />
+                    ) : (
+                      <MapStampGlyph type={selectedPestType} size={18} />
+                    )}
                   </button>
                   <button
                     type="button"
-                    className={`${styles.mapIconBtn} ${styles.mapToggleLast} ${styles.mapStampTypeBtn} ${isObjectSelected || activeStampMenu === 'object' ? styles.mapIconBtnActive : ''}`}
+                    className={`${styles.mapIconBtn} ${styles.mapStampTypeBtn} ${isObjectSelected || activeStampMenu === 'object' ? styles.mapIconBtnActive : ''}`}
                     onClick={() => {
                       activateObjectTool(selectedObjectType);
                       setActiveStampMenu(prev => (prev === 'object' ? null : 'object'));
@@ -1675,6 +1867,20 @@ function StepMapPlot({
                   >
                     <MapStampGlyph type={selectedObjectType} size={18} />
                   </button>
+                  {canShowConditionMenu && (
+                    <button
+                      type="button"
+                      className={`${styles.mapIconBtn} ${styles.mapToggleLast} ${styles.mapStampTypeBtn} ${isConditionSelected ? styles.mapIconBtnActive : ''}`}
+                      onClick={() => {
+                        activateConditionTool('other-condition');
+                        setActiveStampMenu(null);
+                      }}
+                      title="Conducive Condition"
+                      aria-label="Conducive Condition"
+                    >
+                      <ConditionStampGlyph />
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -1736,10 +1942,11 @@ function StepMapPlot({
       <PestStampModal
         stamp={mapPlotData.stamps.find(s => s.id === pestModalStampId)!}
         companyId={companyId}
-        onSave={(id, notes, photoUrls) => {
+        iconSvg={companyPestOptions.find(o => o.id === mapPlotData.stamps.find(s => s.id === pestModalStampId)?.pestId)?.icon_svg ?? null}
+        onSave={(id, notes, photoUrls, customConditionText) => {
           updateMapPlotData({
             stamps: mapPlotData.stamps.map(s =>
-              s.id === id ? { ...s, notes, photoUrls } : s
+              s.id === id ? { ...s, notes, photoUrls, ...(customConditionText != null ? { customConditionText } : {}) } : s
             ),
           });
           setPestModalStampId(null);
@@ -1769,10 +1976,66 @@ export interface MapPlotCanvasProps {
   canNext?: boolean;
 }
 
-function ReadOnlySummary({ mapPlotData }: { mapPlotData: MapPlotData }) {
+interface StaticMapProjectionContext {
+  centerLat: number;
+  centerLng: number;
+  zoom: number;
+  width: number;
+  height: number;
+}
+
+const STATIC_MAP_MAX_DIMENSION = 640;
+const SATELLITE_STAMP_BASE_ZOOM = 20;
+const SATELLITE_STAMP_MIN_SCALE = 0.4;
+const SATELLITE_STAMP_MAX_SCALE = 0.75;
+const BLANK_GRID_STAMP_SCALE = 0.6;
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
+function getSatelliteStampScale(zoom: number): number {
+  const safeZoom = Number.isFinite(zoom) ? zoom : SATELLITE_STAMP_BASE_ZOOM;
+  const scaled = 1 + (safeZoom - SATELLITE_STAMP_BASE_ZOOM) * 0.11;
+  return Math.max(SATELLITE_STAMP_MIN_SCALE, Math.min(SATELLITE_STAMP_MAX_SCALE, scaled));
+}
+
+function latLngToWorldPoint(lat: number, lng: number): { x: number; y: number } {
+  const clampedLat = Math.max(-85.05112878, Math.min(85.05112878, lat));
+  const sinLat = Math.sin((clampedLat * Math.PI) / 180);
+  return {
+    x: ((lng + 180) / 360) * 256,
+    y: (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * 256,
+  };
+}
+
+function projectLatLngToStaticPixel(
+  lat: number,
+  lng: number,
+  context: StaticMapProjectionContext
+): { x: number; y: number } {
+  const scale = Math.pow(2, context.zoom);
+  const worldSize = 256 * scale;
+  const centerWorld = latLngToWorldPoint(context.centerLat, context.centerLng);
+  const pointWorld = latLngToWorldPoint(lat, lng);
+
+  let deltaX = (pointWorld.x - centerWorld.x) * scale;
+  if (deltaX > worldSize / 2) deltaX -= worldSize;
+  if (deltaX < -worldSize / 2) deltaX += worldSize;
+
+  const deltaY = (pointWorld.y - centerWorld.y) * scale;
+  return {
+    x: context.width / 2 + deltaX,
+    y: context.height / 2 + deltaY,
+  };
+}
+
+function ReadOnlySummary({ mapPlotData, companyId }: { mapPlotData: MapPlotData; companyId?: string }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
-  const [showModal, setShowModal] = useState(false);
-  const [modalMapData, setModalMapData] = useState<MapPlotData>(mapPlotData);
+  const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
+  const previewFrameRef = useRef<HTMLDivElement>(null);
+  const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
+  const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
 
   useEffect(() => {
     fetch('/api/google-places-key')
@@ -1781,86 +2044,337 @@ function ReadOnlySummary({ mapPlotData }: { mapPlotData: MapPlotData }) {
       .catch(() => {});
   }, []);
 
-  const lat = getMapLatitude(mapPlotData);
-  const lng = getMapLongitude(mapPlotData);
-  const hasCoords = lat !== null && lng !== null;
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/pest-options/${companyId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then((d: { data?: Array<{ id: string; icon_svg?: string | null }> } | null) => {
+        if (!d?.data) return;
+        const map: Record<string, string> = {};
+        for (const opt of d.data) {
+          if (opt.icon_svg) map[opt.id] = opt.icon_svg;
+        }
+        setPestIconMap(map);
+      })
+      .catch(() => {});
+  }, [companyId]);
+
+  useEffect(() => {
+    const container = previewFrameRef.current;
+    if (!container) return;
+
+    const updateSize = () => {
+      const nextWidth = container.clientWidth;
+      const nextHeight = container.clientHeight;
+      setPreviewSize(current =>
+        current.width === nextWidth && current.height === nextHeight
+          ? current
+          : { width: nextWidth, height: nextHeight }
+      );
+    };
+
+    updateSize();
+    const observer = new ResizeObserver(updateSize);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
+
+  const centerLat = getMapLatitude(mapPlotData);
+  const centerLng = getMapLongitude(mapPlotData);
+  const hasCoords = centerLat !== null && centerLng !== null;
+  const previewZoom = Math.max(Math.min(Math.round(mapPlotData.zoom ?? 20), 20), MAP_MIN_ZOOM);
+  const readOnlyStampScale = getSatelliteStampScale(previewZoom);
   const stampCount = mapPlotData.stamps.length;
   const outlineCount = mapPlotData.outlines.length;
 
-  const staticMapUrl = hasCoords && apiKey ? (() => {
-    const zoom = Math.max(Math.min(mapPlotData.zoom ?? 20, 20), 16);
+  const staticRequestSize = useMemo(() => {
+    if (previewSize.width <= 0 || previewSize.height <= 0) return null;
+    const scale = Math.min(1, STATIC_MAP_MAX_DIMENSION / Math.max(previewSize.width, previewSize.height));
+    return {
+      width: Math.max(1, Math.round(previewSize.width * scale)),
+      height: Math.max(1, Math.round(previewSize.height * scale)),
+    };
+  }, [previewSize.height, previewSize.width]);
+
+  const projectionContext = useMemo<StaticMapProjectionContext | null>(() => {
+    if (
+      centerLat === null ||
+      centerLng === null ||
+      !staticRequestSize
+    ) {
+      return null;
+    }
+    return {
+      centerLat,
+      centerLng,
+      zoom: previewZoom,
+      width: staticRequestSize.width,
+      height: staticRequestSize.height,
+    };
+  }, [centerLat, centerLng, previewZoom, staticRequestSize]);
+
+  const staticMapUrl = hasCoords && apiKey && staticRequestSize ? (() => {
     const params = new URLSearchParams({
-      center: `${lat},${lng}`,
-      zoom: String(Math.max(zoom - 1, 16)),
-      size: '600x280',
+      center: `${centerLat},${centerLng}`,
+      zoom: String(previewZoom),
+      size: `${staticRequestSize.width}x${staticRequestSize.height}`,
       maptype: 'satellite',
       scale: '2',
       key: apiKey,
     });
-    for (const stamp of mapPlotData.stamps) {
-      if (stamp.lat != null && stamp.lng != null) {
-        const opt = getMapStampOption(stamp.type);
-        const hexColor = opt.color.replace('#', '0x') + 'FF';
-        const label = opt.label.charAt(0).toUpperCase();
-        params.append('markers', `color:${hexColor}|size:mid|label:${label}|${stamp.lat},${stamp.lng}`);
-      }
-    }
-    for (const outline of mapPlotData.outlines) {
-      const geo = outline.points.filter(p => p.lat != null && p.lng != null);
-      if (geo.length >= 2) {
-        // Close the polygon explicitly so the final stroke segment is rendered
-        const closedGeo = outline.isClosed ? [...geo, geo[0]] : geo;
-        const coords = closedGeo.map(p => `${p.lat},${p.lng}`).join('|');
-        params.append('path', `color:0x3b82f6FF|weight:2|fillcolor:0x3b82f620|${coords}`);
-      }
-    }
     return `https://maps.googleapis.com/maps/api/staticmap?${params.toString()}`;
   })() : null;
 
+  const previewOutlines = useMemo(() => {
+    if (
+      previewSize.width <= 0 ||
+      previewSize.height <= 0 ||
+      !staticRequestSize
+    ) {
+      return [];
+    }
+
+    return mapPlotData.outlines
+      .map(outline => {
+        const projectedPoints = outline.points
+          .map(point => {
+            if (
+              projectionContext &&
+              isFiniteNumber(point.lat) &&
+              isFiniteNumber(point.lng)
+            ) {
+              const projected = projectLatLngToStaticPixel(point.lat, point.lng, projectionContext);
+              return {
+                x: (projected.x / staticRequestSize.width) * previewSize.width,
+                y: (projected.y / staticRequestSize.height) * previewSize.height,
+              };
+            }
+            if (!isFiniteNumber(point.x) || !isFiniteNumber(point.y)) return null;
+            return {
+              x: point.x * previewSize.width,
+              y: point.y * previewSize.height,
+            };
+          })
+          .filter((point): point is { x: number; y: number } => point !== null);
+
+        if (projectedPoints.length < 2) return null;
+
+        const option =
+          MAP_ELEMENT_STAMP_OPTIONS.find(element => element.type === outline.type) ??
+          MAP_ELEMENT_STAMP_OPTIONS[0];
+        const strokeColor = outline.type === 'house' ? '#ef4444' : option.color;
+
+        return {
+          id: outline.id,
+          points: projectedPoints,
+          strokeColor,
+          fillColor: hexToRgba(strokeColor, 0.12),
+          isClosed: outline.isClosed,
+        };
+      })
+      .filter((outline): outline is {
+        id: string;
+        points: Array<{ x: number; y: number }>;
+        strokeColor: string;
+        fillColor: string;
+        isClosed: boolean;
+      } => outline !== null);
+  }, [mapPlotData.outlines, previewSize.height, previewSize.width, projectionContext, staticRequestSize]);
+
+  const previewStamps = useMemo(() => {
+    if (
+      previewSize.width <= 0 ||
+      previewSize.height <= 0 ||
+      !staticRequestSize
+    ) {
+      return [];
+    }
+
+    return mapPlotData.stamps
+      .map(stamp => {
+        if (projectionContext && isFiniteNumber(stamp.lat) && isFiniteNumber(stamp.lng)) {
+          const projected = projectLatLngToStaticPixel(stamp.lat, stamp.lng, projectionContext);
+          return {
+            stamp,
+            point: {
+              x: (projected.x / staticRequestSize.width) * previewSize.width,
+              y: (projected.y / staticRequestSize.height) * previewSize.height,
+            },
+          };
+        }
+        if (!isFiniteNumber(stamp.x) || !isFiniteNumber(stamp.y)) return null;
+        return {
+          stamp,
+          point: {
+            x: stamp.x * previewSize.width,
+            y: stamp.y * previewSize.height,
+          },
+        };
+      })
+      .filter((entry): entry is { stamp: MapPlotStamp; point: { x: number; y: number } } => entry !== null);
+  }, [mapPlotData.stamps, previewSize.height, previewSize.width, projectionContext, staticRequestSize]);
+
+  const selectedStamp = useMemo(
+    () => mapPlotData.stamps.find(stamp => stamp.id === selectedStampId) ?? null,
+    [mapPlotData.stamps, selectedStampId]
+  );
+  const selectedStampOption = selectedStamp ? getMapStampOption(selectedStamp.type) : null;
+  const selectedStampHasDetails = Boolean(
+    selectedStamp && (
+      (selectedStamp.notes && selectedStamp.notes.trim().length > 0) ||
+      (selectedStamp.photoUrls && selectedStamp.photoUrls.length > 0)
+    )
+  );
+
+  useEffect(() => {
+    if (!selectedStampId) return;
+    if (!mapPlotData.stamps.some(stamp => stamp.id === selectedStampId)) {
+      setSelectedStampId(null);
+    }
+  }, [mapPlotData.stamps, selectedStampId]);
+
   return (
     <>
-      <button
-        type="button"
-        className={styles.readOnlyThumbnail}
-        onClick={() => { setModalMapData(mapPlotData); setShowModal(true); }}
-        aria-label="Open map preview"
-      >
-        {staticMapUrl ? (
-          <img src={staticMapUrl} alt="Map preview" className={styles.readOnlyMapImg} />
-        ) : (
-          <div className={styles.readOnlyPlaceholder}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-              <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
-            </svg>
-            <span>Tap to view map</span>
-          </div>
-        )}
-        <div className={styles.readOnlyBadge}>
-          {stampCount > 0 && <span>{stampCount} stamp{stampCount !== 1 ? 's' : ''}</span>}
-          {outlineCount > 0 && <span>{outlineCount} outline{outlineCount !== 1 ? 's' : ''}</span>}
-          <span className={styles.readOnlyBadgeHint}>Tap to expand ↗</span>
-        </div>
-      </button>
+      <div className={styles.readOnlyThumbnail}>
+        <div ref={previewFrameRef} className={styles.readOnlyMapFrame}>
+          {staticMapUrl ? (
+            <>
+              <img src={staticMapUrl} alt="Map preview" className={styles.readOnlyMapImg} />
+              <div className={styles.readOnlyDarkOverlay} />
+            </>
+          ) : (
+            <div className={styles.readOnlyPlaceholder}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                <circle cx="12" cy="9" r="2.5" stroke="currentColor" strokeWidth="2" />
+              </svg>
+              <span>Tap to view map</span>
+            </div>
+          )}
 
-      {showModal && (
-        <div className={styles.readOnlyModal}>
-          <button
-            type="button"
-            className={styles.readOnlyModalClose}
-            onClick={() => setShowModal(false)}
-          >
-            ✕ Close
-          </button>
-          <div className={styles.readOnlyModalInner}>
-            <StepMapPlot
-              companyId=""
-              mapPlotData={modalMapData}
-              onChange={setModalMapData}
-              onBack={() => setShowModal(false)}
-              onNext={() => setShowModal(false)}
-              canNext={false}
-            />
+          {(previewOutlines.length > 0 || previewStamps.length > 0) && (
+            <div className={styles.readOnlyMapOverlay}>
+              {previewSize.width > 0 && previewSize.height > 0 && (
+                <svg
+                  className={styles.readOnlySvgOverlay}
+                  viewBox={`0 0 ${previewSize.width} ${previewSize.height}`}
+                  preserveAspectRatio="none"
+                >
+                  {previewOutlines.map(outline =>
+                    outline.isClosed && outline.points.length >= 3 ? (
+                      <polygon
+                        key={outline.id}
+                        points={outline.points.map(point => `${point.x},${point.y}`).join(' ')}
+                        fill={outline.fillColor}
+                        stroke={outline.strokeColor}
+                        strokeWidth={2}
+                        strokeLinejoin="round"
+                      />
+                    ) : (
+                      <polyline
+                        key={outline.id}
+                        points={outline.points.map(point => `${point.x},${point.y}`).join(' ')}
+                        fill="none"
+                        stroke={outline.strokeColor}
+                        strokeWidth={2}
+                        strokeLinejoin="round"
+                      />
+                    )
+                  )}
+                </svg>
+              )}
+
+              <div className={styles.readOnlyStampLayer}>
+                {previewStamps.map(({ stamp, point }) => {
+                  const option = getMapStampOption(stamp.type);
+                  const isPestStamp = option.category === 'pest';
+                  const isObjectStamp = option.category === 'object';
+                  const isConditionStamp = option.category === 'condition';
+                  const hasDetails = Boolean(
+                    (stamp.notes && stamp.notes.trim().length > 0) ||
+                    (stamp.photoUrls && stamp.photoUrls.length > 0)
+                  );
+
+                  const isBaitStation = stamp.type === 'sentricon-bait-station';
+
+                  let stampIcon: React.ReactNode;
+                  if (isBaitStation) {
+                    stampIcon = <PlotObjectBlueprintGlyph type="sentricon-bait-station" />;
+                  } else if (isConditionStamp) {
+                    stampIcon = <ConditionStampGlyph />;
+                  } else if (isObjectStamp) {
+                    stampIcon = <PlotObjectBlueprintGlyph type={stamp.type as MapObjectStampType} />;
+                  } else if (stamp.type === 'dynamic-pest' && stamp.pestId) {
+                    const iconSvg = pestIconMap[stamp.pestId];
+                    stampIcon = iconSvg
+                      ? <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: iconSvg }} />
+                      : <MapStampGlyph type={stamp.type} size={22} />;
+                  } else {
+                    stampIcon = <MapStampGlyph type={stamp.type} size={22} />;
+                  }
+
+                  return (
+                    <button
+                      key={stamp.id}
+                      type="button"
+                      className={`${styles.mapStamp} ${styles.readOnlyStamp} ${isPestStamp || isBaitStation || isConditionStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''}`}
+                      style={{
+                        left: `${point.x}px`,
+                        top: `${point.y}px`,
+                        transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${readOnlyStampScale})`,
+                        ...(isPestStamp || isBaitStation || isConditionStamp
+                          ? { color: 'var(--blue-500, #0075de)' }
+                          : isObjectStamp
+                          ? { color: '#ffffff' }
+                          : { backgroundColor: option.color, color: '#ffffff' }),
+                      }}
+                      title={hasDetails ? `${stamp.customConditionText || stamp.displayLabel || option.label} finding` : `${stamp.customConditionText || stamp.displayLabel || option.label} (no notes/photos)`}
+                      onClick={() => setSelectedStampId(stamp.id)}
+                    >
+                      {stampIcon}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {selectedStamp && selectedStampOption && (
+        <div className={styles.readOnlyStampModal} role="dialog" aria-modal="true" aria-label="Stamp details">
+          <div className={styles.readOnlyStampModalCard}>
+            <div className={styles.readOnlyStampModalHeader}>
+              <p className={styles.readOnlyStampModalTitle}>{selectedStamp.customConditionText || selectedStamp.displayLabel || selectedStampOption.label} Finding</p>
+              <button
+                type="button"
+                className={styles.readOnlyStampModalClose}
+                onClick={() => setSelectedStampId(null)}
+              >
+                Close
+              </button>
+            </div>
+            {selectedStamp.notes && selectedStamp.notes.trim().length > 0 ? (
+              <p className={styles.readOnlyStampModalNotes}>{selectedStamp.notes}</p>
+            ) : (
+              <p className={styles.readOnlyStampModalEmpty}>No description added for this stamp.</p>
+            )}
+            {selectedStamp.photoUrls && selectedStamp.photoUrls.length > 0 ? (
+              <div className={styles.readOnlyStampPhotoGrid}>
+                {selectedStamp.photoUrls.map(url => (
+                  <img
+                    key={url}
+                    src={url}
+                    alt={`${selectedStampOption.label} photo`}
+                    className={styles.readOnlyStampPhoto}
+                  />
+                ))}
+              </div>
+            ) : (
+              !selectedStampHasDetails && (
+                <p className={styles.readOnlyStampModalEmpty}>No photos added for this stamp.</p>
+              )
+            )}
           </div>
         </div>
       )}
@@ -1878,7 +2392,7 @@ export function MapPlotCanvas({
   canNext = true,
 }: MapPlotCanvasProps) {
   if (isReadOnly) {
-    return <ReadOnlySummary mapPlotData={mapPlotData} />;
+    return <ReadOnlySummary mapPlotData={mapPlotData} companyId={companyId} />;
   }
 
   return (

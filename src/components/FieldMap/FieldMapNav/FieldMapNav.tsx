@@ -8,8 +8,8 @@ export function FieldMapNav() {
   const pathname = usePathname();
 
   const isActive = (href: string) => {
-    if (href === '/field-map') {
-      return pathname === '/field-map';
+    if (href === '/field-ops/field-map') {
+      return pathname === '/field-ops/field-map';
     }
     return pathname.startsWith(href);
   };
@@ -19,8 +19,8 @@ export function FieldMapNav() {
       <div className={styles.navInner}>
         {/* Home / Route Dashboard */}
         <Link
-          href="/field-map"
-          className={`${styles.navItem} ${isActive('/field-map') ? styles.active : ''}`}
+          href="/field-ops/field-map"
+          className={`${styles.navItem} ${isActive('/field-ops/field-map') ? styles.active : ''}`}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
@@ -42,7 +42,7 @@ export function FieldMapNav() {
         </Link>
 
         {/* New Stop — raised center button */}
-        <Link href="/field-map/new" className={styles.newItem}>
+        <Link href="/field-ops/field-map/new" className={styles.newItem}>
           <div className={styles.newBtn}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
@@ -55,8 +55,8 @@ export function FieldMapNav() {
 
         {/* History */}
         <Link
-          href="/field-map/history"
-          className={`${styles.navItem} ${isActive('/field-map/history') ? styles.active : ''}`}
+          href="/field-ops/field-map/history"
+          className={`${styles.navItem} ${isActive('/field-ops/field-map/history') ? styles.active : ''}`}
         >
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
             <path
