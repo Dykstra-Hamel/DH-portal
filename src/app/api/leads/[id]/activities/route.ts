@@ -93,7 +93,7 @@ export async function POST(
       'email': 'contact_made',
     };
 
-    const mappedActivityType = activityTypeMapping[activity_type] || 'contact_made';
+    const mappedActivityType = activityTypeMapping[activity_type] ?? activity_type;
 
     // Create the activity using the new unified activity_log table
     const { data: newActivity, error: insertError } = await supabase

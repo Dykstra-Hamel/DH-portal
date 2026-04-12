@@ -26,8 +26,7 @@ export async function GET(request: NextRequest) {
     // Get all profiles
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('*')
-      .in('role', ['admin', 'project_manager']);
+      .select('*');
 
     if (profilesError) {
       return NextResponse.json(

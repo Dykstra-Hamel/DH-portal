@@ -42,13 +42,19 @@ export async function PUT(
       );
     }
 
+    const allowedRoles = ['admin', 'user', 'customer', 'project_manager'];
+    const role = body.role && allowedRoles.includes(body.role) ? body.role : undefined;
+
+    const updatePayload: Record<string, string> = {
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      email: userData.email,
+    };
+    if (role !== undefined) updatePayload.role = role;
+
     const { error } = await supabase
       .from('profiles')
-      .update({
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        email: userData.email,
-      })
+      .update(updatePayload)
       .eq('id', userId);
 
     if (error) {

@@ -44,6 +44,7 @@ interface QuickQuoteStep4Props {
   onSubmit: () => void;
   isSubmitting: boolean;
   submitError: string | null;
+  hasSchedulingPermission: boolean;
 }
 
 function formatPrice(price: number): string {
@@ -72,6 +73,7 @@ export default function QuickQuoteStep4({
   onSubmit,
   isSubmitting,
   submitError,
+  hasSchedulingPermission,
 }: QuickQuoteStep4Props) {
   const customerName = [customerData.firstName, customerData.lastName]
     .filter(Boolean)
@@ -130,7 +132,9 @@ export default function QuickQuoteStep4({
           <p className={styles.sectionTitle}>Requested Appointment</p>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Preferred Date</label>
+            <label className={styles.label}>
+              {hasSchedulingPermission ? 'Scheduled Date' : 'Preferred Date'}
+            </label>
             <input
               type="date"
               className={styles.dateInput}
@@ -141,13 +145,24 @@ export default function QuickQuoteStep4({
           </div>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>Time Preference</label>
-            <CustomDropdown
-              options={TIME_PREFERENCE_OPTIONS}
-              value={requestedTime}
-              onChange={onTimeChange}
-              placeholder="Select time preference"
-            />
+            <label className={styles.label}>
+              {hasSchedulingPermission ? 'Scheduled Time' : 'Time Preference'}
+            </label>
+            {hasSchedulingPermission ? (
+              <input
+                type="time"
+                className={styles.dateInput}
+                value={requestedTime}
+                onChange={(e) => onTimeChange(e.target.value)}
+              />
+            ) : (
+              <CustomDropdown
+                options={TIME_PREFERENCE_OPTIONS}
+                value={requestedTime}
+                onChange={onTimeChange}
+                placeholder="Select time preference"
+              />
+            )}
           </div>
         </div>
       </div>
@@ -163,7 +178,9 @@ export default function QuickQuoteStep4({
           onClick={onSubmit}
           disabled={isSubmitting || !selectedPlan}
         >
-          {isSubmitting ? 'Scheduling\u2026' : 'Confirm Schedule'}
+          {isSubmitting
+            ? (hasSchedulingPermission ? 'Scheduling\u2026' : 'Sending\u2026')
+            : (hasSchedulingPermission ? 'Confirm Schedule' : 'Send to Scheduling')}
         </button>
       </div>
     </div>

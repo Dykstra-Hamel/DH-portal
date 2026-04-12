@@ -13,6 +13,16 @@ import CadenceModal from '@/components/Common/CadenceModal/CadenceModal';
 import CadenceLibraryBrowser from '@/components/Automation/CadenceLibraryBrowser/CadenceLibraryBrowser';
 import styles from './SalesConfigManager.module.scss';
 
+type SalesTab = 'quickQuote' | 'cadences' | 'leadAssignment';
+
+interface ZipCodeGroup {
+  id: string;
+  name: string;
+  assigned_user_id: string | null;
+  assigned_user_name: string | null;
+  zip_codes: string[];
+}
+
 interface SalesConfigManagerProps {
   companyId: string;
 }
@@ -38,10 +48,16 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
   const [quickQuoteStep2Script, setQuickQuoteStep2Script] = useState('');
   const [quickQuoteStep3Script, setQuickQuoteStep3Script] = useState('');
   const [savingQuickQuote, setSavingQuickQuote] = useState(false);
+  const [autoAssignCustomQuoteLeads, setAutoAssignCustomQuoteLeads] = useState(false);
+  const [zipCodeGroups, setZipCodeGroups] = useState<ZipCodeGroup[]>([]);
+  const [loadingGroups, setLoadingGroups] = useState(false);
+  const [savingLeadAssignment, setSavingLeadAssignment] = useState(false);
+  const [activeTab, setActiveTab] = useState<SalesTab>('quickQuote');
 
   useEffect(() => {
     loadCadences();
     loadDefaultCadences();
+    loadZipCodeGroups();
   }, [companyId]);
 
   const loadDefaultCadences = async () => {
@@ -58,8 +74,54 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
       setQuickQuoteStep1Tips(settings?.quick_quote_step1_tips?.value ?? '');
       setQuickQuoteStep2Script(settings?.quick_quote_step2_script?.value ?? '');
       setQuickQuoteStep3Script(settings?.quick_quote_step3_script?.value ?? '');
+      setAutoAssignCustomQuoteLeads(settings?.auto_assign_custom_quote_leads?.value === 'true');
     } catch {
       // Non-critical — silently ignore
+    }
+  };
+
+  const loadZipCodeGroups = async () => {
+    try {
+      setLoadingGroups(true);
+      const response = await fetch(`/api/companies/${companyId}/zip-code-groups`);
+      if (!response.ok) return;
+      const data = await response.json();
+      setZipCodeGroups(Array.isArray(data) ? data : (data.groups ?? []));
+    } catch {
+      // Non-critical — silently ignore
+    } finally {
+      setLoadingGroups(false);
+    }
+  };
+
+  const handleSaveLeadAssignment = async () => {
+    try {
+      setSavingLeadAssignment(true);
+      setError(null);
+
+      const response = await fetch(`/api/companies/${companyId}/settings`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          settings: {
+            auto_assign_custom_quote_leads: {
+              value: autoAssignCustomQuoteLeads ? 'true' : 'false',
+              type: 'boolean',
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        const { error: errorMsg } = await response.json();
+        throw new Error(errorMsg || 'Failed to save assignment settings');
+      }
+
+      setSuccess('Assignment settings saved successfully');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save assignment settings');
+    } finally {
+      setSavingLeadAssignment(false);
     }
   };
 
@@ -221,249 +283,349 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
 
   return (
     <div className={styles.salesConfigManager}>
-      {/* Quick Quote Script Settings */}
-      <div className={styles.quickQuoteCard}>
-        <div className={styles.quickQuoteCardHeader}>
-          <h3>Quick Quote Script</h3>
-          <p>Customize the sales script and tips shown to reps during the Quick Quote flow. Leave blank to use the default text.</p>
-        </div>
-
-        <div className={styles.quickQuoteStepSection}>
-          <p className={styles.quickQuoteStepLabel}>Step 1 — Pest Selection</p>
-          <div className={styles.quickQuoteFormGroup}>
-            <label className={styles.quickQuoteLabel}>Sales Script</label>
-            <textarea
-              className={styles.quickQuoteTextarea}
-              rows={3}
-              value={quickQuoteStep1Script}
-              onChange={(e) => setQuickQuoteStep1Script(e.target.value)}
-              disabled={savingQuickQuote}
-              placeholder={`"Thank you for calling us today! My name is [Your Name] and I'd be happy to help you get a quote. Can I start by asking — what kind of pest issue are you dealing with?"`}
-            />
-          </div>
-          <div className={styles.quickQuoteFormGroup}>
-            <label className={styles.quickQuoteLabel}>Sales Tips</label>
-            <p className={styles.quickQuoteHint}>Enter one tip per line. Each line will appear as a bullet point.</p>
-            <textarea
-              className={styles.quickQuoteTextarea}
-              rows={5}
-              value={quickQuoteStep1Tips}
-              onChange={(e) => setQuickQuoteStep1Tips(e.target.value)}
-              disabled={savingQuickQuote}
-              placeholder={`Ask how long they've been noticing the problem — longer duration often signals a bigger issue.\nConfirm property ownership — owners are more likely to commit to recurring plans.\nMention that pest pressure is high in their area to build urgency.`}
-            />
-          </div>
-        </div>
-
-        <div className={styles.quickQuoteStepSection}>
-          <p className={styles.quickQuoteStepLabel}>Step 2 — Customer Info</p>
-          <div className={styles.quickQuoteFormGroup}>
-            <label className={styles.quickQuoteLabel}>Sales Script</label>
-            <textarea
-              className={styles.quickQuoteTextarea}
-              rows={3}
-              value={quickQuoteStep2Script}
-              onChange={(e) => setQuickQuoteStep2Script(e.target.value)}
-              disabled={savingQuickQuote}
-              placeholder={`"Great! I just need to gather a few details. Can I get your name and the best phone number to reach you?"`}
-            />
-          </div>
-        </div>
-
-        <div className={styles.quickQuoteStepSection}>
-          <p className={styles.quickQuoteStepLabel}>Step 3 — Plan Selection</p>
-          <div className={styles.quickQuoteFormGroup}>
-            <label className={styles.quickQuoteLabel}>Sales Script</label>
-            <textarea
-              className={styles.quickQuoteTextarea}
-              rows={3}
-              value={quickQuoteStep3Script}
-              onChange={(e) => setQuickQuoteStep3Script(e.target.value)}
-              disabled={savingQuickQuote}
-              placeholder={`"Based on what you've described, let me walk you through a few plan options. Our plans are designed to give you the right level of protection — I'd recommend starting with our most comprehensive option."`}
-            />
-          </div>
-        </div>
-
-        <div className={styles.quickQuoteCardFooter}>
-          <button
-            onClick={handleSaveQuickQuote}
-            className={styles.saveButton}
-            disabled={savingQuickQuote}
-          >
-            {savingQuickQuote ? 'Saving...' : 'Save Quick Quote Settings'}
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.defaultCadencesCard}>
-        <div className={styles.defaultCadencesHeader}>
-          <h3>Automation Default Cadences</h3>
-          <p>Select which cadence is automatically assigned for each automation workflow.</p>
-        </div>
-
-        {DEFAULT_CADENCE_ROWS.map((row, index) => (
-          <div
-            key={row.key}
-            className={styles.defaultCadenceRow}
-            data-last={index === DEFAULT_CADENCE_ROWS.length - 1 ? 'true' : undefined}
-          >
-            <div className={styles.defaultCadenceLabel}>
-              <span className={styles.defaultCadenceName}>{row.label}</span>
-              <span className={styles.defaultCadenceDesc}>{row.description}</span>
-            </div>
-            <select
-              value={defaultCadences[row.key]}
-              onChange={(e) =>
-                setDefaultCadences((prev) => ({ ...prev, [row.key]: e.target.value }))
-              }
-              disabled={loading || savingDefaults}
-              className={styles.defaultCadenceSelect}
-            >
-              <option value="">— No default —</option>
-              {activeCadences.map((cadence) => (
-                <option key={cadence.id} value={cadence.id}>
-                  {cadence.name}
-                </option>
-              ))}
-            </select>
-          </div>
-        ))}
-
-        <div className={styles.defaultCadencesFooter}>
-          <button
-            onClick={handleSaveDefaults}
-            className={styles.saveButton}
-            disabled={loading || savingDefaults}
-          >
-            {savingDefaults ? 'Saving...' : 'Save Defaults'}
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.header}>
-        <h2>Sales Cadence Configuration</h2>
-        <div className={styles.headerActions}>
-          <button
-            onClick={() => setShowLibraryBrowser(true)}
-            className={styles.importButton}
-            disabled={saving}
-          >
-            Import from Library
-          </button>
-          <button onClick={handleCreateCadence} className={styles.createButton} disabled={saving}>
-            <Plus size={16} />
-            Create Cadence
-          </button>
-        </div>
-      </div>
-
       {error && (
         <div className={styles.errorMessage}>
           <strong>Error:</strong> {error}
         </div>
       )}
-
       {success && (
         <div className={styles.successMessage}>
           <strong>Success:</strong> {success}
         </div>
       )}
 
-      {cadences.length === 0 ? (
-        <div className={styles.emptyState}>
-          <p>No sales cadences configured yet.</p>
-          <p>Create your first cadence to get started.</p>
-        </div>
-      ) : (
-        <div className={styles.cadenceList}>
-          {cadences.map((cadence) => (
-            <div key={cadence.id} className={styles.cadenceCard}>
-              <div className={styles.cadenceHeader}>
-                <div className={styles.cadenceInfo}>
-                  <h3>{cadence.name}</h3>
-                  {cadence.description && <p>{cadence.description}</p>}
-                  <div className={styles.cadenceMeta}>
-                    <span>{cadence.steps?.length || 0} steps</span>
-                    {cadence.is_default && <span className={styles.badge}>Default</span>}
-                    {cadence.is_active ? (
-                      <span className={styles.statusActive}>Active</span>
-                    ) : (
-                      <span className={styles.statusInactive}>Inactive</span>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.cadenceActions}>
-                  <button
-                    onClick={() => toggleCadenceExpansion(cadence.id)}
-                    className={styles.iconButton}
-                    title="View Steps"
-                  >
-                    {expandedCadence === cadence.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                  <button
-                    onClick={() => handleEditCadence(cadence)}
-                    className={styles.iconButton}
-                    disabled={saving}
-                    title="Edit Cadence"
-                  >
-                    <Edit2 size={16} />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteCadence(cadence.id)}
-                    className={styles.iconButton}
-                    disabled={saving}
-                    title="Delete Cadence"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-              </div>
+      <div className={styles.tabs}>
+        <button
+          type="button"
+          className={`${styles.tabButton} ${activeTab === 'quickQuote' ? styles.active : ''}`}
+          onClick={() => setActiveTab('quickQuote')}
+        >
+          Quick Quote
+        </button>
+        <button
+          type="button"
+          className={`${styles.tabButton} ${activeTab === 'cadences' ? styles.active : ''}`}
+          onClick={() => setActiveTab('cadences')}
+        >
+          Sales Cadences
+        </button>
+        <button
+          type="button"
+          className={`${styles.tabButton} ${activeTab === 'leadAssignment' ? styles.active : ''}`}
+          onClick={() => setActiveTab('leadAssignment')}
+        >
+          Lead Assignment
+        </button>
+      </div>
 
-              {expandedCadence === cadence.id && cadence.steps && cadence.steps.length > 0 && (
-                <div className={styles.cadenceSteps}>
-                  <h4>Cadence Steps:</h4>
-                  <div className={styles.stepsTimeline}>
-                    {[...cadence.steps]
-                      .sort((a, b) => {
-                        // Sort by day number first
-                        if (a.day_number !== b.day_number) {
-                          return a.day_number - b.day_number;
-                        }
-                        // Then sort by time of day (morning before afternoon)
-                        if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon') return -1;
-                        if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning') return 1;
-                        return 0;
-                      })
-                      .map((step, index) => (
-                      <div key={step.id} className={styles.stepItem}>
-                        <div className={styles.stepNumber}>{index + 1}</div>
-                        <div className={styles.stepContent}>
-                          <div className={styles.stepHeader}>
-                            <span className={styles.stepDay}>
-                              Day {step.day_number} - {TIME_OF_DAY_LABELS[step.time_of_day]}
-                            </span>
-                            <span
-                              className={styles.priorityBadge}
-                              style={{ backgroundColor: PRIORITY_COLORS[step.priority] }}
-                            >
-                              {PRIORITY_LABELS[step.priority]}
-                            </span>
-                          </div>
-                          <div className={styles.stepAction}>
-                            {ACTION_TYPE_LABELS[step.action_type]}
-                          </div>
-                          {step.description && (
-                            <div className={styles.stepDescription}>{step.description}</div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+      {activeTab === 'quickQuote' && (
+        <div className={styles.quickQuoteCard}>
+          <div className={styles.quickQuoteCardHeader}>
+            <h3>Quick Quote Script</h3>
+            <p>Customize the sales script and tips shown to reps during the Quick Quote flow. Leave blank to use the default text.</p>
+          </div>
+
+          <div className={styles.quickQuoteStepSection}>
+            <p className={styles.quickQuoteStepLabel}>Step 1 — Pest Selection</p>
+            <div className={styles.quickQuoteFormGroup}>
+              <label className={styles.quickQuoteLabel}>Sales Script</label>
+              <textarea
+                className={styles.quickQuoteTextarea}
+                rows={3}
+                value={quickQuoteStep1Script}
+                onChange={(e) => setQuickQuoteStep1Script(e.target.value)}
+                disabled={savingQuickQuote}
+                placeholder={`"Thank you for calling us today! My name is [Your Name] and I'd be happy to help you get a quote. Can I start by asking — what kind of pest issue are you dealing with?"`}
+              />
             </div>
-          ))}
+            <div className={styles.quickQuoteFormGroup}>
+              <label className={styles.quickQuoteLabel}>Sales Tips</label>
+              <p className={styles.quickQuoteHint}>Enter one tip per line. Each line will appear as a bullet point.</p>
+              <textarea
+                className={styles.quickQuoteTextarea}
+                rows={5}
+                value={quickQuoteStep1Tips}
+                onChange={(e) => setQuickQuoteStep1Tips(e.target.value)}
+                disabled={savingQuickQuote}
+                placeholder={`Ask how long they've been noticing the problem — longer duration often signals a bigger issue.\nConfirm property ownership — owners are more likely to commit to recurring plans.\nMention that pest pressure is high in their area to build urgency.`}
+              />
+            </div>
+          </div>
+
+          <div className={styles.quickQuoteStepSection}>
+            <p className={styles.quickQuoteStepLabel}>Step 2 — Customer Info</p>
+            <div className={styles.quickQuoteFormGroup}>
+              <label className={styles.quickQuoteLabel}>Sales Script</label>
+              <textarea
+                className={styles.quickQuoteTextarea}
+                rows={3}
+                value={quickQuoteStep2Script}
+                onChange={(e) => setQuickQuoteStep2Script(e.target.value)}
+                disabled={savingQuickQuote}
+                placeholder={`"Great! I just need to gather a few details. Can I get your name and the best phone number to reach you?"`}
+              />
+            </div>
+          </div>
+
+          <div className={styles.quickQuoteStepSection}>
+            <p className={styles.quickQuoteStepLabel}>Step 3 — Plan Selection</p>
+            <div className={styles.quickQuoteFormGroup}>
+              <label className={styles.quickQuoteLabel}>Sales Script</label>
+              <textarea
+                className={styles.quickQuoteTextarea}
+                rows={3}
+                value={quickQuoteStep3Script}
+                onChange={(e) => setQuickQuoteStep3Script(e.target.value)}
+                disabled={savingQuickQuote}
+                placeholder={`"Based on what you've described, let me walk you through a few plan options. Our plans are designed to give you the right level of protection — I'd recommend starting with our most comprehensive option."`}
+              />
+            </div>
+          </div>
+
+          <div className={styles.quickQuoteCardFooter}>
+            <button
+              onClick={handleSaveQuickQuote}
+              className={styles.saveButton}
+              disabled={savingQuickQuote}
+            >
+              {savingQuickQuote ? 'Saving...' : 'Save Quick Quote Settings'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'cadences' && (
+        <>
+          <div className={styles.defaultCadencesCard}>
+            <div className={styles.defaultCadencesHeader}>
+              <h3>Automation Default Cadences</h3>
+              <p>Select which cadence is automatically assigned for each automation workflow.</p>
+            </div>
+
+            {DEFAULT_CADENCE_ROWS.map((row, index) => (
+              <div
+                key={row.key}
+                className={styles.defaultCadenceRow}
+                data-last={index === DEFAULT_CADENCE_ROWS.length - 1 ? 'true' : undefined}
+              >
+                <div className={styles.defaultCadenceLabel}>
+                  <span className={styles.defaultCadenceName}>{row.label}</span>
+                  <span className={styles.defaultCadenceDesc}>{row.description}</span>
+                </div>
+                <select
+                  value={defaultCadences[row.key]}
+                  onChange={(e) =>
+                    setDefaultCadences((prev) => ({ ...prev, [row.key]: e.target.value }))
+                  }
+                  disabled={loading || savingDefaults}
+                  className={styles.defaultCadenceSelect}
+                >
+                  <option value="">— No default —</option>
+                  {activeCadences.map((cadence) => (
+                    <option key={cadence.id} value={cadence.id}>
+                      {cadence.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ))}
+
+            <div className={styles.defaultCadencesFooter}>
+              <button
+                onClick={handleSaveDefaults}
+                className={styles.saveButton}
+                disabled={loading || savingDefaults}
+              >
+                {savingDefaults ? 'Saving...' : 'Save Defaults'}
+              </button>
+            </div>
+          </div>
+
+          <div className={styles.header}>
+            <h2>Sales Cadence Configuration</h2>
+            <div className={styles.headerActions}>
+              <button
+                onClick={() => setShowLibraryBrowser(true)}
+                className={styles.importButton}
+                disabled={saving}
+              >
+                Import from Library
+              </button>
+              <button onClick={handleCreateCadence} className={styles.createButton} disabled={saving}>
+                <Plus size={16} />
+                Create Cadence
+              </button>
+            </div>
+          </div>
+
+          {cadences.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>No sales cadences configured yet.</p>
+              <p>Create your first cadence to get started.</p>
+            </div>
+          ) : (
+            <div className={styles.cadenceList}>
+              {cadences.map((cadence) => (
+                <div key={cadence.id} className={styles.cadenceCard}>
+                  <div className={styles.cadenceHeader}>
+                    <div className={styles.cadenceInfo}>
+                      <h3>{cadence.name}</h3>
+                      {cadence.description && <p>{cadence.description}</p>}
+                      <div className={styles.cadenceMeta}>
+                        <span>{cadence.steps?.length || 0} steps</span>
+                        {cadence.is_default && <span className={styles.badge}>Default</span>}
+                        {cadence.is_active ? (
+                          <span className={styles.statusActive}>Active</span>
+                        ) : (
+                          <span className={styles.statusInactive}>Inactive</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.cadenceActions}>
+                      <button
+                        onClick={() => toggleCadenceExpansion(cadence.id)}
+                        className={styles.iconButton}
+                        title="View Steps"
+                      >
+                        {expandedCadence === cadence.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      <button
+                        onClick={() => handleEditCadence(cadence)}
+                        className={styles.iconButton}
+                        disabled={saving}
+                        title="Edit Cadence"
+                      >
+                        <Edit2 size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteCadence(cadence.id)}
+                        className={styles.iconButton}
+                        disabled={saving}
+                        title="Delete Cadence"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+
+                  {expandedCadence === cadence.id && cadence.steps && cadence.steps.length > 0 && (
+                    <div className={styles.cadenceSteps}>
+                      <h4>Cadence Steps:</h4>
+                      <div className={styles.stepsTimeline}>
+                        {[...cadence.steps]
+                          .sort((a, b) => {
+                            if (a.day_number !== b.day_number) {
+                              return a.day_number - b.day_number;
+                            }
+                            if (a.time_of_day === 'morning' && b.time_of_day === 'afternoon') return -1;
+                            if (a.time_of_day === 'afternoon' && b.time_of_day === 'morning') return 1;
+                            return 0;
+                          })
+                          .map((step, index) => (
+                            <div key={step.id} className={styles.stepItem}>
+                              <div className={styles.stepNumber}>{index + 1}</div>
+                              <div className={styles.stepContent}>
+                                <div className={styles.stepHeader}>
+                                  <span className={styles.stepDay}>
+                                    Day {step.day_number} - {TIME_OF_DAY_LABELS[step.time_of_day]}
+                                  </span>
+                                  <span
+                                    className={styles.priorityBadge}
+                                    style={{ backgroundColor: PRIORITY_COLORS[step.priority] }}
+                                  >
+                                    {PRIORITY_LABELS[step.priority]}
+                                  </span>
+                                </div>
+                                <div className={styles.stepAction}>
+                                  {ACTION_TYPE_LABELS[step.action_type]}
+                                </div>
+                                {step.description && (
+                                  <div className={styles.stepDescription}>{step.description}</div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
+      )}
+
+      {activeTab === 'leadAssignment' && (
+        <div className={styles.leadAssignmentCard}>
+          <div className={styles.leadAssignmentHeader}>
+            <h3>Custom Quote Auto-Assignment</h3>
+            <p>Automatically assign leads to the inspector who owns the matching zip code when the selected plan requires a custom quote.</p>
+          </div>
+
+          <div className={styles.toggleRow}>
+            <span className={styles.toggleLabel}>Enable auto-assignment</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={autoAssignCustomQuoteLeads}
+              className={`${styles.toggleSwitch} ${autoAssignCustomQuoteLeads ? styles.toggleOn : ''}`}
+              onClick={() => setAutoAssignCustomQuoteLeads((v) => !v)}
+              disabled={savingLeadAssignment}
+            >
+              <span className={styles.toggleThumb} />
+            </button>
+          </div>
+
+          {autoAssignCustomQuoteLeads && (
+            <div className={styles.infoNote}>
+              Assignment is determined by zip code groups. Configure inspector territories in{' '}
+              <strong>Service Areas &rarr; Zip Codes</strong>.
+            </div>
+          )}
+
+          <div className={styles.groupsTableSection}>
+            <p className={styles.groupsTableTitle}>Current Zip Code Group Assignments</p>
+            {loadingGroups ? (
+              <p className={styles.groupsTableEmpty}>Loading groups&hellip;</p>
+            ) : zipCodeGroups.length === 0 ? (
+              <p className={styles.groupsTableEmpty}>
+                No zip code groups configured yet. Go to Service Areas &rarr; Zip Codes to set them up.
+              </p>
+            ) : (
+              <table className={styles.groupsTable}>
+                <thead>
+                  <tr>
+                    <th>Group Name</th>
+                    <th>Assigned Inspector</th>
+                    <th># of Zip Codes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {zipCodeGroups.map((group) => (
+                    <tr key={group.id}>
+                      <td>{group.name}</td>
+                      <td>
+                        {group.assigned_user_name ?? (
+                          <span className={styles.unassigned}>&mdash; No inspector assigned &mdash;</span>
+                        )}
+                      </td>
+                      <td>{group.zip_codes.length}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          <div className={styles.leadAssignmentFooter}>
+            <button
+              onClick={handleSaveLeadAssignment}
+              className={styles.saveButton}
+              disabled={savingLeadAssignment}
+            >
+              {savingLeadAssignment ? 'Saving...' : 'Save Assignment Settings'}
+            </button>
+          </div>
         </div>
       )}
 

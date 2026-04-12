@@ -36,7 +36,7 @@ const STEP_ID_LABELS: Record<StepId, string> = {
   'type-select': 'Type',
   'map-address': 'Address',
   'photos': 'Photos',
-  'ai-review': 'AI Review',
+  'ai-review': 'Review',
   'new-customer': 'Customer',
   'select-site': 'Site',
   'service-plan-select': 'Plan',
@@ -123,6 +123,7 @@ interface ServicePlan {
   plan_terms: string | null;
   plan_disclaimer: string | null;
   highlight_badge: string | null;
+  requires_quote: boolean | null;
   display_order: number | null;
 }
 
@@ -520,8 +521,8 @@ function StepAIReview({
 
   return (
     <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>AI Review</h2>
-      <p className={styles.stepDesc}>Review and edit the AI&apos;s findings</p>
+      <h2 className={styles.stepTitle}>Review</h2>
+      <p className={styles.stepDesc}>Review and edit findings</p>
 
       <div className={styles.fieldGroup}>
         <label className={styles.fieldLabel}>Issue Detected</label>
@@ -567,12 +568,12 @@ function StepAIReview({
           <p className={styles.fieldHint}>No company pest options are configured yet.</p>
         )}
         {aiResult.service_category && (
-          <p className={styles.fieldHint}>AI service type: {aiResult.service_category}</p>
+          <p className={styles.fieldHint}>Service type: {aiResult.service_category}</p>
         )}
       </div>
 
       <div className={styles.fieldGroup}>
-        <label className={styles.fieldLabel}>AI Summary</label>
+        <label className={styles.fieldLabel}>Summary</label>
         <textarea
           className={`${styles.fieldTextarea} ${styles.fieldTextareaAuto}`}
           value={aiResult.ai_summary}
@@ -975,7 +976,7 @@ function StepServiceDetails({
       <div className={styles.serviceSection}>
         <p className={styles.serviceSectionTitle}>Select a Service Plan</p>
         {suggestedPestType && (
-          <p className={styles.serviceHint}>AI detected: <strong>{suggestedPestType}</strong></p>
+          <p className={styles.serviceHint}>Detected: <strong>{suggestedPestType}</strong></p>
         )}
         {plansLoading ? (
           <div className={styles.loadingState}>
@@ -1457,7 +1458,7 @@ function StepServicePlanSelect({
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Select a Service Plan</h2>
       {suggestedPestType && (
-        <p className={styles.stepDesc}>AI detected: <strong>{suggestedPestType}</strong></p>
+        <p className={styles.stepDesc}>Detected: <strong>{suggestedPestType}</strong></p>
       )}
       <div className={styles.planCardList}>
         {plans.map(plan => {
@@ -1736,7 +1737,7 @@ function StepReview({
       </div>
 
       <div className={styles.reviewSection}>
-        <h3 className={styles.reviewSectionTitle}>AI Findings</h3>
+        <h3 className={styles.reviewSectionTitle}>Findings</h3>
         {aiResult.issue_detected && (
           <p className={styles.reviewRow}><strong>Issue:</strong> {aiResult.issue_detected}</p>
         )}
@@ -1885,7 +1886,7 @@ export function NewOpportunityWizard() {
   // Computed wizard steps based on lead type and PestPac availability
   const wizardSteps = useMemo((): StepId[] => {
     if (leadType === 'new-lead') {
-      return ['type-select', 'photos', 'ai-review', 'new-customer', 'review'];
+      return ['type-select', 'photos', 'ai-review', 'new-customer', 'service-plan-select', 'review'];
     }
     if (isPestPacEnabled) {
       return ['type-select', 'photos', 'ai-review', 'select-site', 'service-details', 'review', 'service-today-confirm'];
@@ -2174,6 +2175,9 @@ export function NewOpportunityWizard() {
 
       if (selectedCustomer) {
         body.customerId = selectedCustomer.id;
+        if (selectedCustomer.zip_code) {
+          body.zip = selectedCustomer.zip_code;
+        }
       }
 
       // Upload photos to Supabase Storage
@@ -2624,7 +2628,7 @@ export function NewOpportunityWizard() {
             {isAnalyzing ? (
               <><span className={styles.spinner} />Analyzing…</>
             ) : (
-              <>✨ Analyze with AI</>
+              <>Analyze Photo</>
             )}
           </button>
         )}
@@ -2653,7 +2657,7 @@ export function NewOpportunityWizard() {
           <div className={styles.reviewActions}>
             <button
               className={styles.scheduleBtn}
-              onClick={() => handleSubmit('schedule')}
+              onClick={() => handleSubmit('default')}
               disabled={isSubmitting}
             >
               {isSubmitting ? (
@@ -2662,13 +2666,15 @@ export function NewOpportunityWizard() {
                 <>Refer To Sales</>
               )}
             </button>
-            <button
-              className={styles.serviceTodayBtn}
-              onClick={() => setStepIndex(i => i + 1)}
-              disabled={isSubmitting}
-            >
-              <>Sell It</>
-            </button>
+            {!selectedServicePlan?.requires_quote && (
+              <button
+                className={styles.serviceTodayBtn}
+                onClick={() => setStepIndex(i => i + 1)}
+                disabled={isSubmitting}
+              >
+                <>Sell It</>
+              </button>
+            )}
           </div>
         )}
 
