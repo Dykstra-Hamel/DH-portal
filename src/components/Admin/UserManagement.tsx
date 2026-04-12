@@ -6,6 +6,7 @@ import { useUserDepartments } from '@/hooks/useUserDepartments';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
 import { Department, canHaveDepartments } from '@/types/user';
 import BranchSelector, { BranchSelectorHandle } from '@/components/Common/BranchSelector/BranchSelector';
+import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
 import styles from './UserManagement.module.scss';
 
 interface UserWithProfile {
@@ -46,6 +47,9 @@ export default function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<UserWithProfile | null>(null);
+  const [filterCompanyId, setFilterCompanyId] = useState<string | null>(null);
+  const [filterGlobalAdmin, setFilterGlobalAdmin] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [showInviteForm, setShowInviteForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [inviteFormData, setInviteFormData] = useState({
@@ -115,6 +119,27 @@ export default function UserManagement() {
     }
   };
 
+  const filteredUsers = users.filter(user => {
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const fullName = [user.profiles?.first_name, user.profiles?.last_name]
+        .filter(Boolean).join(' ').toLowerCase();
+      if (!fullName.includes(q) && !user.email.toLowerCase().includes(q)) return false;
+    }
+    if (filterCompanyId) {
+      const userRels = relationships.filter(r => r.user_id === user.id);
+      if (!userRels.some(r => r.company_id === filterCompanyId)) return false;
+    }
+    if (filterGlobalAdmin === 'true') {
+      if (user.profiles?.role !== 'admin') return false;
+    }
+    return true;
+  }).sort((a, b) => {
+    const aName = [a.profiles?.first_name, a.profiles?.last_name].filter(Boolean).join(' ') || a.email;
+    const bName = [b.profiles?.first_name, b.profiles?.last_name].filter(Boolean).join(' ') || b.email;
+    return aName.localeCompare(bName);
+  });
+
   if (loading) {
     return <div className={styles.loading}>Loading users...</div>;
   }
@@ -130,6 +155,41 @@ export default function UserManagement() {
           Invite User
         </button>
       </div>
+      <div className={styles.toolbar}>
+        <FilterPanel
+          filters={[
+            {
+              key: 'company',
+              label: 'Company',
+              value: filterCompanyId,
+              options: [
+                { value: null, label: 'All Companies' },
+                ...companies.map(c => ({ value: c.id, label: c.name })),
+              ],
+              onChange: setFilterCompanyId,
+              searchable: true,
+            },
+            {
+              key: 'globalAdmin',
+              label: 'Role',
+              value: filterGlobalAdmin,
+              options: [
+                { value: null, label: 'All Roles' },
+                { value: 'true', label: 'Global Admins Only' },
+              ],
+              onChange: setFilterGlobalAdmin,
+            },
+          ]}
+          onClearAll={() => { setFilterCompanyId(null); setFilterGlobalAdmin(null); }}
+        />
+        <input
+          type="text"
+          className={styles.searchInput}
+          placeholder="Search by name or email..."
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+        />
+      </div>
 
       {error && (
         <div className={styles.error}>
@@ -139,7 +199,7 @@ export default function UserManagement() {
       )}
 
       <div className={styles.userList}>
-        {users.map(user => {
+        {filteredUsers.map(user => {
           const userRels = relationships.filter(r => r.user_id === user.id);
           return (
             <div key={user.id} className={styles.userRow}>
@@ -190,8 +250,10 @@ export default function UserManagement() {
             </div>
           );
         })}
-        {users.length === 0 && (
-          <div className={styles.empty}>No users found.</div>
+        {filteredUsers.length === 0 && !loading && (
+          <div className={styles.emptyState}>
+            {users.length === 0 ? 'No users found.' : 'No users match the current filters.'}
+          </div>
         )}
       </div>
 
@@ -246,6 +308,7 @@ function EditUserModal({
     first_name: user.profiles?.first_name || '',
     last_name: user.profiles?.last_name || '',
     email: user.email,
+    role: user.profiles?.role || 'user',
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
@@ -304,7 +367,7 @@ function EditUserModal({
       await adminAPI.updateUser(user.profiles.id, profileForm);
       onUserUpdated({
         ...user,
-        profiles: { ...user.profiles, ...profileForm },
+        profiles: user.profiles ? { ...user.profiles, ...profileForm } : user.profiles,
       });
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : 'Failed to save profile');
@@ -394,14 +457,29 @@ function EditUserModal({
                   />
                 </div>
               </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Email</label>
-                <input
-                  className={styles.input}
-                  type="email"
-                  value={profileForm.email}
-                  onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))}
-                />
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Email</label>
+                  <input
+                    className={styles.input}
+                    type="email"
+                    value={profileForm.email}
+                    onChange={e => setProfileForm(p => ({ ...p, email: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Global Role</label>
+                  <select
+                    className={styles.input}
+                    value={profileForm.role}
+                    onChange={e => setProfileForm(p => ({ ...p, role: e.target.value }))}
+                  >
+                    <option value="user">User</option>
+                    <option value="customer">Customer</option>
+                    <option value="project_manager">Project Manager</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
               </div>
               {profileError && <p className={styles.fieldError}>{profileError}</p>}
               <button

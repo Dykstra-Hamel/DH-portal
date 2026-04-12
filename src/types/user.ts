@@ -126,11 +126,7 @@ export const validateDepartments = (departments: Department[]): {
     errors.push('At least one department must be selected');
   }
 
-  if (departments.length > 3) {
-    errors.push('Cannot assign more than 3 departments');
-  }
-
-  const validDepartments: Department[] = ['sales', 'support', 'scheduling', 'technician', 'inspector'];
+const validDepartments: Department[] = ['sales', 'support', 'scheduling', 'technician', 'inspector'];
   const invalidDepartments = departments.filter(dept => !validDepartments.includes(dept));
 
   if (invalidDepartments.length > 0) {

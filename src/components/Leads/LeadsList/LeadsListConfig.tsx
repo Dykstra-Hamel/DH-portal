@@ -219,6 +219,7 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
                 firstName={lead.assigned_user.first_name}
                 lastName={lead.assigned_user.last_name}
                 email={lead.assigned_user.email}
+                userId={lead.assigned_user.id}
                 avatarUrl={lead.assigned_user.avatar_url}
                 size="small"
               />

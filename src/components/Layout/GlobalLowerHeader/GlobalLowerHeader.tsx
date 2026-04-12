@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, ReactNode } from 'react';
-import Image from 'next/image';
 import { ChevronDown, Users } from 'lucide-react';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import styles from './GlobalLowerHeader.module.scss';
 
 interface ActionButton {
@@ -13,6 +13,8 @@ interface ActionButton {
 interface AssignableUser {
   id: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   display_name: string;
   avatar_url?: string | null;
   departments: string[];
@@ -103,9 +105,6 @@ const TeamAvatar = () => (
   </div>
 );
 
-const DefaultAvatar = ({ name }: { name: string }) => (
-  <div className={styles.defaultAvatar}>{name.charAt(0).toUpperCase()}</div>
-);
 
 export function GlobalLowerHeader({
   title,
@@ -257,17 +256,21 @@ export function GlobalLowerHeader({
             'Unknown',
           subtitle: schedulerUser.email || '',
           avatar: schedulerUser.avatar_url || null,
+          userId: schedulerUser.id,
+          email: schedulerUser.email || '',
+          firstName: schedulerUser.first_name,
+          lastName: schedulerUser.last_name,
         };
       }
-      return { name: 'Select Scheduler', subtitle: '', avatar: null };
+      return { name: 'Select Scheduler', subtitle: '', avatar: null, userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
 
     // Show salesperson for earlier statuses
     if (assignedTo === 'sales_team') {
-      return { name: 'Sales Team', subtitle: '', avatar: 'team' };
+      return { name: 'Sales Team', subtitle: '', avatar: 'team', userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
     if (assignedTo === 'support_team') {
-      return { name: 'Support Team', subtitle: '', avatar: 'team' };
+      return { name: 'Support Team', subtitle: '', avatar: 'team', userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
     if (assignedUser) {
       return {
@@ -276,9 +279,13 @@ export function GlobalLowerHeader({
           'Unknown',
         subtitle: assignedUser.email || '',
         avatar: assignedUser.avatar_url || null,
+        userId: assignedUser.id,
+        email: assignedUser.email || '',
+        firstName: assignedUser.first_name,
+        lastName: assignedUser.last_name,
       };
     }
-    return { name: 'Select', subtitle: '', avatar: null };
+    return { name: 'Select', subtitle: '', avatar: null, userId: undefined, email: '', firstName: undefined, lastName: undefined };
   };
 
   const isSchedulingStatus = () => {
@@ -318,7 +325,7 @@ export function GlobalLowerHeader({
     const { assignedTo, assignedUser } = supportCaseAssignmentControls;
 
     if (assignedTo === 'support_team') {
-      return { name: 'Support Team', subtitle: '', avatar: 'team' };
+      return { name: 'Support Team', subtitle: '', avatar: 'team', userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
     if (assignedUser) {
       return {
@@ -327,9 +334,13 @@ export function GlobalLowerHeader({
           'Unknown',
         subtitle: assignedUser.email || '',
         avatar: assignedUser.avatar_url || null,
+        userId: assignedUser.id,
+        email: assignedUser.email || '',
+        firstName: assignedUser.first_name,
+        lastName: assignedUser.last_name,
       };
     }
-    return { name: 'Select', subtitle: '', avatar: null };
+    return { name: 'Select', subtitle: '', avatar: null, userId: undefined, email: '', firstName: undefined, lastName: undefined };
   };
 
   const getSupportTeamCount = () => {
@@ -444,18 +455,17 @@ export function GlobalLowerHeader({
                     if (display.avatar === 'team') {
                       return <TeamAvatar />;
                     }
-                    if (display.avatar) {
-                      return (
-                        <Image
-                          src={display.avatar}
-                          alt={display.name}
-                          width={24}
-                          height={24}
-                          className={styles.avatar}
-                        />
-                      );
-                    }
-                    return <DefaultAvatar name={display.name} />;
+                    return (
+                      <MiniAvatar
+                        firstName={display.firstName}
+                        lastName={display.lastName}
+                        email={display.email || ''}
+                        userId={display.userId}
+                        avatarUrl={display.avatar as string | null}
+                        size="small"
+                        showTooltip={false}
+                      />
+                    );
                   })()}
                   <span className={styles.controlValue}>
                     {getAssignedToDisplay().name}
@@ -481,19 +491,15 @@ export function GlobalLowerHeader({
                         }}
                       >
                         <div className={styles.optionContent}>
-                          {leadAssignmentControls.currentUser.avatar ? (
-                            <Image
-                              src={leadAssignmentControls.currentUser.avatar}
-                              alt={leadAssignmentControls.currentUser.name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar
-                              name={leadAssignmentControls.currentUser.name}
-                            />
-                          )}
+                          <MiniAvatar
+                            firstName={leadAssignmentControls.currentUser.name.split(' ')[0]}
+                            lastName={leadAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
+                            email={leadAssignmentControls.currentUser.email}
+                            userId={leadAssignmentControls.currentUser.id}
+                            avatarUrl={leadAssignmentControls.currentUser.avatar}
+                            size="small"
+                            showTooltip={false}
+                          />
                           <div className={styles.optionInfo}>
                             <div className={styles.optionName}>
                               {leadAssignmentControls.currentUser.name}
@@ -516,17 +522,15 @@ export function GlobalLowerHeader({
                             }}
                           >
                             <div className={styles.optionContent}>
-                              {user.avatar_url ? (
-                                <Image
-                                  src={user.avatar_url}
-                                  alt={user.display_name}
-                                  width={32}
-                                  height={32}
-                                  className={styles.avatar}
-                                />
-                              ) : (
-                                <DefaultAvatar name={user.display_name} />
-                              )}
+                              <MiniAvatar
+                                firstName={user.first_name || user.display_name}
+                                lastName={user.last_name}
+                                email={user.email}
+                                userId={user.id}
+                                avatarUrl={user.avatar_url}
+                                size="small"
+                                showTooltip={false}
+                              />
                               <div className={styles.optionInfo}>
                                 <div className={styles.optionName}>
                                   {user.display_name}
@@ -552,19 +556,15 @@ export function GlobalLowerHeader({
                         }}
                       >
                         <div className={styles.optionContent}>
-                          {leadAssignmentControls.currentUser.avatar ? (
-                            <Image
-                              src={leadAssignmentControls.currentUser.avatar}
-                              alt={leadAssignmentControls.currentUser.name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar
-                              name={leadAssignmentControls.currentUser.name}
-                            />
-                          )}
+                          <MiniAvatar
+                            firstName={leadAssignmentControls.currentUser.name.split(' ')[0]}
+                            lastName={leadAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
+                            email={leadAssignmentControls.currentUser.email}
+                            userId={leadAssignmentControls.currentUser.id}
+                            avatarUrl={leadAssignmentControls.currentUser.avatar}
+                            size="small"
+                            showTooltip={false}
+                          />
                           <div className={styles.optionInfo}>
                             <div className={styles.optionName}>
                               {leadAssignmentControls.currentUser.name}
@@ -642,17 +642,15 @@ export function GlobalLowerHeader({
                               }}
                             >
                               <div className={styles.optionContent}>
-                                {user.avatar_url ? (
-                                  <Image
-                                    src={user.avatar_url}
-                                    alt={user.display_name}
-                                    width={32}
-                                    height={32}
-                                    className={styles.avatar}
-                                  />
-                                ) : (
-                                  <DefaultAvatar name={user.display_name} />
-                                )}
+                                <MiniAvatar
+                                  firstName={user.first_name || user.display_name}
+                                  lastName={user.last_name}
+                                  email={user.email}
+                                  userId={user.id}
+                                  avatarUrl={user.avatar_url}
+                                  size="small"
+                                  showTooltip={false}
+                                />
                                 <div className={styles.optionInfo}>
                                   <div className={styles.optionName}>
                                     {user.display_name}
@@ -773,18 +771,17 @@ export function GlobalLowerHeader({
                     if (display.avatar === 'team') {
                       return <TeamAvatar />;
                     }
-                    if (display.avatar) {
-                      return (
-                        <Image
-                          src={display.avatar}
-                          alt={display.name}
-                          width={24}
-                          height={24}
-                          className={styles.avatar}
-                        />
-                      );
-                    }
-                    return <DefaultAvatar name={display.name} />;
+                    return (
+                      <MiniAvatar
+                        firstName={display.firstName}
+                        lastName={display.lastName}
+                        email={display.email || ''}
+                        userId={display.userId}
+                        avatarUrl={display.avatar as string | null}
+                        size="small"
+                        showTooltip={false}
+                      />
+                    );
                   })()}
                   <span className={styles.controlValue}>
                     {getSupportCaseAssignedToDisplay().name}
@@ -807,19 +804,15 @@ export function GlobalLowerHeader({
                     }}
                   >
                     <div className={styles.optionContent}>
-                      {supportCaseAssignmentControls.currentUser.avatar ? (
-                        <Image
-                          src={supportCaseAssignmentControls.currentUser.avatar}
-                          alt={supportCaseAssignmentControls.currentUser.name}
-                          width={32}
-                          height={32}
-                          className={styles.avatar}
-                        />
-                      ) : (
-                        <DefaultAvatar
-                          name={supportCaseAssignmentControls.currentUser.name}
-                        />
-                      )}
+                      <MiniAvatar
+                        firstName={supportCaseAssignmentControls.currentUser.name.split(' ')[0]}
+                        lastName={supportCaseAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
+                        email={supportCaseAssignmentControls.currentUser.email}
+                        userId={supportCaseAssignmentControls.currentUser.id}
+                        avatarUrl={supportCaseAssignmentControls.currentUser.avatar}
+                        size="small"
+                        showTooltip={false}
+                      />
                       <div className={styles.optionInfo}>
                         <div className={styles.optionName}>
                           {supportCaseAssignmentControls.currentUser.name}
@@ -867,17 +860,15 @@ export function GlobalLowerHeader({
                         }}
                       >
                         <div className={styles.optionContent}>
-                          {user.avatar_url ? (
-                            <Image
-                              src={user.avatar_url}
-                              alt={user.display_name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar name={user.display_name} />
-                          )}
+                          <MiniAvatar
+                            firstName={user.first_name || user.display_name}
+                            lastName={user.last_name}
+                            email={user.email}
+                            userId={user.id}
+                            avatarUrl={user.avatar_url}
+                            size="small"
+                            showTooltip={false}
+                          />
                           <div className={styles.optionInfo}>
                             <div className={styles.optionName}>
                               {user.display_name}

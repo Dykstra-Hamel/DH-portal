@@ -3,6 +3,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, X, Check } from 'lucide-react';
+import { useCompanyRole } from '@/hooks/useCompanyRole';
+import { useUserDepartments } from '@/hooks/useUserDepartments';
 import QuickQuoteStep1 from './QuickQuoteStep1';
 import QuickQuoteStep2, { CustomerFormData } from './QuickQuoteStep2';
 import QuickQuoteStep3 from './QuickQuoteStep3';
@@ -32,6 +34,11 @@ interface CustomerResult {
   city: string | null;
   state: string | null;
   zip_code: string | null;
+  primary_service_address?: Array<{
+    service_address: {
+      home_size_range?: string | null;
+    };
+  }> | null;
 }
 
 interface ServicePlan {
@@ -74,6 +81,12 @@ export default function QuickQuoteModal({
   onClose,
 }: QuickQuoteModalProps) {
   const router = useRouter();
+
+  // Scheduling permission
+  const { isCompanyAdmin, isLoading: roleLoading } = useCompanyRole(companyId);
+  const { departments, isLoading: deptLoading } = useUserDepartments(userId, companyId);
+  const hasSchedulingPermission =
+    !roleLoading && !deptLoading && (isCompanyAdmin || departments.includes('scheduling'));
 
   // Wizard state
   const [step, setStep] = useState<QuickQuoteStep>(1);
@@ -186,6 +199,13 @@ export default function QuickQuoteModal({
         state: customer.state || '',
         zip: customer.zip_code || '',
       });
+
+      // Prefill home size from primary service address if available
+      const storedHomeSize =
+        customer.primary_service_address?.[0]?.service_address?.home_size_range;
+      if (storedHomeSize) {
+        setHomeSize(storedHomeSize);
+      }
     },
     []
   );
@@ -193,6 +213,7 @@ export default function QuickQuoteModal({
   const handleClearCustomer = useCallback(() => {
     setExistingCustomer(null);
     setIsNewCustomer(false);
+    setHomeSize('');
     setCustomerForm({
       firstName: '',
       lastName: '',
@@ -212,12 +233,12 @@ export default function QuickQuoteModal({
   // Step 3: plan selected
   const handlePlanSelect = useCallback((plan: ServicePlan) => {
     setSelectedPlan(plan);
-    // Reset homeSize so the recalculated options for the new plan are used
-    setHomeSize('');
+    // homeSize intentionally NOT reset here — the selected range persists
+    // across plan changes; only cleared when the customer is cleared.
   }, []);
 
   // Build lead creation payload
-  const buildLeadPayload = (status: 'quoted' | 'scheduling') => {
+  const buildLeadPayload = (status: 'quoted' | 'scheduling' | 'won') => {
     const payload: Record<string, any> = {
       companyId,
       leadStatus: status,
@@ -268,6 +289,18 @@ export default function QuickQuoteModal({
       const serviceAddressId: string | null =
         leadData.lead.service_address_id || null;
 
+      // 1b. Add pest sighting locations note (best-effort)
+      if (pestLocations.length > 0) {
+        await fetch(`/api/leads/${leadId}/activities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activity_type: 'note_added',
+            notes: `Pest sighting locations: ${pestLocations.join(', ')}`,
+          }),
+        }).catch(() => {});
+      }
+
       // 2. Update service address with home size if selected
       if (homeSize && serviceAddressId) {
         await fetch(`/api/service-addresses/${serviceAddressId}`, {
@@ -303,23 +336,15 @@ export default function QuickQuoteModal({
         }).catch(() => {});
       }
 
-      // 5. Enroll in default cadence (best-effort)
-      await fetch(`/api/leads/${leadId}/cadence`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      }).catch(() => {});
-
-      // 6. Navigate to lead detail page
+      // 5. Close modal
       onClose();
-      router.push(`/tickets/leads/${leadId}`);
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'An unexpected error occurred'
       );
       setIsSubmitting(false);
     }
-  }, [homeSize, selectedPlan, onClose, router]);
+  }, [homeSize, pestLocations, selectedPlan, onClose]);
 
   // Send Quote flow — gate on email for existing customers
   const handleSendQuote = useCallback(async () => {
@@ -367,15 +392,23 @@ export default function QuickQuoteModal({
     setSubmitError(null);
 
     try {
-      // 1. Create lead with scheduling status
+      // 1. Create lead — status and field names depend on scheduling permission
+      const leadPayload = hasSchedulingPermission
+        ? {
+            ...buildLeadPayload('won'),
+            scheduledDate: requestedDate || undefined,
+            scheduledTime: requestedTime !== 'anytime' ? requestedTime : undefined,
+          }
+        : {
+            ...buildLeadPayload('scheduling'),
+            requestedDate: requestedDate || undefined,
+            requestedTime: requestedTime !== 'anytime' ? requestedTime : undefined,
+          };
+
       const leadRes = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...buildLeadPayload('scheduling'),
-          requestedDate: requestedDate || undefined,
-          requestedTime: requestedTime !== 'anytime' ? requestedTime : undefined,
-        }),
+        body: JSON.stringify(leadPayload),
       });
 
       if (!leadRes.ok) {
@@ -387,6 +420,18 @@ export default function QuickQuoteModal({
       const leadId: string = leadData.lead.id;
       const serviceAddressId: string | null =
         leadData.lead.service_address_id || null;
+
+      // 1b. Add pest sighting locations note (best-effort)
+      if (pestLocations.length > 0) {
+        await fetch(`/api/leads/${leadId}/activities`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            activity_type: 'note_added',
+            notes: `Pest sighting locations: ${pestLocations.join(', ')}`,
+          }),
+        }).catch(() => {});
+      }
 
       // 2. Update service address with home size if selected
       if (homeSize && serviceAddressId) {
@@ -411,9 +456,8 @@ export default function QuickQuoteModal({
         throw new Error('Failed to create quote');
       }
 
-      // 4. Navigate to lead detail page
+      // 4. Close modal
       onClose();
-      router.push(`/tickets/leads/${leadId}`);
     } catch (err) {
       setSubmitError(
         err instanceof Error ? err.message : 'An unexpected error occurred'
@@ -423,6 +467,7 @@ export default function QuickQuoteModal({
   }, [
     selectedPlan,
     homeSize,
+    pestLocations,
     requestedDate,
     requestedTime,
     companyId,
@@ -431,7 +476,7 @@ export default function QuickQuoteModal({
     userId,
     selectedPest,
     onClose,
-    router,
+    hasSchedulingPermission,
   ]);
 
   // Show step 4 when "Continue to Scheduling" is clicked from step 3
@@ -561,6 +606,7 @@ export default function QuickQuoteModal({
               onSubmit={handleScheduleSubmit}
               isSubmitting={isSubmitting}
               submitError={submitError}
+              hasSchedulingPermission={hasSchedulingPermission}
             />
           )}
         </div>

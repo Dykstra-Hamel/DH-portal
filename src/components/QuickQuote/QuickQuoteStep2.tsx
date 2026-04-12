@@ -20,6 +20,11 @@ interface CustomerResult {
   city: string | null;
   state: string | null;
   zip_code: string | null;
+  primary_service_address?: Array<{
+    service_address: {
+      home_size_range?: string | null;
+    };
+  }> | null;
 }
 
 export interface CustomerFormData {
@@ -390,7 +395,7 @@ export default function QuickQuoteStep2({
                   {pestSummary.observation_count}
                 </span>
                 <span className={styles.pressureLabel}>
-                  {pestLabel} reports in your service area
+                  {pestLabel} reports in the last 30 days
                 </span>
               </div>
 

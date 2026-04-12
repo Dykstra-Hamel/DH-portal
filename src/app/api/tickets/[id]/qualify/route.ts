@@ -385,6 +385,9 @@ export async function POST(
         );
       }
 
+      // Mutable resolved assignee — may be updated by zip-code auto-assignment below
+      let resolvedAssignedTo = assignedTo || ticket.assigned_to;
+
       // After successful lead creation, geocode customer address and create service address
       // Only do this if ticket doesn't already have a service_address_id (inherit from ticket if it does)
       try {
@@ -503,6 +506,141 @@ export async function POST(
         );
       }
 
+      // Auto-recommend cheapest service plan based on pest type
+      if (ticket.pest_type) {
+        try {
+          // Step 1: match by pest_types.name (default case — no custom label set)
+          const { data: pestOptionByName, error: pestOptionError } = await supabase
+            .from('company_pest_options')
+            .select('pest_id, pest_types!inner(name)')
+            .eq('company_id', newLead.company_id)
+            .eq('is_active', true)
+            .eq('pest_types.name', ticket.pest_type)
+            .maybeSingle();
+
+          // Step 2: fallback — match by custom_label (company renamed the pest)
+          let pestOption: { pest_id: any } | null = pestOptionByName;
+          if (!pestOption?.pest_id && !pestOptionError) {
+            const { data: pestOptionByLabel, error: labelError } = await supabase
+              .from('company_pest_options')
+              .select('pest_id')
+              .eq('company_id', newLead.company_id)
+              .eq('is_active', true)
+              .eq('custom_label', ticket.pest_type)
+              .maybeSingle();
+            if (labelError) {
+              console.error('[qualify] custom_label lookup error:', labelError);
+            } else {
+              pestOption = pestOptionByLabel;
+            }
+          }
+
+          if (pestOptionError) {
+            console.error('[qualify] pest option lookup error:', pestOptionError);
+          } else if (pestOption?.pest_id) {
+            // Find cheapest active plan covering this pest (admin client to bypass RLS on plan_pest_coverage)
+            const adminSupabaseForPlan = createAdminClient();
+            const { data: recommendedPlan, error: planError } = await adminSupabaseForPlan
+              .from('service_plans')
+              .select(`
+                id, plan_name, initial_price, recurring_price,
+                billing_frequency, requires_quote,
+                plan_pest_coverage!inner(coverage_level)
+              `)
+              .eq('company_id', newLead.company_id)
+              .eq('is_active', true)
+              .eq('plan_pest_coverage.pest_id', pestOption.pest_id)
+              .order('recurring_price', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+
+            if (planError) {
+              console.error('[qualify] service_plans lookup error:', planError);
+            } else if (recommendedPlan) {
+              // Persist recommended plan on the lead
+              await supabase
+                .from('leads')
+                .update({
+                  selected_plan_id: recommendedPlan.id,
+                  recommended_plan_name: recommendedPlan.plan_name,
+                })
+                .eq('id', newLead.id);
+
+              // Fetch the auto-created quote ID so we can insert a line item
+              const { data: autoQuote } = await supabase
+                .from('quotes')
+                .select('id')
+                .eq('lead_id', newLead.id)
+                .maybeSingle();
+
+              if (autoQuote?.id) {
+                await supabase.from('quote_line_items').insert({
+                  quote_id: autoQuote.id,
+                  service_plan_id: recommendedPlan.id,
+                  plan_name: recommendedPlan.plan_name,
+                  initial_price: recommendedPlan.initial_price ?? 0,
+                  recurring_price: recommendedPlan.recurring_price ?? 0,
+                  billing_frequency: recommendedPlan.billing_frequency ?? 'monthly',
+                  final_initial_price: recommendedPlan.initial_price ?? 0,
+                  final_recurring_price: recommendedPlan.recurring_price ?? 0,
+                  display_order: 0,
+                });
+
+                await supabase
+                  .from('quotes')
+                  .update({
+                    primary_pest: ticket.pest_type,
+                    total_initial_price: recommendedPlan.initial_price ?? 0,
+                    total_recurring_price: recommendedPlan.recurring_price ?? 0,
+                  })
+                  .eq('id', autoQuote.id);
+
+                console.log('✅ Auto-recommended plan set on lead and quote:', recommendedPlan.plan_name);
+              }
+
+              // Auto-assign inspector based on zip code group if plan requires a custom quote
+              if (recommendedPlan.requires_quote && !resolvedAssignedTo) {
+                const customerZip = ticket.customer?.zip_code;
+                if (customerZip) {
+                  const [settingRow, zipGroupRow] = await Promise.all([
+                    adminSupabaseForPlan
+                      .from('company_settings')
+                      .select('setting_value')
+                      .eq('company_id', newLead.company_id)
+                      .eq('setting_key', 'auto_assign_custom_quote_leads')
+                      .maybeSingle(),
+                    adminSupabaseForPlan
+                      .from('zip_code_groups')
+                      .select('assigned_user_id')
+                      .eq('company_id', newLead.company_id)
+                      .contains('zip_codes', [customerZip])
+                      .not('assigned_user_id', 'is', null)
+                      .limit(1)
+                      .maybeSingle(),
+                  ]);
+
+                  if (
+                    settingRow.data?.setting_value === 'true' &&
+                    zipGroupRow.data?.assigned_user_id
+                  ) {
+                    const inspectorId = zipGroupRow.data.assigned_user_id;
+                    await supabase
+                      .from('leads')
+                      .update({ assigned_to: inspectorId, lead_status: 'in_process' })
+                      .eq('id', newLead.id);
+                    resolvedAssignedTo = inspectorId;
+                    console.log('✅ Lead auto-assigned to inspector via zip code group:', inspectorId);
+                  }
+                }
+              }
+            }
+          }
+        } catch (planErr) {
+          console.error('[qualify] Error auto-recommending plan:', planErr);
+          // Non-critical — do not fail the conversion
+        }
+      }
+
       // Update call_record to link it to the newly created lead
       // This ensures call information shows up on the lead detail page
       if (ticket.call_record_id) {
@@ -524,8 +662,8 @@ export async function POST(
       }
 
       // Auto-start default initial-contact cadence when lead is assigned and in_process
-      const effectiveStatus = customStatus || (assignedTo || ticket.assigned_to ? 'in_process' : 'new');
-      const effectiveAssignedTo = assignedTo || ticket.assigned_to;
+      const effectiveStatus = customStatus || (resolvedAssignedTo ? 'in_process' : 'new');
+      const effectiveAssignedTo = resolvedAssignedTo;
       if (effectiveStatus === 'in_process' && effectiveAssignedTo) {
         try {
           const { startDefaultCadenceForStage } = await import('@/lib/cadence/start-default-cadence');
@@ -543,13 +681,13 @@ export async function POST(
 
       // Send lead creation notification (non-blocking)
       notifyLeadCreated(newLead.id, ticket.company_id, {
-        assignedUserId: assignedTo,
+        assignedUserId: resolvedAssignedTo,
       }).catch(error => {
         console.error('Lead notification failed:', error);
       });
 
       // Create assignment notification if lead was assigned to someone
-      if (assignedTo) {
+      if (resolvedAssignedTo) {
         try {
           const { createAdminClient } = await import(
             '@/lib/supabase/server-admin'
@@ -584,27 +722,27 @@ export async function POST(
           const customerDetails = `${customerName} | ${leadType}`;
 
           console.log('Creating lead assignment notification with params:', {
-            p_user_id: assignedTo,
+            p_user_id: resolvedAssignedTo,
             p_company_id: ticket.company_id,
             p_type: 'assignment',
             p_title: 'New Lead Assigned To You',
             p_message: customerDetails,
             p_reference_id: newLead.id,
             p_reference_type: 'lead',
-            p_assigned_to: assignedTo,
+            p_assigned_to: resolvedAssignedTo,
           });
 
           const { data, error } = await adminSupabase.rpc(
             'create_notification',
             {
-              p_user_id: assignedTo,
+              p_user_id: resolvedAssignedTo,
               p_company_id: ticket.company_id,
               p_type: 'assignment',
               p_title: 'New Lead Assigned To You',
               p_message: customerDetails,
               p_reference_id: newLead.id,
               p_reference_type: 'lead',
-              p_assigned_to: assignedTo,
+              p_assigned_to: resolvedAssignedTo,
             }
           );
 
