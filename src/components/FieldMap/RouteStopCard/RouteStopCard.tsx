@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import styles from './RouteStopCard.module.scss';
 
+export type InspectionStatus = 'not_started' | 'in_progress' | 'done';
+
 export interface RouteStop {
   stopId: string;
   routeId: string;
@@ -17,6 +19,8 @@ export interface RouteStop {
   accessInstructions?: string;
   lat?: number | null;
   lng?: number | null;
+  inspectionStatus?: InspectionStatus;
+  leadId?: string | null;
 }
 
 interface RouteStopCardProps {
@@ -41,9 +45,16 @@ function getStatusStyle(status: string): string {
   return styles.statusScheduled;
 }
 
+function getInspectionBadge(status: InspectionStatus): { label: string; className: string } | null {
+  if (status === 'not_started') return null;
+  if (status === 'in_progress') return { label: 'Inspection Started', className: styles.inspectionInProgress };
+  return { label: 'Inspection Done', className: styles.inspectionDone };
+}
+
 export function RouteStopCard({ stop, companyId }: RouteStopCardProps) {
   const status = stop.serviceStatus.toLowerCase();
   const showStatus = !status.includes('scheduled');
+  const inspectionBadge = stop.inspectionStatus ? getInspectionBadge(stop.inspectionStatus) : null;
 
   return (
     <Link
@@ -56,11 +67,18 @@ export function RouteStopCard({ stop, companyId }: RouteStopCardProps) {
       <div className={styles.content}>
         <div className={styles.topRow}>
           <span className={styles.clientName}>{stop.clientName || 'Unknown Client'}</span>
-          {showStatus && (
-            <span className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}>
-              {stop.serviceStatus}
-            </span>
-          )}
+          <div className={styles.badges}>
+            {inspectionBadge && (
+              <span className={`${styles.status} ${inspectionBadge.className}`}>
+                {inspectionBadge.label}
+              </span>
+            )}
+            {showStatus && (
+              <span className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}>
+                {stop.serviceStatus}
+              </span>
+            )}
+          </div>
         </div>
         <p className={styles.address}>{stop.address}</p>
         {stop.serviceType && (

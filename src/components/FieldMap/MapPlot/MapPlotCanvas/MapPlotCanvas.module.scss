@@ -225,10 +225,10 @@
 }
 
 .mapStampPest {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   background: #ffffff;
-  border: none;
+  border: 2px solid currentColor;
   border-radius: 50%;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
   padding: 0;
@@ -258,7 +258,7 @@
   svg {
     width: 24px !important;
     height: 24px !important;
-    fill: var(--blue-500, #0075de) !important;
+    fill: currentColor !important;
 
     *,
     path,
@@ -268,7 +268,7 @@
     ellipse,
     polyline,
     line {
-      fill: var(--blue-500, #0075de) !important;
+      fill: currentColor !important;
       stroke: none !important;
     }
   }
@@ -285,6 +285,10 @@
 .mapPickerBtn .mapStampDynamicIcon svg polyline,
 .mapPickerBtn .mapStampDynamicIcon svg line {
   fill: var(--gray-500) !important;
+}
+
+.mapStampNoBorder {
+  border: none !important;
 }
 
 .mapStampActive {
@@ -689,6 +693,12 @@
   width: 100%;
   border: 1px solid var(--gray-200);
   border-radius: 12px;
+
+  @media (max-width: 992px) {
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
   overflow: hidden;
   background: var(--gray-100);
   position: relative;
@@ -751,8 +761,10 @@
 
   /* Restore the pest stamp circle styling when in read-only mode */
   &.mapStampPest {
+    width: 42px;
+    height: 42px;
     background: #ffffff;
-    border: none;
+    border: 2px solid currentColor;
   }
 }
 
@@ -792,6 +804,22 @@
   padding: 0 !important;
 }
 
+@keyframes readOnlyOverlayIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes readOnlyCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 .readOnlyStampModal {
   position: fixed;
   inset: 0;
@@ -801,6 +829,7 @@
   align-items: center;
   justify-content: center;
   padding: 20px;
+  animation: readOnlyOverlayIn 0.2s ease forwards;
 }
 
 .readOnlyStampModalCard {
@@ -815,6 +844,8 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  animation: readOnlyCardIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  will-change: transform, opacity;
 }
 
 .readOnlyStampModalHeader {

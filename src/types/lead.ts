@@ -1,3 +1,5 @@
+import type { MapPlotData } from '@/components/FieldMap/MapPlot/types';
+
 export type LeadFormat = 'call' | 'form' | 'email' | 'text';
 
 // New taxonomy values (use these for all new records)
@@ -192,6 +194,9 @@ export interface Lead {
     home_size_range?: string; // Range like "0-1500", "1501-2000"
     yard_size_range?: string; // Range like "0-0.25", "0.26-0.50"
   };
+  // Field Map inspection data
+  map_plot_data?: MapPlotData | null;
+
   call_record?: {
     id: string;
     call_id: string;

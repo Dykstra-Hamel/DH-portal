@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic'];
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json({ error: 'Invalid file type' }, { status: 400 });
     }

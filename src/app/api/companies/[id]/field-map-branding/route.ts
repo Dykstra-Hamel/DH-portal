@@ -24,14 +24,14 @@ export async function GET(
         .single(),
       supabase
         .from('brands')
-        .select('logo_url, primary_color_hex, secondary_color_hex, font_color_hex, font_primary_name, font_primary_url, font_secondary_name, font_secondary_url')
+        .select('logo_url, primary_color_hex, secondary_color_hex, font_color_hex, alternative_colors, font_primary_name, font_primary_url, font_secondary_name, font_secondary_url')
         .eq('company_id', id)
         .single(),
       supabase
         .from('company_settings')
         .select('setting_key, setting_value')
         .eq('company_id', id)
-        .eq('setting_key', 'quote_accent_color_preference'),
+        .in('setting_key', ['quote_accent_color_preference', 'quote_terms']),
     ]);
 
     if (companyResult.error || !companyResult.data) {
@@ -40,12 +40,18 @@ export async function GET(
 
     const company = companyResult.data;
     const brand = brandResult.data;
-    const accentPref = settingsResult.data?.[0]?.setting_value ?? null;
+    const settingsMap: Record<string, string> = {};
+    (settingsResult.data ?? []).forEach(s => { settingsMap[s.setting_key] = s.setting_value; });
+    const accentPref = settingsMap['quote_accent_color_preference'] ?? null;
+    const quoteTerms = settingsMap['quote_terms'] ?? null;
 
     return NextResponse.json({
       logo_url: brand?.logo_url ?? null,
       primary_color: brand?.primary_color_hex ?? null,
       secondary_color: brand?.secondary_color_hex ?? null,
+      alternative_color_1: Array.isArray(brand?.alternative_colors) && brand.alternative_colors.length > 0
+        ? (brand.alternative_colors[0] as { hex?: string })?.hex ?? null
+        : null,
       font_color: brand?.font_color_hex ?? null,
       font_primary_name: brand?.font_primary_name ?? null,
       font_primary_url: brand?.font_primary_url ?? null,
@@ -54,6 +60,7 @@ export async function GET(
       company_name: company.name,
       company_phone: company.phone ?? null,
       company_email: company.email ?? null,
+      quote_terms: quoteTerms,
       quote_accent_color_preference: accentPref,
     });
   } catch (error) {
