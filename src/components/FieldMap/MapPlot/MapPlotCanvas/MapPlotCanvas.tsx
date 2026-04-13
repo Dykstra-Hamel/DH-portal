@@ -87,6 +87,7 @@ function StepMapPlot({
   onBack,
   onNext,
   canNext,
+  stampColor,
 }: {
   companyId: string;
   mapPlotData: MapPlotData;
@@ -94,6 +95,7 @@ function StepMapPlot({
   onBack: () => void;
   onNext: () => void;
   canNext: boolean;
+  stampColor?: string;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const toolbarDockRef = useRef<HTMLDivElement>(null);
@@ -225,6 +227,15 @@ function StepMapPlot({
       .catch(() => { /* fallback to static options */ });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  // Default to outline tool when the map is first locked (isViewSet transitions false → true)
+  const wasViewSetRef = useRef(mapPlotData.isViewSet);
+  useEffect(() => {
+    if (mapPlotData.isViewSet && !wasViewSetRef.current) {
+      updateMapPlotData({ drawTool: 'outline' });
+    }
+    wasViewSetRef.current = mapPlotData.isViewSet;
+  }, [mapPlotData.isViewSet, updateMapPlotData]);
 
   useEffect(() => {
     const container = mapRef.current;
@@ -934,13 +945,18 @@ function StepMapPlot({
     if (gesture.mode === 'close-outline') {
       setSnapToFirst(false);
       const outline = mapPlotData.outlines.find(item => item.id === gesture.outlineId);
-      if (outline && !gesture.hasMoved && !outline.isClosed && outline.points.length >= 3) {
-        updateMapPlotData({
-          outlines: mapPlotData.outlines.map(item =>
-            item.id === outline.id ? { ...item, isClosed: true } : item
-          ),
-          activeOutlineId: null,
-        });
+      if (outline && !gesture.hasMoved && !outline.isClosed) {
+        if (outline.type === 'fence' && outline.points.length >= 2) {
+          // Fence lines never close — tapping the first node finishes the line
+          updateMapPlotData({ activeOutlineId: null });
+        } else if (outline.type !== 'fence' && outline.points.length >= 3) {
+          updateMapPlotData({
+            outlines: mapPlotData.outlines.map(item =>
+              item.id === outline.id ? { ...item, isClosed: true } : item
+            ),
+            activeOutlineId: null,
+          });
+        }
       }
     }
 
@@ -1219,11 +1235,12 @@ function StepMapPlot({
       return;
     }
 
+    const minPointsToSnap = activeOutline?.type === 'fence' ? 2 : 3;
     if (
       !mapPlotData.isViewSet ||
       mapPlotData.drawTool !== 'outline' ||
       activeOutlineClosed ||
-      activeOutlinePoints.length < 3
+      activeOutlinePoints.length < minPointsToSnap
     ) {
       if (snapToFirst) setSnapToFirst(false);
       return;
@@ -1494,12 +1511,25 @@ function StepMapPlot({
                 const sw = isBlankGridMode
                   ? (isActive ? 2 / blankGridScale : 1.5 / blankGridScale)
                   : (isActive ? 2 : 1.5);
-                const dash = outline.isClosed ? 'none'
+                const isFence = outline.type === 'fence';
+                // For fence: total length of open polyline; for closed outlines: perimeter
+                const perimeterFt = (isFence ? showDimensions && outline.points.length >= 2 : outline.isClosed && showDimensions)
+                  ? getOutlineSegmentDimensions(outline).reduce((sum, seg) => sum + seg.feet, 0)
+                  : null;
+                // For fence label position: average of all points (midpoint of polyline)
+                const fenceLabelCenter = isFence && perimeterFt !== null && outline.points.length >= 2
+                  ? {
+                      x: outline.points.reduce((s, p) => s + p.x, 0) / outline.points.length,
+                      y: outline.points.reduce((s, p) => s + p.y, 0) / outline.points.length,
+                    }
+                  : null;
+                const dash = isFence ? 'none'
+                  : outline.isClosed ? 'none'
                   : isBlankGridMode ? `${12 / blankGridScale} ${6 / blankGridScale}` : '12 6';
                 return (
                   <g key={outline.id}>
                     {outline.points.length >= 2 && (
-                      outline.points.length >= 3 ? (
+                      !isFence && outline.points.length >= 3 ? (
                         <polygon
                           points={outline.points.map(p => `${gx(p)},${gy(p)}`).join(' ')}
                           fill={outline.isClosed ? metrics.fillColor : 'none'}
@@ -1514,7 +1544,9 @@ function StepMapPlot({
                           fill="none"
                           stroke={metrics.strokeColor}
                           strokeWidth={sw}
+                          strokeDasharray={dash}
                           strokeLinejoin="round"
+                          strokeLinecap="round"
                         />
                       )
                     )}
@@ -1542,6 +1574,30 @@ function StepMapPlot({
                               {`${Math.round(metrics.areaSqFt ?? 0).toLocaleString()} sq ft`}
                             </tspan>
                           )}
+                          {perimeterFt != null && perimeterFt > 0 && (
+                            <tspan x={0} dy="16">
+                              {`~${Math.round(perimeterFt).toLocaleString()} linear ft`}
+                            </tspan>
+                          )}
+                        </text>
+                      </g>
+                    )}
+
+                    {/* Fence linear feet label */}
+                    {fenceLabelCenter && perimeterFt !== null && perimeterFt > 0 && (
+                      <g transform={isBlankGridMode
+                        ? `translate(${fenceLabelCenter.x * W}, ${fenceLabelCenter.y * H}) scale(${1 / blankGridScale})`
+                        : `translate(${fenceLabelCenter.x * W}, ${fenceLabelCenter.y * H})`}
+                      >
+                        <text
+                          x={0}
+                          y={0}
+                          textAnchor="middle"
+                          dominantBaseline="middle"
+                          className={styles.mapHomeFootprintText}
+                          style={{ fill: metrics.strokeColor }}
+                        >
+                          <tspan x={0}>{`~${Math.round(perimeterFt).toLocaleString()} linear ft`}</tspan>
                         </text>
                       </g>
                     )}
@@ -1617,7 +1673,7 @@ function StepMapPlot({
                             cy={gy(outline.points[0])}
                             r={isBlankGridMode ? 18 / blankGridScale : 18}
                             fill="none"
-                            stroke="#f97316"
+                            stroke={isFence ? '#22c55e' : '#f97316'}
                             strokeWidth={isBlankGridMode ? 2 / blankGridScale : 2}
                             className={styles.mapSnapRing}
                           />
@@ -1626,10 +1682,10 @@ function StepMapPlot({
                           cx={gx(outline.points[0])}
                           cy={gy(outline.points[0])}
                           r={isBlankGridMode
-                            ? (outline.isClosed ? 6 : outline.points.length >= 3 ? 7 : 5) / blankGridScale
-                            : (outline.isClosed ? 6 : outline.points.length >= 3 ? 7 : 5)}
+                            ? (outline.isClosed ? 6 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 7 : 5) / blankGridScale
+                            : (outline.isClosed ? 6 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 7 : 5)}
                           fill="white"
-                          stroke={outline.isClosed ? metrics.strokeColor : outline.points.length >= 3 ? '#f97316' : '#2563eb'}
+                          stroke={outline.isClosed ? metrics.strokeColor : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? (isFence ? '#22c55e' : '#f97316') : '#2563eb'}
                           strokeWidth={isBlankGridMode ? 2.5 / blankGridScale : 2.5}
                           filter="url(#nodeShadow)"
                         />
@@ -1670,14 +1726,16 @@ function StepMapPlot({
                 <button
                   key={stamp.id}
                   type="button"
-                  className={`${styles.mapStamp} ${isPestStamp || isBaitStation || isConditionStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''} ${isActiveStamp ? styles.mapStampActive : ''}`}
+                  className={`${styles.mapStamp} ${isPestStamp || isBaitStation || isConditionStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''} ${isActiveStamp ? styles.mapStampActive : ''} ${isSatelliteMode && !isActiveStamp && (isPestStamp || isBaitStation || isConditionStamp) ? styles.mapStampNoBorder : ''}`}
                   style={{
                     left: `${stamp.x * 100}%`,
                     top: `${stamp.y * 100}%`,
                     transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${stampScale})`,
                     ...(pestModalStampId && (isPestStamp || isBaitStation || isConditionStamp) ? { opacity: 1 } : {}),
-                    ...(!isActiveStamp && (isPestStamp || isBaitStation || isConditionStamp)
-                      ? { color: 'var(--blue-500, #0075de)' }
+                    ...(!isActiveStamp && isConditionStamp
+                      ? { color: 'var(--UI-Alert-500, #FD484F)' }
+                      : !isActiveStamp && (isPestStamp || isBaitStation)
+                      ? { color: stampColor ?? 'var(--blue-500, #0075de)' }
                       : !isActiveStamp && isObjectStamp
                       ? { color: '#ffffff' }
                       : !isActiveStamp
@@ -1974,6 +2032,7 @@ export interface MapPlotCanvasProps {
   onBack?: () => void;
   onNext?: () => void;
   canNext?: boolean;
+  stampColor?: string;
 }
 
 interface StaticMapProjectionContext {
@@ -2030,7 +2089,7 @@ function projectLatLngToStaticPixel(
   };
 }
 
-function ReadOnlySummary({ mapPlotData, companyId }: { mapPlotData: MapPlotData; companyId?: string }) {
+function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: MapPlotData; companyId?: string; stampColor?: string }) {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [selectedStampId, setSelectedStampId] = useState<string | null>(null);
   const previewFrameRef = useRef<HTMLDivElement>(null);
@@ -2322,8 +2381,10 @@ function ReadOnlySummary({ mapPlotData, companyId }: { mapPlotData: MapPlotData;
                         left: `${point.x}px`,
                         top: `${point.y}px`,
                         transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${readOnlyStampScale})`,
-                        ...(isPestStamp || isBaitStation || isConditionStamp
-                          ? { color: 'var(--blue-500, #0075de)' }
+                        ...(isConditionStamp
+                          ? { color: 'var(--UI-Alert-500, #FD484F)' }
+                          : isPestStamp || isBaitStation
+                          ? { color: stampColor ?? 'var(--blue-500, #0075de)' }
                           : isObjectStamp
                           ? { color: '#ffffff' }
                           : { backgroundColor: option.color, color: '#ffffff' }),
@@ -2390,9 +2451,10 @@ export function MapPlotCanvas({
   onBack,
   onNext,
   canNext = true,
+  stampColor,
 }: MapPlotCanvasProps) {
   if (isReadOnly) {
-    return <ReadOnlySummary mapPlotData={mapPlotData} companyId={companyId} />;
+    return <ReadOnlySummary mapPlotData={mapPlotData} companyId={companyId} stampColor={stampColor} />;
   }
 
   return (
@@ -2403,6 +2465,7 @@ export function MapPlotCanvas({
       onBack={onBack ?? (() => undefined)}
       onNext={onNext ?? (() => undefined)}
       canNext={canNext}
+      stampColor={stampColor}
     />
   );
 }

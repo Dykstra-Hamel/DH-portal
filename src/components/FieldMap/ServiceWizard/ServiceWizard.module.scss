@@ -107,36 +107,41 @@
 .stepTrackItem {
   display: flex;
   align-items: center;
+  gap: 6px;
   flex-shrink: 0;
 }
 
 .stepLabel {
-  font-size: 12px;
-  font-weight: 500;
-  font-family: var(--font-satoshi);
-  color: var(--gray-400);
-  white-space: nowrap;
-  padding: 3px 9px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
   border-radius: 20px;
-  transition: background 0.2s ease, color 0.2s ease;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  white-space: nowrap;
+  background: var(--gray-100);
+  color: var(--gray-400);
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .stepLabelActive {
-  background: var(--blue-500);
-  color: var(--white);
-  font-weight: 600;
+  background: var(--blue-50, #eff6ff);
+  color: var(--blue-600, #2563eb);
 }
 
 .stepLabelDone {
-  color: var(--gray-500);
+  background: var(--green-50, #f0fdf4);
+  color: var(--green-600, #16a34a);
 }
 
 .stepLine {
   width: 20px;
-  height: 1px;
+  height: 2px;
   background: var(--gray-200);
+  border-radius: 1px;
   flex-shrink: 0;
-  margin: 0 2px;
 }
 
 .stepContent {
@@ -511,6 +516,7 @@
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--gray-100);
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   flex-shrink: 0;
   background: var(--white);
@@ -518,6 +524,18 @@
   .nextBtn {
     flex-grow: 1;
   }
+}
+
+.stepSaveError {
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--error-600, #dc2626);
+  background: var(--error-50, #fef2f2);
+  border: 1px solid var(--error-200, #fecaca);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--font-satoshi);
 }
 
 .nextBtn {

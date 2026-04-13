@@ -11,9 +11,10 @@ interface MapPlotStepProps {
   onNext: () => void;
   canNext: boolean;
   companyId?: string;
+  stampColor?: string;
 }
 
-export function MapPlotStep({ address, initialData, onChange, onBack, onNext, canNext, companyId }: MapPlotStepProps) {
+export function MapPlotStep({ address, initialData, onChange, onBack, onNext, canNext, companyId, stampColor }: MapPlotStepProps) {
   const data = initialData.addressInput ? initialData : {
     ...DEFAULT_MAP_PLOT_DATA,
     addressInput: address,
@@ -28,6 +29,7 @@ export function MapPlotStep({ address, initialData, onChange, onBack, onNext, ca
       onNext={onNext}
       canNext={canNext}
       companyId={companyId}
+      stampColor={stampColor}
     />
   );
 }

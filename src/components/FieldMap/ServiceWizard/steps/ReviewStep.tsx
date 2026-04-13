@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
-import { ReadyToScheduleModal } from '@/components/Common/ReadyToScheduleModal/ReadyToScheduleModal';
 import { MapPlotData } from '@/components/FieldMap/MapPlot/types';
 import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
 import VideoLightbox from '@/components/Quote/QuoteContent/VideoLightbox';
@@ -40,6 +39,7 @@ interface BrandingData {
   logo_url: string | null;
   primary_color: string | null;
   secondary_color: string | null;
+  alternative_color_1: string | null;
   font_color: string | null;
   font_primary_name: string | null;
   font_primary_url: string | null;
@@ -47,6 +47,7 @@ interface BrandingData {
   font_secondary_url: string | null;
   company_name: string;
   company_phone: string | null;
+  quote_terms: string | null;
   quote_accent_color_preference: string | null;
 }
 
@@ -84,8 +85,11 @@ interface ReviewStepProps {
   notes: string;
   mapPlotData: MapPlotData;
   inspectorName: string;
+  inspectorAvatarUrl?: string | null;
   companyName: string;
   companyId: string;
+  leadId: string | null;
+  quoteId: string | null;
   onBack: () => void;
 }
 
@@ -102,8 +106,11 @@ export function ReviewStep({
   notes,
   mapPlotData,
   inspectorName,
+  inspectorAvatarUrl,
   companyName,
   companyId,
+  leadId,
+  quoteId,
   onBack,
 }: ReviewStepProps) {
   const router = useRouter();
@@ -126,10 +133,21 @@ export function ReviewStep({
   const [showEmailInput, setShowEmailInput] = useState(false);
   const [enteredEmail, setEnteredEmail] = useState('');
   const [showSigModal, setShowSigModal] = useState(false);
+  const [showMapView, setShowMapView] = useState(false);
+  const housePhoto = mapPlotData.housePhotos?.[0] ?? null;
   const [signedBy, setSignedBy] = useState(clientName || '');
   const [signatureData, setSignatureData] = useState<string | null>(null);
-  const [showReadyToScheduleModal, setShowReadyToScheduleModal] = useState(false);
   const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState('');
+
+  // Preferred date/time
+  const [preferredDate, setPreferredDate] = useState('');
+  const [preferredTime, setPreferredTime] = useState('');
+
+  // Terms
+  const [termsViewed, setTermsViewed] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsNudge, setTermsNudge] = useState(false);
+  const termsBodyRef = useRef<HTMLDivElement | null>(null);
   const [discountTarget, setDiscountTarget] = useState<DiscountTarget>('initial');
   const [discountAmount, setDiscountAmount] = useState<number | null>(null);
   const [discountType, setDiscountType] = useState<'$' | '%'>('$');
@@ -199,6 +217,19 @@ export function ReviewStep({
     return () => el.removeEventListener('scroll', handleScroll);
   }, [brandingLoaded, catalogLoaded]);
 
+  // ── Terms scroll-to-view ───────────────────────────────────────────────
+  useEffect(() => {
+    if (!showSigModal) return;
+    const el = termsBodyRef.current;
+    if (!el) return;
+    if (el.scrollHeight <= el.clientHeight) { setTermsViewed(true); return; }
+    const handleScroll = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) setTermsViewed(true);
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [showSigModal]);
+
   const isLoading = !brandingLoaded || !catalogLoaded;
 
   const selectedItems = quoteLineItems.filter(i => selectedItemIds.has(i.id));
@@ -255,10 +286,16 @@ export function ReviewStep({
 
   // Brand CSS vars
   const isReversed = branding?.quote_accent_color_preference === 'secondary';
+  const brandPrimary = branding ? (isReversed ? branding.secondary_color : branding.primary_color) : null;
+  const brandSecondary = branding ? (isReversed ? branding.primary_color : branding.secondary_color) : null;
   const brandingStyle: React.CSSProperties = branding ? ({
-    '--brand-primary': isReversed ? branding.secondary_color : branding.primary_color,
-    '--brand-secondary': isReversed ? branding.primary_color : branding.secondary_color,
-    '--accent-color': isReversed ? branding.secondary_color : branding.primary_color,
+    '--brand-primary': brandPrimary,
+    '--brand-secondary': brandSecondary,
+    '--accent-color': brandPrimary,
+    // Override blue-500/primary-color with the first alternative color if set,
+    // then secondary color, then leave unset so CSS falls back to blue-500
+    '--blue-500': branding.alternative_color_1 ?? brandSecondary ?? undefined,
+    '--primary-color': branding.alternative_color_1 ?? brandSecondary ?? undefined,
     '--color-text': branding.font_color ?? undefined,
     '--primary-font': branding.font_primary_name ?? undefined,
     '--secondary-font': branding.font_secondary_name ?? branding.font_primary_name ?? undefined,
@@ -266,27 +303,24 @@ export function ReviewStep({
 
   // ── API call ───────────────────────────────────────────────────────────
   const callSendQuoteApi = useCallback(async (emailOverride: string | null, sendEmail: boolean) => {
-    // Apply edited prices to all items before submitting
-    const submittedLineItems = quoteLineItems.map(item => ({
-      ...item,
-      initialCost: editedPrices[item.id]?.initialCost ?? item.initialCost,
-      recurringCost: editedPrices[item.id]?.recurringCost ?? item.recurringCost,
-    }));
     const res = await fetch('/api/field-map/send-quote', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        clientName, clientEmail: emailOverride ?? clientEmail, clientPhone,
-        address, pestTypes, quoteLineItems: submittedLineItems, notes, mapPlotData,
-        inspectorName, companyName, sendEmail,
-        discountTarget, discountAmount, discountType,
+        leadId,
+        quoteId,
         companyId,
+        sendEmail,
+        clientEmail: emailOverride ?? clientEmail,
+        clientName,
+        inspectorName,
+        companyName,
       }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error ?? 'Failed to send quote');
     return data;
-  }, [clientName, clientEmail, clientPhone, address, pestTypes, quoteLineItems, editedPrices, notes, mapPlotData, inspectorName, companyName, discountTarget, discountAmount, discountType]);
+  }, [leadId, quoteId, companyId, clientEmail, clientName, inspectorName, companyName]);
 
   async function handleSendQuote() {
     if (!clientEmail && !showEmailInput) { setShowEmailInput(true); return; }
@@ -301,35 +335,48 @@ export function ReviewStep({
     }
   }
 
-  function handleConfirmSignature() {
-    if (!signatureRef.current || signatureRef.current.isEmpty()) {
-      setErrorMsg('Customer signature is required before scheduling.'); return;
+  async function handleScheduleSubmit() {
+    if (hasTerms && !termsAccepted) {
+      setErrorMsg('You must accept the terms and conditions before scheduling.');
+      return;
     }
-    if (!signedBy.trim()) { setErrorMsg('Enter the customer name for the signature.'); return; }
-    setSignatureData(signatureRef.current.toDataURL());
+    if (!signatureRef.current || signatureRef.current.isEmpty()) {
+      setErrorMsg('Customer signature is required before scheduling.');
+      return;
+    }
+    if (!signedBy.trim()) {
+      setErrorMsg('Enter the customer name for the signature.');
+      return;
+    }
+    const sig = signatureRef.current.toDataURL();
+    setSignatureData(sig);
     setShowSigModal(false);
-    setShowReadyToScheduleModal(true);
+    void handleSchedule('later', undefined, sig, preferredDate || null, preferredTime || null);
   }
 
-  async function handleSchedule(option: 'now' | 'later' | 'someone_else', assignedTo?: string) {
+  async function handleSchedule(
+    option: 'now' | 'later' | 'someone_else',
+    assignedTo?: string,
+    sigOverride?: string,
+    prefDate?: string | null,
+    prefTime?: string | null,
+  ) {
     setActionState('scheduling');
     setErrorMsg(null);
     try {
-      // Apply edited prices to all items before submitting
-      const submittedLineItems = quoteLineItems.map(item => ({
-        ...item,
-        initialCost: editedPrices[item.id]?.initialCost ?? item.initialCost,
-        recurringCost: editedPrices[item.id]?.recurringCost ?? item.recurringCost,
-      }));
       const res = await fetch('/api/field-map/schedule', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          clientName, clientEmail, clientPhone, address, pestTypes,
-          quoteLineItems: submittedLineItems, notes, mapPlotData,
-          signatureData, signedBy, scheduleOption: option, assignedTo,
-          discountTarget, discountAmount, discountType,
+          leadId,
+          quoteId,
           companyId,
+          signatureData: sigOverride ?? signatureData,
+          signedBy,
+          scheduleOption: option,
+          assignedTo,
+          preferredDate: prefDate ?? null,
+          preferredTime: prefTime ?? null,
         }),
       });
       const data = await res.json();
@@ -346,6 +393,18 @@ export function ReviewStep({
   }
 
   const isBusy = actionState === 'sending' || actionState === 'scheduling';
+
+  // ── Terms content for unified schedule modal ───────────────────────────
+  const companyTerms = branding?.quote_terms ?? null;
+  const planTermsBlocks = quoteLineItems
+    .filter(i => i.catalogItemId && catalogDetails[i.catalogItemId]?.plan_terms)
+    .map(i => ({ name: i.catalogItemName ?? 'Plan', terms: catalogDetails[i.catalogItemId!].plan_terms as string }));
+  const addonTermsBlocks = quoteLineItems
+    .filter(i => i.catalogItemId && catalogDetails[i.catalogItemId]?.addon_terms)
+    .map(i => ({ name: i.catalogItemName ?? 'Add-on', terms: catalogDetails[i.catalogItemId!].addon_terms as string }));
+  const hasTerms = Boolean(companyTerms || planTermsBlocks.length > 0 || addonTermsBlocks.length > 0);
+
+  const todayIso = new Date().toISOString().split('T')[0];
 
   // ── Helpers for plan card content ──────────────────────────────────────
   function getPlanContent(item: QuoteLineItem) {
@@ -491,13 +550,10 @@ export function ReviewStep({
         </div>
 
         {/* ── Hero ── */}
-        <section className={qcStyles.heroSection}>
+        <section className={`${qcStyles.heroSection} ${styles.heroSectionCompact}`}>
           <div className={qcStyles.heroContainer}>
-            <div className={qcStyles.heroContent}>
+            <div className={`${qcStyles.heroContent} ${styles.heroContentCentered}`}>
               <h1 className={qcStyles.heroTitle}>Your Quote Is Ready, {firstName}</h1>
-              <p className={qcStyles.heroSubtitle}>
-                Inspected at <strong>{address}</strong> by {inspectorName}.
-              </p>
               {pestTypes.length > 0 && (
                 <div className={styles.heroPests}>
                   <p className={styles.heroPestsLabel}>Pests identified</p>
@@ -510,9 +566,75 @@ export function ReviewStep({
                   </div>
                 </div>
               )}
+              {/* Inspector + address card */}
+              <div className={styles.inspectorCard}>
+                <div className={styles.inspectorInfo}>
+                  {inspectorAvatarUrl && (
+                    <Image
+                      src={inspectorAvatarUrl}
+                      alt={inspectorName}
+                      width={57}
+                      height={57}
+                      className={styles.inspectorAvatar}
+                    />
+                  )}
+                  <div className={styles.inspectorText}>
+                    <p className={styles.inspectorName}>{inspectorName}</p>
+                    <p className={styles.inspectorTitle}>Lead Sales Inspector</p>
+                  </div>
+                </div>
+                <div className={styles.inspectorSeparator} />
+                <div className={styles.inspectorAddress}>
+                  <p className={styles.inspectorAddressLabel}>Inspection<span className={styles.addressLabelBreak}><br /></span> Address:</p>
+                  <div className={styles.inspectorAddressSeparator} />
+                  <p className={styles.inspectorAddressValue}>
+                    {(() => {
+                      const comma = address.indexOf(',');
+                      if (comma === -1) return address;
+                      return <>{address.slice(0, comma)}<br />{address.slice(comma + 1).trim()}</>;
+                    })()}
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className={`${qcStyles.heroImage} ${styles.heroMapWrap}`}>
-              <MapPlotCanvas mapPlotData={mapPlotData} onChange={() => {}} isReadOnly companyId={companyId} />
+            <div className={`${qcStyles.heroImage} ${styles.heroMapWrap}`} style={{ '--blue-500': '#3b82f6', '--primary-color': '#3b82f6' } as React.CSSProperties}>
+              {/* Map layer — stays in normal flow so it drives container height */}
+              <div className={styles.heroMapLayer} style={{ opacity: (showMapView || !housePhoto) ? 1 : 0 }}>
+                <MapPlotCanvas mapPlotData={mapPlotData} onChange={() => {}} isReadOnly companyId={companyId} stampColor={brandPrimary ?? undefined} />
+              </div>
+              {/* House photo — absolutely overlaid, crossfades over the map */}
+              {housePhoto && (
+                <div className={`${styles.heroPhotoLayer} ${!showMapView ? styles.heroPhotoLayerVisible : ''}`}>
+                  <Image src={housePhoto} alt="House photo" fill style={{ objectFit: 'cover' }} sizes="(max-width: 768px) 100vw, 50vw" />
+                </div>
+              )}
+              {/* "Switch To Pest Findings Map" — shown in photo view */}
+              {housePhoto && !showMapView && (
+                <button
+                  type="button"
+                  className={styles.heroViewToggleBtn}
+                  style={{ color: brandPrimary ?? '#1D3D7C' }}
+                  onClick={() => setShowMapView(true)}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 22 22" fill="none">
+                    <path d="M21 11C21 16.5228 16.5228 21 11 21M21 11C21 5.47715 16.5228 1 11 1M21 11H17M11 21C5.47715 21 1 16.5228 1 11M11 21V17M1 11C1 5.47715 5.47715 1 11 1M1 11H5M11 1V5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                  Switch To Pest Findings Map
+                </button>
+              )}
+              {/* "Close Map" — shown in map view, top-right */}
+              {housePhoto && showMapView && (
+                <button
+                  type="button"
+                  className={styles.heroCloseMapBtn}
+                  onClick={() => setShowMapView(false)}
+                >
+                  Close Map
+                  <svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 36 36" fill="none">
+                    <path d="M23.1 12.9L12.9 23.1M12.9 12.9L23.1 23.1M35 18C35 27.3888 27.3888 35 18 35C8.61116 35 1 27.3888 1 18C1 8.61116 8.61116 1 18 1C27.3888 1 35 8.61116 35 18Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -829,33 +951,38 @@ export function ReviewStep({
                             {isEditing ? (
                               <span className={styles.priceEditGroup}>
                                 {(item.recurringCost ?? 0) > 0 && (
-                                  <span className={styles.priceEditField}>
-                                    <span className={styles.priceEditPrefix}>$</span>
-                                    <input
-                                      type="number"
-                                      inputMode="decimal"
-                                      min="0"
-                                      step="0.01"
-                                      className={styles.priceEditInput}
-                                      value={effRecurring}
-                                      onChange={e => handleEditPrice(item.id, 'recurringCost', e.target.value)}
-                                    />
-                                    <span className={styles.priceEditSuffix}>/{abbreviateFrequency(item.frequency)}</span>
+                                  <span className={styles.priceEditCol}>
+                                    <span className={styles.priceEditColLabel}>Recurring</span>
+                                    <span className={styles.priceEditField}>
+                                      <span className={styles.priceEditPrefix}>$</span>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min="0"
+                                        step="0.01"
+                                        className={styles.priceEditInput}
+                                        value={effRecurring}
+                                        onChange={e => handleEditPrice(item.id, 'recurringCost', e.target.value)}
+                                      />
+                                      <span className={styles.priceEditSuffix}>/{abbreviateFrequency(item.frequency)}</span>
+                                    </span>
                                   </span>
                                 )}
                                 {(item.initialCost ?? 0) > 0 && (
-                                  <span className={styles.priceEditField}>
-                                    <span className={styles.priceEditPrefix}>$</span>
-                                    <input
-                                      type="number"
-                                      inputMode="decimal"
-                                      min="0"
-                                      step="0.01"
-                                      className={styles.priceEditInput}
-                                      value={effInitial}
-                                      onChange={e => handleEditPrice(item.id, 'initialCost', e.target.value)}
-                                    />
-                                    <span className={styles.priceEditSuffix}> init</span>
+                                  <span className={styles.priceEditCol}>
+                                    <span className={styles.priceEditColLabel}>Initial</span>
+                                    <span className={styles.priceEditField}>
+                                      <span className={styles.priceEditPrefix}>$</span>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min="0"
+                                        step="0.01"
+                                        className={styles.priceEditInput}
+                                        value={effInitial}
+                                        onChange={e => handleEditPrice(item.id, 'initialCost', e.target.value)}
+                                      />
+                                    </span>
                                   </span>
                                 )}
                               </span>
@@ -868,7 +995,7 @@ export function ReviewStep({
                                   </span>
                                 )}
                                 {effRecurring > 0 && effInitial > 0 && (
-                                  <span className={qcStyles.totalItemPriceRecurring}>&nbsp;/&nbsp;</span>
+                                  <span className={qcStyles.totalItemPriceRecurring}>&nbsp;&middot;&nbsp;</span>
                                 )}
                                 {effInitial > 0 && (
                                   <span className={qcStyles.totalItemPriceInitial}>
@@ -904,33 +1031,38 @@ export function ReviewStep({
                             {isEditing ? (
                               <span className={styles.priceEditGroup}>
                                 {(item.recurringCost ?? 0) > 0 && (
-                                  <span className={styles.priceEditField}>
-                                    <span className={styles.priceEditPrefix}>$</span>
-                                    <input
-                                      type="number"
-                                      inputMode="decimal"
-                                      min="0"
-                                      step="0.01"
-                                      className={styles.priceEditInput}
-                                      value={effRecurring}
-                                      onChange={e => handleEditPrice(item.id, 'recurringCost', e.target.value)}
-                                    />
-                                    <span className={styles.priceEditSuffix}>/{abbreviateFrequency(item.frequency)}</span>
+                                  <span className={styles.priceEditCol}>
+                                    <span className={styles.priceEditColLabel}>Recurring</span>
+                                    <span className={styles.priceEditField}>
+                                      <span className={styles.priceEditPrefix}>$</span>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min="0"
+                                        step="0.01"
+                                        className={styles.priceEditInput}
+                                        value={effRecurring}
+                                        onChange={e => handleEditPrice(item.id, 'recurringCost', e.target.value)}
+                                      />
+                                      <span className={styles.priceEditSuffix}>/{abbreviateFrequency(item.frequency)}</span>
+                                    </span>
                                   </span>
                                 )}
                                 {(item.initialCost ?? 0) > 0 && (
-                                  <span className={styles.priceEditField}>
-                                    <span className={styles.priceEditPrefix}>$</span>
-                                    <input
-                                      type="number"
-                                      inputMode="decimal"
-                                      min="0"
-                                      step="0.01"
-                                      className={styles.priceEditInput}
-                                      value={effInitial}
-                                      onChange={e => handleEditPrice(item.id, 'initialCost', e.target.value)}
-                                    />
-                                    <span className={styles.priceEditSuffix}> init</span>
+                                  <span className={styles.priceEditCol}>
+                                    <span className={styles.priceEditColLabel}>Initial</span>
+                                    <span className={styles.priceEditField}>
+                                      <span className={styles.priceEditPrefix}>$</span>
+                                      <input
+                                        type="number"
+                                        inputMode="decimal"
+                                        min="0"
+                                        step="0.01"
+                                        className={styles.priceEditInput}
+                                        value={effInitial}
+                                        onChange={e => handleEditPrice(item.id, 'initialCost', e.target.value)}
+                                      />
+                                    </span>
                                   </span>
                                 )}
                               </span>
@@ -943,7 +1075,7 @@ export function ReviewStep({
                                   </span>
                                 )}
                                 {effRecurring > 0 && effInitial > 0 && (
-                                  <span className={qcStyles.totalItemPriceRecurring}>&nbsp;/&nbsp;</span>
+                                  <span className={qcStyles.totalItemPriceRecurring}>&nbsp;&middot;&nbsp;</span>
                                 )}
                                 {effInitial > 0 && (
                                   <span className={qcStyles.totalItemPriceInitial}>
@@ -1042,7 +1174,7 @@ export function ReviewStep({
             <div className={qcStyles.faqsSection}>
               {faqSources.length === 1 ? (
                 <>
-                  <h2 className={qcStyles.faqsTitle}>Frequently Asked Questions</h2>
+                  <h2 className={`${qcStyles.faqsTitle} ${styles.faqsTitleOverride}`}>Frequently Asked Questions</h2>
                   <div className={qcStyles.faqsContainer}>
                     {getFaqsForItem(faqSources[0]).map((faq: { question: string; answer: string }, fi: number) => (
                       <FaqItem key={fi} faq={faq} />
@@ -1051,7 +1183,7 @@ export function ReviewStep({
                 </>
               ) : (
                 <>
-                  <h2 className={qcStyles.faqsTitle}>Frequently Asked Questions</h2>
+                  <h2 className={`${qcStyles.faqsTitle} ${styles.faqsTitleOverride}`}>Frequently Asked Questions</h2>
                   <div className={qcStyles.faqDropdownContainer}>
                     <label htmlFor="rv-faq-select" className={qcStyles.faqDropdownLabel}>Choose A Plan To View FAQs:</label>
                     <select id="rv-faq-select" className={qcStyles.faqDropdown} value={clampedFaqTab} onChange={e => setActiveFaqTab(Number(e.target.value))}>
@@ -1117,7 +1249,16 @@ export function ReviewStep({
         {/* ── Sticky action bar ── */}
         <div className={styles.stickyActions}>
           <div className={styles.stickyActionsInner}>
-            <button type="button" className={styles.sendBtn} onClick={() => { setErrorMsg(null); setShowSigModal(true); }} disabled={isBusy || !companyId}>
+            <button type="button" className={styles.sendBtn} onClick={() => {
+              setErrorMsg(null);
+              setTermsViewed(false);
+              setTermsAccepted(false);
+              setTermsNudge(false);
+              setPreferredDate('');
+              setPreferredTime('');
+              signatureRef.current?.clear();
+              setShowSigModal(true);
+            }} disabled={isBusy || !companyId}>
               {actionState === 'scheduling' ? 'Scheduling…' : 'Schedule Service'}
             </button>
             <button type="button" className={styles.scheduleBtn} onClick={handleSendQuote} disabled={isBusy}>
@@ -1132,38 +1273,131 @@ export function ReviewStep({
         <VideoLightbox videoUrl={videoLightboxUrl} onClose={() => setVideoLightboxUrl(null)} />
       )}
 
-      {/* Signature modal */}
+      {/* Unified Schedule Service modal */}
       {showSigModal && (
         <div className={styles.sigOverlay} onClick={e => { if (e.target === e.currentTarget) setShowSigModal(false); }}>
           <div className={styles.sigSheet}>
-            <h3 className={styles.sigTitle}>Customer Signature</h3>
-            <p className={styles.sigSub}>Review the details above and sign to proceed with scheduling.</p>
-            <div>
-              <label className={styles.sigLabel} htmlFor="review-sig-name">Customer Name</label>
-              <input id="review-sig-name" type="text" className={styles.sigNameInput} value={signedBy} onChange={e => setSignedBy(e.target.value)} placeholder="Full name" />
+
+            {/* Header */}
+            <div className={styles.sigHeader}>
+              <h3 className={styles.sigTitle}>Schedule Service</h3>
+              <button type="button" className={styles.sigCloseBtn} onClick={() => setShowSigModal(false)} aria-label="Close">&#215;</button>
             </div>
-            <div>
-              <label className={styles.sigLabel}>Signature</label>
-              <div className={styles.sigCanvasWrap}>
-                <SignatureCanvas ref={signatureRef} canvasProps={{ width: 640, height: 160, style: { width: '100%', height: 160, display: 'block' } }} backgroundColor="white" />
+
+            {/* Section 1: Preferred date & time */}
+            <div className={styles.sigSection}>
+              <p className={styles.sigSectionLabel}>Preferred Date &amp; Time</p>
+              <div className={styles.sigDateRow}>
+                <input
+                  type="date"
+                  className={styles.sigDateInput}
+                  min={todayIso}
+                  value={preferredDate}
+                  onChange={e => setPreferredDate(e.target.value)}
+                />
+                <select
+                  className={styles.sigTimeSelect}
+                  value={preferredTime}
+                  onChange={e => setPreferredTime(e.target.value)}
+                >
+                  <option value="">No preference</option>
+                  <option value="morning">Morning (8am&ndash;12pm)</option>
+                  <option value="afternoon">Afternoon (12pm&ndash;5pm)</option>
+                  <option value="evening">Evening (5pm&ndash;8pm)</option>
+                  <option value="anytime">Anytime</option>
+                </select>
               </div>
-              <button type="button" className={styles.sigClear} onClick={() => signatureRef.current?.clear()}>Clear signature</button>
-              <p className={styles.sigDate}>Date: {todayLabel}</p>
             </div>
+
+            {/* Section 2: Terms & Conditions */}
+            {hasTerms && (
+              <div className={styles.sigSection}>
+                <p className={styles.sigSectionLabel}>Terms &amp; Conditions</p>
+                <div className={styles.termsBody} ref={termsBodyRef}>
+                  {companyTerms && <div dangerouslySetInnerHTML={{ __html: companyTerms }} />}
+                  {planTermsBlocks.map((b, i) => (
+                    <div key={`plan-t-${i}`} className={styles.specificTermsBlock}>
+                      <h4>{b.name} &mdash; Terms and Conditions</h4>
+                      <div dangerouslySetInnerHTML={{ __html: b.terms }} />
+                    </div>
+                  ))}
+                  {addonTermsBlocks.map((b, i) => (
+                    <div key={`addon-t-${i}`} className={styles.specificTermsBlock}>
+                      <h4>{b.name} &mdash; Terms and Conditions</h4>
+                      <div dangerouslySetInnerHTML={{ __html: b.terms }} />
+                    </div>
+                  ))}
+                </div>
+                <div
+                  className={styles.termsCheckRow}
+                  onClick={() => {
+                    if (!termsViewed) {
+                      setTermsNudge(true);
+                      setTimeout(() => setTermsNudge(false), 2000);
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    id="sched-terms"
+                    checked={termsAccepted}
+                    disabled={!termsViewed}
+                    onChange={e => { if (termsViewed) setTermsAccepted(e.target.checked); }}
+                  />
+                  <label htmlFor="sched-terms">
+                    I have read and accept the terms and conditions
+                    {!termsViewed && termsNudge && (
+                      <span className={styles.termsHint}> &mdash; Scroll to the bottom first</span>
+                    )}
+                  </label>
+                  {termsViewed && <span className={styles.viewedBadge}>&#10003; Viewed</span>}
+                </div>
+              </div>
+            )}
+
+            {/* Section 3: Signature */}
+            <div className={styles.sigSection}>
+              <p className={styles.sigSectionLabel}>Customer Signature</p>
+              <div>
+                <label className={styles.sigLabel} htmlFor="review-sig-name">Customer Name</label>
+                <input
+                  id="review-sig-name"
+                  type="text"
+                  className={styles.sigNameInput}
+                  value={signedBy}
+                  onChange={e => setSignedBy(e.target.value)}
+                  placeholder="Full name"
+                />
+              </div>
+              <div>
+                <div className={styles.sigCanvasWrap}>
+                  <SignatureCanvas
+                    ref={signatureRef}
+                    canvasProps={{ width: 640, height: 160, style: { width: '100%', height: 160, display: 'block' } }}
+                    backgroundColor="white"
+                  />
+                </div>
+                <button type="button" className={styles.sigClear} onClick={() => signatureRef.current?.clear()}>Clear signature</button>
+                <p className={styles.sigDate}>Date: {todayLabel}</p>
+              </div>
+            </div>
+
+            {/* Error + footer */}
+            {errorMsg && <p className={styles.sigError}>{errorMsg}</p>}
             <div className={styles.sigFooter}>
               <button type="button" className={styles.sigCancelBtn} onClick={() => setShowSigModal(false)}>Cancel</button>
-              <button type="button" className={styles.sigConfirmBtn} onClick={handleConfirmSignature}>Continue</button>
+              <button
+                type="button"
+                className={styles.sigConfirmBtn}
+                onClick={handleScheduleSubmit}
+                disabled={isBusy || (hasTerms && !termsAccepted)}
+              >
+                {isBusy ? 'Scheduling\u2026' : 'Schedule Service'}
+              </button>
             </div>
           </div>
         </div>
       )}
-
-      <ReadyToScheduleModal
-        isOpen={showReadyToScheduleModal}
-        onClose={() => setShowReadyToScheduleModal(false)}
-        onSubmit={(option, assignedTo) => { void handleSchedule(option, assignedTo); }}
-        companyId={companyId}
-      />
     </>
   );
 }

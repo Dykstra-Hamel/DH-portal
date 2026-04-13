@@ -5,6 +5,10 @@ import { getOAuthToken } from '@/lib/pestpac-auth';
 
 const PESTPAC_BASE_URL = 'https://api.workwave.com/pestpac/v1';
 
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 async function fetchWithPathFallback(
   paths: string[],
   headers: Record<string, string>,
@@ -255,14 +259,14 @@ export async function GET(
           client.BillToName ?? client.billToName ??
           client.CompanyName ?? client.companyName ??
           `${client.FirstName ?? client.firstName ?? ''} ${client.LastName ?? client.lastName ?? ''}`.trim();
-        if (fromClient) return fromClient;
+        if (fromClient) return toTitleCase(fromClient);
 
         const fromStop =
           stop.BillToName ?? stop.billToName ??
           stop.ClientName ?? stop.clientName ??
           stop.Company ?? stop.company ??
           `${stop.FirstName ?? stop.firstName ?? ''} ${stop.LastName ?? stop.lastName ?? ''}`.trim();
-        return fromStop || null;
+        return fromStop ? toTitleCase(fromStop) : null;
       })(),
       clientEmail: client.email ?? client.Email ?? stop.email ?? stop.Email ?? '',
       clientPhone:

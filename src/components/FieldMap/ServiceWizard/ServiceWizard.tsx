@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { Check } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -23,7 +24,7 @@ interface ServiceWizardProps {
 export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { profile } = useUser();
+  const { profile, getAvatarUrl } = useUser();
   const { selectedCompany } = useCompany();
 
   const clientName = searchParams.get('clientName') ?? '';
@@ -35,6 +36,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const hasPrefilledAddress = Boolean(stopId && address);
 
   const inspectorName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Inspector';
+  const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
   const [currentStep, setCurrentStep] = useState(() => (hasPrefilledAddress ? 1 : 0));
@@ -43,6 +45,22 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     addressInput: address,
   }));
   const [isGeocoding, setIsGeocoding] = useState(hasPrefilledAddress);
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState<string | undefined>(undefined);
+
+  // Fetch brand primary color for stamp icons
+  useEffect(() => {
+    const companyId = selectedCompany?.id;
+    if (!companyId) return;
+    fetch(`/api/companies/${companyId}/field-map-branding`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { primary_color?: string | null; quote_accent_color_preference?: string | null; secondary_color?: string | null } | null) => {
+        if (!data) return;
+        const isReversed = data.quote_accent_color_preference === 'secondary';
+        const primary = isReversed ? data.secondary_color : data.primary_color;
+        if (primary) setBrandPrimaryColor(primary);
+      })
+      .catch(() => {});
+  }, [selectedCompany?.id]);
 
   // When skipping the address step, geocode the pre-filled address to get coordinates
   useEffect(() => {
@@ -69,6 +87,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] = useState(false);
+  const [leadId, setLeadId] = useState<string | null>(null);
+  const [quoteId, setQuoteId] = useState<string | null>(null);
+  const [isSavingStep, setIsSavingStep] = useState(false);
+  const [stepSaveError, setStepSaveError] = useState<string | null>(null);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents && typeof mapPlotData.addressComponents.formatted_address === 'string'
@@ -100,12 +122,80 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     }
   }
 
-  function handleNext() {
-    if (currentStep === 2 && returnToReviewAfterMapEdit) {
-      setCurrentStep(4);
-      setReturnToReviewAfterMapEdit(false);
+  async function handleNext() {
+    setStepSaveError(null);
+
+    // After Map step — save inspection (creates/updates lead)
+    if (currentStep === 2) {
+      setIsSavingStep(true);
+      try {
+        const res = await fetch('/api/field-map/save-inspection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName,
+            clientEmail,
+            clientPhone,
+            address: inspectionAddress,
+            pestTypes,
+            mapPlotData,
+            companyId: selectedCompany?.id ?? '',
+            leadId: leadId ?? undefined,
+            stopId: stopId ?? undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Failed to save inspection');
+        setLeadId(data.leadId);
+      } catch (err) {
+        setStepSaveError(err instanceof Error ? err.message : 'Failed to save inspection');
+        setIsSavingStep(false);
+        return;
+      }
+      setIsSavingStep(false);
+
+      if (returnToReviewAfterMapEdit) {
+        setCurrentStep(4);
+        setReturnToReviewAfterMapEdit(false);
+        return;
+      }
+      setCurrentStep(s => s + 1);
       return;
     }
+
+    // After Quote step — save quote (creates/updates quote + line items)
+    if (currentStep === 3) {
+      if (!leadId) {
+        setStepSaveError('No lead found. Please go back to the map step.');
+        return;
+      }
+      setIsSavingStep(true);
+      try {
+        const res = await fetch('/api/field-map/save-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leadId,
+            companyId: selectedCompany?.id ?? '',
+            quoteLineItems,
+            discountTarget: 'initial',
+            discountAmount: null,
+            discountType: '$',
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Failed to save quote');
+        setQuoteId(data.quoteId);
+      } catch (err) {
+        setStepSaveError(err instanceof Error ? err.message : 'Failed to save quote');
+        setIsSavingStep(false);
+        return;
+      }
+      setIsSavingStep(false);
+      setCurrentStep(s => s + 1);
+      return;
+    }
+
     if (currentStep < STEP_COUNT - 1) setCurrentStep(s => s + 1);
   }
 
@@ -181,8 +271,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             notes={notes}
             mapPlotData={mapPlotData}
             inspectorName={inspectorName}
+            inspectorAvatarUrl={inspectorAvatarUrl}
             companyName={companyName}
             companyId={selectedCompany?.id ?? ''}
+            leadId={leadId}
+            quoteId={quoteId}
             onBack={handleBack}
           />
         );
@@ -224,12 +317,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           <div className={styles.stepTrack}>
             {STEP_LABELS.map((label, i) => (
               <div key={i} className={styles.stepTrackItem}>
-                <span
+                {i > 0 && <div className={styles.stepLine} />}
+                <div
                   className={`${styles.stepLabel} ${i === currentStep ? styles.stepLabelActive : i < currentStep ? styles.stepLabelDone : ''}`}
                 >
+                  {i < currentStep && <Check size={11} strokeWidth={2.5} />}
                   {label}
-                </span>
-                {i < STEP_COUNT - 1 && <div className={styles.stepLine} />}
+                </div>
               </div>
             ))}
           </div>
@@ -268,11 +362,15 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       {/* Footer — hidden on map step (toolbar is inside canvas) and finalize step */}
       {currentStep !== 0 && currentStep !== 2 && !isLastStep && (
         <div className={styles.footer}>
+          {stepSaveError && (
+            <p className={styles.stepSaveError}>{stepSaveError}</p>
+          )}
           <button
             type="button"
             className={styles.prevBtn}
             onClick={handleBack}
             aria-label="Previous step"
+            disabled={isSavingStep}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -282,9 +380,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             type="button"
             className={styles.nextBtn}
             onClick={handleNext}
-            disabled={!canAdvance()}
+            disabled={!canAdvance() || isSavingStep}
           >
-            {isLastStep ? 'Finish' : 'Continue'}
+            {isSavingStep ? 'Saving\u2026' : isLastStep ? 'Finish' : 'Continue'}
           </button>
         </div>
       )}
