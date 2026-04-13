@@ -46,10 +46,10 @@ export function FieldOpsNav() {
   };
 
   const thirdHref = isInspector
-    ? '/field-ops/field-map/history'
+    ? '/field-ops/my-tasks'
     : '/field-ops/tech-leads/opportunities';
 
-  const thirdLabel = isInspector ? 'History' : 'My Opps';
+  const thirdLabel = isInspector ? 'Tasks' : 'My Opps';
 
   return (
     <>

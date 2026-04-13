@@ -1,18 +1,25 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import {
-  UserPlus,
-  TrendingUp,
-  ChevronDown,
-  X,
-} from 'lucide-react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from 'react';
+import { UserPlus, TrendingUp, ChevronDown, X } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWizard } from '@/contexts/WizardContext';
-import { useRecentTechLeadCustomers, type RecentCustomer } from '@/hooks/useRecentTechLeadCustomers';
-import { AddressAutocomplete, type AddressComponents } from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
+import {
+  useRecentTechLeadCustomers,
+  type RecentCustomer,
+} from '@/hooks/useRecentTechLeadCustomers';
+import {
+  AddressAutocomplete,
+  type AddressComponents,
+} from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
 import { createClient } from '@/lib/supabase/client';
 import styles from './NewOpportunityWizard.module.scss';
 
@@ -35,16 +42,15 @@ type StepId =
 const STEP_ID_LABELS: Record<StepId, string> = {
   'type-select': 'Type',
   'map-address': 'Address',
-  'photos': 'Photos',
+  photos: 'Photos',
   'ai-review': 'Review',
   'new-customer': 'Customer',
   'select-site': 'Site',
   'service-plan-select': 'Plan',
   'service-details': 'Services',
-  'review': 'Review',
+  review: 'Review',
   'service-today-confirm': 'Confirm',
 };
-
 
 interface NewCustomerForm {
   firstName: string;
@@ -61,7 +67,12 @@ interface PestPacClientResult {
   lastName: string | null;
   phone: string | null;
   email: string | null;
-  primaryAddress: { street: string; city: string; state: string; zip: string } | null;
+  primaryAddress: {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+  } | null;
 }
 
 interface PhotoPreview {
@@ -131,7 +142,9 @@ const OTHER_PEST_OPTION_VALUE = '__other__';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fileToBase64(file: File): Promise<{ base64: string; dataUrl: string; mimeType: string }> {
+function fileToBase64(
+  file: File
+): Promise<{ base64: string; dataUrl: string; mimeType: string }> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => {
@@ -144,10 +157,11 @@ function fileToBase64(file: File): Promise<{ base64: string; dataUrl: string; mi
   });
 }
 
-
 function getCustomerDisplayName(c: CustomerResult): string {
   const parts = [c.first_name, c.last_name].filter(Boolean);
-  return parts.length > 0 ? parts.join(' ') : c.email ?? `Customer #${c.id.slice(0, 8)}`;
+  return parts.length > 0
+    ? parts.join(' ')
+    : (c.email ?? `Customer #${c.id.slice(0, 8)}`);
 }
 
 function getPrimaryAddress(c: CustomerResult): ServiceAddress | null {
@@ -186,12 +200,27 @@ function getOptionKeywords(option: PestOption): Set<string> {
       .filter(Boolean)
   );
 
-  if (tokens.has('rodent') || tokens.has('rodents') || tokens.has('rat') || tokens.has('rats') || tokens.has('mouse') || tokens.has('mice')) {
-    ['rodent', 'rodents', 'rat', 'rats', 'mouse', 'mice'].forEach(token => tokens.add(token));
+  if (
+    tokens.has('rodent') ||
+    tokens.has('rodents') ||
+    tokens.has('rat') ||
+    tokens.has('rats') ||
+    tokens.has('mouse') ||
+    tokens.has('mice')
+  ) {
+    ['rodent', 'rodents', 'rat', 'rats', 'mouse', 'mice'].forEach(token =>
+      tokens.add(token)
+    );
   }
 
-  if (tokens.has('cockroach') || tokens.has('cockroaches') || tokens.has('roaches')) {
-    ['roach', 'roaches', 'cockroach', 'cockroaches'].forEach(token => tokens.add(token));
+  if (
+    tokens.has('cockroach') ||
+    tokens.has('cockroaches') ||
+    tokens.has('roaches')
+  ) {
+    ['roach', 'roaches', 'cockroach', 'cockroaches'].forEach(token =>
+      tokens.add(token)
+    );
   }
 
   if (tokens.has('termite') || tokens.has('termites')) {
@@ -203,7 +232,9 @@ function getOptionKeywords(option: PestOption): Set<string> {
   }
 
   if (tokens.has('bed') || tokens.has('bug') || tokens.has('bugs')) {
-    ['bedbug', 'bedbugs', 'bed', 'bug', 'bugs'].forEach(token => tokens.add(token));
+    ['bedbug', 'bedbugs', 'bed', 'bug', 'bugs'].forEach(token =>
+      tokens.add(token)
+    );
   }
 
   if (tokens.has('ant') || tokens.has('ants')) {
@@ -222,14 +253,22 @@ function getOptionKeywords(option: PestOption): Set<string> {
     ['tick', 'ticks'].forEach(token => tokens.add(token));
   }
 
-  if (tokens.has('wasp') || tokens.has('wasps') || tokens.has('hornet') || tokens.has('hornets')) {
+  if (
+    tokens.has('wasp') ||
+    tokens.has('wasps') ||
+    tokens.has('hornet') ||
+    tokens.has('hornets')
+  ) {
     ['wasp', 'wasps', 'hornet', 'hornets'].forEach(token => tokens.add(token));
   }
 
   return tokens;
 }
 
-function findBestPestMatch(aiResult: AIResult, pestOptions: PestOption[]): PestOption | null {
+function findBestPestMatch(
+  aiResult: AIResult,
+  pestOptions: PestOption[]
+): PestOption | null {
   if (pestOptions.length === 0) return null;
 
   const candidateText = normalizeForMatching(
@@ -248,12 +287,28 @@ function findBestPestMatch(aiResult: AIResult, pestOptions: PestOption[]): PestO
   const rawTokens = new Set(candidateText.split(' ').filter(Boolean));
 
   // Expand rodent-family synonyms in both directions so "rodents" matches "Mice & Rats" options
-  if (rawTokens.has('rodent') || rawTokens.has('rodents') || rawTokens.has('rat') || rawTokens.has('rats') || rawTokens.has('mouse') || rawTokens.has('mice')) {
-    ['rodent', 'rodents', 'rat', 'rats', 'mouse', 'mice'].forEach(t => rawTokens.add(t));
+  if (
+    rawTokens.has('rodent') ||
+    rawTokens.has('rodents') ||
+    rawTokens.has('rat') ||
+    rawTokens.has('rats') ||
+    rawTokens.has('mouse') ||
+    rawTokens.has('mice')
+  ) {
+    ['rodent', 'rodents', 'rat', 'rats', 'mouse', 'mice'].forEach(t =>
+      rawTokens.add(t)
+    );
   }
   // Expand cockroach synonyms
-  if (rawTokens.has('roach') || rawTokens.has('roaches') || rawTokens.has('cockroach') || rawTokens.has('cockroaches')) {
-    ['roach', 'roaches', 'cockroach', 'cockroaches'].forEach(t => rawTokens.add(t));
+  if (
+    rawTokens.has('roach') ||
+    rawTokens.has('roaches') ||
+    rawTokens.has('cockroach') ||
+    rawTokens.has('cockroaches')
+  ) {
+    ['roach', 'roaches', 'cockroach', 'cockroaches'].forEach(t =>
+      rawTokens.add(t)
+    );
   }
 
   const candidateTokens = rawTokens;
@@ -291,51 +346,96 @@ function findBestPestMatch(aiResult: AIResult, pestOptions: PestOption[]): PestO
 
 // ─── Step components ──────────────────────────────────────────────────────────
 
-function StepTypeSelect({
-  onSelect,
-}: {
-  onSelect: (type: LeadType) => void;
-}) {
+function StepTypeSelect({ onSelect }: { onSelect: (type: LeadType) => void }) {
   return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Select Opportunity Type</h2>
       <p className={styles.stepDesc}>What kind of opportunity did you find?</p>
       <div className={styles.typeCards}>
-        <button className={styles.typeCard} onClick={() => onSelect('new-lead')}>
-          <span className={styles.typeCardIcon}><UserPlus size={32} strokeWidth={1.5} /></span>
+        <button
+          className={styles.typeCard}
+          onClick={() => onSelect('new-lead')}
+        >
+          <span className={styles.typeCardIcon}>
+            <UserPlus size={32} strokeWidth={1.5} />
+          </span>
           <span className={styles.typeCardLabel}>New Lead</span>
           <span className={styles.typeCardSub}>New customer opportunity</span>
         </button>
         <button className={styles.typeCard} onClick={() => onSelect('upsell')}>
-          <span className={styles.typeCardIcon}><TrendingUp size={32} strokeWidth={1.5} /></span>
+          <span className={styles.typeCardIcon}>
+            <TrendingUp size={32} strokeWidth={1.5} />
+          </span>
           <span className={styles.typeCardLabel}>Upsell Opportunity</span>
-          <span className={styles.typeCardSub}>Additional service for existing customer</span>
+          <span className={styles.typeCardSub}>
+            Additional service for existing customer
+          </span>
         </button>
         <div className={styles.typeCardDisabled}>
           <span className={styles.typeCardIcon}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="33" viewBox="0 0 83 85" fill="none">
-              <path d="M61.908 1.14612C61.7742 1.39088 61.5582 1.67482 61.2714 1.9855C61.0086 2.29524 60.6999 2.65469 60.308 3.0294C60.1358 3.20462 59.9563 3.3826 59.7719 3.56548L59.7708 3.56657L59.7697 3.56768C59.5484 3.7871 59.3198 4.01382 59.0882 4.25106C58.6504 4.67548 58.1802 5.185 57.7357 5.7414C57.2923 6.3217 56.9388 7.05409 56.7278 7.7569C56.5054 8.47214 56.3546 9.18454 56.2154 9.88451C56.05 10.6919 55.8892 11.4945 55.7321 12.2778C55.4525 13.6727 55.1851 15.0066 54.9267 16.1976C55.4373 16.0936 55.9375 16.0259 56.4406 16.03C56.6609 14.8547 56.8866 13.5548 57.1179 12.2223L57.1183 12.2199C57.2383 11.5289 57.3597 10.8293 57.4827 10.1337L57.4865 10.1124C57.7387 8.69759 57.9736 7.37979 58.6983 6.44567C59.0729 5.93993 59.4734 5.48106 59.8987 5.04516C60.3117 4.59778 60.7256 4.1743 61.0936 3.80053C61.4616 3.42677 61.8047 3.03004 62.0895 2.67154C62.3992 2.336 62.6257 2.01573 62.7805 1.6983C63.1159 1.1103 63.306 0.77949 63.306 0.77949C63.4398 0.534728 63.3555 0.226755 63.122 0.0803368C62.8761 -0.0775624 62.5682 0.00646156 62.4105 0.25217L62.3303 0.339161C62.3303 0.339161 62.1745 0.632688 61.8716 1.13559L61.908 1.14612Z" fill="currentColor"/>
-              <path d="M44.1292 8.87799L38.7822 21.7096L38.6513 22.0261L40.6944 31.3684L41.05 30.9831C41.6809 30.2996 42.4151 29.8036 43.203 29.4491L41.1725 22.1897L45.7362 9.23348L45.8326 8.95427L45.7512 8.71802L44.5853 5.06435C44.4751 4.70951 44.1077 4.50852 43.752 4.59444C43.3848 4.69278 43.1602 5.06087 43.2475 5.44057L44.1407 8.86556L44.1292 8.87799Z" fill="currentColor"/>
-              <path d="M54.7671 40.1642L54.7722 40.1506L54.7607 40.163L54.7671 40.1642Z" fill="currentColor"/>
-              <path d="M54.7671 40.1642C54.4647 40.9617 54.0426 41.7397 53.4154 42.4194L53.0598 42.8046L62.5355 44.094L62.8405 43.9382L75.2034 37.5821L78.6889 38.1985C79.0504 38.256 79.4003 38.0266 79.4814 37.6642C79.574 37.2894 79.3433 36.9154 78.9569 36.8349L75.2217 35.9649L74.9796 35.9026L74.7091 36.0211L62.1468 41.5949L54.7671 40.1642Z" fill="currentColor"/>
-              <path d="M70.7192 26.3161C71.5397 26.0801 72.3829 25.8376 73.2331 25.5912C73.9197 25.3964 74.6177 25.1892 75.3129 24.9103C76.009 24.6552 76.7108 24.2443 77.2413 23.7444C77.7489 23.2693 78.2307 22.7473 78.6187 22.277C78.9823 21.8363 79.3366 21.4276 79.6715 21.0413L79.6722 21.0404L79.7389 20.9635C80.0811 20.5428 80.4147 20.2064 80.7024 19.9196C80.9892 19.6089 81.2549 19.3709 81.4882 19.218C81.9652 18.8758 82.2205 18.6741 82.2205 18.6741L82.3008 18.5871C82.5341 18.4342 82.5932 18.1206 82.44 17.8872C82.2869 17.6538 81.9493 17.5953 81.716 17.7482C81.716 17.7482 81.4014 17.9642 80.8421 18.3455C80.5381 18.5252 80.2494 18.7881 79.9273 19.1121C79.5927 19.4247 79.2237 19.7745 78.8816 20.1952C78.535 20.5707 78.1791 20.9785 77.8033 21.4091L77.7365 21.4857C77.3121 21.9455 76.9106 22.3805 76.4365 22.7944C75.5633 23.5914 74.2685 23.931 72.8784 24.2955L72.8575 24.301C72.5019 24.3937 72.1456 24.4865 71.7902 24.579C70.1442 25.0075 68.5173 25.4311 67.0759 25.8229C67.1202 26.324 67.1051 26.8395 67.0184 27.3578L67.0433 27.3807C68.1687 27.0496 69.4157 26.691 70.7192 26.3161Z" fill="currentColor"/>
-              <path d="M47.9936 62.2703L37.0735 78.5194L37.0487 78.4964L37.0485 78.4975C36.6872 80.5108 36.3258 82.5248 35.9884 84.5371C35.9407 84.8383 35.6616 85.0409 35.3603 84.993C35.0829 84.9441 34.88 84.6648 34.9162 84.376C35.0751 83.1806 35.2178 81.978 35.3606 80.7743L35.3607 80.7731L35.3609 80.7718C35.4653 79.8914 35.5698 79.0105 35.6808 78.1315L35.6999 78.011L35.7897 77.8637L45.7073 61.4029L44.2456 53.702C44.8771 52.4437 45.6272 51.1568 46.5447 49.8633L48.1634 61.4374L48.2306 61.9137L47.9936 62.2703Z" fill="currentColor"/>
-              <path d="M56.9817 73.3739L54.7724 69.6777L56.3982 51.8926L56.4582 51.3035L55.973 50.8558L50.2787 45.6691C49.5073 46.43 48.8296 47.1393 48.2217 47.7979L53.8564 52.4003L53.2336 69.8224L53.2203 70.0863L53.3476 70.2729L55.908 74.0629C56.0995 74.3547 56.4859 74.4352 56.7785 74.2679C57.0825 74.0883 57.1856 73.6771 56.9942 73.3854L56.9817 73.3739Z" fill="currentColor"/>
-              <path d="M34.1805 38.4515C32.952 39.4579 31.7417 40.32 30.5256 41.0387L30.5131 41.0272L22.7199 40.1861L7.10504 51.3885L6.96546 51.4898L6.83444 51.507C6.05471 51.6696 5.27305 51.8272 4.49098 51.9848L4.48951 51.9851C3.21177 52.2427 1.93295 52.5005 0.659647 52.781C0.363201 52.8526 0.0800017 52.6603 0.00811189 52.3638C-0.0398677 52.0664 0.128307 51.7843 0.424753 51.7127C1.71029 51.3991 2.98506 51.066 4.26269 50.7321C4.96474 50.5487 5.66766 50.365 6.3737 50.1842L21.6849 37.988L22.0214 37.7233L34.1805 38.4515Z" fill="currentColor"/>
-              <path d="M37.9257 34.5532L38.0632 34.3945L32.4262 29.1456L31.941 28.6979L31.3587 28.8047L13.7606 31.8479L9.89955 29.9412C9.59438 29.7976 9.21571 29.9084 9.05997 30.2019C8.88129 30.5203 8.99244 30.8991 9.31102 31.078L13.2937 33.3271L13.4898 33.4391L13.7643 33.4163L31.0808 31.402L36.1191 36.6506L36.1056 36.6152C36.6735 36 37.2797 35.2996 37.9257 34.5532Z" fill="currentColor"/>
-              <path d="M39.8167 56.993C38.5514 60.1231 37.3348 63.1328 34.9048 66.0464L34.856 66.0244C26.5665 75.9791 13.9735 79.3151 10.6522 76.2496C7.34232 73.1717 9.63653 60.3531 18.9088 51.3055C21.6207 48.6604 24.5184 47.2072 27.5304 45.6967C30.416 44.2496 33.4065 42.7499 36.4393 40.0991C37.6253 39.0594 38.8454 37.6344 40.2189 36.0302C41.0816 35.0225 42.0049 33.9442 43.0183 32.8462C44.0965 31.6781 45.7451 31.2896 47.4485 31.3658C47.7068 30.4342 47.895 29.5304 48.0755 28.6638C48.5447 26.4111 48.9614 24.4105 50.4193 22.8309C52.1283 20.9793 54.6537 18.2931 58.0149 19.094C58.1495 18.5738 58.3443 18.0632 58.6587 17.5479C58.8393 17.2773 59.1002 16.9198 59.2981 16.7802C59.6232 16.5279 59.9367 16.288 60.3766 16.2107C60.8165 16.1335 61.3245 16.257 61.6211 16.4848C61.9301 16.724 62.0957 16.9689 62.201 17.2042C62.4003 17.6494 62.4156 18.0484 62.4257 18.3128C62.4262 18.3279 62.4268 18.3425 62.4274 18.3567C62.4505 18.6311 62.397 18.7889 62.397 18.7889C62.397 18.7889 62.2965 18.6731 62.1089 18.477C61.9338 18.2924 61.6716 18.0274 61.3875 17.8111L61.3788 17.8046C61.2453 17.7039 61.1008 17.595 60.9837 17.5996C60.8857 17.584 60.8447 17.6057 60.7885 17.6355C60.7756 17.6423 60.7619 17.6495 60.7466 17.6569C60.6758 17.6836 60.5248 17.7973 60.4091 17.8977L59.9388 18.4072C59.891 18.4833 59.8413 18.5602 59.791 18.6383C59.5811 18.9638 59.3589 19.3085 59.2002 19.6817C59.5851 20.0984 59.8808 20.6896 60.1728 21.2734C60.318 21.5636 60.4622 21.8519 60.616 22.1162C60.8918 22.2484 61.1895 22.3705 61.4892 22.4934C62.0919 22.7405 62.7022 22.9908 63.1559 23.3327C63.5025 23.1565 63.8307 22.9047 64.1382 22.6688C64.2159 22.6092 64.2922 22.5507 64.3672 22.4946L64.8375 21.985C64.9283 21.8617 65.0181 21.7145 65.0506 21.6294C65.0567 21.6135 65.0628 21.5993 65.0686 21.5859C65.0937 21.5275 65.1121 21.4848 65.0887 21.3884C65.0724 21.2813 64.9585 21.1301 64.8456 21.0029C64.6073 20.7369 64.3222 20.4968 64.1241 20.337C63.9282 20.1968 63.818 20.0998 63.7948 20.079C63.8043 20.0808 63.828 20.0748 63.8643 20.0656C63.937 20.0473 64.0599 20.0162 64.2186 20.01C64.4931 19.9871 64.8871 19.9596 65.3855 20.1434C65.6409 20.241 65.8983 20.3865 66.1614 20.6754C66.4361 20.9519 66.576 21.4493 66.5341 21.894C66.4923 22.3386 66.2782 22.6704 66.0642 23.0021C65.9473 23.1998 65.6395 23.4696 65.4009 23.6787L65.3626 23.7124C64.874 24.067 64.3807 24.302 63.8729 24.4778C64.9401 27.7642 62.4645 30.4963 60.7554 32.348C59.3039 33.9206 57.3539 34.4978 55.1624 35.1465C54.306 35.4 53.4127 35.6643 52.4979 36.0033C52.6987 37.7076 52.4548 39.3696 51.3766 40.5377C50.3693 41.6291 49.3725 42.6313 48.4394 43.5694C46.95 45.0669 45.6227 46.4015 44.6732 47.6758C42.2774 50.9054 41.0249 54.0041 39.8167 56.993Z" fill="currentColor"/>
-              <path d="M63.7902 20.0748C63.7902 20.0748 63.7917 20.0762 63.7948 20.079C63.7918 20.0784 63.7903 20.0771 63.7902 20.0748Z" fill="currentColor"/>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="32"
+              height="33"
+              viewBox="0 0 83 85"
+              fill="none"
+            >
+              <path
+                d="M61.908 1.14612C61.7742 1.39088 61.5582 1.67482 61.2714 1.9855C61.0086 2.29524 60.6999 2.65469 60.308 3.0294C60.1358 3.20462 59.9563 3.3826 59.7719 3.56548L59.7708 3.56657L59.7697 3.56768C59.5484 3.7871 59.3198 4.01382 59.0882 4.25106C58.6504 4.67548 58.1802 5.185 57.7357 5.7414C57.2923 6.3217 56.9388 7.05409 56.7278 7.7569C56.5054 8.47214 56.3546 9.18454 56.2154 9.88451C56.05 10.6919 55.8892 11.4945 55.7321 12.2778C55.4525 13.6727 55.1851 15.0066 54.9267 16.1976C55.4373 16.0936 55.9375 16.0259 56.4406 16.03C56.6609 14.8547 56.8866 13.5548 57.1179 12.2223L57.1183 12.2199C57.2383 11.5289 57.3597 10.8293 57.4827 10.1337L57.4865 10.1124C57.7387 8.69759 57.9736 7.37979 58.6983 6.44567C59.0729 5.93993 59.4734 5.48106 59.8987 5.04516C60.3117 4.59778 60.7256 4.1743 61.0936 3.80053C61.4616 3.42677 61.8047 3.03004 62.0895 2.67154C62.3992 2.336 62.6257 2.01573 62.7805 1.6983C63.1159 1.1103 63.306 0.77949 63.306 0.77949C63.4398 0.534728 63.3555 0.226755 63.122 0.0803368C62.8761 -0.0775624 62.5682 0.00646156 62.4105 0.25217L62.3303 0.339161C62.3303 0.339161 62.1745 0.632688 61.8716 1.13559L61.908 1.14612Z"
+                fill="currentColor"
+              />
+              <path
+                d="M44.1292 8.87799L38.7822 21.7096L38.6513 22.0261L40.6944 31.3684L41.05 30.9831C41.6809 30.2996 42.4151 29.8036 43.203 29.4491L41.1725 22.1897L45.7362 9.23348L45.8326 8.95427L45.7512 8.71802L44.5853 5.06435C44.4751 4.70951 44.1077 4.50852 43.752 4.59444C43.3848 4.69278 43.1602 5.06087 43.2475 5.44057L44.1407 8.86556L44.1292 8.87799Z"
+                fill="currentColor"
+              />
+              <path
+                d="M54.7671 40.1642L54.7722 40.1506L54.7607 40.163L54.7671 40.1642Z"
+                fill="currentColor"
+              />
+              <path
+                d="M54.7671 40.1642C54.4647 40.9617 54.0426 41.7397 53.4154 42.4194L53.0598 42.8046L62.5355 44.094L62.8405 43.9382L75.2034 37.5821L78.6889 38.1985C79.0504 38.256 79.4003 38.0266 79.4814 37.6642C79.574 37.2894 79.3433 36.9154 78.9569 36.8349L75.2217 35.9649L74.9796 35.9026L74.7091 36.0211L62.1468 41.5949L54.7671 40.1642Z"
+                fill="currentColor"
+              />
+              <path
+                d="M70.7192 26.3161C71.5397 26.0801 72.3829 25.8376 73.2331 25.5912C73.9197 25.3964 74.6177 25.1892 75.3129 24.9103C76.009 24.6552 76.7108 24.2443 77.2413 23.7444C77.7489 23.2693 78.2307 22.7473 78.6187 22.277C78.9823 21.8363 79.3366 21.4276 79.6715 21.0413L79.6722 21.0404L79.7389 20.9635C80.0811 20.5428 80.4147 20.2064 80.7024 19.9196C80.9892 19.6089 81.2549 19.3709 81.4882 19.218C81.9652 18.8758 82.2205 18.6741 82.2205 18.6741L82.3008 18.5871C82.5341 18.4342 82.5932 18.1206 82.44 17.8872C82.2869 17.6538 81.9493 17.5953 81.716 17.7482C81.716 17.7482 81.4014 17.9642 80.8421 18.3455C80.5381 18.5252 80.2494 18.7881 79.9273 19.1121C79.5927 19.4247 79.2237 19.7745 78.8816 20.1952C78.535 20.5707 78.1791 20.9785 77.8033 21.4091L77.7365 21.4857C77.3121 21.9455 76.9106 22.3805 76.4365 22.7944C75.5633 23.5914 74.2685 23.931 72.8784 24.2955L72.8575 24.301C72.5019 24.3937 72.1456 24.4865 71.7902 24.579C70.1442 25.0075 68.5173 25.4311 67.0759 25.8229C67.1202 26.324 67.1051 26.8395 67.0184 27.3578L67.0433 27.3807C68.1687 27.0496 69.4157 26.691 70.7192 26.3161Z"
+                fill="currentColor"
+              />
+              <path
+                d="M47.9936 62.2703L37.0735 78.5194L37.0487 78.4964L37.0485 78.4975C36.6872 80.5108 36.3258 82.5248 35.9884 84.5371C35.9407 84.8383 35.6616 85.0409 35.3603 84.993C35.0829 84.9441 34.88 84.6648 34.9162 84.376C35.0751 83.1806 35.2178 81.978 35.3606 80.7743L35.3607 80.7731L35.3609 80.7718C35.4653 79.8914 35.5698 79.0105 35.6808 78.1315L35.6999 78.011L35.7897 77.8637L45.7073 61.4029L44.2456 53.702C44.8771 52.4437 45.6272 51.1568 46.5447 49.8633L48.1634 61.4374L48.2306 61.9137L47.9936 62.2703Z"
+                fill="currentColor"
+              />
+              <path
+                d="M56.9817 73.3739L54.7724 69.6777L56.3982 51.8926L56.4582 51.3035L55.973 50.8558L50.2787 45.6691C49.5073 46.43 48.8296 47.1393 48.2217 47.7979L53.8564 52.4003L53.2336 69.8224L53.2203 70.0863L53.3476 70.2729L55.908 74.0629C56.0995 74.3547 56.4859 74.4352 56.7785 74.2679C57.0825 74.0883 57.1856 73.6771 56.9942 73.3854L56.9817 73.3739Z"
+                fill="currentColor"
+              />
+              <path
+                d="M34.1805 38.4515C32.952 39.4579 31.7417 40.32 30.5256 41.0387L30.5131 41.0272L22.7199 40.1861L7.10504 51.3885L6.96546 51.4898L6.83444 51.507C6.05471 51.6696 5.27305 51.8272 4.49098 51.9848L4.48951 51.9851C3.21177 52.2427 1.93295 52.5005 0.659647 52.781C0.363201 52.8526 0.0800017 52.6603 0.00811189 52.3638C-0.0398677 52.0664 0.128307 51.7843 0.424753 51.7127C1.71029 51.3991 2.98506 51.066 4.26269 50.7321C4.96474 50.5487 5.66766 50.365 6.3737 50.1842L21.6849 37.988L22.0214 37.7233L34.1805 38.4515Z"
+                fill="currentColor"
+              />
+              <path
+                d="M37.9257 34.5532L38.0632 34.3945L32.4262 29.1456L31.941 28.6979L31.3587 28.8047L13.7606 31.8479L9.89955 29.9412C9.59438 29.7976 9.21571 29.9084 9.05997 30.2019C8.88129 30.5203 8.99244 30.8991 9.31102 31.078L13.2937 33.3271L13.4898 33.4391L13.7643 33.4163L31.0808 31.402L36.1191 36.6506L36.1056 36.6152C36.6735 36 37.2797 35.2996 37.9257 34.5532Z"
+                fill="currentColor"
+              />
+              <path
+                d="M39.8167 56.993C38.5514 60.1231 37.3348 63.1328 34.9048 66.0464L34.856 66.0244C26.5665 75.9791 13.9735 79.3151 10.6522 76.2496C7.34232 73.1717 9.63653 60.3531 18.9088 51.3055C21.6207 48.6604 24.5184 47.2072 27.5304 45.6967C30.416 44.2496 33.4065 42.7499 36.4393 40.0991C37.6253 39.0594 38.8454 37.6344 40.2189 36.0302C41.0816 35.0225 42.0049 33.9442 43.0183 32.8462C44.0965 31.6781 45.7451 31.2896 47.4485 31.3658C47.7068 30.4342 47.895 29.5304 48.0755 28.6638C48.5447 26.4111 48.9614 24.4105 50.4193 22.8309C52.1283 20.9793 54.6537 18.2931 58.0149 19.094C58.1495 18.5738 58.3443 18.0632 58.6587 17.5479C58.8393 17.2773 59.1002 16.9198 59.2981 16.7802C59.6232 16.5279 59.9367 16.288 60.3766 16.2107C60.8165 16.1335 61.3245 16.257 61.6211 16.4848C61.9301 16.724 62.0957 16.9689 62.201 17.2042C62.4003 17.6494 62.4156 18.0484 62.4257 18.3128C62.4262 18.3279 62.4268 18.3425 62.4274 18.3567C62.4505 18.6311 62.397 18.7889 62.397 18.7889C62.397 18.7889 62.2965 18.6731 62.1089 18.477C61.9338 18.2924 61.6716 18.0274 61.3875 17.8111L61.3788 17.8046C61.2453 17.7039 61.1008 17.595 60.9837 17.5996C60.8857 17.584 60.8447 17.6057 60.7885 17.6355C60.7756 17.6423 60.7619 17.6495 60.7466 17.6569C60.6758 17.6836 60.5248 17.7973 60.4091 17.8977L59.9388 18.4072C59.891 18.4833 59.8413 18.5602 59.791 18.6383C59.5811 18.9638 59.3589 19.3085 59.2002 19.6817C59.5851 20.0984 59.8808 20.6896 60.1728 21.2734C60.318 21.5636 60.4622 21.8519 60.616 22.1162C60.8918 22.2484 61.1895 22.3705 61.4892 22.4934C62.0919 22.7405 62.7022 22.9908 63.1559 23.3327C63.5025 23.1565 63.8307 22.9047 64.1382 22.6688C64.2159 22.6092 64.2922 22.5507 64.3672 22.4946L64.8375 21.985C64.9283 21.8617 65.0181 21.7145 65.0506 21.6294C65.0567 21.6135 65.0628 21.5993 65.0686 21.5859C65.0937 21.5275 65.1121 21.4848 65.0887 21.3884C65.0724 21.2813 64.9585 21.1301 64.8456 21.0029C64.6073 20.7369 64.3222 20.4968 64.1241 20.337C63.9282 20.1968 63.818 20.0998 63.7948 20.079C63.8043 20.0808 63.828 20.0748 63.8643 20.0656C63.937 20.0473 64.0599 20.0162 64.2186 20.01C64.4931 19.9871 64.8871 19.9596 65.3855 20.1434C65.6409 20.241 65.8983 20.3865 66.1614 20.6754C66.4361 20.9519 66.576 21.4493 66.5341 21.894C66.4923 22.3386 66.2782 22.6704 66.0642 23.0021C65.9473 23.1998 65.6395 23.4696 65.4009 23.6787L65.3626 23.7124C64.874 24.067 64.3807 24.302 63.8729 24.4778C64.9401 27.7642 62.4645 30.4963 60.7554 32.348C59.3039 33.9206 57.3539 34.4978 55.1624 35.1465C54.306 35.4 53.4127 35.6643 52.4979 36.0033C52.6987 37.7076 52.4548 39.3696 51.3766 40.5377C50.3693 41.6291 49.3725 42.6313 48.4394 43.5694C46.95 45.0669 45.6227 46.4015 44.6732 47.6758C42.2774 50.9054 41.0249 54.0041 39.8167 56.993Z"
+                fill="currentColor"
+              />
+              <path
+                d="M63.7902 20.0748C63.7902 20.0748 63.7917 20.0762 63.7948 20.079C63.7918 20.0784 63.7903 20.0771 63.7902 20.0748Z"
+                fill="currentColor"
+              />
             </svg>
           </span>
           <span className={styles.typeCardLabel}>Termite Renewal</span>
-          <span className={styles.typeCardSub}>Renew termite protection plan</span>
+          <span className={styles.typeCardSub}>
+            Renew termite protection plan
+          </span>
           <span className={styles.typeCardComingSoon}>Coming Soon</span>
         </div>
       </div>
     </div>
   );
 }
-
 
 function StepPhotos({
   photos,
@@ -394,9 +494,27 @@ function StepPhotos({
             onClick={() => cameraInputRef.current?.click()}
             aria-label="Add photo"
           >
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2"/>
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle
+                cx="12"
+                cy="13"
+                r="4"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
             </svg>
             Photo
           </button>
@@ -409,9 +527,27 @@ function StepPhotos({
             className={styles.photoActionBtn}
             onClick={() => cameraInputRef.current?.click()}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="12" cy="13" r="4" stroke="currentColor" strokeWidth="2"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle
+                cx="12"
+                cy="13"
+                r="4"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
             </svg>
             Camera
           </button>
@@ -419,10 +555,36 @@ function StepPhotos({
             className={styles.photoActionBtn}
             onClick={() => libraryInputRef.current?.click()}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2"/>
-              <polyline points="21 15 16 10 5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <rect
+                x="3"
+                y="3"
+                width="18"
+                height="18"
+                rx="2"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <circle
+                cx="8.5"
+                cy="8.5"
+                r="1.5"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <polyline
+                points="21 15 16 10 5 21"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
             </svg>
             Gallery
           </button>
@@ -487,7 +649,8 @@ function StepAIReview({
 
   const startDictation = () => {
     const SpeechRecognitionAPI =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) return;
 
     const recognition = new SpeechRecognitionAPI();
@@ -517,7 +680,8 @@ function StepAIReview({
 
   const hasSpeechSupport =
     typeof window !== 'undefined' &&
-    ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+    ((window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition);
 
   return (
     <div className={styles.stepContent}>
@@ -529,7 +693,9 @@ function StepAIReview({
         <input
           className={styles.fieldInput}
           value={aiResult.issue_detected}
-          onChange={e => onAIResultChange({ ...aiResult, issue_detected: e.target.value })}
+          onChange={e =>
+            onAIResultChange({ ...aiResult, issue_detected: e.target.value })
+          }
           placeholder="What issue was found?"
         />
       </div>
@@ -565,10 +731,14 @@ function StepAIReview({
           <p className={styles.fieldHint}>Loading company pest options...</p>
         )}
         {!isPestOptionsLoading && pestOptions.length === 0 && (
-          <p className={styles.fieldHint}>No company pest options are configured yet.</p>
+          <p className={styles.fieldHint}>
+            No company pest options are configured yet.
+          </p>
         )}
         {aiResult.service_category && (
-          <p className={styles.fieldHint}>Service type: {aiResult.service_category}</p>
+          <p className={styles.fieldHint}>
+            Service type: {aiResult.service_category}
+          </p>
         )}
       </div>
 
@@ -672,7 +842,9 @@ function StepNewCustomer({
       </div>
 
       <div className={styles.fieldGroup}>
-        <label className={styles.fieldLabel}>Phone <span className={styles.fieldRequired}>*</span></label>
+        <label className={styles.fieldLabel}>
+          Phone <span className={styles.fieldRequired}>*</span>
+        </label>
         <input
           className={styles.fieldInput}
           type="tel"
@@ -699,8 +871,18 @@ function StepNewCustomer({
         <label className={styles.fieldLabel}>Service Address</label>
         <AddressAutocomplete
           value={form.addressInput}
-          onChange={val => onChange({ ...form, addressInput: val, addressComponents: null })}
-          onAddressSelect={components => onChange({ ...form, addressComponents: components, addressInput: `${components.street_number ? components.street_number + ' ' : ''}${components.route ?? ''}`.trim() || form.addressInput })}
+          onChange={val =>
+            onChange({ ...form, addressInput: val, addressComponents: null })
+          }
+          onAddressSelect={components =>
+            onChange({
+              ...form,
+              addressComponents: components,
+              addressInput:
+                `${components.street_number ? components.street_number + ' ' : ''}${components.route ?? ''}`.trim() ||
+                form.addressInput,
+            })
+          }
           placeholder="Start typing address…"
         />
         {form.addressComponents && (
@@ -782,15 +964,27 @@ function StepServiceDetails({
       setPlansLoading(true);
       try {
         let data: any;
-        if (selectedPestValue && selectedPestValue !== OTHER_PEST_OPTION_VALUE) {
-          const res = await fetch(`/api/service-plans/${companyId}/by-pest/${selectedPestValue}`);
+        if (
+          selectedPestValue &&
+          selectedPestValue !== OTHER_PEST_OPTION_VALUE
+        ) {
+          const res = await fetch(
+            `/api/service-plans/${companyId}/by-pest/${selectedPestValue}`
+          );
           data = await res.json();
-          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          if (
+            data.success &&
+            Array.isArray(data.data) &&
+            data.data.length > 0
+          ) {
             const recId = data.cheapest_plan?.id ?? null;
             setRecommendedId(recId);
             // Recommended plan first, rest follow
             const sorted = recId
-              ? [data.data.find((p: ServicePlan) => p.id === recId)!, ...data.data.filter((p: ServicePlan) => p.id !== recId)]
+              ? [
+                  data.data.find((p: ServicePlan) => p.id === recId)!,
+                  ...data.data.filter((p: ServicePlan) => p.id !== recId),
+                ]
               : data.data;
             setPlans(sorted);
             return;
@@ -799,8 +993,9 @@ function StepServiceDetails({
         const res = await fetch(`/api/service-plans/${companyId}`);
         data = await res.json();
         if (data.success && Array.isArray(data.plans)) {
-          const byPrice = [...data.plans].sort((a: ServicePlan, b: ServicePlan) =>
-            (a.recurring_price ?? 9999) - (b.recurring_price ?? 9999)
+          const byPrice = [...data.plans].sort(
+            (a: ServicePlan, b: ServicePlan) =>
+              (a.recurring_price ?? 9999) - (b.recurring_price ?? 9999)
           );
           const recId = byPrice[0]?.id ?? null;
           setRecommendedId(recId);
@@ -824,7 +1019,9 @@ function StepServiceDetails({
 
   const historyOrders = orders.filter(o => {
     const status = (o?.Status ?? o?.status ?? '').toLowerCase();
-    return status === 'completed' || status === 'closed' || status === 'cancelled';
+    return (
+      status === 'completed' || status === 'closed' || status === 'cancelled'
+    );
   });
 
   const pestKeywords = [suggestedPestType, matchedPestOption]
@@ -840,7 +1037,11 @@ function StepServiceDetails({
   const formatDate = (val: string | null | undefined) => {
     if (!val) return '—';
     try {
-      return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return new Date(val).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      });
     } catch {
       return val;
     }
@@ -848,14 +1049,19 @@ function StepServiceDetails({
 
   const formatCurrency = (val: number | null | undefined) => {
     if (val == null) return '—';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(val);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+    }).format(val);
   };
 
   if (!locationId) {
     return (
       <div className={styles.stepContent}>
         <h2 className={styles.stepTitle}>Service Details</h2>
-        <p className={styles.emptyState}>No PestPac account linked to this customer.</p>
+        <p className={styles.emptyState}>
+          No PestPac account linked to this customer.
+        </p>
       </div>
     );
   }
@@ -863,7 +1069,9 @@ function StepServiceDetails({
   return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Service Details</h2>
-      <p className={styles.stepDesc}>Current services and upsell opportunities from PestPac</p>
+      <p className={styles.stepDesc}>
+        Current services and upsell opportunities from PestPac
+      </p>
 
       {isLoading && (
         <div className={styles.loadingState}>
@@ -872,11 +1080,15 @@ function StepServiceDetails({
         </div>
       )}
 
-      {!isLoading && fetchError && orders.length === 0 && serviceTypes.length === 0 && (
-        <p className={styles.serviceUnavailable}>
-          Service history is not available for this customer&apos;s PestPac account. You can still proceed to submit the lead.
-        </p>
-      )}
+      {!isLoading &&
+        fetchError &&
+        orders.length === 0 &&
+        serviceTypes.length === 0 && (
+          <p className={styles.serviceUnavailable}>
+            Service history is not available for this customer&apos;s PestPac
+            account. You can still proceed to submit the lead.
+          </p>
+        )}
 
       {!isLoading && (
         <>
@@ -904,7 +1116,10 @@ function StepServiceDetails({
                         <span>{formatCurrency(o?.Price ?? o?.price)}</span>
                       )}
                       {(o?.NextServiceDate ?? o?.nextServiceDate) && (
-                        <span>Next: {formatDate(o?.NextServiceDate ?? o?.nextServiceDate)}</span>
+                        <span>
+                          Next:{' '}
+                          {formatDate(o?.NextServiceDate ?? o?.nextServiceDate)}
+                        </span>
                       )}
                     </div>
                   </div>
@@ -950,7 +1165,12 @@ function StepServiceDetails({
                 {serviceTypes
                   .filter(st => st?.Active !== false)
                   .map((st, i) => {
-                    const name = st?.ServiceTypeName ?? st?.serviceTypeName ?? st?.Name ?? st?.name ?? '';
+                    const name =
+                      st?.ServiceTypeName ??
+                      st?.serviceTypeName ??
+                      st?.Name ??
+                      st?.name ??
+                      '';
                     const relevant = isRelevantServiceType(name);
                     return (
                       <div
@@ -958,7 +1178,7 @@ function StepServiceDetails({
                         className={`${styles.serviceRow} ${relevant ? styles.serviceRowHighlighted : ''}`}
                       >
                         <span className={styles.serviceRowName}>{name}</span>
-                        {st?.Description ?? st?.description ? (
+                        {(st?.Description ?? st?.description) ? (
                           <span className={styles.serviceRowDesc}>
                             {st?.Description ?? st?.description}
                           </span>
@@ -976,7 +1196,9 @@ function StepServiceDetails({
       <div className={styles.serviceSection}>
         <p className={styles.serviceSectionTitle}>Select a Service Plan</p>
         {suggestedPestType && (
-          <p className={styles.serviceHint}>Detected: <strong>{suggestedPestType}</strong></p>
+          <p className={styles.serviceHint}>
+            Detected: <strong>{suggestedPestType}</strong>
+          </p>
         )}
         {plansLoading ? (
           <div className={styles.loadingState}>
@@ -990,7 +1212,9 @@ function StepServiceDetails({
             {plans.map(plan => {
               const isSelected = selectedPlan?.id === plan.id;
               const isRecommended = plan.id === recommendedId;
-              const features: string[] = Array.isArray(plan.plan_features) ? plan.plan_features : [];
+              const features: string[] = Array.isArray(plan.plan_features)
+                ? plan.plan_features
+                : [];
               return (
                 <button
                   key={plan.id}
@@ -1000,7 +1224,9 @@ function StepServiceDetails({
                 >
                   <div className={styles.planCardHeader}>
                     <div className={styles.planCardNameRow}>
-                      <span className={styles.planCardName}>{plan.plan_name}</span>
+                      <span className={styles.planCardName}>
+                        {plan.plan_name}
+                      </span>
 
                       {isRecommended && (
                         <span className={styles.planCardBadge}>
@@ -1011,19 +1237,29 @@ function StepServiceDetails({
                     <div className={styles.planCardPrice}>
                       {plan.recurring_price != null ? (
                         <div className={styles.planCardPriceRow}>
-                          <span className={styles.planCardPriceAmount}>{formatPrice(plan.recurring_price)}</span>
-                          <span className={styles.planCardPriceFreq}>{formatFrequency(plan.billing_frequency)}</span>
+                          <span className={styles.planCardPriceAmount}>
+                            {formatPrice(plan.recurring_price)}
+                          </span>
+                          <span className={styles.planCardPriceFreq}>
+                            {formatFrequency(plan.billing_frequency)}
+                          </span>
                         </div>
                       ) : (
-                        <span className={styles.planCardPriceAmount}>Contact for pricing</span>
+                        <span className={styles.planCardPriceAmount}>
+                          Contact for pricing
+                        </span>
                       )}
                       {plan.initial_price != null && plan.initial_price > 0 && (
-                        <span className={styles.planCardInitial}>+ {formatPrice(plan.initial_price)} initial</span>
+                        <span className={styles.planCardInitial}>
+                          + {formatPrice(plan.initial_price)} initial
+                        </span>
                       )}
                     </div>
                   </div>
                   {plan.plan_description && (
-                    <p className={styles.planCardDesc}>{plan.plan_description}</p>
+                    <p className={styles.planCardDesc}>
+                      {plan.plan_description}
+                    </p>
                   )}
                   {features.length > 0 && (
                     <ul className={styles.planCardFeatures}>
@@ -1064,8 +1300,12 @@ function StepSelectSite({
 }) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CustomerResult[]>([]);
-  const [pestPacResults, setPestPacResults] = useState<PestPacClientResult[]>([]);
-  const [pestPacSearchError, setPestPacSearchError] = useState<string | null>(null);
+  const [pestPacResults, setPestPacResults] = useState<PestPacClientResult[]>(
+    []
+  );
+  const [pestPacSearchError, setPestPacSearchError] = useState<string | null>(
+    null
+  );
   const [isSearching, setIsSearching] = useState(false);
   const [nearbyResults, setNearbyResults] = useState<PestPacClientResult[]>([]);
   const [nearbyStreet, setNearbyStreet] = useState<string | null>(null);
@@ -1109,17 +1349,23 @@ function StepSelectSite({
     }
 
     navigator.geolocation.getCurrentPosition(
-      async (position) => {
+      async position => {
         try {
           const { latitude, longitude } = position.coords;
           const geoRes = await fetch(
             `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
             { headers: { 'Accept-Language': 'en' } }
           );
-          if (!geoRes.ok) { setIsLocating(false); return; }
+          if (!geoRes.ok) {
+            setIsLocating(false);
+            return;
+          }
           const geoData = await geoRes.json();
           const street = geoData?.address?.road;
-          if (!street) { setIsLocating(false); return; }
+          if (!street) {
+            setIsLocating(false);
+            return;
+          }
           cachedStreet.current = street;
           await runSearch(street);
         } catch {
@@ -1151,7 +1397,10 @@ function StepSelectSite({
             setPestPacResults(data.clients ?? []);
           } else {
             const data = await res.json().catch(() => ({}));
-            setPestPacSearchError(data.error ?? 'PestPac search failed. Check your integration settings.');
+            setPestPacSearchError(
+              data.error ??
+                'PestPac search failed. Check your integration settings.'
+            );
             setPestPacResults([]);
           }
         } else {
@@ -1183,7 +1432,8 @@ function StepSelectSite({
   const renderPestPacCard = (client: PestPacClientResult) => {
     const isSelected = selectedPestPacClient?.clientId === client.clientId;
     const nameParts = [client.firstName, client.lastName].filter(Boolean);
-    const displayName = nameParts.length > 0 ? nameParts.join(' ') : `Client #${client.clientId}`;
+    const displayName =
+      nameParts.length > 0 ? nameParts.join(' ') : `Client #${client.clientId}`;
     return (
       <button
         key={client.clientId}
@@ -1193,7 +1443,8 @@ function StepSelectSite({
         <div className={styles.customerCardName}>{displayName}</div>
         {client.primaryAddress && (
           <div className={styles.customerCardAddr}>
-            {client.primaryAddress.street}, {client.primaryAddress.city}, {client.primaryAddress.state} {client.primaryAddress.zip}
+            {client.primaryAddress.street}, {client.primaryAddress.city},{' '}
+            {client.primaryAddress.state} {client.primaryAddress.zip}
           </div>
         )}
         <div className={styles.customerCardContact}>
@@ -1213,7 +1464,9 @@ function StepSelectSite({
         className={`${styles.customerCard} ${isSelected ? styles.customerCardSelected : ''}`}
         onClick={() => onSelectCustomer(customer)}
       >
-        <div className={styles.customerCardName}>{getCustomerDisplayName(customer)}</div>
+        <div className={styles.customerCardName}>
+          {getCustomerDisplayName(customer)}
+        </div>
         {addr && (
           <div className={styles.customerCardAddr}>
             {addr.street_address}, {addr.city}, {addr.state} {addr.zip_code}
@@ -1230,7 +1483,10 @@ function StepSelectSite({
   const renderRecentCard = (recent: RecentCustomer) => {
     const isSelected = selectedCustomer?.id === recent.id;
     const nameParts = [recent.first_name, recent.last_name].filter(Boolean);
-    const displayName = nameParts.length > 0 ? nameParts.join(' ') : recent.email ?? `Customer #${recent.id.slice(0, 8)}`;
+    const displayName =
+      nameParts.length > 0
+        ? nameParts.join(' ')
+        : (recent.email ?? `Customer #${recent.id.slice(0, 8)}`);
     const asCustomer: CustomerResult = {
       id: recent.id,
       first_name: recent.first_name,
@@ -1251,7 +1507,8 @@ function StepSelectSite({
         <div className={styles.customerCardName}>{displayName}</div>
         {recent.primaryAddress && (
           <div className={styles.customerCardAddr}>
-            {recent.primaryAddress.street_address}, {recent.primaryAddress.city}, {recent.primaryAddress.state} {recent.primaryAddress.zip_code}
+            {recent.primaryAddress.street_address}, {recent.primaryAddress.city}
+            , {recent.primaryAddress.state} {recent.primaryAddress.zip_code}
           </div>
         )}
         <div className={styles.customerCardContact}>
@@ -1273,14 +1530,20 @@ function StepSelectSite({
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Select Site</h2>
       <p className={styles.stepDesc}>
-        {isPestPacEnabled ? 'Search PestPac or select a customer below' : 'Link this opportunity to a customer'}
+        {isPestPacEnabled
+          ? 'Search PestPac or select a customer below'
+          : 'Link this opportunity to a customer'}
       </p>
 
       <div className={styles.searchInputWrapper}>
         <input
           className={styles.searchInput}
           type="text"
-          placeholder={isPestPacEnabled ? 'Search by name, address, or phone…' : 'Search by name or address…'}
+          placeholder={
+            isPestPacEnabled
+              ? 'Search by name, address, or phone…'
+              : 'Search by name or address…'
+          }
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -1291,7 +1554,9 @@ function StepSelectSite({
         {/* Manual search results */}
         {isSearchActive && (
           <>
-            <p className={styles.listLabel}>{isPestPacEnabled ? 'PestPac Results' : 'Search Results'}</p>
+            <p className={styles.listLabel}>
+              {isPestPacEnabled ? 'PestPac Results' : 'Search Results'}
+            </p>
             {isSearching && (
               <div className={styles.loadingState}>
                 <span className={styles.spinner} />
@@ -1299,18 +1564,35 @@ function StepSelectSite({
               </div>
             )}
             {!isSearching && isPestPacEnabled && pestPacSearchError && (
-              <p className={styles.emptyState} style={{ color: 'var(--color-error, #dc2626)' }}>
+              <p
+                className={styles.emptyState}
+                style={{ color: 'var(--color-error, #dc2626)' }}
+              >
                 {pestPacSearchError}
               </p>
             )}
-            {!isSearching && isPestPacEnabled && !pestPacSearchError && pestPacResults.map(renderPestPacCard)}
-            {!isSearching && isPestPacEnabled && !pestPacSearchError && pestPacResults.length === 0 && (
-              <p className={styles.emptyState}>No PestPac customers found for &quot;{query}&quot;</p>
-            )}
-            {!isSearching && !isPestPacEnabled && searchResults.map(renderCustomerCard)}
-            {!isSearching && !isPestPacEnabled && searchResults.length === 0 && (
-              <p className={styles.emptyState}>No customers found for &quot;{query}&quot;</p>
-            )}
+            {!isSearching &&
+              isPestPacEnabled &&
+              !pestPacSearchError &&
+              pestPacResults.map(renderPestPacCard)}
+            {!isSearching &&
+              isPestPacEnabled &&
+              !pestPacSearchError &&
+              pestPacResults.length === 0 && (
+                <p className={styles.emptyState}>
+                  No PestPac customers found for &quot;{query}&quot;
+                </p>
+              )}
+            {!isSearching &&
+              !isPestPacEnabled &&
+              searchResults.map(renderCustomerCard)}
+            {!isSearching &&
+              !isPestPacEnabled &&
+              searchResults.length === 0 && (
+                <p className={styles.emptyState}>
+                  No customers found for &quot;{query}&quot;
+                </p>
+              )}
           </>
         )}
 
@@ -1329,7 +1611,9 @@ function StepSelectSite({
             {showNearby && nearbyResults.map(renderPestPacCard)}
             {showRecents && recentCustomers.map(renderRecentCard)}
             {!isLocating && !showNearby && !showRecents && (
-              <p className={styles.emptyState}>Search above to find a customer</p>
+              <p className={styles.emptyState}>
+                Search above to find a customer
+              </p>
             )}
           </>
         )}
@@ -1390,14 +1674,26 @@ function StepServicePlanSelect({
       try {
         // Use by-pest endpoint if we have a selected pest id (not 'other')
         let data: any;
-        if (selectedPestValue && selectedPestValue !== OTHER_PEST_OPTION_VALUE) {
-          const res = await fetch(`/api/service-plans/${companyId}/by-pest/${selectedPestValue}`);
+        if (
+          selectedPestValue &&
+          selectedPestValue !== OTHER_PEST_OPTION_VALUE
+        ) {
+          const res = await fetch(
+            `/api/service-plans/${companyId}/by-pest/${selectedPestValue}`
+          );
           data = await res.json();
-          if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          if (
+            data.success &&
+            Array.isArray(data.data) &&
+            data.data.length > 0
+          ) {
             const recId = data.cheapest_plan?.id ?? null;
             setRecommendedId(recId);
             const sorted = recId
-              ? [data.data.find((p: ServicePlan) => p.id === recId)!, ...data.data.filter((p: ServicePlan) => p.id !== recId)]
+              ? [
+                  data.data.find((p: ServicePlan) => p.id === recId)!,
+                  ...data.data.filter((p: ServicePlan) => p.id !== recId),
+                ]
               : data.data;
             setPlans(sorted);
             return;
@@ -1407,8 +1703,9 @@ function StepServicePlanSelect({
         const res = await fetch(`/api/service-plans/${companyId}`);
         data = await res.json();
         if (data.success && Array.isArray(data.plans)) {
-          const byPrice = [...data.plans].sort((a: ServicePlan, b: ServicePlan) =>
-            (a.recurring_price ?? 9999) - (b.recurring_price ?? 9999)
+          const byPrice = [...data.plans].sort(
+            (a: ServicePlan, b: ServicePlan) =>
+              (a.recurring_price ?? 9999) - (b.recurring_price ?? 9999)
           );
           const recId = byPrice[0]?.id ?? null;
           setRecommendedId(recId);
@@ -1449,7 +1746,9 @@ function StepServicePlanSelect({
     return (
       <div className={styles.stepContent}>
         <h2 className={styles.stepTitle}>Select a Service Plan</h2>
-        <p className={styles.emptyState}>No active service plans found for your company.</p>
+        <p className={styles.emptyState}>
+          No active service plans found for your company.
+        </p>
       </div>
     );
   }
@@ -1458,13 +1757,17 @@ function StepServicePlanSelect({
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Select a Service Plan</h2>
       {suggestedPestType && (
-        <p className={styles.stepDesc}>Detected: <strong>{suggestedPestType}</strong></p>
+        <p className={styles.stepDesc}>
+          Detected: <strong>{suggestedPestType}</strong>
+        </p>
       )}
       <div className={styles.planCardList}>
         {plans.map(plan => {
           const isSelected = selectedPlan?.id === plan.id;
           const isRecommended = plan.id === recommendedId;
-          const features: string[] = Array.isArray(plan.plan_features) ? plan.plan_features : [];
+          const features: string[] = Array.isArray(plan.plan_features)
+            ? plan.plan_features
+            : [];
           return (
             <button
               key={plan.id}
@@ -1493,7 +1796,9 @@ function StepServicePlanSelect({
                       </span>
                     </div>
                   ) : (
-                    <span className={styles.planCardPriceAmount}>Contact for pricing</span>
+                    <span className={styles.planCardPriceAmount}>
+                      Contact for pricing
+                    </span>
                   )}
                   {plan.initial_price != null && plan.initial_price > 0 && (
                     <span className={styles.planCardInitial}>
@@ -1536,7 +1841,9 @@ function StepServiceTodayConfirm({
 }) {
   const signatureRef = useRef<SignatureCanvas>(null);
   const addr = selectedCustomer ? getPrimaryAddress(selectedCustomer) : null;
-  const features: string[] = Array.isArray(selectedPlan?.plan_features) ? selectedPlan!.plan_features! : [];
+  const features: string[] = Array.isArray(selectedPlan?.plan_features)
+    ? selectedPlan!.plan_features!
+    : [];
 
   const handleSignEnd = () => {
     if (signatureRef.current) {
@@ -1560,21 +1867,33 @@ function StepServiceTodayConfirm({
   return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Service Today — Confirm</h2>
-      <p className={styles.stepDesc}>Review details and sign below to complete</p>
+      <p className={styles.stepDesc}>
+        Review details and sign below to complete
+      </p>
 
       {/* Customer Info */}
       <div className={styles.confirmSection}>
         <h3 className={styles.confirmSectionTitle}>Customer</h3>
         {selectedCustomer ? (
           <>
-            <p className={styles.confirmValue}>{getCustomerDisplayName(selectedCustomer)}</p>
+            <p className={styles.confirmValue}>
+              {getCustomerDisplayName(selectedCustomer)}
+            </p>
             {addr && (
               <p className={styles.confirmValueMuted}>
                 {addr.street_address}, {addr.city}, {addr.state} {addr.zip_code}
               </p>
             )}
-            {selectedCustomer.phone && <p className={styles.confirmValueMuted}>{selectedCustomer.phone}</p>}
-            {selectedCustomer.email && <p className={styles.confirmValueMuted}>{selectedCustomer.email}</p>}
+            {selectedCustomer.phone && (
+              <p className={styles.confirmValueMuted}>
+                {selectedCustomer.phone}
+              </p>
+            )}
+            {selectedCustomer.email && (
+              <p className={styles.confirmValueMuted}>
+                {selectedCustomer.email}
+              </p>
+            )}
           </>
         ) : (
           <p className={styles.confirmValueMuted}>No customer selected</p>
@@ -1585,7 +1904,9 @@ function StepServiceTodayConfirm({
       <div className={styles.confirmSection}>
         <h3 className={styles.confirmSectionTitle}>Service Date</h3>
         <p className={styles.confirmValue}>{today}</p>
-        <p className={styles.confirmValueMuted}>Serviced by {techName || 'technician'}</p>
+        <p className={styles.confirmValueMuted}>
+          Serviced by {techName || 'technician'}
+        </p>
       </div>
 
       {/* Selected Plan */}
@@ -1595,14 +1916,18 @@ function StepServiceTodayConfirm({
           <p className={styles.confirmValue}>{selectedPlan.plan_name}</p>
           {selectedPlan.recurring_price != null && (
             <p className={styles.reviewPlanPrice}>
-              {formatPrice(selectedPlan.recurring_price)}{formatFrequency(selectedPlan.billing_frequency)}
-              {selectedPlan.initial_price != null && selectedPlan.initial_price > 0
+              {formatPrice(selectedPlan.recurring_price)}
+              {formatFrequency(selectedPlan.billing_frequency)}
+              {selectedPlan.initial_price != null &&
+              selectedPlan.initial_price > 0
                 ? ` + ${formatPrice(selectedPlan.initial_price)} initial`
                 : ''}
             </p>
           )}
           {selectedPlan.plan_description && (
-            <p className={styles.confirmValueMuted}>{selectedPlan.plan_description}</p>
+            <p className={styles.confirmValueMuted}>
+              {selectedPlan.plan_description}
+            </p>
           )}
           {features.length > 0 && (
             <ul className={styles.confirmFeatureList}>
@@ -1644,7 +1969,9 @@ function StepServiceTodayConfirm({
       {/* Signature */}
       <div className={styles.confirmSection}>
         <h3 className={styles.confirmSectionTitle}>Customer Signature</h3>
-        <p className={styles.confirmValueMuted}>Please sign below to acknowledge service completed today</p>
+        <p className={styles.confirmValueMuted}>
+          Please sign below to acknowledge service completed today
+        </p>
         <div className={styles.signatureWrapper}>
           <SignatureCanvas
             ref={signatureRef}
@@ -1704,7 +2031,9 @@ function StepReview({
         <h3 className={styles.reviewSectionTitle}>Customer & Site</h3>
         {selectedCustomer ? (
           <>
-            <p className={styles.reviewValue}>{getCustomerDisplayName(selectedCustomer)}</p>
+            <p className={styles.reviewValue}>
+              {getCustomerDisplayName(selectedCustomer)}
+            </p>
             {addr && (
               <p className={styles.reviewValueMuted}>
                 {addr.street_address}, {addr.city}, {addr.state} {addr.zip_code}
@@ -1725,12 +2054,19 @@ function StepReview({
 
       <div className={styles.reviewSection}>
         <h3 className={styles.reviewSectionTitle}>Photos</h3>
-        <p className={styles.reviewValue}>{photos.length} photo{photos.length !== 1 ? 's' : ''} attached</p>
+        <p className={styles.reviewValue}>
+          {photos.length} photo{photos.length !== 1 ? 's' : ''} attached
+        </p>
         {photos.length > 0 && (
           <div className={styles.reviewPhotoRow}>
             {photos.map((p, i) => (
               // eslint-disable-next-line @next/next/no-img-element
-              <img key={i} src={p.dataUrl} alt={`Photo ${i + 1}`} className={styles.reviewThumb} />
+              <img
+                key={i}
+                src={p.dataUrl}
+                alt={`Photo ${i + 1}`}
+                className={styles.reviewThumb}
+              />
             ))}
           </div>
         )}
@@ -1739,22 +2075,34 @@ function StepReview({
       <div className={styles.reviewSection}>
         <h3 className={styles.reviewSectionTitle}>Findings</h3>
         {aiResult.issue_detected && (
-          <p className={styles.reviewRow}><strong>Issue:</strong> {aiResult.issue_detected}</p>
+          <p className={styles.reviewRow}>
+            <strong>Issue:</strong> {aiResult.issue_detected}
+          </p>
         )}
         {selectedPestLabel && (
-          <p className={styles.reviewRow}><strong>Primary Pest:</strong> {selectedPestLabel}</p>
+          <p className={styles.reviewRow}>
+            <strong>Primary Pest:</strong> {selectedPestLabel}
+          </p>
         )}
         {!selectedPestLabel && trimmedOtherPest && (
-          <p className={styles.reviewRow}><strong>Primary Pest:</strong> Other ({trimmedOtherPest})</p>
+          <p className={styles.reviewRow}>
+            <strong>Primary Pest:</strong> Other ({trimmedOtherPest})
+          </p>
         )}
         {aiResult.service_category && (
-          <p className={styles.reviewRow}><strong>Category:</strong> {aiResult.service_category}</p>
+          <p className={styles.reviewRow}>
+            <strong>Category:</strong> {aiResult.service_category}
+          </p>
         )}
         {aiResult.ai_summary && (
-          <p className={styles.reviewRow}><strong>Summary:</strong> {aiResult.ai_summary}</p>
+          <p className={styles.reviewRow}>
+            <strong>Summary:</strong> {aiResult.ai_summary}
+          </p>
         )}
         {aiResult.severity && (
-          <p className={styles.reviewRow}><strong>Severity:</strong> {aiResult.severity}</p>
+          <p className={styles.reviewRow}>
+            <strong>Severity:</strong> {aiResult.severity}
+          </p>
         )}
       </div>
 
@@ -1764,8 +2112,10 @@ function StepReview({
           <p className={styles.reviewValue}>{selectedPlan.plan_name}</p>
           {selectedPlan.recurring_price != null && (
             <p className={styles.reviewPlanPrice}>
-              {formatPrice(selectedPlan.recurring_price)}{formatFrequency(selectedPlan.billing_frequency)}
-              {selectedPlan.initial_price != null && selectedPlan.initial_price > 0
+              {formatPrice(selectedPlan.recurring_price)}
+              {formatFrequency(selectedPlan.billing_frequency)}
+              {selectedPlan.initial_price != null &&
+              selectedPlan.initial_price > 0
                 ? ` + ${formatPrice(selectedPlan.initial_price)} initial`
                 : ''}
             </p>
@@ -1781,8 +2131,14 @@ function StepReview({
           <p className={styles.reviewValueMuted}>No notes added</p>
         )}
         <div className={styles.flagRow}>
-          {customerMentioned && <span className={styles.flag}>Customer mentioned</span>}
-          {isHighPriority && <span className={`${styles.flag} ${styles.flagHigh}`}>High priority</span>}
+          {customerMentioned && (
+            <span className={styles.flag}>Customer mentioned</span>
+          )}
+          {isHighPriority && (
+            <span className={`${styles.flag} ${styles.flagHigh}`}>
+              High priority
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -1801,18 +2157,25 @@ export function NewOpportunityWizard() {
 
   // Scroll to top of wizard on every step change
   useEffect(() => {
-    wizardContainerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    wizardContainerRef.current?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
   }, [stepIndex]);
 
   // Sync lead type label into global header; clear on unmount
   useEffect(() => {
-    return () => { setWizardTitle(null); };
+    return () => {
+      setWizardTitle(null);
+    };
   }, [setWizardTitle]);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isDone, setIsDone] = useState(false);
-  const [submitMode, setSubmitMode] = useState<'default' | 'schedule' | 'service-today'>('default');
+  const [submitMode, setSubmitMode] = useState<
+    'default' | 'schedule' | 'service-today'
+  >('default');
   const [showExitPrompt, setShowExitPrompt] = useState(false);
 
   // Register a back interceptor when the wizard has progress; clear it when at step 0 or done
@@ -1822,14 +2185,17 @@ export function NewOpportunityWizard() {
     } else {
       setBackInterceptor(null);
     }
-    return () => { setBackInterceptor(null); };
+    return () => {
+      setBackInterceptor(null);
+    };
   }, [stepIndex, isDone, setBackInterceptor]);
   const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // PestPac integration state
   const [isPestPacEnabled, setIsPestPacEnabled] = useState(false);
-  const [selectedPestPacClient, setSelectedPestPacClient] = useState<PestPacClientResult | null>(null);
+  const [selectedPestPacClient, setSelectedPestPacClient] =
+    useState<PestPacClientResult | null>(null);
 
   // Current user display name (for "Service Today" note)
   const [techName, setTechName] = useState('');
@@ -1850,7 +2216,8 @@ export function NewOpportunityWizard() {
   const [notes, setNotes] = useState('');
   const [customerMentioned, setCustomerMentioned] = useState(false);
   const [isHighPriority, setIsHighPriority] = useState(false);
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerResult | null>(null);
+  const [selectedCustomer, setSelectedCustomer] =
+    useState<CustomerResult | null>(null);
   const [pestOptions, setPestOptions] = useState<PestOption[]>([]);
   const [isPestOptionsLoading, setIsPestOptionsLoading] = useState(false);
   const [selectedPestValue, setSelectedPestValue] = useState('');
@@ -1858,7 +2225,8 @@ export function NewOpportunityWizard() {
   const [hasManualPestSelection, setHasManualPestSelection] = useState(false);
 
   // Service plan selection
-  const [selectedServicePlan, setSelectedServicePlan] = useState<ServicePlan | null>(null);
+  const [selectedServicePlan, setSelectedServicePlan] =
+    useState<ServicePlan | null>(null);
 
   // Signature data for service-today confirmation
   const [signatureData, setSignatureData] = useState<string | null>(null);
@@ -1873,25 +2241,51 @@ export function NewOpportunityWizard() {
     addressComponents: null,
   });
   const [isCreatingCustomer, setIsCreatingCustomer] = useState(false);
-  const [createCustomerError, setCreateCustomerError] = useState<string | null>(null);
+  const [createCustomerError, setCreateCustomerError] = useState<string | null>(
+    null
+  );
 
   // Draft persistence
   const [draftRestored, setDraftRestored] = useState(false);
 
   const companyId = selectedCompany?.id ?? '';
-  const selectedPestOption = pestOptions.find(option => option.id === selectedPestValue) ?? null;
+  const selectedPestOption =
+    pestOptions.find(option => option.id === selectedPestValue) ?? null;
 
   const { recentCustomers, addRecent } = useRecentTechLeadCustomers(companyId);
 
   // Computed wizard steps based on lead type and PestPac availability
   const wizardSteps = useMemo((): StepId[] => {
     if (leadType === 'new-lead') {
-      return ['type-select', 'photos', 'ai-review', 'new-customer', 'service-plan-select', 'review'];
+      return [
+        'type-select',
+        'photos',
+        'ai-review',
+        'new-customer',
+        'service-plan-select',
+        'review',
+      ];
     }
     if (isPestPacEnabled) {
-      return ['type-select', 'photos', 'ai-review', 'select-site', 'service-details', 'review', 'service-today-confirm'];
+      return [
+        'type-select',
+        'photos',
+        'ai-review',
+        'select-site',
+        'service-details',
+        'review',
+        'service-today-confirm',
+      ];
     }
-    return ['type-select', 'photos', 'ai-review', 'select-site', 'service-plan-select', 'review', 'service-today-confirm'];
+    return [
+      'type-select',
+      'photos',
+      'ai-review',
+      'select-site',
+      'service-plan-select',
+      'review',
+      'service-today-confirm',
+    ];
   }, [leadType, isPestPacEnabled]);
 
   const currentStepId = wizardSteps[stepIndex];
@@ -1911,7 +2305,9 @@ export function NewOpportunityWizard() {
       const d = JSON.parse(saved);
       if (d.leadType) {
         setLeadType(d.leadType);
-        setWizardTitle(d.leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity');
+        setWizardTitle(
+          d.leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'
+        );
       }
       if (d.aiResult) setAIResult(d.aiResult);
       if (d.notes) setNotes(d.notes);
@@ -1919,12 +2315,18 @@ export function NewOpportunityWizard() {
       if (d.isHighPriority) setIsHighPriority(d.isHighPriority);
       if (d.selectedPestValue) setSelectedPestValue(d.selectedPestValue);
       if (d.otherPest) setOtherPest(d.otherPest);
-      if (d.hasManualPestSelection) setHasManualPestSelection(d.hasManualPestSelection);
+      if (d.hasManualPestSelection)
+        setHasManualPestSelection(d.hasManualPestSelection);
       if (d.selectedCustomer) setSelectedCustomer(d.selectedCustomer);
-      if (d.selectedPestPacClient) setSelectedPestPacClient(d.selectedPestPacClient);
+      if (d.selectedPestPacClient)
+        setSelectedPestPacClient(d.selectedPestPacClient);
       if (d.selectedServicePlan) setSelectedServicePlan(d.selectedServicePlan);
       if (d.newCustomerForm) {
-        setNewCustomerForm(prev => ({ ...prev, ...d.newCustomerForm, addressComponents: null }));
+        setNewCustomerForm(prev => ({
+          ...prev,
+          ...d.newCustomerForm,
+          addressComponents: null,
+        }));
       }
       if (typeof d.stepIndex === 'number' && d.stepIndex > 0) {
         setStepIndex(d.stepIndex);
@@ -1933,38 +2335,63 @@ export function NewOpportunityWizard() {
     } catch {
       // Corrupt draft — ignore
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
   // Auto-save draft whenever key state changes (skip at step 0 — nothing to save yet)
   useEffect(() => {
     if (!draftKey || stepIndex === 0) return;
     try {
-      localStorage.setItem(draftKey, JSON.stringify({
-        leadType, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
-        selectedPestValue, otherPest, hasManualPestSelection,
-        selectedCustomer, selectedPestPacClient, selectedServicePlan,
-        savedAt: new Date().toISOString(),
-        newCustomerForm: {
-          firstName: newCustomerForm.firstName,
-          lastName: newCustomerForm.lastName,
-          phone: newCustomerForm.phone,
-          email: newCustomerForm.email,
-          addressInput: newCustomerForm.addressInput,
-        },
-      }));
+      localStorage.setItem(
+        draftKey,
+        JSON.stringify({
+          leadType,
+          stepIndex,
+          aiResult,
+          notes,
+          customerMentioned,
+          isHighPriority,
+          selectedPestValue,
+          otherPest,
+          hasManualPestSelection,
+          selectedCustomer,
+          selectedPestPacClient,
+          selectedServicePlan,
+          savedAt: new Date().toISOString(),
+          newCustomerForm: {
+            firstName: newCustomerForm.firstName,
+            lastName: newCustomerForm.lastName,
+            phone: newCustomerForm.phone,
+            email: newCustomerForm.email,
+            addressInput: newCustomerForm.addressInput,
+          },
+        })
+      );
     } catch {
       // localStorage full or unavailable — silently skip
     }
   }, [
-    draftKey, leadType, stepIndex, aiResult, notes, customerMentioned, isHighPriority,
-    selectedPestValue, otherPest, hasManualPestSelection,
-    selectedCustomer, selectedPestPacClient, selectedServicePlan, newCustomerForm,
+    draftKey,
+    leadType,
+    stepIndex,
+    aiResult,
+    notes,
+    customerMentioned,
+    isHighPriority,
+    selectedPestValue,
+    otherPest,
+    hasManualPestSelection,
+    selectedCustomer,
+    selectedPestPacClient,
+    selectedServicePlan,
+    newCustomerForm,
   ]);
 
   const clearDraft = () => {
     if (draftKey) {
-      try { localStorage.removeItem(draftKey); } catch {}
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {}
     }
     setDraftRestored(false);
   };
@@ -1980,7 +2407,9 @@ export function NewOpportunityWizard() {
         .eq('id', user.id)
         .single();
       if (profile) {
-        const name = [profile.first_name, profile.last_name].filter(Boolean).join(' ');
+        const name = [profile.first_name, profile.last_name]
+          .filter(Boolean)
+          .join(' ');
         if (name) setTechName(name);
       }
     });
@@ -2019,9 +2448,8 @@ export function NewOpportunityWizard() {
         }
 
         const data = await res.json();
-        const options: Array<{ id: string; name: string; slug: string }> = Array.isArray(data.pestTypes)
-          ? data.pestTypes
-          : [];
+        const options: Array<{ id: string; name: string; slug: string }> =
+          Array.isArray(data.pestTypes) ? data.pestTypes : [];
         setPestOptions(
           options.map(option => ({
             id: option.id,
@@ -2040,7 +2468,8 @@ export function NewOpportunityWizard() {
   }, [companyId]);
 
   useEffect(() => {
-    if (hasManualPestSelection || selectedPestValue || pestOptions.length === 0) return;
+    if (hasManualPestSelection || selectedPestValue || pestOptions.length === 0)
+      return;
 
     const match = findBestPestMatch(aiResult, pestOptions);
     if (match) {
@@ -2054,7 +2483,14 @@ export function NewOpportunityWizard() {
     setLeadType('new-lead');
     setWizardTitle(null);
     setPhotos([]);
-    setAIResult({ issue_detected: '', service_category: '', ai_summary: '', suggested_pest_type: null, matched_pest_option: null, severity: null });
+    setAIResult({
+      issue_detected: '',
+      service_category: '',
+      ai_summary: '',
+      suggested_pest_type: null,
+      matched_pest_option: null,
+      severity: null,
+    });
     setSelectedPestValue('');
     setOtherPest('');
     setHasManualPestSelection(false);
@@ -2065,7 +2501,14 @@ export function NewOpportunityWizard() {
     setSelectedPestPacClient(null);
     setSelectedServicePlan(null);
     setSignatureData(null);
-    setNewCustomerForm({ firstName: '', lastName: '', phone: '', email: '', addressInput: '', addressComponents: null });
+    setNewCustomerForm({
+      firstName: '',
+      lastName: '',
+      phone: '',
+      email: '',
+      addressInput: '',
+      addressComponents: null,
+    });
     setCreateCustomerError(null);
     setSubmitError(null);
     setSyncError(null);
@@ -2094,7 +2537,10 @@ export function NewOpportunityWizard() {
       // Auto-select pest option: try exact name match first, then fuzzy fallback
       if (!hasManualPestSelection) {
         const exactMatch = data.matched_pest_option
-          ? pestOptions.find(p => p.name.toLowerCase() === data.matched_pest_option!.toLowerCase())
+          ? pestOptions.find(
+              p =>
+                p.name.toLowerCase() === data.matched_pest_option!.toLowerCase()
+            )
           : null;
         const match = exactMatch ?? findBestPestMatch(data, pestOptions);
         if (match) setSelectedPestValue(match.id);
@@ -2104,7 +2550,9 @@ export function NewOpportunityWizard() {
       const aiReviewIndex = wizardSteps.indexOf('ai-review');
       if (aiReviewIndex !== -1) setStepIndex(aiReviewIndex);
     } catch {
-      setAnalyzeError('AI analysis failed. You can still continue and fill in the details manually.');
+      setAnalyzeError(
+        'AI analysis failed. You can still continue and fill in the details manually.'
+      );
       const aiReviewIndex = wizardSteps.indexOf('ai-review');
       if (aiReviewIndex !== -1) setStepIndex(aiReviewIndex);
     } finally {
@@ -2112,7 +2560,9 @@ export function NewOpportunityWizard() {
     }
   };
 
-  const handleSubmit = async (mode: 'default' | 'schedule' | 'service-today' = 'default') => {
+  const handleSubmit = async (
+    mode: 'default' | 'schedule' | 'service-today' = 'default'
+  ) => {
     if (!companyId) return;
     setIsSubmitting(true);
     setSubmitError(null);
@@ -2128,7 +2578,9 @@ export function NewOpportunityWizard() {
           : summary;
 
       const fallbackSuggestedPest =
-        pestOptions.length === 0 ? aiResult.suggested_pest_type ?? undefined : undefined;
+        pestOptions.length === 0
+          ? (aiResult.suggested_pest_type ?? undefined)
+          : undefined;
 
       // Build notes: tech notes + service-today attribution note
       const today = new Date();
@@ -2137,12 +2589,15 @@ export function NewOpportunityWizard() {
         day: 'numeric',
         year: 'numeric',
       });
-      const serviceTodayNote = mode === 'service-today'
-        ? `This Lead had already been Serviced by ${techName || 'the technician'} on ${formattedDate}. Please update the customer\u2019s billing and close the lead.`
-        : null;
+      const serviceTodayNote =
+        mode === 'service-today'
+          ? `This Lead had already been Serviced by ${techName || 'the technician'} on ${formattedDate}. Please update the customer\u2019s billing and close the lead.`
+          : null;
 
       const trimmedTechNotes = notes.trim();
-      const combinedNotes = [trimmedTechNotes, serviceTodayNote].filter(Boolean).join('\n\n');
+      const combinedNotes = [trimmedTechNotes, serviceTodayNote]
+        .filter(Boolean)
+        .join('\n\n');
 
       const body: Record<string, unknown> = {
         companyId,
@@ -2183,7 +2638,9 @@ export function NewOpportunityWizard() {
       // Upload photos to Supabase Storage
       if (photos.length > 0) {
         const supabase = createClient();
-        const { data: { user } } = await supabase.auth.getUser();
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
         const uploadedUrls: string[] = [];
 
         for (let i = 0; i < photos.length; i++) {
@@ -2192,18 +2649,27 @@ export function NewOpportunityWizard() {
           const byteString = atob(photo.base64);
           const ab = new ArrayBuffer(byteString.length);
           const ia = new Uint8Array(ab);
-          for (let j = 0; j < byteString.length; j++) ia[j] = byteString.charCodeAt(j);
+          for (let j = 0; j < byteString.length; j++)
+            ia[j] = byteString.charCodeAt(j);
           const mimeType = photo.mimeType || 'image/jpeg';
           const blob = new Blob([ab], { type: mimeType });
-          const ext = mimeType === 'image/png' ? 'png' : mimeType === 'image/webp' ? 'webp' : 'jpg';
+          const ext =
+            mimeType === 'image/png'
+              ? 'png'
+              : mimeType === 'image/webp'
+                ? 'webp'
+                : 'jpg';
           const path = `${companyId}/${user?.id ?? 'unknown'}/${Date.now()}-${i}.${ext}`;
 
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('tech-lead-photos')
-            .upload(path, blob, { contentType: blob.type, upsert: false });
+          const { data: uploadData, error: uploadError } =
+            await supabase.storage
+              .from('tech-lead-photos')
+              .upload(path, blob, { contentType: blob.type, upsert: false });
 
           if (!uploadError && uploadData) {
-            const { data: { publicUrl } } = supabase.storage
+            const {
+              data: { publicUrl },
+            } = supabase.storage
               .from('tech-lead-photos')
               .getPublicUrl(uploadData.path);
             uploadedUrls.push(publicUrl);
@@ -2253,22 +2719,37 @@ export function NewOpportunityWizard() {
   // Thank You screen
   if (isDone) {
     const customerFirstName = selectedCustomer?.first_name ?? null;
-    const customerFullName = [selectedCustomer?.first_name, selectedCustomer?.last_name].filter(Boolean).join(' ') || null;
+    const customerFullName =
+      [selectedCustomer?.first_name, selectedCustomer?.last_name]
+        .filter(Boolean)
+        .join(' ') || null;
     const companyPhone = selectedCompany?.phone ?? null;
     const isSchedule = submitMode === 'schedule';
 
     return (
       <div className={styles.thankYouScreen}>
         <div className={styles.thankYouIcon}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="72" height="72" viewBox="0 0 20 20" fill="none">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="72"
+            height="72"
+            viewBox="0 0 20 20"
+            fill="none"
+          >
             <g clipPath="url(#clip0_thankyou_check)">
               <path
                 d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
               <path
                 d="M7.5 9.16671L10 11.6667L18.3333 3.33337"
-                stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
               />
             </g>
             <defs>
@@ -2284,27 +2765,42 @@ export function NewOpportunityWizard() {
         {isSchedule ? (
           <div className={styles.scheduleCallout}>
             <p className={styles.scheduleCalloutText}>
-              Let&apos;s get{customerFirstName ? ` ${customerFirstName}` : ''} on the books.
+              Let&apos;s get{customerFirstName ? ` ${customerFirstName}` : ''}{' '}
+              on the books.
             </p>
             {companyPhone ? (
               <>
-                <a href={`tel:${companyPhone}`} className={styles.scheduleCallBtn}>
+                <a
+                  href={`tel:${companyPhone}`}
+                  className={styles.scheduleCallBtn}
+                >
                   Call the office now
                 </a>
                 <p className={styles.schedulePhoneDisplay}>{companyPhone}</p>
               </>
             ) : (
-              <p className={styles.thankYouDesc}>Call the office to get{customerFullName ? ` ${customerFullName}` : ' this customer'} scheduled.</p>
+              <p className={styles.thankYouDesc}>
+                Call the office to get
+                {customerFullName
+                  ? ` ${customerFullName}`
+                  : ' this customer'}{' '}
+                scheduled.
+              </p>
             )}
           </div>
         ) : (
-          <p className={styles.thankYouDesc}>The lead has been created successfully.</p>
+          <p className={styles.thankYouDesc}>
+            The lead has been created successfully.
+          </p>
         )}
         <div className={styles.thankYouActions}>
           <button className={styles.primaryBtn} onClick={resetWizard}>
             Start Another
           </button>
-          <button className={styles.secondaryBtn} onClick={() => router.push('/tech-leads')}>
+          <button
+            className={styles.secondaryBtn}
+            onClick={() => router.push('/field-ops/dashboard')}
+          >
             Go Home
           </button>
         </div>
@@ -2314,13 +2810,30 @@ export function NewOpportunityWizard() {
 
   const canGoNext = (): boolean => {
     if (currentStepId === 'photos' && photos.length === 0) return false;
-    if (currentStepId === 'ai-review' && selectedPestValue === OTHER_PEST_OPTION_VALUE && !otherPest.trim()) return false;
-    if (currentStepId === 'select-site' && isPestPacEnabled && !selectedPestPacClient && !selectedCustomer) return false;
+    if (
+      currentStepId === 'ai-review' &&
+      selectedPestValue === OTHER_PEST_OPTION_VALUE &&
+      !otherPest.trim()
+    )
+      return false;
+    if (
+      currentStepId === 'select-site' &&
+      isPestPacEnabled &&
+      !selectedPestPacClient &&
+      !selectedCustomer
+    )
+      return false;
     if (currentStepId === 'new-customer') {
-      return !!(newCustomerForm.firstName.trim() && newCustomerForm.lastName.trim() && newCustomerForm.phone.trim());
+      return !!(
+        newCustomerForm.firstName.trim() &&
+        newCustomerForm.lastName.trim() &&
+        newCustomerForm.phone.trim()
+      );
     }
-    if (currentStepId === 'service-plan-select') return selectedServicePlan !== null;
-    if (currentStepId === 'service-details') return selectedServicePlan !== null;
+    if (currentStepId === 'service-plan-select')
+      return selectedServicePlan !== null;
+    if (currentStepId === 'service-details')
+      return selectedServicePlan !== null;
     return true;
   };
 
@@ -2331,7 +2844,8 @@ export function NewOpportunityWizard() {
       setCreateCustomerError(null);
       try {
         const ac = newCustomerForm.addressComponents;
-        const street = `${ac?.street_number ? ac.street_number + ' ' : ''}${ac?.route ?? ''}`.trim();
+        const street =
+          `${ac?.street_number ? ac.street_number + ' ' : ''}${ac?.route ?? ''}`.trim();
         const res = await fetch('/api/customers', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -2355,7 +2869,9 @@ export function NewOpportunityWizard() {
         setSelectedCustomer(data);
         setStepIndex(i => i + 1);
       } catch (err: any) {
-        setCreateCustomerError(err.message ?? 'Failed to create customer. Please try again.');
+        setCreateCustomerError(
+          err.message ?? 'Failed to create customer. Please try again.'
+        );
       } finally {
         setIsCreatingCustomer(false);
       }
@@ -2363,14 +2879,21 @@ export function NewOpportunityWizard() {
     }
 
     // Upsell: PestPac sync when leaving site selection with a PestPac client selected
-    if (currentStepId === 'select-site' && isPestPacEnabled && selectedPestPacClient) {
+    if (
+      currentStepId === 'select-site' &&
+      isPestPacEnabled &&
+      selectedPestPacClient
+    ) {
       setIsSyncingCustomer(true);
       setSyncError(null);
       try {
         const res = await fetch('/api/customers/pestpac-sync', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientId: selectedPestPacClient.clientId, companyId }),
+          body: JSON.stringify({
+            clientId: selectedPestPacClient.clientId,
+            companyId,
+          }),
         });
         if (!res.ok) {
           const err = await res.json();
@@ -2380,7 +2903,8 @@ export function NewOpportunityWizard() {
         const synced = data.customer;
         setSelectedCustomer(synced);
         // Save to recent customers
-        const addr = synced.primary_service_address?.[0]?.service_address ?? null;
+        const addr =
+          synced.primary_service_address?.[0]?.service_address ?? null;
         addRecent({
           id: synced.id,
           first_name: synced.first_name,
@@ -2388,16 +2912,21 @@ export function NewOpportunityWizard() {
           email: synced.email,
           phone: synced.phone,
           pestpac_client_id: synced.pestpac_client_id ?? null,
-          primaryAddress: addr ? {
-            street_address: addr.street_address,
-            city: addr.city,
-            state: addr.state,
-            zip_code: addr.zip_code,
-          } : null,
+          primaryAddress: addr
+            ? {
+                street_address: addr.street_address,
+                city: addr.city,
+                state: addr.state,
+                zip_code: addr.zip_code,
+              }
+            : null,
         });
         setStepIndex(i => i + 1);
       } catch (err: any) {
-        setSyncError(err.message ?? 'Failed to sync customer from PestPac. Please try again.');
+        setSyncError(
+          err.message ??
+            'Failed to sync customer from PestPac. Please try again.'
+        );
       } finally {
         setIsSyncingCustomer(false);
       }
@@ -2413,12 +2942,14 @@ export function NewOpportunityWizard() {
         last_name: selectedCustomer.last_name,
         email: selectedCustomer.email,
         phone: selectedCustomer.phone,
-        primaryAddress: addr ? {
-          street_address: addr.street_address,
-          city: addr.city,
-          state: addr.state,
-          zip_code: addr.zip_code,
-        } : null,
+        primaryAddress: addr
+          ? {
+              street_address: addr.street_address,
+              city: addr.city,
+              state: addr.state,
+              zip_code: addr.zip_code,
+            }
+          : null,
       });
     }
 
@@ -2431,7 +2962,9 @@ export function NewOpportunityWizard() {
 
   // Determine if the next button should show a loading state
   const isNextLoading = isSyncingCustomer || isCreatingCustomer;
-  const nextLoadingLabel = isCreatingCustomer ? 'Creating customer…' : 'Syncing customer…';
+  const nextLoadingLabel = isCreatingCustomer
+    ? 'Creating customer…'
+    : 'Syncing customer…';
 
   // Steps visible in progress bar
   const progressSteps: StepId[] = wizardSteps.filter(
@@ -2447,19 +2980,21 @@ export function NewOpportunityWizard() {
           <p className={styles.progressLeadType}>
             {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
           </p>
-        <div className={styles.progressBar}>
-          {progressSteps.map((stepId, i) => (
-            <div
-              key={stepId}
-              className={`${styles.progressStep} ${i === progressIndex ? styles.progressStepActive : ''} ${i < progressIndex ? styles.progressStepDone : ''}`}
-            >
-              <div className={styles.progressDot}>
-                {i < progressIndex ? '✓' : i + 1}
+          <div className={styles.progressBar}>
+            {progressSteps.map((stepId, i) => (
+              <div
+                key={stepId}
+                className={`${styles.progressStep} ${i === progressIndex ? styles.progressStepActive : ''} ${i < progressIndex ? styles.progressStepDone : ''}`}
+              >
+                <div className={styles.progressDot}>
+                  {i < progressIndex ? '✓' : i + 1}
+                </div>
+                <span className={styles.progressLabel}>
+                  {STEP_ID_LABELS[stepId]}
+                </span>
               </div>
-              <span className={styles.progressLabel}>{STEP_ID_LABELS[stepId]}</span>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -2496,22 +3031,23 @@ export function NewOpportunityWizard() {
           <StepTypeSelect
             onSelect={type => {
               setLeadType(type);
-              setWizardTitle(type === 'new-lead' ? 'New Lead' : 'Upsell Opportunity');
+              setWizardTitle(
+                type === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'
+              );
               setStepIndex(1);
             }}
           />
         )}
 
         {currentStepId === 'photos' && (
-          <StepPhotos
-            photos={photos}
-            onPhotosChange={setPhotos}
-          />
+          <StepPhotos photos={photos} onPhotosChange={setPhotos} />
         )}
 
         {currentStepId === 'ai-review' && (
           <>
-            {analyzeError && <p className={styles.analyzeError}>{analyzeError}</p>}
+            {analyzeError && (
+              <p className={styles.analyzeError}>{analyzeError}</p>
+            )}
             <StepAIReview
               aiResult={aiResult}
               notes={notes}
@@ -2522,14 +3058,14 @@ export function NewOpportunityWizard() {
               otherPestValue={otherPest}
               isPestOptionsLoading={isPestOptionsLoading}
               onAIResultChange={setAIResult}
-              onPestValueChange={(value) => {
+              onPestValueChange={value => {
                 setSelectedPestValue(value);
                 setHasManualPestSelection(true);
                 if (value !== OTHER_PEST_OPTION_VALUE) {
                   setOtherPest('');
                 }
               }}
-              onOtherPestChange={(value) => {
+              onOtherPestChange={value => {
                 setOtherPest(value);
                 setHasManualPestSelection(true);
               }}
@@ -2573,7 +3109,11 @@ export function NewOpportunityWizard() {
         {currentStepId === 'service-details' && (
           <StepServiceDetails
             companyId={companyId}
-            locationId={selectedPestPacClient?.clientId ?? selectedCustomer?.pestpac_client_id ?? null}
+            locationId={
+              selectedPestPacClient?.clientId ??
+              selectedCustomer?.pestpac_client_id ??
+              null
+            }
             suggestedPestType={aiResult.suggested_pest_type}
             matchedPestOption={aiResult.matched_pest_option}
             selectedPestValue={selectedPestValue}
@@ -2591,7 +3131,9 @@ export function NewOpportunityWizard() {
             customerMentioned={customerMentioned}
             isHighPriority={isHighPriority}
             selectedPestLabel={selectedPestOption?.name ?? null}
-            otherPest={selectedPestValue === OTHER_PEST_OPTION_VALUE ? otherPest : ''}
+            otherPest={
+              selectedPestValue === OTHER_PEST_OPTION_VALUE ? otherPest : ''
+            }
             selectedCustomer={selectedCustomer}
             selectedPlan={selectedServicePlan}
           />
@@ -2614,7 +3156,10 @@ export function NewOpportunityWizard() {
             ← Back
           </button>
         ) : (
-          <button className={styles.backBtn} onClick={() => router.push('/tech-leads')}>
+          <button
+            className={styles.backBtn}
+            onClick={() => router.push('/field-ops/dashboard')}
+          >
             ← Cancel
           </button>
         )}
@@ -2626,7 +3171,10 @@ export function NewOpportunityWizard() {
             disabled={isAnalyzing}
           >
             {isAnalyzing ? (
-              <><span className={styles.spinner} />Analyzing…</>
+              <>
+                <span className={styles.spinner} />
+                Analyzing…
+              </>
             ) : (
               <>Analyze Photo</>
             )}
@@ -2639,19 +3187,25 @@ export function NewOpportunityWizard() {
           </button>
         )}
 
-        {currentStepId !== 'type-select' && currentStepId !== 'photos' && currentStepId !== 'review' && currentStepId !== 'service-today-confirm' && (
-          <button
-            className={styles.nextBtn}
-            onClick={handleNext}
-            disabled={!canGoNext() || isNextLoading}
-          >
-            {isNextLoading ? (
-              <><span className={styles.spinner} />{nextLoadingLabel}</>
-            ) : (
-              'Next →'
-            )}
-          </button>
-        )}
+        {currentStepId !== 'type-select' &&
+          currentStepId !== 'photos' &&
+          currentStepId !== 'review' &&
+          currentStepId !== 'service-today-confirm' && (
+            <button
+              className={styles.nextBtn}
+              onClick={handleNext}
+              disabled={!canGoNext() || isNextLoading}
+            >
+              {isNextLoading ? (
+                <>
+                  <span className={styles.spinner} />
+                  {nextLoadingLabel}
+                </>
+              ) : (
+                'Next →'
+              )}
+            </button>
+          )}
 
         {currentStepId === 'review' && leadType === 'upsell' && (
           <div className={styles.reviewActions}>
@@ -2661,7 +3215,10 @@ export function NewOpportunityWizard() {
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <><span className={styles.spinner} />Submitting…</>
+                <>
+                  <span className={styles.spinner} />
+                  Submitting…
+                </>
               ) : (
                 <>Refer To Sales</>
               )}
@@ -2702,7 +3259,10 @@ export function NewOpportunityWizard() {
             disabled={isSubmitting || !signatureData}
           >
             {isSubmitting ? (
-              <><span className={styles.spinner} />Submitting…</>
+              <>
+                <span className={styles.spinner} />
+                Submitting…
+              </>
             ) : (
               'Submit'
             )}
@@ -2715,10 +3275,19 @@ export function NewOpportunityWizard() {
 
       {/* Exit prompt modal */}
       {showExitPrompt && (
-        <div className={styles.exitPromptOverlay} onClick={() => setShowExitPrompt(false)}>
-          <div className={styles.exitPromptSheet} onClick={e => e.stopPropagation()}>
+        <div
+          className={styles.exitPromptOverlay}
+          onClick={() => setShowExitPrompt(false)}
+        >
+          <div
+            className={styles.exitPromptSheet}
+            onClick={e => e.stopPropagation()}
+          >
             <p className={styles.exitPromptTitle}>Leave opportunity?</p>
-            <p className={styles.exitPromptBody}>Your progress has been saved as a draft. You can restore it from My Opportunities.</p>
+            <p className={styles.exitPromptBody}>
+              Your progress has been saved as a draft. You can restore it from
+              My Opportunities.
+            </p>
             <button
               type="button"
               className={styles.exitSaveDraftBtn}
