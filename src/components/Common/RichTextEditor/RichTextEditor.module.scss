@@ -19,7 +19,7 @@
   flex-wrap: wrap;
 
   button {
-    padding: 6px 10px;
+    padding: 6px;
     border: none;
     background: white;
     border-radius: 4px;
@@ -40,12 +40,6 @@
       background: var(--action-100, #d6e9ff);
       color: var(--action-700, #0054c2);
     }
-
-    strong,
-    em,
-    s {
-      font-size: 14px;
-    }
   }
 }
 
@@ -54,6 +48,20 @@
   height: 24px;
   background: var(--gray-300, #d1d5db);
   margin: 0 4px;
+}
+
+.aiButton {
+  color: #7c3aed;
+
+  &:hover:not(:disabled) {
+    background: #f5f3ff !important;
+    color: #6d28d9;
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
 }
 
 // Compact mode styles
@@ -104,7 +112,7 @@
   max-width: 100%;
 
   button {
-    padding: 6px 10px;
+    padding: 6px;
     border: none;
     background: white;
     border-radius: 4px;
@@ -124,12 +132,6 @@
     &.active {
       background: var(--action-100, #d6e9ff);
       color: var(--action-700, #0054c2);
-    }
-
-    strong,
-    em,
-    s {
-      font-size: 14px;
     }
   }
 }

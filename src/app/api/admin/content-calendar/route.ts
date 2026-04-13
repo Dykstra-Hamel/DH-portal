@@ -12,12 +12,15 @@ export interface ContentPieceCalendarItem {
   task_id: string | null;
   is_completed: boolean;
   is_planned: false;
+  sort_order: number | null;
   task_is_completed: boolean | null;
+  task_due_date: string | null;
   task_assignee_name: string | null;
   task_assignee_email: string | null;
   task_assignee_avatar_url: string | null;
   social_media_task_id: string | null;
   social_media_task_is_completed: boolean | null;
+  social_media_task_due_date: string | null;
   social_media_task_assignee_name: string | null;
   social_media_task_assignee_email: string | null;
   social_media_task_assignee_avatar_url: string | null;
@@ -28,6 +31,7 @@ export interface PlannedContentItem {
   content_type: string | null;
   title: string; // from template title
   is_planned: true;
+  week_of_month: number | null;
 }
 
 export type CalendarItem = ContentPieceCalendarItem | PlannedContentItem;
@@ -131,8 +135,9 @@ export async function GET(request: NextRequest) {
         google_doc_link,
         topic,
         service_month,
+        sort_order,
         project_tasks!task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) ),
-        social_media_task:project_tasks!social_media_task_id ( is_completed, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) )
+        social_media_task:project_tasks!social_media_task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) )
       `)
       .in('monthly_service_id', serviceIds)
       .order('sort_order', { ascending: true, nullsFirst: false })
@@ -173,6 +178,7 @@ export async function GET(request: NextRequest) {
         google_doc_link: (piece as any).google_doc_link ?? null,
         topic: (piece as any).topic,
         task_id: piece.task_id,
+        sort_order: (piece as any).sort_order ?? null,
         is_completed: (() => {
           const contentDone = task?.is_completed ?? false;
           const socialDone = socialTask ? (socialTask.is_completed ?? false) : true;
@@ -180,6 +186,7 @@ export async function GET(request: NextRequest) {
         })(),
         is_planned: false,
         task_is_completed: task?.is_completed ?? null,
+        task_due_date: task?.due_date ?? null,
         task_assignee_name: task?.profiles
           ? `${(task.profiles as any).first_name ?? ''} ${(task.profiles as any).last_name ?? ''}`.trim() || null
           : null,
@@ -187,6 +194,7 @@ export async function GET(request: NextRequest) {
         task_assignee_avatar_url: task?.profiles ? (task.profiles as any).avatar_url ?? null : null,
         social_media_task_id: (piece as any).social_media_task_id ?? null,
         social_media_task_is_completed: socialTask?.is_completed ?? null,
+        social_media_task_due_date: socialTask?.due_date ?? null,
         social_media_task_assignee_name: socialTask?.profiles
           ? `${(socialTask.profiles as any).first_name ?? ''} ${(socialTask.profiles as any).last_name ?? ''}`.trim() || null
           : null,
@@ -222,9 +230,21 @@ export async function GET(request: NextRequest) {
               content_type: t.content_type,
               title: t.title,
               is_planned: true as const,
+              week_of_month: t.week_of_month ?? null,
             }));
           items.push(...planned);
         }
+
+        // Sort all items (real + planned) by effective week, nulls last
+        items.sort((a, b) => {
+          const aWeek = a.is_planned
+            ? ((a as PlannedContentItem).week_of_month ?? Infinity)
+            : ((a as ContentPieceCalendarItem).sort_order ?? Infinity);
+          const bWeek = b.is_planned
+            ? ((b as PlannedContentItem).week_of_month ?? Infinity)
+            : ((b as ContentPieceCalendarItem).sort_order ?? Infinity);
+          return aWeek - bWeek;
+        });
 
         if (items.length > 0) {
           months[monthKey] = items;

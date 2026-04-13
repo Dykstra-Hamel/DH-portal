@@ -425,6 +425,7 @@
 .taskChip {
   display: inline-flex;
   align-items: center;
+  gap: 5px;
   padding: 3px 8px;
   border-radius: 12px;
   font-size: 12px;
@@ -446,11 +447,23 @@
 }
 .taskChipAvatar {
   background: transparent;
-  padding: 0;
+  padding: 0 4px 0 0;
 
   &:hover {
     background: transparent;
   }
+}
+
+.taskCellInner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.taskDueDate {
+  font-size: 11px;
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .taskCompletedCheck {

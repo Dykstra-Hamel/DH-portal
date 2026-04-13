@@ -51,6 +51,11 @@ export async function GET(request: NextRequest) {
               icon_logo_url
             )
           )
+        ),
+        monthly_service_task_department_assignments!task_id (
+          department:monthly_services_departments!department_id (
+            name
+          )
         )
       `)
       .order('created_at', { ascending: false });

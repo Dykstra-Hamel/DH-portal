@@ -63,13 +63,17 @@ export async function GET(
       );
     }
 
-    // Count pest pressure data points for this company + pest
+    // Count pest pressure data points for this company + pest (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
     const { count, error: countError } = await adminClient
       .from('pest_pressure_data_points')
       .select('id', { count: 'exact', head: true })
       .eq('company_id', companyId)
       .eq('pest_type', pestSlug)
-      .in('source_type', ['call', 'form', 'manual']);
+      .in('source_type', ['call', 'form', 'manual'])
+      .gte('observed_at', thirtyDaysAgo.toISOString());
 
     if (countError) {
       console.error('Error counting pest pressure data points:', countError);

@@ -27,7 +27,6 @@ interface TaskFormData {
   project_id: string;
   assigned_to: string;
   due_date: string;
-  start_date: string;
 }
 
 interface TaskModalProps {
@@ -67,7 +66,6 @@ export function TaskModal({
     due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
       .toISOString()
       .split('T')[0],
-    start_date: '',
     category_ids: [] as string[],
   });
 
@@ -99,10 +97,6 @@ export function TaskModal({
         project_id: task.project_id || '',
         assigned_to: task.assigned_to || '',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
-        start_date:
-          isProjectTask(task) && task.start_date
-            ? task.start_date.split('T')[0]
-            : '',
         category_ids: [],
       });
     } else {
@@ -117,7 +111,6 @@ export function TaskModal({
         due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
           .toISOString()
           .split('T')[0],
-        start_date: '',
         category_ids: [],
       });
     }
@@ -152,9 +145,6 @@ export function TaskModal({
       assigned_to: formData.assigned_to || undefined,
       due_date: formData.due_date
         ? new Date(formData.due_date).toISOString()
-        : undefined,
-      start_date: formData.start_date
-        ? new Date(formData.start_date).toISOString()
         : undefined,
       category_ids: formData.category_ids.length > 0 ? formData.category_ids : undefined,
     };
@@ -319,37 +309,20 @@ export function TaskModal({
             </select>
           </div>
 
-          <div className={styles.formRow}>
-            <div className={styles.formGroup}>
-              <label htmlFor="start_date" className={styles.label}>
-                Start Date
-              </label>
-              <input
-                type="date"
-                id="start_date"
-                className={styles.input}
-                value={formData.start_date}
-                onChange={e =>
-                  setFormData({ ...formData, start_date: e.target.value })
-                }
-              />
-            </div>
-
-            <div className={styles.formGroup}>
-              <label htmlFor="due_date" className={styles.label}>
-                Due Date <span className={styles.required}>*</span>
-              </label>
-              <input
-                type="date"
-                id="due_date"
-                className={styles.input}
-                value={formData.due_date}
-                onChange={e =>
-                  setFormData({ ...formData, due_date: e.target.value })
-                }
-                required
-              />
-            </div>
+          <div className={styles.formGroup}>
+            <label htmlFor="due_date" className={styles.label}>
+              Due Date <span className={styles.required}>*</span>
+            </label>
+            <input
+              type="date"
+              id="due_date"
+              className={styles.input}
+              value={formData.due_date}
+              onChange={e =>
+                setFormData({ ...formData, due_date: e.target.value })
+              }
+              required
+            />
           </div>
         </ModalMiddle>
 

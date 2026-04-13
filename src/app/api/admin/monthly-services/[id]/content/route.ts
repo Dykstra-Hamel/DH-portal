@@ -86,7 +86,7 @@ export async function POST(
     }
 
     const body = await request.json();
-    const { content_type, title, publish_date, link, task_id, service_month, topic } = body;
+    const { content_type, title, publish_date, link, task_id, service_month, topic, sort_order } = body;
 
     if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
       return NextResponse.json({ error: 'Invalid content_type' }, { status: 400 });
@@ -103,6 +103,7 @@ export async function POST(
         link: link || null,
         topic: topic || null,
         service_month: service_month || null,
+        sort_order: typeof sort_order === 'number' ? sort_order : null,
         created_by: user.id,
       })
       .select()

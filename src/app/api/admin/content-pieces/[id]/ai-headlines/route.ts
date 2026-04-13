@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getGeminiClient } from '@/lib/ai/gemini-client';
+import { fetchStandingInstructions } from '@/lib/ai/standing-instructions';
 
 interface AIHeadlinesResponse {
   headlines: string[];
@@ -86,6 +87,8 @@ export async function POST(
       return NextResponse.json({ error: 'A topic must be approved before generating headlines.' }, { status: 400 });
     }
 
+    const companyId: string | undefined = service?.company_id;
+
     const companyName: string = company?.name ?? 'Unknown Company';
     const location = [company?.city, company?.state].filter(Boolean).join(', ') || 'N/A';
     const aiContextBlock = company?.ai_context
@@ -102,11 +105,15 @@ export async function POST(
     ].filter(Boolean).join('\n');
     const brandVoiceSection = brandVoiceLines ? `\nBRAND VOICE:\n${brandVoiceLines}` : '';
 
+    const standingInstructions = companyId
+      ? await fetchStandingInstructions(supabase, companyId, 'headlines', piece.content_type)
+      : '';
+
     const systemInstruction = `You are an SEO content strategist for a pest control company. Generate headline variations for the given content topic.
 
 COMPANY: ${companyName}, ${location}
 CONTENT TYPE: ${piece.content_type ?? 'general'}
-APPROVED TOPIC: ${piece.topic}${aiContextBlock}${brandVoiceSection}
+APPROVED TOPIC: ${piece.topic}${aiContextBlock}${brandVoiceSection}${standingInstructions}
 
 ${getHeadlineInstruction(piece.content_type)}`;
 

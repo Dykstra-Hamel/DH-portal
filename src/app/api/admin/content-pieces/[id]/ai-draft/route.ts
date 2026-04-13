@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { getGeminiClient } from '@/lib/ai/gemini-client';
+import { fetchStandingInstructions } from '@/lib/ai/standing-instructions';
 
 interface AIDraftResponse {
   drafts: Array<{ approach: string; content: string }>;
@@ -183,6 +184,8 @@ export async function POST(
 
     const draftCount = getDraftCount(piece.content_type);
 
+    const standingInstructions = await fetchStandingInstructions(supabase, companyId, 'draft', piece.content_type);
+
     const systemInstruction = `You are a professional content writer specializing in pest control marketing. Write ${draftCount === 1 ? '1 complete content draft' : `${draftCount} complete, distinct content drafts`} for the given topic and title.
 
 COMPANY: ${companyName}
@@ -190,7 +193,7 @@ LOCATION: ${location}
 COMPANY DESCRIPTION: ${description}
 PESTS TREATED: ${pestNames || 'N/A'}
 SERVICE AREAS: ${areasSection || 'N/A'}
-CONTENT TYPE: ${piece.content_type ?? 'general'}${publishMonth ? `\nPUBLISH MONTH: ${publishMonth}` : ''}${aiContextBlock}${brandVoiceSection}
+CONTENT TYPE: ${piece.content_type ?? 'general'}${publishMonth ? `\nPUBLISH MONTH: ${publishMonth}` : ''}${aiContextBlock}${brandVoiceSection}${standingInstructions}
 
 FORMAT: Write all content in valid HTML. Use <h2> and <h3> for section headings, <p> for paragraphs, <strong> for bold emphasis, <em> for italics, and <ul>/<li> for bullet lists. Do NOT use markdown syntax — no ##, **, *, or other markdown characters.
 

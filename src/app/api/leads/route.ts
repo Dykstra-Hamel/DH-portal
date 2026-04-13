@@ -11,6 +11,7 @@ import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { logCreation } from '@/lib/activity-logger';
 import { getUserBranchFilter } from '@/lib/branch-filter';
+import { startDefaultCadenceForStage } from '@/lib/cadence/start-default-cadence';
 
 export async function GET(request: NextRequest) {
   try {
@@ -360,11 +361,11 @@ export async function POST(request: NextRequest) {
       leadSource,
       leadFormat,
       leadType,
-      leadStatus,
+      leadStatus: _leadStatus,
       priority,
       estimatedValue,
       serviceType,
-      assignedTo,
+      assignedTo: _assignedTo,
       scheduledDate,
       scheduledTime,
       requestedDate,
@@ -375,6 +376,10 @@ export async function POST(request: NextRequest) {
       mapPlotData,
       branchId,
     } = body;
+
+    // Mutable assignment variables — may be updated by auto-assignment logic below
+    let assignedTo: string | null | undefined = _assignedTo;
+    const leadStatus: string | null | undefined = _leadStatus;
 
     const normalizedLeadNotes = typeof notes === 'string' ? notes.trim() : '';
     const normalizedMapPlotData = (() => {
@@ -633,6 +638,51 @@ export async function POST(request: NextRequest) {
       userId: submittedBy ?? user.id,
     });
 
+    // Detect if the DB trigger performed auto-assignment
+    const wasAutoAssigned = !!newLead.assigned_to && !assignedTo;
+    if (wasAutoAssigned) {
+      assignedTo = newLead.assigned_to;
+    }
+
+    // When auto-assignment fired via zip code group: start initial-contact cadence + send in-app notification
+    if (wasAutoAssigned && assignedTo) {
+      startDefaultCadenceForStage(
+        newLead.id,
+        companyId,
+        'default_initial_contact_cadence_id',
+        assignedTo
+      ).catch(err => {
+        console.error('[leads POST] initial-contact cadence start failed:', err);
+      });
+
+      try {
+        const { createAdminClient: getAdminForNotif } = await import('@/lib/supabase/server-admin');
+        const adminSupabaseForNotif = getAdminForNotif();
+        const { data: custData } = await adminSupabaseForNotif
+          .from('customers')
+          .select('first_name, last_name')
+          .eq('id', customerId)
+          .maybeSingle();
+        const custName =
+          `${custData?.first_name || ''} ${custData?.last_name || ''}`.trim() || 'Unknown Customer';
+        const srcLabel = leadSource
+          ? leadSource.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+          : 'Lead';
+        await adminSupabaseForNotif.rpc('create_notification', {
+          p_user_id: assignedTo,
+          p_company_id: companyId,
+          p_type: 'assignment',
+          p_title: 'New Lead Assigned To You',
+          p_message: `${custName} | ${srcLabel}`,
+          p_reference_id: newLead.id,
+          p_reference_type: 'lead',
+          p_assigned_to: assignedTo,
+        });
+      } catch (notifErr) {
+        console.error('[leads POST] auto-assign in-app notification failed:', notifErr);
+      }
+    }
+
     // Capture initial technician notes and optional map/plot payload in the lead Notes activity feed
     if (normalizedLeadNotes || normalizedMapPlotData) {
       const noteText = normalizedLeadNotes || 'Map & Plot data captured from TechLeads wizard.';
@@ -654,6 +704,18 @@ export async function POST(request: NextRequest) {
       if (noteError) {
         console.error('Error creating initial lead note activity:', noteError);
       }
+    }
+
+    // Auto-enroll in quote follow-up cadence when lead is created with 'quoted' status
+    if (leadStatus === 'quoted' && assignedTo) {
+      startDefaultCadenceForStage(
+        newLead.id,
+        companyId,
+        'default_quote_followup_cadence_id',
+        assignedTo
+      ).catch(err => {
+        console.error('[leads POST] cadence enrollment failed:', err);
+      });
     }
 
     // Auto-link service address to quote if customer has one and lead doesn't

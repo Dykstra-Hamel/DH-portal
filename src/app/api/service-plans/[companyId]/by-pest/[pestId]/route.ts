@@ -34,6 +34,7 @@ export async function GET(
         plan_features,
         plan_faqs,
         highlight_badge,
+        requires_quote,
         display_order,
         plan_pest_coverage!inner (
           coverage_level
@@ -101,6 +102,7 @@ export async function GET(
         plan_features: plan.plan_features,
         plan_faqs: plan.plan_faqs,
         highlight_badge: plan.highlight_badge,
+        requires_quote: plan.requires_quote,
         display_order: plan.display_order,
         coverage_level: plan.plan_pest_coverage[0]?.coverage_level || 'full',
         covered_pests: planCoveredPests,

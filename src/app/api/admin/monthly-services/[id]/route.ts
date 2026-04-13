@@ -258,7 +258,7 @@ export async function GET(
         // Calculate week from due_date
         // Parse day directly from ISO date string to avoid timezone issues
         const dayOfMonth = parseInt(t.due_date.split('-')[2], 10);
-        const calculatedWeek = Math.ceil(dayOfMonth / 7);
+        const calculatedWeek = Math.min(Math.ceil(dayOfMonth / 7), 4);
         return calculatedWeek === week;
       });
 
