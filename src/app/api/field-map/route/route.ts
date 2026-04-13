@@ -6,6 +6,10 @@ import { getOAuthToken } from '@/lib/pestpac-auth';
 const PESTPAC_BASE_URL = 'https://api.workwave.com/pestpac/v1';
 const PESTPAC_ERROR_SNIPPET_MAX = 500;
 
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
 async function getResponseBodySnippet(response: Response): Promise<string> {
   try {
     const text = await response.text();
@@ -459,7 +463,7 @@ export async function GET(request: NextRequest) {
           routeId: routeId ? String(routeId) : null,
           clientId: clientId ? String(clientId) : null,
           locationId: locationId ? String(locationId) : null,
-          clientName,
+          clientName: clientName ? toTitleCase(clientName) : clientName,
           address,
           scheduledTime:
             stop.WorkDate ?? stop.workDate ??
@@ -475,9 +479,51 @@ export async function GET(request: NextRequest) {
           accessInstructions,
           lat,
           lng,
+          inspectionStatus: 'not_started' as 'not_started' | 'in_progress' | 'done',
+          leadId: null as string | null,
         });
       } catch {
         // Skip problematic rows
+      }
+    }
+
+    // ── Attach inspection status from local leads ──
+    const stopIds = enrichedStops
+      .map(s => s.stopId)
+      .filter((id): id is string => Boolean(id));
+
+    if (stopIds.length > 0) {
+      const { data: matchedLeads } = await adminSupabase
+        .from('leads')
+        .select('id, pestpac_stop_id, lead_status')
+        .eq('company_id', userCompany.company_id)
+        .in('pestpac_stop_id', stopIds);
+
+      const DONE_STATUSES = new Set(['quoted', 'scheduling', 'won']);
+      const leadsByStopId: Record<string, { leadId: string; leadStatus: string }> = {};
+      (matchedLeads ?? []).forEach(lead => {
+        if (lead.pestpac_stop_id) {
+          leadsByStopId[lead.pestpac_stop_id] = { leadId: lead.id, leadStatus: lead.lead_status };
+        }
+      });
+
+      for (const stop of enrichedStops) {
+        const linked = stop.stopId ? leadsByStopId[stop.stopId] : undefined;
+        if (!linked) {
+          stop.inspectionStatus = 'not_started';
+          stop.leadId = null;
+        } else if (DONE_STATUSES.has(linked.leadStatus)) {
+          stop.inspectionStatus = 'done';
+          stop.leadId = linked.leadId;
+        } else {
+          stop.inspectionStatus = 'in_progress';
+          stop.leadId = linked.leadId;
+        }
+      }
+    } else {
+      for (const stop of enrichedStops) {
+        stop.inspectionStatus = 'not_started';
+        stop.leadId = null;
       }
     }
 

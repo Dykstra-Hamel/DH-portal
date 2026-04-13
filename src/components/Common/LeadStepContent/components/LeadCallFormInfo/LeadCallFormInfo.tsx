@@ -13,26 +13,8 @@ import type { MapPlotData } from '@/components/FieldMap/MapPlot/types';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
-// Fetches the field_map activity for a lead and renders a read-only MapPlotCanvas
-function FieldMapPlotSection({ leadId }: { leadId: string }) {
-  const [mapPlotData, setMapPlotData] = useState<MapPlotData | null>(null);
-
-  useEffect(() => {
-    fetch(`/api/leads/${leadId}/activities`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: any) => {
-        if (!data) return;
-        const activities: any[] = data.data ?? [];
-        const fieldMapActivity = activities.find(
-          (a: any) => a.metadata?.source === 'field_map' && a.metadata?.map_plot
-        );
-        if (fieldMapActivity?.metadata?.map_plot) {
-          setMapPlotData(fieldMapActivity.metadata.map_plot as MapPlotData);
-        }
-      })
-      .catch(() => null);
-  }, [leadId]);
-
+// Renders a read-only MapPlotCanvas from map_plot_data stored on the lead
+function FieldMapPlotSection({ mapPlotData }: { mapPlotData: MapPlotData | null }) {
   if (!mapPlotData) return null;
 
   return (
@@ -304,7 +286,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
               </div>
             </div>
           )}
-          <FieldMapPlotSection leadId={lead.id} />
+          <FieldMapPlotSection mapPlotData={lead.map_plot_data ?? null} />
         </div>
       ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>

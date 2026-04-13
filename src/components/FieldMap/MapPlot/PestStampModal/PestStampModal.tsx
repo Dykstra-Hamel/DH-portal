@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { MapStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
+import { isMapPestStampType } from '@/components/FieldMap/MapPlot/types';
+import { Mic, MicOff } from 'lucide-react';
 
 // ─── Conducive Conditions List ────────────────────────────────────────────────
 
@@ -127,6 +129,7 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
   const option = getMapStampOption(stamp.type);
   const isCondition = isMapConditionStampType(stamp.type);
   const isOtherCondition = stamp.type === 'other-condition';
+  const isPestStamp = isMapPestStampType(stamp.type);
   const displayLabel = stamp.displayLabel || option.label;
   const [notes, setNotes] = useState(stamp.notes ?? '');
   const [customConditionText, setCustomConditionText] = useState(stamp.customConditionText ?? '');
@@ -137,6 +140,16 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
   const [searchActive, setSearchActive] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [conditionError, setConditionError] = useState(false);
+
+  // Dictation
+  const [isDictating, setIsDictating] = useState(false);
+  const recognitionRef = useRef<any>(null);
+  const hasSpeechSupport =
+    typeof window !== 'undefined' &&
+    ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
   useEffect(() => {
     if (searchActive) searchInputRef.current?.focus();
@@ -149,6 +162,73 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
       )
     : null;
 
+  function startDictation(currentNotes: string, onUpdate: (v: string) => void) {
+    const SpeechRecognitionAPI =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) return;
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as any[])
+        .map((r: any) => r[0].transcript)
+        .join(' ');
+      onUpdate(currentNotes + (currentNotes ? ' ' : '') + transcript);
+    };
+    recognition.onend = () => setIsDictating(false);
+    recognition.onerror = () => setIsDictating(false);
+    recognition.start();
+    recognitionRef.current = recognition;
+    setIsDictating(true);
+  }
+
+  function stopDictation() {
+    recognitionRef.current?.stop();
+    setIsDictating(false);
+  }
+
+  async function analyzeImage(base64: string, mimeType: string) {
+    if (!isPestStamp && !isOtherCondition) return;
+    console.log('[analyzeImage] starting, stampType:', isOtherCondition ? 'condition' : 'pest', 'base64 len:', base64.length);
+    setAiAnalyzing(true);
+    setAiSuggestions([]);
+    try {
+      const payload: Record<string, unknown> = {
+        stampType: isOtherCondition ? 'condition' : 'pest',
+        image: { mimeType, data: base64 },
+      };
+      if (!isOtherCondition) {
+        payload.pestLabel = stamp.displayLabel || stamp.pestSlug || stamp.type;
+      } else {
+        payload.conditionOptions = CONDUCIVE_CONDITIONS.flatMap(g => g.items);
+      }
+      const res = await fetch('/api/field-map/analyze-stamp-image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        const desc: string = result.description ?? '';
+        console.log('[analyzeImage] result:', result, 'desc:', desc);
+        if (desc) {
+          setNotes(prev => prev ? `${prev} ${desc}` : desc);
+        }
+        if (isOtherCondition && Array.isArray(result.suggestions) && result.suggestions.length > 0) {
+          setAiSuggestions(result.suggestions);
+        }
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        console.error('[analyzeImage] API error', res.status, errBody);
+      }
+    } catch (err) {
+      console.error('[analyzeImage] fetch failed', err);
+    } finally {
+      setAiAnalyzing(false);
+    }
+  }
+
   async function uploadFiles(files: File[]) {
     if (!files.length) return;
     setUploading(true);
@@ -157,20 +237,30 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
 
     try {
       for (const file of files) {
+        // Read as base64 for AI analysis in parallel with upload
+        const base64Promise = new Promise<string>(resolve => {
+          const reader = new FileReader();
+          reader.onload = e => resolve(((e.target?.result as string) ?? '').split(',')[1] ?? '');
+          reader.readAsDataURL(file);
+        });
+
         const formData = new FormData();
         formData.append('file', file);
         if (companyId) formData.append('companyId', companyId);
 
-        const res = await fetch('/api/field-map/upload-photo', {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          errorMessage = data.error ?? 'Upload failed';
+        const [uploadRes, base64] = await Promise.all([
+          fetch('/api/field-map/upload-photo', { method: 'POST', body: formData }).then(r =>
+            r.json().then(d => ({ ok: r.ok, data: d }))
+          ),
+          base64Promise,
+        ]);
+
+        if (!uploadRes.ok) {
+          errorMessage = uploadRes.data.error ?? 'Upload failed';
           continue;
         }
-        setPhotoUrls(prev => [...prev, data.url]);
+        setPhotoUrls(prev => [...prev, uploadRes.data.url]);
+        if (base64) void analyzeImage(base64, file.type);
       }
     } catch {
       errorMessage = 'Upload failed. Please try again.';
@@ -198,14 +288,26 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
     setPhotoUrls(prev => prev.filter(u => u !== url));
   }
 
-  const canSave = !isOtherCondition || customConditionText.trim().length > 0;
+  const canSave = true;
+
+  const isBusy = uploading || aiAnalyzing;
 
   return (
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.sheet} onClick={e => e.stopPropagation()}>
+
+        {/* Full-modal loading overlay */}
+        {isBusy && (
+          <div className={styles.modalLoadingOverlay}>
+            <span className={styles.modalLoadingSpinner} />
+            <p className={styles.modalLoadingText}>
+              {uploading ? 'Uploading\u2026' : 'Analyzing image\u2026'}
+            </p>
+          </div>
+        )}
         {/* Header */}
         <div className={styles.header}>
-          <div className={styles.stampIcon} style={{ backgroundColor: '#ffffff', color: 'var(--blue-500, #0075de)' }}>
+          <div className={styles.stampIcon} style={{ backgroundColor: '#ffffff', color: isCondition ? 'var(--UI-Alert-500, #FD484F)' : 'var(--blue-500, #0075de)' }}>
             {iconSvg ? (
               <span className={styles.stampIconSvg} dangerouslySetInnerHTML={{ __html: iconSvg }} />
             ) : (
@@ -238,11 +340,30 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
               </span>
             </div>
 
+            {/* AI suggested condition pills */}
+            {!isBusy && aiSuggestions.length > 0 && (
+              <div className={styles.aiSuggestionsRow}>
+                <span className={styles.aiSuggestionsLabel}>Suggestions</span>
+                <div className={styles.aiSuggestions}>
+                  {aiSuggestions.map(s => (
+                    <button
+                      key={s}
+                      type="button"
+                      className={`${styles.aiSuggestionPill} ${customConditionText === s ? styles.aiSuggestionActive : ''}`}
+                      onClick={() => { setCustomConditionText(s); setDropdownOpen(false); setConditionError(false); }}
+                    >
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Selector trigger + dropdown as one unit */}
             <div className={styles.conditionSelectorWrap}>
             <button
               type="button"
-              className={`${styles.conditionSelector} ${dropdownOpen ? styles.conditionSelectorOpen : ''}`}
+              className={`${styles.conditionSelector} ${dropdownOpen ? styles.conditionSelectorOpen : ''} ${conditionError ? styles.conditionSelectorError : ''}`}
               onClick={() => { setDropdownOpen(o => !o); setSearchActive(false); setSearchQuery(''); }}
             >
               <span className={customConditionText ? styles.conditionSelectorValue : styles.conditionSelectorPlaceholder}>
@@ -320,6 +441,7 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
                             setDropdownOpen(false);
                             setSearchActive(false);
                             setSearchQuery('');
+                            setConditionError(false);
                           }}
                         >
                           <span className={styles.conditionOptionGroup}>{opt.group}</span>
@@ -342,6 +464,7 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
                               setCustomConditionText(item);
                               setDropdownOpen(false);
                               setSearchActive(false);
+                              setConditionError(false);
                             }}
                           >
                             {item}
@@ -354,14 +477,30 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
               </div>
             )}
             </div>{/* end conditionSelectorWrap */}
+            {conditionError && (
+              <p className={styles.conditionErrorMsg}>Condition Description required</p>
+            )}
           </div>
         )}
 
         {/* Notes */}
         <div className={styles.field}>
-          <label className={styles.fieldLabel} htmlFor={`pest-notes-${stamp.id}`}>
-            {isCondition ? 'Additional Notes' : 'Description'}
-          </label>
+          <div className={styles.fieldLabelRow}>
+            <label className={styles.fieldLabel} htmlFor={`pest-notes-${stamp.id}`}>
+              {isCondition ? 'Additional Notes' : 'Description'}
+            </label>
+            {hasSpeechSupport && (
+              <button
+                type="button"
+                className={`${styles.dictateBtn} ${isDictating ? styles.dictateBtnActive : ''}`}
+                onClick={() => isDictating ? stopDictation() : startDictation(notes, setNotes)}
+                aria-label={isDictating ? 'Stop dictation' : 'Dictate notes'}
+              >
+                {isDictating ? <MicOff size={13} /> : <Mic size={13} />}
+                {isDictating ? 'Stop' : 'Dictate'}
+              </button>
+            )}
+          </div>
           <textarea
             id={`pest-notes-${stamp.id}`}
             className={styles.textarea}
@@ -468,8 +607,13 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
           <button
             type="button"
             className={styles.saveBtn}
-            onClick={() => onSave(stamp.id, notes, photoUrls, isOtherCondition ? customConditionText : undefined)}
-            disabled={!canSave}
+            onClick={() => {
+              if (isOtherCondition && !customConditionText.trim()) {
+                setConditionError(true);
+                return;
+              }
+              onSave(stamp.id, notes, photoUrls, isOtherCondition ? customConditionText : undefined);
+            }}
           >
             Save
           </button>

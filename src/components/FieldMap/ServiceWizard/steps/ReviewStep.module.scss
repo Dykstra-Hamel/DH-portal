@@ -75,6 +75,160 @@
 
 /* .reviewHeaderDate removed — date no longer shown in header */
 
+/* ── Hero section compact padding override ── */
+.heroSectionCompact {
+  padding: 20px 0;
+}
+
+/* ── Hero content centering (until image stacks at 992px) ── */
+.heroContentCentered {
+  @media (max-width: 992px) {
+    text-align: center;
+    align-items: center;
+
+    .heroPests {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+}
+
+/* ── Inspector + address card ── */
+.inspectorCard {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-radius: 8px;
+  background: #f4f5f8;
+  padding: 20px 32px;
+  margin-top: 8px;
+
+  @media (max-width: 992px) {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+    text-align: left;
+  }
+}
+
+.inspectorInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.inspectorAvatar {
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+}
+
+.inspectorAvatarFallback {
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  background: var(--brand-primary, #3b82f6);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.inspectorText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inspectorName {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 22px;
+  color: #111827;
+  font-family: var(--primary-font, var(--font-satoshi));
+}
+
+.inspectorTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 22px;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.inspectorSeparator {
+  width: 1px;
+  align-self: stretch;
+  background: #b8b8b8;
+  flex-shrink: 0;
+
+  @media (max-width: 992px) {
+    display: none;
+  }
+}
+
+.inspectorAddress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 4px;
+
+  @media (max-width: 992px) {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 16px;
+  }
+}
+
+.inspectorAddressSeparator {
+  display: none;
+
+  @media (max-width: 992px) {
+    display: block;
+    width: 1px;
+    align-self: stretch;
+    background: #b8b8b8;
+    flex-shrink: 0;
+  }
+}
+
+.inspectorAddressLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 22px;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.addressLabelBreak {
+  @media (min-width: 993px) {
+    display: none;
+  }
+}
+
+.inspectorAddressValue {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 22px;
+  color: #111827;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
 /* ── Hero extras ── */
 .heroEyebrow {
   font-size: 12px;
@@ -100,17 +254,101 @@
   font-family: var(--secondary-font, var(--font-satoshi));
 }
 
+/* Map layer — normal flow, drives container height, opacity animated via inline style */
+.heroMapLayer {
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.45s ease;
+}
+
+/* House photo — absolutely covers the map, crossfades in */
+.heroPhotoLayer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+
+  &.heroPhotoLayerVisible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Close Map button — top-right of map view */
+.heroCloseMapBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #5c5c5c;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 16px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+/* Toggle button — bottom-left */
+.heroViewToggleBtn {
+  position: absolute;
+  bottom: 23px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(239, 239, 239, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+
+  &:hover {
+    background: rgba(239, 239, 239, 0.96);
+  }
+
+  &:active {
+    transform: translateX(-50%) scale(0.97);
+  }
+}
+
 /* Map in the hero right column — match heroImage sizing */
 .heroMapWrap {
+  position: relative;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  min-height: 320px;
+  box-shadow: none;
+  min-height: 519px;
   width: 100%;
+  align-self: stretch;
+
+  @media (max-width: 992px) {
+    border-radius: 0;
+    box-shadow: none;
+  }
 
   @media (max-width: 768px) {
-    min-height: 220px;
-    border-radius: 0;
+    min-height: 320px;
     margin: 0 -20px;
     width: calc(100% + 40px);
   }
@@ -166,9 +404,25 @@
 /* ── Editable price inputs in the totals list ── */
 .priceEditGroup {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: flex-end;
-  gap: 4px;
+  gap: 8px;
+}
+
+.priceEditCol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.priceEditColLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  text-align: center;
+  font-family: var(--secondary-font, var(--font-satoshi));
 }
 
 .priceEditField {
@@ -182,7 +436,7 @@
 
   &:focus-within {
     border-color: var(--brand-primary, #3b82f6);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
   }
 }
 
@@ -287,7 +541,7 @@
   &:focus {
     outline: none;
     border-color: var(--brand-primary, #3b82f6);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
   }
 }
 
@@ -302,7 +556,7 @@
 
   &:focus-within {
     border-color: var(--brand-primary, #3b82f6);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.15);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
   }
 }
 
@@ -361,6 +615,13 @@
 /* ── Spacer for sticky bar ── */
 .actionSpacer {
   height: 100px;
+}
+
+/* ── FAQ title — match Customized Quote Total h3 size ── */
+.faqsTitleOverride {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  margin-bottom: 40px;
 }
 
 /* ── Sticky action bar ── */
@@ -452,7 +713,7 @@
   &:focus {
     outline: none;
     border-color: var(--brand-primary, #0052cc);
-    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
   }
   &::placeholder { color: #9ca3af; }
 }
@@ -590,7 +851,7 @@
   &:focus {
     outline: none;
     border-color: var(--brand-primary, #0052cc);
-    box-shadow: 0 0 0 3px rgba(0, 82, 204, 0.12);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
   }
 }
 
@@ -648,4 +909,152 @@
   font-weight: 700;
   font-family: var(--secondary-font, var(--font-satoshi));
   cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.sigError {
+  margin: 0;
+  font-size: 13px;
+  color: #dc2626;
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+/* ── Unified schedule modal additions ── */
+
+.sigHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sigCloseBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gray-100, #f3f4f6);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--gray-500, #6b7280);
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--gray-200, #e5e7eb);
+  }
+}
+
+.sigSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sigSectionLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-500, #6b7280);
+  font-family: var(--secondary-font, var(--font-satoshi));
+}
+
+.sigDateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sigDateInput,
+.sigTimeSelect {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: var(--brand-primary, #0052cc);
+    background: #fff;
+  }
+}
+
+.termsBody {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f9fafb;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #374151;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  font-family: var(--secondary-font, var(--font-satoshi));
+
+  h1, h2, h3, h4, h5, h6 { margin: 8px 0 4px; }
+  p { margin: 0 0 6px; }
+  ul, ol { margin: 0 0 6px; padding-left: 18px; }
+}
+
+.specificTermsBlock {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+
+  h4 {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+  }
+}
+
+.termsCheckRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  font-family: var(--secondary-font, var(--font-satoshi));
+  cursor: pointer;
+
+  label {
+    cursor: pointer;
+    flex: 1;
+  }
+
+  input[type='checkbox']:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+}
+
+.termsHint {
+  color: #f97316;
+  font-size: 12px;
+}
+
+.viewedBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #16a34a;
+  white-space: nowrap;
+  flex-shrink: 0;
 }

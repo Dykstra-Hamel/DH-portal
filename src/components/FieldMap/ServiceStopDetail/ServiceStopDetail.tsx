@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useCompany } from '@/contexts/CompanyContext';
 import styles from './ServiceStopDetail.module.scss';
 
 interface StopDetail {
@@ -73,6 +74,7 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const routeId = searchParams.get('routeId');
+  const { selectedCompany } = useCompany();
 
   const [stop, setStop] = useState<StopDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -81,8 +83,11 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
   useEffect(() => {
     async function fetchStop() {
       try {
-        const qs = routeId ? `?routeId=${encodeURIComponent(routeId)}` : '';
-        const res = await fetch(`/api/field-map/service/${stopId}${qs}`);
+        const qs = new URLSearchParams();
+        if (routeId) qs.set('routeId', routeId);
+        if (selectedCompany?.id) qs.set('companyId', selectedCompany.id);
+        const qsStr = qs.toString();
+        const res = await fetch(`/api/field-map/service/${stopId}${qsStr ? `?${qsStr}` : ''}`);
         const data = await res.json();
         if (!res.ok) {
           setError(data.error ?? 'Failed to load stop');
@@ -96,7 +101,7 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
       }
     }
     fetchStop();
-  }, [stopId, routeId]);
+  }, [stopId, routeId, selectedCompany?.id]);
 
   function handleStartService() {
     if (!stop) return;
@@ -108,6 +113,7 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
       clientEmail: stop.clientEmail ?? '',
       clientPhone: stop.clientPhone ?? '',
     });
+    if (selectedCompany?.id) params.set('companyId', selectedCompany.id);
     router.push(`/field-ops/field-map/service/${stopId}/wizard?${params.toString()}`);
   }
 

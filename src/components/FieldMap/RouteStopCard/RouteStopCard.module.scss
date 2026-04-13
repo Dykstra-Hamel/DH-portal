@@ -48,6 +48,13 @@
   margin-bottom: 2px;
 }
 
+.badges {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 .clientName {
   font-size: 15px;
   font-weight: 600;
@@ -77,6 +84,16 @@
 }
 
 .statusCompleted {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.inspectionInProgress {
+  background: #fffbeb;
+  color: #d97706;
+}
+
+.inspectionDone {
   background: #f0fdf4;
   color: #16a34a;
 }

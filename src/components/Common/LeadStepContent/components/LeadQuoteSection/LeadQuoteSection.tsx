@@ -143,6 +143,7 @@ export function LeadQuoteSection({
 
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [fieldMapCustomItems, setFieldMapCustomItems] = useState<any[]>([]);
 
   const [calculatedPrices, setCalculatedPrices] = useState<
     Record<
@@ -546,12 +547,6 @@ export function LeadQuoteSection({
       return;
     }
 
-    // Don't process if service plans haven't loaded yet
-    // (null/undefined means still loading, empty array means loaded but none available)
-    if (allServicePlans === null || allServicePlans === undefined) {
-      return;
-    }
-
     // Separate line items by type
     const servicePlanItems = quote.line_items.filter(
       (item: any) => item.service_plan_id
@@ -562,6 +557,19 @@ export function LeadQuoteSection({
     const addonItems = quote.line_items.filter(
       (item: any) => item.addon_service_id
     );
+    // Custom items have no FK reference (e.g. Field Map inspector quotes)
+    const customItems = quote.line_items.filter(
+      (item: any) => !item.service_plan_id && !item.bundle_plan_id && !item.addon_service_id
+    );
+
+    // Always sync custom items so they display regardless of catalog state
+    setFieldMapCustomItems(customItems);
+
+    // Don't process catalog items if service plans haven't loaded yet
+    // (null/undefined means still loading, empty array means loaded but none available)
+    if (allServicePlans === null || allServicePlans === undefined) {
+      return;
+    }
 
     if (servicePlanItems.length === 0 && bundleItems.length === 0) {
       return;
@@ -1380,6 +1388,31 @@ export function LeadQuoteSection({
               </button>
             </div>
           )}
+          {/* Field Map Custom Services (inspector quotes with no catalog FK) */}
+          {fieldMapCustomItems.length > 0 && (
+            <div className={styles.section}>
+              <p className={cardStyles.dataLabel}>Field Map Services</p>
+              <div className={styles.fieldMapServicesList}>
+                {fieldMapCustomItems.map((item: any, i: number) => {
+                  const initialPrice = item.final_initial_price ?? item.initial_price;
+                  const recurringPrice = item.final_recurring_price ?? item.recurring_price;
+                  const priceStr = [
+                    initialPrice != null ? `$${Number(initialPrice).toFixed(2)} initial` : null,
+                    recurringPrice != null && Number(recurringPrice) > 0
+                      ? `$${Number(recurringPrice).toFixed(2)}/${item.billing_frequency || 'mo'}`
+                      : null,
+                  ].filter(Boolean).join(' · ');
+                  return (
+                    <div key={i} className={styles.fieldMapServiceRow}>
+                      <span className={styles.fieldMapServiceName}>{item.plan_name || `Service ${i + 1}`}</span>
+                      {priceStr && <span className={styles.fieldMapServicePrice}>{priceStr}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Pest Selection Section */}
           <div className={styles.section}>
             {loadingPlan && (
@@ -2834,13 +2867,41 @@ export function LeadQuoteSection({
                                   </div>
                                 )}
 
-                              {/* Total with Add-Ons */}
+                              {/* Custom Items (Field Map inspector quotes) */}
+                              {fieldMapCustomItems.length > 0 && (
+                                <div className={styles.addOnsBreakdown}>
+                                  <div className={styles.addOnsHeader}>Custom Services</div>
+                                  {fieldMapCustomItems.map((item: any) => (
+                                    <div key={item.id ?? item.plan_name} className={styles.addonLineItem}>
+                                      <div className={styles.addonName}>{item.plan_name || 'Custom Service'}</div>
+                                      <div className={styles.addonPrices}>
+                                        {Number(item.final_recurring_price) > 0 && (
+                                          <div className={styles.addonPriceColumn}>
+                                            <span className={styles.addonRecurringPrice}>
+                                              +${formatRecurringPrice(item.final_recurring_price)}/mo
+                                            </span>
+                                          </div>
+                                        )}
+                                        {Number(item.final_initial_price) > 0 && (
+                                          <div className={styles.addonPriceColumn}>
+                                            <span className={styles.addonInitialPrice}>
+                                              ${Math.round(item.final_initial_price)} initial
+                                            </span>
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              {/* Total with Add-Ons / Custom Items */}
                               {quote?.line_items &&
-                                quote.line_items.filter(
+                                (quote.line_items.some(
                                   (item: any) =>
                                     item.addon_service_id != null &&
                                     item.addon_service_id !== ''
-                                ).length > 0 && (
+                                ) || fieldMapCustomItems.length > 0) && (
                                   <div className={styles.singlePlanTotal}>
                                     <div className={styles.totalRow}>
                                       <span className={styles.totalLabel}>
@@ -3175,6 +3236,32 @@ export function LeadQuoteSection({
                                     })}
                                 </div>
                               )}
+
+                            {/* Custom Items (Field Map inspector quotes) */}
+                            {fieldMapCustomItems.length > 0 && (
+                              <div className={styles.addOnsSection}>
+                                <div className={styles.addOnsSectionHeader}>Custom Services</div>
+                                {fieldMapCustomItems.map((item: any) => (
+                                  <div key={item.id ?? item.plan_name} className={styles.planLineItem}>
+                                    <div className={styles.lineItemHeader}>{item.plan_name || 'Custom Service'}</div>
+                                    <div className={styles.lineItemPricing}>
+                                      <div className={styles.lineItemColumn}>
+                                        <div className={styles.lineItemLabel}>Recurring Price</div>
+                                        <div className={styles.lineItemRecurringPrice}>
+                                          ${formatRecurringPrice(item.final_recurring_price || 0)}/mo
+                                        </div>
+                                      </div>
+                                      <div className={styles.lineItemColumn}>
+                                        <div className={styles.lineItemLabel}>Initial Price</div>
+                                        <div className={styles.lineItemInitialPrice}>
+                                          ${Math.round(item.final_initial_price || 0)}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
 
                           {/* Right Column: Total Cost Section */}
