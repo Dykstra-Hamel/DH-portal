@@ -19,7 +19,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ── Review header (with back button + logo) ── */
@@ -34,7 +36,9 @@
   top: 0;
   z-index: 10;
   border-bottom: 1px solid transparent;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .reviewHeaderScrolled {
@@ -56,7 +60,9 @@
   flex-shrink: 0;
   transition: background 0.15s;
 
-  &:hover { background: #e5e7eb; }
+  &:hover {
+    background: #e5e7eb;
+  }
 }
 
 .reviewHeaderLogo {
@@ -183,6 +189,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
+  flex: 1;
   gap: 4px;
 
   @media (max-width: 992px) {
@@ -321,7 +328,9 @@
   font-family: var(--secondary-font, var(--font-satoshi));
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s ease, transform 0.15s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
 
   &:hover {
     background: rgba(239, 239, 239, 0.96);
@@ -436,7 +445,8 @@
 
   &:focus-within {
     border-color: var(--brand-primary, #3b82f6);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
   }
 }
 
@@ -458,9 +468,14 @@
   color: #111827;
   text-align: right;
 
-  &:focus { outline: none; }
+  &:focus {
+    outline: none;
+  }
   &::-webkit-inner-spin-button,
-  &::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 .priceEditSuffix {
@@ -488,7 +503,9 @@
   font-family: var(--secondary-font, var(--font-satoshi));
   color: #6b7280;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 
   &:first-child {
     border-right: 1px solid #d1d5db;
@@ -541,7 +558,8 @@
   &:focus {
     outline: none;
     border-color: var(--brand-primary, #3b82f6);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
   }
 }
 
@@ -556,7 +574,8 @@
 
   &:focus-within {
     border-color: var(--brand-primary, #3b82f6);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
   }
 }
 
@@ -578,10 +597,17 @@
   font-family: var(--secondary-font, var(--font-satoshi));
   color: #111827;
 
-  &::placeholder { color: #d1d5db; }
-  &:focus { outline: none; }
+  &::placeholder {
+    color: #d1d5db;
+  }
+  &:focus {
+    outline: none;
+  }
   &::-webkit-inner-spin-button,
-  &::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
 }
 
 /* ── Notes ── */
@@ -655,12 +681,21 @@
   font-weight: 700;
   font-family: var(--primary-font, var(--font-satoshi));
   cursor: pointer;
-  transition: opacity 0.15s ease, transform 0.1s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
   letter-spacing: -0.2px;
 
-  &:hover:not(:disabled) { opacity: 0.88; }
-  &:active:not(:disabled) { transform: scale(0.98); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 .scheduleBtn {
@@ -674,12 +709,21 @@
   font-weight: 700;
   font-family: var(--primary-font, var(--font-satoshi));
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
   letter-spacing: -0.2px;
 
-  &:hover:not(:disabled) { background: color-mix(in srgb, var(--brand-primary, #0052cc) 8%, white); }
-  &:active:not(:disabled) { transform: scale(0.98); }
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-primary, #0052cc) 8%, white);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 /* ── Error / email capture ── */
@@ -713,9 +757,12 @@
   &:focus {
     outline: none;
     border-color: var(--brand-primary, #0052cc);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
   }
-  &::placeholder { color: #9ca3af; }
+  &::placeholder {
+    color: #9ca3af;
+  }
 }
 
 .emailSendBtn {
@@ -730,7 +777,10 @@
   cursor: pointer;
   flex-shrink: 0;
 
-  &:disabled { opacity: 0.5; cursor: not-allowed; }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
 }
 
 /* ── Success screen ── */
@@ -851,7 +901,8 @@
   &:focus {
     outline: none;
     border-color: var(--brand-primary, #0052cc);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
   }
 }
 
@@ -1006,9 +1057,22 @@
   -webkit-overflow-scrolling: touch;
   font-family: var(--secondary-font, var(--font-satoshi));
 
-  h1, h2, h3, h4, h5, h6 { margin: 8px 0 4px; }
-  p { margin: 0 0 6px; }
-  ul, ol { margin: 0 0 6px; padding-left: 18px; }
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 8px 0 4px;
+  }
+  p {
+    margin: 0 0 6px;
+  }
+  ul,
+  ol {
+    margin: 0 0 6px;
+    padding-left: 18px;
+  }
 }
 
 .specificTermsBlock {
@@ -1035,20 +1099,29 @@
   font-family: var(--secondary-font, var(--font-satoshi));
   cursor: pointer;
 
+  input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
   label {
     cursor: pointer;
     flex: 1;
   }
 
-  input[type='checkbox']:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-  }
+}
+
+.termsCheckboxLocked {
+  opacity: 0.4;
 }
 
 .termsHint {
+  margin: 6px 0 0;
   color: #f97316;
   font-size: 12px;
+  font-weight: 500;
 }
 
 .viewedBadge {

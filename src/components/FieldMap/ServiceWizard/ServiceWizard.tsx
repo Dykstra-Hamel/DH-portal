@@ -39,7 +39,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
-  const [currentStep, setCurrentStep] = useState(() => (hasPrefilledAddress ? 1 : 0));
+  const initialStep = hasPrefilledAddress ? 1 : 0;
+  const [currentStep, setCurrentStep] = useState(initialStep);
+  const [maxStepReached, setMaxStepReached] = useState(initialStep);
   const [mapPlotData, setMapPlotData] = useState<MapPlotData>(() => ({
     ...DEFAULT_MAP_PLOT_DATA,
     addressInput: address,
@@ -84,13 +86,22 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       .finally(() => setIsGeocoding(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
+  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>(() => [{
+    id: crypto.randomUUID(),
+    type: 'plan-addon',
+    coveredPestIds: [],
+    coveredPestLabels: [],
+    initialCost: null,
+    recurringCost: null,
+    frequency: 'monthly',
+  }]);
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] = useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents && typeof mapPlotData.addressComponents.formatted_address === 'string'
@@ -120,6 +131,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       default:
         return false;
     }
+  }
+
+  function advanceStep(target: number) {
+    setCurrentStep(target);
+    setMaxStepReached(prev => Math.max(prev, target));
   }
 
   async function handleNext() {
@@ -155,11 +171,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       setIsSavingStep(false);
 
       if (returnToReviewAfterMapEdit) {
-        setCurrentStep(4);
+        advanceStep(4);
         setReturnToReviewAfterMapEdit(false);
         return;
       }
-      setCurrentStep(s => s + 1);
+      advanceStep(currentStep + 1);
       return;
     }
 
@@ -192,11 +208,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         return;
       }
       setIsSavingStep(false);
-      setCurrentStep(s => s + 1);
+      advanceStep(currentStep + 1);
       return;
     }
 
-    if (currentStep < STEP_COUNT - 1) setCurrentStep(s => s + 1);
+    if (currentStep < STEP_COUNT - 1) advanceStep(currentStep + 1);
   }
 
   function handleBack() {
@@ -302,7 +318,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={handleBack}
+          onClick={() => setShowExitConfirm(true)}
           aria-label="Go back"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
@@ -315,17 +331,31 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             {inspectionAddress && <p className={styles.headerSub}>{inspectionAddress}</p>}
           </div>
           <div className={styles.stepTrack}>
-            {STEP_LABELS.map((label, i) => (
-              <div key={i} className={styles.stepTrackItem}>
-                {i > 0 && <div className={styles.stepLine} />}
-                <div
-                  className={`${styles.stepLabel} ${i === currentStep ? styles.stepLabelActive : i < currentStep ? styles.stepLabelDone : ''}`}
-                >
-                  {i < currentStep && <Check size={11} strokeWidth={2.5} />}
-                  {label}
+            {STEP_LABELS.map((label, i) => {
+              const isDone = i < maxStepReached;
+              const isActive = i === maxStepReached;
+              const isViewing = i === currentStep && i < maxStepReached;
+              const isClickable = i <= maxStepReached;
+              return (
+                <div key={i} className={styles.stepTrackItem}>
+                  {i > 0 && <div className={styles.stepLine} />}
+                  {isClickable ? (
+                    <button
+                      type="button"
+                      className={`${styles.stepLabel} ${isActive ? styles.stepLabelActive : isDone ? styles.stepLabelDone : ''} ${isViewing ? styles.stepLabelViewing : ''}`}
+                      onClick={() => setCurrentStep(i)}
+                    >
+                      {isDone && <Check size={11} strokeWidth={2.5} />}
+                      {label}
+                    </button>
+                  ) : (
+                    <div className={styles.stepLabel}>
+                      {label}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
@@ -344,9 +374,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             onClick={handleBack}
             aria-label="Previous step"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            Go Back
           </button>
           <button
             type="button"
@@ -372,9 +400,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             aria-label="Previous step"
             disabled={isSavingStep}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            Go Back
           </button>
           <button
             type="button"
@@ -384,6 +410,31 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           >
             {isSavingStep ? 'Saving\u2026' : isLastStep ? 'Finish' : 'Continue'}
           </button>
+        </div>
+      )}
+      {/* Exit confirmation modal */}
+      {showExitConfirm && (
+        <div className={styles.modalOverlay} onClick={() => setShowExitConfirm(false)}>
+          <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.modalTitle}>Leave this service?</p>
+            <p className={styles.modalBody}>Your progress will be lost if you go back now.</p>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalCancelBtn}
+                onClick={() => setShowExitConfirm(false)}
+              >
+                Keep Working
+              </button>
+              <button
+                type="button"
+                className={styles.modalConfirmBtn}
+                onClick={() => router.back()}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

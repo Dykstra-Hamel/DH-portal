@@ -73,6 +73,22 @@ function abbreviateFrequency(frequency: string | null): string {
   return frequency ? (abbr[frequency.toLowerCase()] ?? frequency) : 'mo';
 }
 
+// Convert any recurring frequency amount to a monthly equivalent
+function toMonthlyEquivalent(frequency: string | null, amount: number): number {
+  const factors: Record<string, number> = {
+    monthly: 1,
+    'bi-monthly': 6 / 12,       // every 2 months = 6×/year
+    quarterly: 4 / 12,          // every 3 months = 4×/year
+    'semi-annually': 2 / 12,    // every 6 months = 2×/year
+    'semi-annual': 2 / 12,
+    'bi-annually': 2 / 12,      // every 6 months = 2×/year
+    annually: 1 / 12,           // once/year
+    annual: 1 / 12,
+  };
+  const key = (frequency ?? 'monthly').toLowerCase();
+  return amount * (factors[key] ?? 1);
+}
+
 // ── Props ──────────────────────────────────────────────────────────────────
 
 interface ReviewStepProps {
@@ -94,7 +110,6 @@ interface ReviewStepProps {
 }
 
 type ActionState = 'idle' | 'sending' | 'sent' | 'scheduling' | 'scheduled' | 'error';
-type DiscountTarget = 'initial' | 'recurring' | 'both';
 
 export function ReviewStep({
   clientName,
@@ -117,6 +132,7 @@ export function ReviewStep({
   const signatureRef = useRef<SignatureCanvas | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const [hasShadow, setHasShadow] = useState(false);
+  const [sigHasContent, setSigHasContent] = useState(false);
 
   const [branding, setBranding] = useState<BrandingData | null>(null);
   const [brandingLoaded, setBrandingLoaded] = useState(false);
@@ -148,7 +164,6 @@ export function ReviewStep({
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [termsNudge, setTermsNudge] = useState(false);
   const termsBodyRef = useRef<HTMLDivElement | null>(null);
-  const [discountTarget, setDiscountTarget] = useState<DiscountTarget>('initial');
   const [discountAmount, setDiscountAmount] = useState<number | null>(null);
   const [discountType, setDiscountType] = useState<'$' | '%'>('$');
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
@@ -274,12 +289,10 @@ export function ReviewStep({
   }
 
   // Compute discount dollar amounts based on type ($ or %)
-  const discountDollarInitial = discountAmount != null && (discountTarget === 'initial' || discountTarget === 'both')
+  const discountDollarInitial = discountAmount != null
     ? (discountType === '%' ? totalInitial * discountAmount / 100 : discountAmount)
     : 0;
-  const discountDollarRecurring = discountAmount != null && (discountTarget === 'recurring' || discountTarget === 'both')
-    ? (discountType === '%' ? totalRecurring * discountAmount / 100 : discountAmount)
-    : 0;
+  const discountDollarRecurring = 0;
 
   const adjustedInitial = Math.max(0, totalInitial - discountDollarInitial);
   const adjustedRecurring = Math.max(0, totalRecurring - discountDollarRecurring);
@@ -552,7 +565,7 @@ export function ReviewStep({
         {/* ── Hero ── */}
         <section className={`${qcStyles.heroSection} ${styles.heroSectionCompact}`}>
           <div className={qcStyles.heroContainer}>
-            <div className={`${qcStyles.heroContent} ${styles.heroContentCentered}`}>
+            <div className={`${qcStyles.heroContent} ${qcStyles.heroContentCompact} ${styles.heroContentCentered}`}>
               <h1 className={qcStyles.heroTitle}>Your Quote Is Ready, {firstName}</h1>
               {pestTypes.length > 0 && (
                 <div className={styles.heroPests}>
@@ -690,7 +703,7 @@ export function ReviewStep({
                           {(item.initialCost ?? 0) > 0 && (
                             <span className={qcStyles.planHeaderInitial}>
                               <sup>$</sup>{(item.initialCost ?? 0).toFixed(0)}
-                              <span className={qcStyles.initialText}> Initial</span>
+                              <span className={qcStyles.initialText}>{item.frequency === 'one-time' ? ' One Time' : ' Initial'}</span>
                             </span>
                           )}
                         </div>
@@ -751,7 +764,7 @@ export function ReviewStep({
                                   {(item.initialCost ?? 0) > 0 && (
                                     <div className={qcStyles.priceRight}>
                                       <div className={qcStyles.priceInitial}>
-                                        <span className={qcStyles.initialLabel}>Initial Only</span>
+                                        <span className={qcStyles.initialLabel}>{item.frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
                                         <span className={qcStyles.priceNumber}><sup>$</sup>{(item.initialCost ?? 0).toFixed(0)}</span>
                                       </div>
                                     </div>
@@ -845,7 +858,7 @@ export function ReviewStep({
                           {(item.initialCost ?? 0) > 0 && (
                             <span className={qcStyles.planHeaderInitial}>
                               <sup>$</sup>{(item.initialCost ?? 0).toFixed(0)}
-                              <span className={qcStyles.initialText}> Initial</span>
+                              <span className={qcStyles.initialText}>{item.frequency === 'one-time' ? ' One Time' : ' Initial'}</span>
                             </span>
                           )}
                         </div>
@@ -950,24 +963,6 @@ export function ReviewStep({
                           <span className={qcStyles.totalItemPrice}>
                             {isEditing ? (
                               <span className={styles.priceEditGroup}>
-                                {(item.recurringCost ?? 0) > 0 && (
-                                  <span className={styles.priceEditCol}>
-                                    <span className={styles.priceEditColLabel}>Recurring</span>
-                                    <span className={styles.priceEditField}>
-                                      <span className={styles.priceEditPrefix}>$</span>
-                                      <input
-                                        type="number"
-                                        inputMode="decimal"
-                                        min="0"
-                                        step="0.01"
-                                        className={styles.priceEditInput}
-                                        value={effRecurring}
-                                        onChange={e => handleEditPrice(item.id, 'recurringCost', e.target.value)}
-                                      />
-                                      <span className={styles.priceEditSuffix}>/{abbreviateFrequency(item.frequency)}</span>
-                                    </span>
-                                  </span>
-                                )}
                                 {(item.initialCost ?? 0) > 0 && (
                                   <span className={styles.priceEditCol}>
                                     <span className={styles.priceEditColLabel}>Initial</span>
@@ -994,13 +989,10 @@ export function ReviewStep({
                                     <span className={qcStyles.totalItemPriceFreq}>/{abbreviateFrequency(item.frequency)}</span>
                                   </span>
                                 )}
-                                {effRecurring > 0 && effInitial > 0 && (
-                                  <span className={qcStyles.totalItemPriceRecurring}>&nbsp;&middot;&nbsp;</span>
-                                )}
                                 {effInitial > 0 && (
                                   <span className={qcStyles.totalItemPriceInitial}>
                                     <span className={qcStyles.totalItemPriceAmount}>${effInitial.toFixed(0)}</span>
-                                    <span className={qcStyles.totalItemPriceFreq}> initial</span>
+                                    <span className={qcStyles.totalItemPriceFreq}>{item.frequency === 'one-time' ? ' one time' : ' initial'}</span>
                                   </span>
                                 )}
                               </>
@@ -1030,24 +1022,6 @@ export function ReviewStep({
                           <span className={qcStyles.totalItemPrice}>
                             {isEditing ? (
                               <span className={styles.priceEditGroup}>
-                                {(item.recurringCost ?? 0) > 0 && (
-                                  <span className={styles.priceEditCol}>
-                                    <span className={styles.priceEditColLabel}>Recurring</span>
-                                    <span className={styles.priceEditField}>
-                                      <span className={styles.priceEditPrefix}>$</span>
-                                      <input
-                                        type="number"
-                                        inputMode="decimal"
-                                        min="0"
-                                        step="0.01"
-                                        className={styles.priceEditInput}
-                                        value={effRecurring}
-                                        onChange={e => handleEditPrice(item.id, 'recurringCost', e.target.value)}
-                                      />
-                                      <span className={styles.priceEditSuffix}>/{abbreviateFrequency(item.frequency)}</span>
-                                    </span>
-                                  </span>
-                                )}
                                 {(item.initialCost ?? 0) > 0 && (
                                   <span className={styles.priceEditCol}>
                                     <span className={styles.priceEditColLabel}>Initial</span>
@@ -1074,13 +1048,10 @@ export function ReviewStep({
                                     <span className={qcStyles.totalItemPriceFreq}>/{abbreviateFrequency(item.frequency)}</span>
                                   </span>
                                 )}
-                                {effRecurring > 0 && effInitial > 0 && (
-                                  <span className={qcStyles.totalItemPriceRecurring}>&nbsp;&middot;&nbsp;</span>
-                                )}
                                 {effInitial > 0 && (
                                   <span className={qcStyles.totalItemPriceInitial}>
                                     <span className={qcStyles.totalItemPriceAmount}>${effInitial.toFixed(0)}</span>
-                                    <span className={qcStyles.totalItemPriceFreq}> initial</span>
+                                    <span className={qcStyles.totalItemPriceFreq}>{item.frequency === 'one-time' ? ' one time' : ' initial'}</span>
                                   </span>
                                 )}
                               </>
@@ -1090,7 +1061,7 @@ export function ReviewStep({
                       );
                     })}
                     {/* Discount row in list */}
-                    {discountDollarInitial > 0 && (discountTarget === 'initial' || discountTarget === 'both') && (
+                    {discountDollarInitial > 0 && (
                       <li className={`${qcStyles.totalItem} ${styles.discountItem}`}>
                         <span className={qcStyles.totalItemLeft}>Discount</span>
                         <span>-{formatCurrency(discountDollarInitial)}</span>
@@ -1103,17 +1074,8 @@ export function ReviewStep({
               {/* Discount controls — only visible in edit mode */}
               {isEditing && (
                 <div className={styles.discountRow}>
-                  <p className={styles.discountLabel}>Apply discount</p>
+                  <p className={styles.discountLabel}>Discount on initial price</p>
                   <div className={styles.discountControls}>
-                    <select
-                      className={styles.discountSelect}
-                      value={discountTarget}
-                      onChange={e => setDiscountTarget(e.target.value as DiscountTarget)}
-                    >
-                      <option value="initial">On initial</option>
-                      <option value="recurring">On recurring</option>
-                      <option value="both">On both</option>
-                    </select>
                     <div className={styles.discountTypeToggle}>
                       <button
                         type="button"
@@ -1150,22 +1112,24 @@ export function ReviewStep({
                 </div>
               )}
 
-              {/* Total Recurring Cost — one row per frequency */}
-              {recurringByFrequency.map(({ frequency, total }) => {
-                // Apply recurring discount proportionally across frequency groups
-                const adjusted = totalRecurring > 0 && discountDollarRecurring > 0
-                  ? Math.max(0, total * (adjustedRecurring / totalRecurring))
-                  : total;
+              {/* Total Recurring Cost — all frequencies normalized to monthly */}
+              {recurringByFrequency.length > 0 && (() => {
+                const totalMonthly = recurringByFrequency.reduce((sum, { frequency, total }) => {
+                  const adjusted = totalRecurring > 0 && discountDollarRecurring > 0
+                    ? Math.max(0, total * (adjustedRecurring / totalRecurring))
+                    : total;
+                  return sum + toMonthlyEquivalent(frequency, adjusted);
+                }, 0);
                 return (
-                  <div key={frequency} className={qcStyles.totalRow}>
+                  <div className={qcStyles.totalRow}>
                     <div>Total Recurring Cost:</div>
                     <span>
-                      <strong><sup>$</sup>{adjusted.toFixed(0)}</strong>
-                      <span className={qcStyles.totalRowFreq}>/{abbreviateFrequency(frequency)}</span>
+                      <strong><sup>$</sup>{totalMonthly.toFixed(0)}</strong>
+                      <span className={qcStyles.totalRowFreq}>/mo With EasyPay</span>
                     </span>
                   </div>
                 );
-              })}
+              })()}
             </div>
           )}
 
@@ -1257,6 +1221,7 @@ export function ReviewStep({
               setPreferredDate('');
               setPreferredTime('');
               signatureRef.current?.clear();
+              setSigHasContent(false);
               setShowSigModal(true);
             }} disabled={isBusy || !companyId}>
               {actionState === 'scheduling' ? 'Scheduling…' : 'Schedule Service'}
@@ -1328,36 +1293,34 @@ export function ReviewStep({
                     </div>
                   ))}
                 </div>
-                <div
-                  className={styles.termsCheckRow}
-                  onClick={() => {
-                    if (!termsViewed) {
-                      setTermsNudge(true);
-                      setTimeout(() => setTermsNudge(false), 2000);
-                    }
-                  }}
-                >
+                <div className={styles.termsCheckRow}>
                   <input
                     type="checkbox"
                     id="sched-terms"
                     checked={termsAccepted}
-                    disabled={!termsViewed}
-                    onChange={e => { if (termsViewed) setTermsAccepted(e.target.checked); }}
+                    onChange={() => {
+                      if (!termsViewed) {
+                        setTermsNudge(true);
+                        setTimeout(() => setTermsNudge(false), 2000);
+                      } else {
+                        setTermsAccepted(prev => !prev);
+                      }
+                    }}
+                    className={!termsViewed ? styles.termsCheckboxLocked : undefined}
                   />
                   <label htmlFor="sched-terms">
                     I have read and accept the terms and conditions
-                    {!termsViewed && termsNudge && (
-                      <span className={styles.termsHint}> &mdash; Scroll to the bottom first</span>
-                    )}
                   </label>
                   {termsViewed && <span className={styles.viewedBadge}>&#10003; Viewed</span>}
                 </div>
+                {!termsViewed && termsNudge && (
+                  <p className={styles.termsHint}>Please view the full terms and conditions before accepting.</p>
+                )}
               </div>
             )}
 
             {/* Section 3: Signature */}
             <div className={styles.sigSection}>
-              <p className={styles.sigSectionLabel}>Customer Signature</p>
               <div>
                 <label className={styles.sigLabel} htmlFor="review-sig-name">Customer Name</label>
                 <input
@@ -1370,14 +1333,16 @@ export function ReviewStep({
                 />
               </div>
               <div>
+                <p className={styles.sigSectionLabel}>Customer Signature</p>
                 <div className={styles.sigCanvasWrap}>
                   <SignatureCanvas
                     ref={signatureRef}
                     canvasProps={{ width: 640, height: 160, style: { width: '100%', height: 160, display: 'block' } }}
                     backgroundColor="white"
+                    onEnd={() => setSigHasContent(true)}
                   />
                 </div>
-                <button type="button" className={styles.sigClear} onClick={() => signatureRef.current?.clear()}>Clear signature</button>
+                <button type="button" className={styles.sigClear} onClick={() => { signatureRef.current?.clear(); setSigHasContent(false); }}>Clear signature</button>
                 <p className={styles.sigDate}>Date: {todayLabel}</p>
               </div>
             </div>
@@ -1390,7 +1355,7 @@ export function ReviewStep({
                 type="button"
                 className={styles.sigConfirmBtn}
                 onClick={handleScheduleSubmit}
-                disabled={isBusy || (hasTerms && !termsAccepted)}
+                disabled={isBusy || (hasTerms && !termsAccepted) || !sigHasContent}
               >
                 {isBusy ? 'Scheduling\u2026' : 'Schedule Service'}
               </button>

@@ -35,6 +35,7 @@ interface CatalogItem {
   initialPrice: number | null;
   recurringPrice: number | null;
   billingFrequency: string | null;
+  planCategory: string | null;
   pestCoverageIds: string[];
 }
 
@@ -126,32 +127,32 @@ interface LineItemCardProps {
 }
 
 function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, onRemove }: LineItemCardProps) {
-  const [search, setSearch] = useState('');
-  const [showList, setShowList] = useState(!item.catalogItemId);
-
   const plans = catalog.filter(c => c.kind === 'plan');
   const addons = catalog.filter(c => c.kind === 'addon');
   const bundles = catalog.filter(c => c.kind === 'bundle');
 
-  const q = search.toLowerCase();
-  const filtered = (items: CatalogItem[]) =>
-    q ? items.filter(i => i.name.toLowerCase().includes(q)) : items;
-
   function selectCatalogItem(ci: CatalogItem) {
+    const isOneTime = ci.planCategory === 'one-time' || ci.billingFrequency === 'one-time';
     onUpdate({
       catalogItemId: ci.id,
       catalogItemKind: ci.kind,
       catalogItemName: ci.name,
       initialCost: ci.initialPrice,
       recurringCost: ci.recurringPrice,
-      frequency: ci.billingFrequency ?? 'monthly',
-      // Store the plan's pest coverage IDs so coverage display works without
-      // needing to look up the catalog after selection.
+      frequency: isOneTime ? 'one-time' : (ci.billingFrequency ?? 'monthly'),
       coveredPestIds: ci.pestCoverageIds,
       coveredPestLabels: [],
     });
-    setShowList(false);
-    setSearch('');
+  }
+
+  function handleCatalogSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    const id = e.target.value;
+    if (!id) {
+      onUpdate({ catalogItemId: undefined, catalogItemKind: undefined, catalogItemName: undefined, coveredPestIds: [], coveredPestLabels: [] });
+      return;
+    }
+    const ci = catalog.find(c => c.id === id);
+    if (ci) selectCatalogItem(ci);
   }
 
   function togglePest(pest: PlottedPest, checked: boolean) {
@@ -167,35 +168,6 @@ function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, on
       });
     }
   }
-
-  const renderCatalogGroup = (title: string, items: CatalogItem[]) => {
-    const visible = filtered(items);
-    if (visible.length === 0) return null;
-    return (
-      <div className={styles.catalogGroup}>
-        <p className={styles.catalogGroupLabel}>{title}</p>
-        <div className={styles.catalogGrid}>
-          {visible.map(ci => (
-            <button
-              key={ci.id}
-              type="button"
-              className={styles.catalogItem}
-              onClick={() => selectCatalogItem(ci)}
-            >
-              <span className={styles.catalogItemName}>{ci.name}</span>
-              {(ci.initialPrice != null || ci.recurringPrice != null) && (
-                <span className={styles.catalogItemPrice}>
-                  {ci.initialPrice != null ? formatCurrency(ci.initialPrice) : ''}
-                  {ci.initialPrice != null && ci.recurringPrice != null && ' / '}
-                  {ci.recurringPrice != null ? formatCurrency(ci.recurringPrice) : ''}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className={styles.lineItemCard}>
@@ -224,48 +196,40 @@ function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, on
 
       {/* Plans & Addons content */}
       {item.type === 'plan-addon' && (
-        <>
-          {item.catalogItemId && !showList ? (
-            <div className={styles.selectedItem}>
-              <div className={styles.selectedItemInfo}>
-                <span className={styles.selectedItemKind}>{item.catalogItemKind}</span>
-                <span className={styles.selectedItemName}>{item.catalogItemName}</span>
-              </div>
-              <button
-                type="button"
-                className={styles.changeBtn}
-                onClick={() => { setShowList(true); onUpdate({ coveredPestIds: [], coveredPestLabels: [] }); }}
-              >
-                Change
-              </button>
-            </div>
-          ) : (
-            <div className={styles.catalogPicker}>
-              <input
-                type="text"
-                className={styles.catalogSearch}
-                placeholder="Search plans, addons, bundles…"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-              />
-              <div className={styles.catalogList}>
-                {catalog.length === 0 ? (
-                  <p className={styles.catalogEmpty}>No catalog items found for this company.</p>
-                ) : (
-                  <>
-                    {renderCatalogGroup('Service Plans', plans)}
-                    {renderCatalogGroup('Add-Ons', addons)}
-                    {renderCatalogGroup('Bundles', bundles)}
-                    {filtered(plans).length === 0 && filtered(addons).length === 0 && filtered(bundles).length === 0 && (
-                      <p className={styles.catalogEmpty}>No results for &ldquo;{search}&rdquo;</p>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-        </>
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel} htmlFor={`${baseId}-catalog-${item.id}`}>
+            Select Service
+          </label>
+          <select
+            id={`${baseId}-catalog-${item.id}`}
+            className={styles.selectInput}
+            value={item.catalogItemId ?? ''}
+            onChange={handleCatalogSelect}
+          >
+            <option value="">— Select —</option>
+            {plans.length > 0 && (
+              <optgroup label="Service Plans">
+                {plans.map(ci => (
+                  <option key={ci.id} value={ci.id}>{ci.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {addons.length > 0 && (
+              <optgroup label="Add-Ons">
+                {addons.map(ci => (
+                  <option key={ci.id} value={ci.id}>{ci.name}</option>
+                ))}
+              </optgroup>
+            )}
+            {bundles.length > 0 && (
+              <optgroup label="Bundles">
+                {bundles.map(ci => (
+                  <option key={ci.id} value={ci.id}>{ci.name}</option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
       )}
 
       {/* Custom content — name + pest checkboxes */}
@@ -399,6 +363,7 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
         initialPrice: p.initial_price ?? null,
         recurringPrice: p.recurring_price ?? null,
         billingFrequency: p.billing_frequency ?? null,
+        planCategory: p.plan_category ?? null,
         pestCoverageIds: (p.pest_coverage ?? []).map((c: any) => c.pest_id as string),
       }));
 
@@ -410,6 +375,7 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
         initialPrice: a.initial_price ?? null,
         recurringPrice: a.recurring_price ?? null,
         billingFrequency: a.billing_frequency ?? null,
+        planCategory: null,
         pestCoverageIds: [],
       }));
 
@@ -430,6 +396,7 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
           initialPrice: b.custom_initial_price ?? null,
           recurringPrice: b.custom_recurring_price ?? null,
           billingFrequency: b.billing_frequency ?? null,
+          planCategory: null,
           pestCoverageIds: pestIds,
         };
       });

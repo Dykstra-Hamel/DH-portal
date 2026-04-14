@@ -103,16 +103,15 @@ export const MAP_PEST_STAMP_OPTIONS: MapStampOption[] = [
 export const MAP_OBJECT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'door', label: 'Door', category: 'object', color: '#1d4ed8' },
   { type: 'window', label: 'Window', category: 'object', color: '#1d4ed8' },
-  { type: 'sentricon-bait-station', label: 'Sentricon Bait Station', category: 'object', color: '#0075de' },
+  { type: 'sentricon-bait-station', label: 'Sentricon', category: 'object', color: '#0075de' },
 ];
 
 export const MAP_ELEMENT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'house', label: 'Home', category: 'element', color: '#1d4ed8' },
   { type: 'garage', label: 'Garage', category: 'element', color: '#4338ca' },
-  { type: 'patio', label: 'Patio', category: 'element', color: '#0f766e' },
-  { type: 'deck', label: 'Deck', category: 'element', color: '#7c3aed' },
+  { type: 'deck', label: 'Deck/Patio', category: 'element', color: '#7c3aed' },
   { type: 'fence', label: 'Fence', category: 'element', color: '#64748b' },
-  { type: 'water', label: 'Body of Water', category: 'element', color: '#0284c7' },
+  { type: 'water', label: 'Water', category: 'element', color: '#0284c7' },
 ];
 
 export const MAP_CONDITION_STAMP_OPTIONS: MapStampOption[] = [

@@ -4,18 +4,10 @@ import React from 'react';
 import {
   Bug,
   CircleAlert,
-  DoorClosed,
-  DoorOpen,
-  AppWindow,
-  Droplet,
   Droplets,
   EyeOff,
-  Fence,
-  Grid2x2,
   TrendingDown,
   TreePine,
-  Warehouse,
-  House,
 } from 'lucide-react';
 import type { MapPestStampType, MapObjectStampType, MapStampType } from './types';
 import { isMapPestStampType } from './types';
@@ -192,26 +184,69 @@ export function MapStampGlyph({ type, size = 16 }: { type: MapStampType; size?: 
   }
 
   switch (type) {
-    // Object stamps
+    // Object stamps — use fill-based SVGs so they match the visual weight of pest icons
     case 'door':
-      return <DoorClosed size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <rect x="3" y="1" width="16" height="20" rx="1.5" fill="currentColor" />
+        </svg>
+      );
     case 'window':
-      return <Grid2x2 size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg width={size} height={size} viewBox="0 0 22 22" fill="none" aria-hidden="true">
+          <rect x="1.5" y="1.5" width="8.5" height="8.5" rx="1" fill="currentColor" />
+          <rect x="12" y="1.5" width="8.5" height="8.5" rx="1" fill="currentColor" />
+          <rect x="1.5" y="12" width="8.5" height="8.5" rx="1" fill="currentColor" />
+          <rect x="12" y="12" width="8.5" height="8.5" rx="1" fill="currentColor" />
+        </svg>
+      );
     case 'sentricon-bait-station':
       return <PlotObjectBlueprintGlyph type="sentricon-bait-station" />;
     // Element stamps
     case 'house':
-      return <House size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 27 28" fill="none" aria-hidden="true">
+          <path d="M16.6924 17.0041L10.3357 16.9966C9.85382 16.9966 9.48059 17.6132 9.47854 18.0677L9.44367 27.5524L1.33093 27.5661C0.655554 27.4827 0.116892 26.9796 0 26.2871L0.00205066 11.7145L13.3497 0L26.8101 11.7535L26.8237 26.0978C26.8415 26.9092 26.2133 27.5005 25.432 27.562L17.3042 27.5524L17.3944 17.8223C17.4163 17.6378 16.9665 17.0027 16.691 17.0027L16.6924 17.0041Z" fill="currentColor"/>
+        </svg>
+      );
     case 'garage':
-      return <Warehouse size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 34 35" fill="none" aria-hidden="true">
+          <path d="M6.65308 20.6527H17.0701V20.6428H27.347V18.6232H16.93V18.6331H6.65308V20.6527Z" fill="currentColor"/>
+          <path d="M6.6106 24.1456H17.0701V24.1356H27.3895V22.1082H16.93V22.1182H6.6106V24.1456Z" fill="currentColor"/>
+          <path d="M17.0699 17.1606L27.3454 17.1599V15.1537L16.9298 15.1551V15.1651L6.6543 15.1636V17.1698L17.0699 17.1705V17.1606Z" fill="currentColor"/>
+          <path d="M6.6106 27.5647L17.0701 27.5633V27.5534L27.3895 27.5548V25.599L16.93 25.5975V25.6082L6.6106 25.6089V27.5647Z" fill="currentColor"/>
+          <path d="M17.7207 0.131376C17.5267 0.0194122 17.2301 -0.0131849 16.9299 0.00453091V0.0102C16.6793 0.00878271 16.4429 0.0463402 16.2793 0.141297L0 9.51154L0.0134505 34.4313L4.94695 34.4377L4.92217 14.3834C4.92146 13.9745 5.4255 13.3282 5.87716 13.3282L17.0701 13.3261V13.3162L28.1228 13.3183C28.5745 13.3183 29.0785 13.9646 29.0778 14.3735L29.0531 34.4278L33.9866 34.4214L34 9.50162L17.7207 0.131376Z" fill="currentColor"/>
+          <path d="M16.9298 29.0274L6.6543 29.0281V31.0477L17.0699 31.0462V31.0363L27.3454 31.0377V29.0181L16.9298 29.0167V29.0274Z" fill="currentColor"/>
+          <path d="M16.9299 32.5067L6.60059 32.5053V34.4647L17.07 34.4661V34.4561L27.3993 34.4547V32.4954L16.9299 32.4968V32.5067Z" fill="currentColor"/>
+        </svg>
+      );
     case 'patio':
-      return <AppWindow size={size} strokeWidth={1.9} aria-hidden="true" />;
     case 'deck':
-      return <DoorOpen size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 39 30" fill="none" aria-hidden="true">
+          <path d="M29.8943 25.8247L9.07659 25.8253L9.03385 29.9943L5.12896 29.9937L5.10694 25.8071L1.02914 25.8285L1 23L37.9799 23.0006L38 25.8178L33.8458 25.8209L33.7726 29.9723L29.9215 30L29.8943 25.8247Z" fill="currentColor"/>
+          <path d="M5.95651 21.9458L0.847913 22L2.1283 20.1773L2.22858 9.93605C1.82745 10.1608 1.31957 10.42 1.00707 10.4788C0.698459 10.5363 0.126524 10.0537 0.0314173 9.74697C-0.087628 9.36089 0.145287 8.70176 0.499835 8.3917L9.89277 0.178719C10.292 -0.170348 11.0793 0.0464968 11.3045 0.363169C11.6946 0.912552 11.122 1.64638 10.6879 2.06288L10.6187 10.217L12 10.3691L5.95651 21.9458ZM7.42193 12.9401L9.0271 11.0361L9.00511 3.67071L7.41352 4.98433L7.42193 12.9395V12.9401ZM3.98644 17.5335L5.78182 15.1853L5.78765 6.6457L3.92109 8.30245L3.98709 17.5342L3.98644 17.5335Z" fill="currentColor"/>
+          <path d="M38.2065 21.971L33.0388 22L27 10.4724L28.355 10.2734L28.29 2.11993C27.9068 1.76749 27.4534 1.18844 27.4476 0.828757C27.4411 0.428889 28.5079 -0.234483 28.8748 0.0836985L38.7718 8.66998C39.1498 8.99804 39.0138 9.99541 38.6866 10.2326C38.3301 10.4908 37.5326 10.4394 36.8951 10.1436L36.9048 20.0283L38.2052 21.9704L38.2065 21.971ZM31.6037 12.9835L31.6603 5.21676L29.9813 3.71479L29.9351 10.9789L31.6037 12.9835ZM35.0203 17.5211L35.0899 8.34785L33.2782 6.77143L33.2678 15.2965L35.0196 17.5211H35.0203Z" fill="currentColor"/>
+          <path d="M25 21.9919L20.1286 22L20 10.0751L22.2428 10L25 21.9919Z" fill="currentColor"/>
+          <path d="M32 21.971L26.416 22L23 10.0599L25.6127 10L32 21.971Z" fill="currentColor"/>
+          <path d="M12.6256 21.9587L7 22L13.3988 10.0284L16 10L12.6256 21.9587Z" fill="currentColor"/>
+          <path d="M18.9476 21.9831L14 22L16.711 10.0608L19 10L18.9476 21.9831Z" fill="currentColor"/>
+        </svg>
+      );
     case 'fence':
-      return <Fence size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 39 31" fill="none" aria-hidden="true">
+          <path d="M39 12.0537V8.05922H36.7478V4.15448L34.2436 0L31.7851 4.12665V8.05922H29.3649V4.15448L26.8607 0L24.4022 4.12665V8.05922H21.982V4.15448L19.4778 0L17.0193 4.12665V8.05922H14.5991V4.15448L12.0949 0L9.63644 4.12665V8.05922H7.21623V4.15448L4.712 0L2.25353 4.12665V8.05922H0V12.0537H2.25285V22.1095H0V26.1039H2.25285V31H7.21554V26.1039H9.63575V31H14.5984V26.1039H17.0187V31H21.9813V26.1039H24.4016V31H29.3642V26.1039H31.7845V31H36.7471V26.1039H38.9993V22.1095H36.7471V12.0537H38.9993H39ZM7.21554 22.1095V12.0537H9.63575V22.1095H7.21554ZM14.5984 22.1095V12.0537H17.0187V22.1095H14.5984ZM21.9813 22.1095V12.0537H24.4016V22.1095H21.9813ZM31.7845 22.1095H29.3642V12.0537H31.7845V22.1095Z" fill="currentColor"/>
+        </svg>
+      );
     case 'water':
-      return <Droplet size={size} strokeWidth={1.9} aria-hidden="true" />;
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 34" fill="none" aria-hidden="true">
+          <path d="M19.6608 21.5267C17.4376 23.1309 14.5773 23.0458 12.6001 21.1276C9.81501 18.4249 5.85551 17.7929 2.67063 20.2149C1.9405 20.7697 0.917254 21.0046 0 20.9464C0.28656 18.6696 0.949312 16.7481 2.16621 14.9469L6.43909 8.62624L11.569 0L17.0065 8.83822L20.7723 14.3339C22.0304 16.1704 22.8319 18.2325 23.301 20.4707C21.9245 20.5453 20.7704 20.7259 19.6608 21.5267Z" fill="currentColor"/>
+          <path d="M23.318 22.6513C23.0327 27.3227 19.7419 31.1343 15.7431 32.6037C11.1137 34.3048 6.15773 33.0375 2.91856 29.5065C1.23322 27.6701 0.227643 25.4738 0.0568848 23.0478C1.48445 23.0426 2.78967 22.7017 3.92021 21.899C6.12568 20.3327 8.8565 20.5362 10.8448 22.4564C13.6214 25.1375 17.5822 25.7453 20.7448 23.3553C21.3735 22.8803 22.0913 22.6664 23.318 22.652V22.6513Z" fill="currentColor"/>
+        </svg>
+      );
     // Conducive condition stamps — all use the shared condition glyph
     case 'excessive-moisture':
     case 'faulty-grade':

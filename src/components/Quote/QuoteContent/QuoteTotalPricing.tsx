@@ -76,9 +76,10 @@ export default function QuoteTotalPricing({
     const recurring = isAddon ? item.recurring_price : (item.final_recurring_price || item.recurring_price);
     const initial = isAddon ? item.initial_price : (item.final_initial_price || item.initial_price);
     const freq = item.billing_frequency;
+    const isOneTime = freq === 'one-time';
     return (
       <>
-        {recurring > 0 && (
+        {recurring > 0 && !isOneTime && (
           <span className={styles.totalItemPriceRecurring}>
             <span className={styles.totalItemPriceAmount}>${formatCurrency(recurring)}</span>
             <span className={styles.totalItemPriceFreq}>/{abbreviateFrequency(freq)}</span>
@@ -87,7 +88,7 @@ export default function QuoteTotalPricing({
         {initial > 0 && (
           <span className={styles.totalItemPriceInitial}>
             <span className={styles.totalItemPriceAmount}>${formatCurrency(initial)}</span>
-            <span className={styles.totalItemPriceFreq}> initial</span>
+            <span className={styles.totalItemPriceFreq}>{isOneTime ? ' one time' : ' initial'}</span>
           </span>
         )}
       </>
@@ -164,16 +165,18 @@ export default function QuoteTotalPricing({
           </ul>
         </div>
       </div>
-      <div className={styles.totalRow}>
-        <div>Total Recurring Cost:</div>
-        <span>
-          <strong>
-            <sup>$</sup>
-            {formatCurrency(totalRecurring)}
-          </strong>
-          <span className={styles.totalRowFreq}>/{abbreviateFrequency(billingFrequency)}</span>
-        </span>
-      </div>
+      {totalRecurring > 0 && (
+        <div className={styles.totalRow}>
+          <div>Total Recurring Cost:</div>
+          <span>
+            <strong>
+              <sup>$</sup>
+              {formatCurrency(totalRecurring)}
+            </strong>
+            <span className={styles.totalRowFreq}>/{abbreviateFrequency(billingFrequency)}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }
