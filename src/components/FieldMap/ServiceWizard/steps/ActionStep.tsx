@@ -206,7 +206,7 @@ export function ActionStep({
         <button
           type="button"
           className={styles.nextBtn}
-          onClick={() => router.push('/field-ops/field-map')}
+          onClick={() => router.push('/field-ops/dashboard')}
           style={{ marginTop: 8 }}
         >
           Back to Route
@@ -230,7 +230,7 @@ export function ActionStep({
         <button
           type="button"
           className={styles.nextBtn}
-          onClick={() => router.push('/field-ops/field-map')}
+          onClick={() => router.push('/field-ops/dashboard')}
           style={{ marginTop: 8 }}
         >
           Back to Route
@@ -256,7 +256,7 @@ export function ActionStep({
         <button
           type="button"
           className={styles.nextBtn}
-          onClick={() => router.push('/field-ops/field-map')}
+          onClick={() => router.push('/field-ops/dashboard')}
           style={{ marginTop: 8 }}
         >
           Back to Route

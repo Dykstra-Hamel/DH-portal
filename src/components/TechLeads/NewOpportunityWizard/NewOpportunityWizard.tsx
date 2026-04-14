@@ -8,7 +8,7 @@ import React, {
   useMemo,
 } from 'react';
 import { UserPlus, TrendingUp, ChevronDown, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWizard } from '@/contexts/WizardContext';
@@ -618,6 +618,7 @@ function StepAIReview({
   notes,
   customerMentioned,
   isHighPriority,
+  techMentioned,
   pestOptions,
   selectedPestValue,
   otherPestValue,
@@ -628,11 +629,13 @@ function StepAIReview({
   onNotesChange,
   onCustomerMentionedChange,
   onHighPriorityChange,
+  onTechMentionedChange,
 }: {
   aiResult: AIResult;
   notes: string;
   customerMentioned: boolean;
   isHighPriority: boolean;
+  techMentioned: boolean;
   pestOptions: PestOption[];
   selectedPestValue: string;
   otherPestValue: string;
@@ -643,6 +646,7 @@ function StepAIReview({
   onNotesChange: (notes: string) => void;
   onCustomerMentionedChange: (v: boolean) => void;
   onHighPriorityChange: (v: boolean) => void;
+  onTechMentionedChange: (v: boolean) => void;
 }) {
   const [isDictating, setIsDictating] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -798,6 +802,14 @@ function StepAIReview({
             onChange={e => onHighPriorityChange(e.target.checked)}
           />
           <span>High priority</span>
+        </label>
+        <label className={styles.checkboxLabel}>
+          <input
+            type="checkbox"
+            checked={techMentioned}
+            onChange={e => onTechMentionedChange(e.target.checked)}
+          />
+          <span>Tech mentioned it to customer</span>
         </label>
       </div>
     </div>
@@ -1055,32 +1067,30 @@ function StepServiceDetails({
     }).format(val);
   };
 
-  if (!locationId) {
-    return (
-      <div className={styles.stepContent}>
-        <h2 className={styles.stepTitle}>Service Details</h2>
-        <p className={styles.emptyState}>
-          No PestPac account linked to this customer.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Service Details</h2>
       <p className={styles.stepDesc}>
-        Current services and upsell opportunities from PestPac
+        {locationId
+          ? 'Current services and upsell opportunities from PestPac'
+          : 'Select a service plan to add for this customer'}
       </p>
 
-      {isLoading && (
+      {!locationId && (
+        <p className={styles.serviceUnavailable}>
+          No PestPac account linked — showing available plans.
+        </p>
+      )}
+
+      {locationId && isLoading && (
         <div className={styles.loadingState}>
           <span className={styles.spinnerDark} />
           Loading service details…
         </div>
       )}
 
-      {!isLoading &&
+      {locationId &&
+        !isLoading &&
         fetchError &&
         orders.length === 0 &&
         serviceTypes.length === 0 && (
@@ -1090,7 +1100,7 @@ function StepServiceDetails({
           </p>
         )}
 
-      {!isLoading && (
+      {locationId && !isLoading && (
         <>
           {/* Current Services */}
           <div className={styles.serviceSection}>
@@ -2149,10 +2159,15 @@ function StepReview({
 
 export function NewOpportunityWizard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const pestpacClientIdParam = searchParams.get('pestpacClientId');
+  const pestpacLocationIdParam = searchParams.get('pestpacLocationId');
+  const isFromRouteStop = searchParams.get('type') === 'upsell' && !!pestpacClientIdParam;
   const { selectedCompany } = useCompany();
   const { setWizardTitle, setBackInterceptor } = useWizard();
 
   const wizardContainerRef = useRef<HTMLDivElement>(null);
+  const isSyncFired = useRef(false);
   const [stepIndex, setStepIndex] = useState(0);
 
   // Scroll to top of wizard on every step change
@@ -2215,6 +2230,7 @@ export function NewOpportunityWizard() {
   });
   const [notes, setNotes] = useState('');
   const [customerMentioned, setCustomerMentioned] = useState(false);
+  const [techMentioned, setTechMentioned] = useState(false);
   const [isHighPriority, setIsHighPriority] = useState(false);
   const [selectedCustomer, setSelectedCustomer] =
     useState<CustomerResult | null>(null);
@@ -2266,27 +2282,13 @@ export function NewOpportunityWizard() {
         'review',
       ];
     }
-    if (isPestPacEnabled) {
-      return [
-        'type-select',
-        'photos',
-        'ai-review',
-        'select-site',
-        'service-details',
-        'review',
-        'service-today-confirm',
-      ];
-    }
-    return [
-      'type-select',
-      'photos',
-      'ai-review',
-      'select-site',
-      'service-plan-select',
-      'review',
-      'service-today-confirm',
-    ];
-  }, [leadType, isPestPacEnabled]);
+    // Upsell: skip select-site when customer is pre-supplied from route stop
+    const steps: StepId[] = ['type-select', 'photos', 'ai-review'];
+    if (!isFromRouteStop) steps.push('select-site');
+    steps.push(isPestPacEnabled ? 'service-details' : 'service-plan-select');
+    steps.push('review', 'service-today-confirm');
+    return steps;
+  }, [leadType, isPestPacEnabled, isFromRouteStop]);
 
   const currentStepId = wizardSteps[stepIndex];
   const draftKey = companyId ? `techleads_draft_${companyId}` : null;
@@ -2312,6 +2314,7 @@ export function NewOpportunityWizard() {
       if (d.aiResult) setAIResult(d.aiResult);
       if (d.notes) setNotes(d.notes);
       if (d.customerMentioned) setCustomerMentioned(d.customerMentioned);
+      if (d.techMentioned) setTechMentioned(d.techMentioned);
       if (d.isHighPriority) setIsHighPriority(d.isHighPriority);
       if (d.selectedPestValue) setSelectedPestValue(d.selectedPestValue);
       if (d.otherPest) setOtherPest(d.otherPest);
@@ -2338,6 +2341,76 @@ export function NewOpportunityWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
+  // On mount: if URL has ?type=upsell, skip type-select
+  useEffect(() => {
+    if (searchParams.get('type') !== 'upsell') return;
+    setLeadType('upsell');
+    setWizardTitle('Upsell Opportunity');
+    setStepIndex(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const triggerPestpacSync = useCallback(async () => {
+    if (!pestpacClientIdParam || !selectedCompany?.id) return;
+    setIsSyncingCustomer(true);
+    setSyncError(null);
+
+    try {
+      // Step 1: Fast path — look up by pestpac_client_id in local DB
+      const dbRes = await fetch(
+        `/api/customers/by-pestpac/${encodeURIComponent(pestpacClientIdParam)}?companyId=${selectedCompany.id}`
+      );
+      if (dbRes.ok) {
+        const data = await dbRes.json();
+        if (data.customer) {
+          setSelectedCustomer(data.customer);
+          addRecent(data.customer);
+          return;
+        }
+      }
+
+      // Step 2: Not in local DB — create via pestpac-sync using the location ID
+      if (!pestpacLocationIdParam) {
+        throw new Error('No location ID available for sync');
+      }
+      const syncRes = await fetch('/api/customers/pestpac-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientId: pestpacLocationIdParam, // location ID — correct for GET /Locations/{id}
+          companyId: selectedCompany.id,
+        }),
+      });
+      if (!syncRes.ok) throw new Error(`Sync failed (${syncRes.status})`);
+      const syncData = await syncRes.json();
+      if (syncData.customer) {
+        setSelectedCustomer(syncData.customer);
+        addRecent(syncData.customer);
+      } else {
+        throw new Error(syncData.error ?? 'No customer returned');
+      }
+    } catch {
+      setSyncError('Failed to load customer data. Please retry.');
+    } finally {
+      setIsSyncingCustomer(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pestpacClientIdParam, pestpacLocationIdParam, selectedCompany?.id]);
+
+  const handleSyncRetry = () => {
+    isSyncFired.current = false;
+    isSyncFired.current = true;
+    triggerPestpacSync();
+  };
+
+  // Pre-sync customer from route stop once selectedCompany is available
+  useEffect(() => {
+    if (!pestpacClientIdParam || !selectedCompany?.id || isSyncFired.current) return;
+    isSyncFired.current = true;
+    triggerPestpacSync();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pestpacClientIdParam, selectedCompany?.id]);
+
   // Auto-save draft whenever key state changes (skip at step 0 — nothing to save yet)
   useEffect(() => {
     if (!draftKey || stepIndex === 0) return;
@@ -2350,6 +2423,7 @@ export function NewOpportunityWizard() {
           aiResult,
           notes,
           customerMentioned,
+          techMentioned,
           isHighPriority,
           selectedPestValue,
           otherPest,
@@ -2377,6 +2451,7 @@ export function NewOpportunityWizard() {
     aiResult,
     notes,
     customerMentioned,
+    techMentioned,
     isHighPriority,
     selectedPestValue,
     otherPest,
@@ -2599,10 +2674,20 @@ export function NewOpportunityWizard() {
         .filter(Boolean)
         .join('\n\n');
 
+      const checkboxNotes = [
+        customerMentioned ? 'Customer mentioned this issue.' : null,
+        isHighPriority ? 'High priority.' : null,
+        techMentioned ? 'Tech mentioned it to customer.' : null,
+      ]
+        .filter(Boolean)
+        .join('\n');
+
+      const finalNotes = [combinedNotes, checkboxNotes].filter(Boolean).join('\n\n');
+
       const body: Record<string, unknown> = {
         companyId,
         comments: commentWithOtherPest || 'TechLead opportunity',
-        notes: combinedNotes || undefined,
+        notes: finalNotes || undefined,
         pestType: selectedPestOption?.name ?? fallbackSuggestedPest,
         priority: isHighPriority ? 'high' : 'medium',
         leadSource: 'technician',
@@ -2810,6 +2895,12 @@ export function NewOpportunityWizard() {
 
   const canGoNext = (): boolean => {
     if (currentStepId === 'photos' && photos.length === 0) return false;
+    if (
+      currentStepId === 'ai-review' &&
+      isFromRouteStop &&
+      (isSyncingCustomer || !selectedCustomer)
+    )
+      return false;
     if (
       currentStepId === 'ai-review' &&
       selectedPestValue === OTHER_PEST_OPTION_VALUE &&
@@ -3072,6 +3163,8 @@ export function NewOpportunityWizard() {
               onNotesChange={setNotes}
               onCustomerMentionedChange={setCustomerMentioned}
               onHighPriorityChange={setIsHighPriority}
+              techMentioned={techMentioned}
+              onTechMentionedChange={setTechMentioned}
             />
           </>
         )}
@@ -3270,7 +3363,14 @@ export function NewOpportunityWizard() {
         )}
       </div>
 
-      {syncError && <p className={styles.submitError}>{syncError}</p>}
+      {syncError && (
+        <p className={styles.submitError}>
+          {syncError}
+          {isFromRouteStop && currentStepId === 'ai-review' && (
+            <button className={styles.retryLink} onClick={handleSyncRetry}> Retry</button>
+          )}
+        </p>
+      )}
       {submitError && <p className={styles.submitError}>{submitError}</p>}
 
       {/* Exit prompt modal */}

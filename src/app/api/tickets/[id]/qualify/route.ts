@@ -443,7 +443,7 @@ export async function POST(
 
       // Read the final assignee from the INSERT result — the DB trigger
       // (auto_assign_quote_lead) may have resolved a zip-code-group inspector.
-      let resolvedAssignedTo = newLead.assigned_to;
+      const resolvedAssignedTo = newLead.assigned_to;
 
       // After successful lead creation, geocode customer address and create service address
       // Only do this if ticket doesn't already have a service_address_id (inherit from ticket if it does)

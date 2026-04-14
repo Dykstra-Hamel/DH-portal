@@ -31,6 +31,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const clientEmail = searchParams.get('clientEmail') ?? '';
   const clientPhone = searchParams.get('clientPhone') ?? '';
   const address = searchParams.get('address') ?? '';
+  const resumeReview = searchParams.get('resumeReview') === 'true';
+  const resumeLeadId = searchParams.get('leadId') ?? null;
 
   // When launched from a service order the address is already known — skip step 0
   const hasPrefilledAddress = Boolean(stopId && address);
@@ -39,12 +41,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
-  const [currentStep, setCurrentStep] = useState(() => (hasPrefilledAddress ? 1 : 0));
+  const [currentStep, setCurrentStep] = useState(() => (resumeReview ? 4 : hasPrefilledAddress ? 1 : 0));
   const [mapPlotData, setMapPlotData] = useState<MapPlotData>(() => ({
     ...DEFAULT_MAP_PLOT_DATA,
     addressInput: address,
   }));
-  const [isGeocoding, setIsGeocoding] = useState(hasPrefilledAddress);
+  const [isGeocoding, setIsGeocoding] = useState(hasPrefilledAddress && !resumeReview);
+  const [isLoadingResume, setIsLoadingResume] = useState(resumeReview);
   const [brandPrimaryColor, setBrandPrimaryColor] = useState<string | undefined>(undefined);
 
   // Fetch brand primary color for stamp icons
@@ -65,6 +68,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   // When skipping the address step, geocode the pre-filled address to get coordinates
   useEffect(() => {
     if (!hasPrefilledAddress) return;
+    if (resumeReview) return;
     setIsGeocoding(true);
     fetch(`/api/internal/geocode?address=${encodeURIComponent(address)}`)
       .then(r => r.json())
@@ -84,6 +88,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       .finally(() => setIsGeocoding(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] = useState(false);
@@ -91,6 +96,55 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+
+  // When resuming a completed inspection, load existing lead + quote data
+  useEffect(() => {
+    if (!resumeReview || !resumeLeadId) return;
+
+    async function loadExistingInspection() {
+      try {
+        const [leadRes, quoteRes] = await Promise.all([
+          fetch(`/api/leads/${resumeLeadId}`),
+          fetch(`/api/leads/${resumeLeadId}/quote`),
+        ]);
+        const lead = await leadRes.json();
+        const quoteData = await quoteRes.json();
+
+        if (lead.map_plot_data) {
+          setMapPlotData({ ...DEFAULT_MAP_PLOT_DATA, ...lead.map_plot_data, addressInput: address });
+        }
+
+        const lineItems: any[] = quoteData?.data?.line_items ?? [];
+        setQuoteLineItems(lineItems.map((item: any): QuoteLineItem => {
+          const catalogItemId = item.service_plan_id ?? item.addon_service_id ?? item.bundle_plan_id ?? undefined;
+          const catalogItemKind: QuoteLineItem['catalogItemKind'] = item.service_plan_id ? 'plan' : item.addon_service_id ? 'addon' : item.bundle_plan_id ? 'bundle' : undefined;
+          return {
+            id: item.id,
+            type: catalogItemId ? 'plan-addon' : 'custom',
+            catalogItemKind,
+            catalogItemId,
+            catalogItemName: item.plan_name,
+            coveredPestIds: [],
+            coveredPestLabels: [],
+            initialCost: item.final_initial_price ?? item.initial_price ?? null,
+            recurringCost: item.final_recurring_price ?? item.recurring_price ?? null,
+            frequency: item.billing_frequency ?? null,
+          };
+        }));
+
+        setLeadId(lead.id);
+        if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
+      } catch {
+        // Graceful fallback: start from step 1
+        setCurrentStep(hasPrefilledAddress ? 1 : 0);
+      } finally {
+        setIsLoadingResume(false);
+      }
+    }
+
+    loadExistingInspection();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents && typeof mapPlotData.addressComponents.formatted_address === 'string'
@@ -290,6 +344,17 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         <div className={styles.geocodingState}>
           <div className={styles.geocodingSpinner} />
           <p>Loading map&hellip;</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingResume) {
+    return (
+      <div className={styles.wizard}>
+        <div className={styles.geocodingState}>
+          <div className={styles.geocodingSpinner} />
+          <p>Loading your inspection&hellip;</p>
         </div>
       </div>
     );

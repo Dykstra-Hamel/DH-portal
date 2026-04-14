@@ -133,7 +133,10 @@ export default function FieldOpsDashboard() {
     return (
       <div className={styles.wrapper}>
         <div className={styles.section}>
-          <FieldMapDashboard companyId={selectedCompany?.id ?? ''} />
+          <FieldMapDashboard
+            companyId={selectedCompany?.id ?? ''}
+            isTechnicianOnly={true}
+          />
         </div>
         <FieldOpsNav />
       </div>

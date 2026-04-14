@@ -74,6 +74,8 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const routeId = searchParams.get('routeId');
+  const leadId = searchParams.get('leadId');
+  const inspectionStatus = searchParams.get('inspectionStatus');
   const { selectedCompany } = useCompany();
 
   const [stop, setStop] = useState<StopDetail | null>(null);
@@ -114,6 +116,10 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
       clientPhone: stop.clientPhone ?? '',
     });
     if (selectedCompany?.id) params.set('companyId', selectedCompany.id);
+    if (inspectionStatus === 'done' && leadId) {
+      params.set('leadId', leadId);
+      params.set('resumeReview', 'true');
+    }
     router.push(`/field-ops/field-map/service/${stopId}/wizard?${params.toString()}`);
   }
 
@@ -409,7 +415,7 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
 
       <div className={styles.footer}>
         <button onClick={handleStartService} className={styles.startBtn}>
-          Start Service
+          {inspectionStatus === 'done' ? 'Review Quote' : 'Start Service'}
         </button>
       </div>
     </div>

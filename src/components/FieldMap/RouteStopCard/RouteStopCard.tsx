@@ -21,18 +21,30 @@ export interface RouteStop {
   lng?: number | null;
   inspectionStatus?: InspectionStatus;
   leadId?: string | null;
+  leadStatus?: string | null;
 }
 
 interface RouteStopCardProps {
   stop: RouteStop;
   companyId?: string;
+  imageSrc?: string;
+  isTechnicianOnly?: boolean;
 }
 
 function formatTime(time: string | null): string {
   if (!time) return 'No time set';
   try {
-    const date = new Date(time.includes('T') ? time : `1970-01-01T${time}`);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    // Extract time portion only — strip any timezone suffix so no UTC conversion occurs.
+    // PestPac times are already in company local time.
+    const timePart = time.includes('T')
+      ? time.split('T')[1].replace(/Z$/i, '').split('+')[0].split('-')[0]
+      : time;
+    const date = new Date(`1970-01-01T${timePart}`);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   } catch {
     return time;
   }
@@ -41,55 +53,95 @@ function formatTime(time: string | null): string {
 function getStatusStyle(status: string): string {
   const s = status.toLowerCase();
   if (s.includes('complete')) return styles.statusCompleted;
-  if (s.includes('progress') || s.includes('started')) return styles.statusInProgress;
+  if (s.includes('progress') || s.includes('started'))
+    return styles.statusInProgress;
   return styles.statusScheduled;
 }
 
-function getInspectionBadge(status: InspectionStatus): { label: string; className: string } | null {
+function getInspectionBadge(
+  status: InspectionStatus
+): { label: string; className: string } | null {
   if (status === 'not_started') return null;
-  if (status === 'in_progress') return { label: 'Inspection Started', className: styles.inspectionInProgress };
+  if (status === 'in_progress')
+    return {
+      label: 'Inspection Started',
+      className: styles.inspectionInProgress,
+    };
   return { label: 'Inspection Done', className: styles.inspectionDone };
 }
 
-export function RouteStopCard({ stop, companyId }: RouteStopCardProps) {
+export function RouteStopCard({
+  stop,
+  companyId,
+  imageSrc,
+  isTechnicianOnly = false,
+}: RouteStopCardProps) {
   const status = stop.serviceStatus.toLowerCase();
   const showStatus = !status.includes('scheduled');
-  const inspectionBadge = stop.inspectionStatus ? getInspectionBadge(stop.inspectionStatus) : null;
+  const inspectionBadge = stop.inspectionStatus
+    ? getInspectionBadge(stop.inspectionStatus)
+    : null;
+
+  const href = isTechnicianOnly
+    ? `/field-ops/tech-leads/new?type=upsell${stop.clientId ? `&pestpacClientId=${stop.clientId}` : ''}${stop.locationId ? `&pestpacLocationId=${stop.locationId}` : ''}${stop.stopId ? `&stopId=${stop.stopId}` : ''}${stop.clientName ? `&clientName=${encodeURIComponent(stop.clientName)}` : ''}`
+    : `/field-ops/field-map/service/${stop.stopId}?routeId=${stop.routeId}${companyId ? `&companyId=${companyId}` : ''}${stop.leadId ? `&leadId=${stop.leadId}` : ''}${stop.inspectionStatus ? `&inspectionStatus=${stop.inspectionStatus}` : ''}`;
 
   return (
-    <Link
-      href={`/field-ops/field-map/service/${stop.stopId}?routeId=${stop.routeId}${companyId ? `&companyId=${companyId}` : ''}`}
-      className={styles.card}
-    >
-      <div className={styles.timeCol}>
-        <span className={styles.time}>{formatTime(stop.scheduledTime)}</span>
-      </div>
-      <div className={styles.content}>
-        <div className={styles.topRow}>
-          <span className={styles.clientName}>{stop.clientName || 'Unknown Client'}</span>
-          <div className={styles.badges}>
-            {inspectionBadge && (
-              <span className={`${styles.status} ${inspectionBadge.className}`}>
-                {inspectionBadge.label}
-              </span>
-            )}
-            {showStatus && (
-              <span className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}>
-                {stop.serviceStatus}
-              </span>
-            )}
-          </div>
+    <Link href={href} className={styles.card}>
+      <div className={styles.infoRow}>
+        <div className={styles.timeCol}>
+          <span className={styles.time}>{formatTime(stop.scheduledTime)}</span>
         </div>
-        <p className={styles.address}>{stop.address}</p>
-        {stop.serviceType && (
-          <span className={styles.serviceType}>{stop.serviceType}</span>
-        )}
+        <div className={styles.content}>
+          <div className={styles.topRow}>
+            <span className={styles.clientName}>
+              {stop.clientName || 'Unknown Client'}
+            </span>
+          </div>
+          <p className={styles.address}>{stop.address}</p>
+          {/* {stop.serviceType && (
+            <span className={styles.serviceType}>{stop.serviceType}</span>
+          )} */}
+        </div>
+        <div className={styles.badges}>
+          {inspectionBadge && (
+            <span className={`${styles.status} ${inspectionBadge.className}`}>
+              {inspectionBadge.label}
+            </span>
+          )}
+          {showStatus && (
+            <span
+              className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}
+            >
+              {stop.serviceStatus}
+            </span>
+          )}
+        </div>
+        <div className={styles.chevronBtn}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="8"
+            height="13"
+            viewBox="0 0 8 13"
+            fill="none"
+          >
+            <path
+              d="M1 11.5L6.25 6.25L1 1"
+              stroke="#F5F9FF"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </div>
       </div>
-      <div className={styles.chevron}>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      </div>
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt={`Street view of ${stop.address}`}
+          className={styles.stopImage}
+        />
+      )}
     </Link>
   );
 }

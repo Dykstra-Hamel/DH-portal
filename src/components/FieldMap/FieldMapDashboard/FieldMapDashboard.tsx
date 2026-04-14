@@ -68,92 +68,39 @@ const MapPlaceholder = ({
   </div>
 );
 
-function RouteMapPreview({ stops }: { stops: RouteStop[] }) {
-  // Show the first incomplete stop; fall back to the last stop when all are done
-  const nextStop =
-    stops.find(
-      s =>
-        s.lat != null &&
-        s.lng != null &&
-        !s.serviceStatus.toLowerCase().includes('complete')
-    ) ?? stops.find(s => s.lat != null && s.lng != null);
-
-  const [imgSrc, setImgSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!nextStop?.lat || !nextStop?.lng) { setImgSrc(null); return; }
-
-    const streetSrc = `/api/internal/street-view-image?latitude=${nextStop.lat}&longitude=${nextStop.lng}&width=640&height=480&type=streetview&marker=false`;
-    const satSrc = `/api/internal/street-view-image?latitude=${nextStop.lat}&longitude=${nextStop.lng}&width=640&height=480&type=satellite&marker=true`;
-
-    fetch('/api/internal/street-view-metadata', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ latitude: nextStop.lat, longitude: nextStop.lng }),
-    })
-      .then(r => r.json())
-      .then(meta => setImgSrc(meta.available ? streetSrc : satSrc))
-      .catch(() => setImgSrc(streetSrc));
-  }, [nextStop?.lat, nextStop?.lng]);
-
-  if (!nextStop) return <MapPlaceholder />;
-
-  const stopNumber = stops.indexOf(nextStop) + 1;
-  const allDone = !stops.some(
-    s => !s.serviceStatus.toLowerCase().includes('complete')
-  );
-  const label = allDone
-    ? `Route Complete - Stop ${stopNumber} of ${stops.length}`
-    : `Up Next - Stop ${stopNumber} of ${stops.length}`;
-
-  return (
-    <div className={styles.streetViewWrap}>
-      {imgSrc && (
-        <img
-          src={imgSrc}
-          alt={`Street view of ${nextStop.address}`}
-          className={styles.map}
-        />
-      )}
-      <div className={styles.mapOverlay} />
-      <div className={styles.mapHeroContent}>
-        <div className={styles.mapHeroTextCard}>
-          <p className={styles.heroEyebrow}>{label}</p>
-          <p className={styles.heroCustomerName}>
-            {nextStop.clientName || 'Unknown Client'}
-          </p>
-          <p className={styles.heroAddress}>{nextStop.address}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function FieldMapDashboard({
   companyId = '',
   embedded = false,
+  isTechnicianOnly = false,
 }: {
   companyId?: string;
   embedded?: boolean;
+  isTechnicianOnly?: boolean;
 }) {
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const selectedDateObj = new Date(selectedDate + 'T12:00:00');
+  const isToday = selectedDate === todayStr;
+
+  type StopFilter = 'left' | 'total' | 'completed' | 'quoted' | 'won';
+  const [activeFilter, setActiveFilter] = useState<StopFilter>('left');
+
   const [stops, setStops] = useState<RouteStop[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [inlineSrc, setInlineSrc] = useState<string | null>(null);
 
-  const today = new Date();
-  const dateParam = today.toISOString().split('T')[0];
-
   useEffect(() => {
     if (!companyId) return;
     setLoading(true);
     setError(null);
     setNeedsSetup(false);
+    setActiveFilter('left');
     async function fetchRoute() {
       try {
         const res = await fetch(
-          `/api/field-map/route?date=${dateParam}&companyId=${companyId}`
+          `/api/field-map/route?date=${selectedDate}&companyId=${companyId}`
         );
         const data = await res.json();
         if (data.needsSetup) {
@@ -172,36 +119,55 @@ export function FieldMapDashboard({
       }
     }
     fetchRoute();
-  }, [dateParam, companyId]);
+  }, [selectedDate, companyId]);
 
-  const completed = stops.filter(s =>
-    s.serviceStatus.toLowerCase().includes('complete')
-  ).length;
+  const isCompleted = (s: RouteStop) =>
+    s.serviceStatus.toLowerCase().includes('complete') || s.inspectionStatus === 'done';
+  const completed = stops.filter(isCompleted).length;
   const remaining = stops.length - completed;
+
+  const quoted = stops.filter(s => s.leadStatus === 'quoted').length;
+  const won = stops.filter(
+    s => s.leadStatus === 'scheduling' || s.leadStatus === 'won'
+  ).length;
 
   const totalDisplay = useCountUp(stops.length);
   const completedDisplay = useCountUp(completed);
   const remainingDisplay = useCountUp(remaining);
+  const quotedDisplay = useCountUp(quoted);
+  const wonDisplay = useCountUp(won);
+
+  const visibleStops = (() => {
+    switch (activeFilter) {
+      case 'total':     return stops;
+      case 'completed': return stops.filter(isCompleted);
+      case 'quoted':    return stops.filter(s => s.leadStatus === 'quoted');
+      case 'won':       return stops.filter(s => s.leadStatus === 'scheduling' || s.leadStatus === 'won');
+      default:          return stops.filter(s => !isCompleted(s)); // 'left'
+    }
+  })();
 
   // Find the next incomplete stop for inline street view (embedded mode)
   const nextIncompleteStop =
-    stops.find(
-      s =>
-        s.lat != null &&
-        s.lng != null &&
-        !s.serviceStatus.toLowerCase().includes('complete')
-    ) ?? stops.find(s => s.lat != null && s.lng != null);
+    stops.find(s => s.lat != null && s.lng != null && !isCompleted(s)) ??
+    stops.find(s => s.lat != null && s.lng != null);
 
   useEffect(() => {
-    if (!nextIncompleteStop?.lat || !nextIncompleteStop?.lng) { setInlineSrc(null); return; }
+    if (!nextIncompleteStop?.lat || !nextIncompleteStop?.lng) {
+      setInlineSrc(null);
+      return;
+    }
 
     const streetSrc = `/api/internal/street-view-image?latitude=${nextIncompleteStop.lat}&longitude=${nextIncompleteStop.lng}&width=640&height=280&type=streetview&marker=false`;
-    const satSrc = `/api/internal/street-view-image?latitude=${nextIncompleteStop.lat}&longitude=${nextIncompleteStop.lng}&width=640&height=280&type=satellite&marker=true`;
+    const satSrc = `/api/internal/street-view-image?latitude=${nextIncompleteStop.lat}&longitude=${nextIncompleteStop.lng}&width=640&height=280&type=satellite&marker=false`;
 
     fetch('/api/internal/street-view-metadata', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ latitude: nextIncompleteStop.lat, longitude: nextIncompleteStop.lng }),
+      body: JSON.stringify({
+        latitude: nextIncompleteStop.lat,
+        longitude: nextIncompleteStop.lng,
+      }),
     })
       .then(r => r.json())
       .then(meta => setInlineSrc(meta.available ? streetSrc : satSrc))
@@ -210,72 +176,71 @@ export function FieldMapDashboard({
 
   return (
     <div className={styles.page}>
-      {/* Map hero — hidden in embedded mode */}
-      {!embedded && (
-        <div className={styles.mapHero}>
-          {loading ? (
-            <div className={styles.mapLoading}>
-              <div className={styles.spinner} />
-            </div>
-          ) : stops.length > 0 ? (
-            <RouteMapPreview stops={stops} />
-          ) : (
-            <MapPlaceholder message="No stops to map today" />
-          )}
-        </div>
-      )}
-
       <div className={`${styles.body} ${embedded ? styles.bodyEmbedded : ''}`}>
         {/* Header */}
         <div className={styles.header}>
           <div>
-            <h1 className={styles.title}>Today&apos;s Route</h1>
-            <p className={styles.date}>{formatDateHeader(today)}</p>
+            <h1 className={styles.title}>
+              {isToday ? 'Today\u2019s Route' : 'Route'}
+            </h1>
+            <p className={styles.date}>{formatDateHeader(selectedDateObj)}</p>
           </div>
+          <input
+            type="date"
+            className={styles.datePicker}
+            value={selectedDate}
+            onChange={e => setSelectedDate(e.target.value)}
+          />
         </div>
 
         {/* Stats */}
         {!loading && !needsSetup && !error && stops.length > 0 && (
           <div className={styles.statsRow}>
-            <div className={styles.statCard}>
+            <button
+              className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
+              onClick={() => setActiveFilter('total')}
+            >
               <span className={styles.statNumber}>{totalDisplay}</span>
               <span className={styles.statLabel}>Total</span>
-            </div>
-            <div className={styles.statCard}>
+            </button>
+            <button
+              className={`${styles.statCard} ${activeFilter === 'completed' ? styles.statCardActive : ''}`}
+              onClick={() => setActiveFilter('completed')}
+            >
               <span className={`${styles.statNumber} ${styles.statDone}`}>
                 {completedDisplay}
               </span>
               <span className={styles.statLabel}>Completed</span>
-            </div>
-            <div className={styles.statCard}>
+            </button>
+            <button
+              className={`${styles.statCard} ${activeFilter === 'left' ? styles.statCardActive : ''}`}
+              onClick={() => setActiveFilter('left')}
+            >
               <span className={`${styles.statNumber} ${styles.statRemaining}`}>
                 {remainingDisplay}
               </span>
               <span className={styles.statLabel}>Left</span>
-            </div>
+            </button>
+            <button
+              className={`${styles.statCard} ${activeFilter === 'quoted' ? styles.statCardActive : ''}`}
+              onClick={() => setActiveFilter('quoted')}
+            >
+              <span className={`${styles.statNumber} ${styles.statQuoted}`}>
+                {quotedDisplay}
+              </span>
+              <span className={styles.statLabel}>Quoted</span>
+            </button>
+            <button
+              className={`${styles.statCard} ${activeFilter === 'won' ? styles.statCardActive : ''}`}
+              onClick={() => setActiveFilter('won')}
+            >
+              <span className={`${styles.statNumber} ${styles.statWon}`}>
+                {wonDisplay}
+              </span>
+              <span className={styles.statLabel}>Won</span>
+            </button>
           </div>
         )}
-
-        {/* Inline street view — embedded mode only, shown before stop list */}
-        {embedded &&
-          !loading &&
-          !needsSetup &&
-          !error &&
-          stops.length > 0 &&
-          inlineSrc && (
-            <div className={styles.inlineStreetViewWrap}>
-              <p className={styles.upNextLabel}>Up Next</p>
-              <img
-                src={inlineSrc}
-                alt={
-                  nextIncompleteStop
-                    ? `Street view of ${nextIncompleteStop.address}`
-                    : 'Street view'
-                }
-                className={styles.inlineStreetView}
-              />
-            </div>
-          )}
 
         {/* States */}
         {loading && (
@@ -367,11 +332,17 @@ export function FieldMapDashboard({
         {/* Stop list */}
         {!loading && !needsSetup && !error && stops.length > 0 && (
           <div className={styles.stopList}>
-            {stops.map(stop => (
+            {visibleStops.map(stop => (
               <RouteStopCard
                 key={stop.stopId}
                 stop={stop}
                 companyId={companyId}
+                isTechnicianOnly={isTechnicianOnly}
+                imageSrc={
+                  stop.stopId === nextIncompleteStop?.stopId
+                    ? (inlineSrc ?? undefined)
+                    : undefined
+                }
               />
             ))}
           </div>

@@ -887,6 +887,17 @@
   font-family: var(--font-satoshi);
 }
 
+.retryLink {
+  background: none;
+  border: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+  font: inherit;
+  margin-left: 0.25rem;
+}
+
 // ─── Thank You Screen ────────────────────────────────────────────────────────
 
 .thankYouScreen {
