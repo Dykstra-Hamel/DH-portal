@@ -60,7 +60,7 @@ export default function HeroSection({ hero, companyId }: HeroSectionProps) {
   };
 
   return (
-    <section id="hero-section" className={styles.heroSection}>
+    <section id="hero-section" className={`${styles.heroSection} ${styles.heroSectionWithBackground}`}>
       <div className={styles.heroContainer}>
         {/* Left column - Content */}
         <div className={styles.heroContent}>
