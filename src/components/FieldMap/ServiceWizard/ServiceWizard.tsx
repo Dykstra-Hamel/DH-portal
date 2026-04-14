@@ -36,9 +36,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const { profile, getAvatarUrl } = useUser();
   const { selectedCompany } = useCompany();
 
-  const clientName = searchParams.get('clientName') ?? '';
-  const clientEmail = searchParams.get('clientEmail') ?? '';
-  const clientPhone = searchParams.get('clientPhone') ?? '';
+  const [clientName, setClientName] = useState(searchParams.get('clientName') ?? '');
+  const [clientEmail, setClientEmail] = useState(searchParams.get('clientEmail') ?? '');
+  const [clientPhone, setClientPhone] = useState(searchParams.get('clientPhone') ?? '');
   const address = searchParams.get('address') ?? '';
   const resumeReview = searchParams.get('resumeReview') === 'true';
   const resumeLeadId = searchParams.get('leadId') ?? null;
@@ -248,6 +248,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   async function handleNext() {
     setStepSaveError(null);
 
+    // After Address step (new inspection only) — validate customer name
+    if (currentStep === 0 && !stopId) {
+      if (!clientName.trim()) {
+        setStepSaveError('Customer name is required before continuing.');
+        return;
+      }
+    }
+
     // After Map step — save inspection (creates/updates lead)
     if (currentStep === 2) {
       setIsSavingStep(true);
@@ -349,6 +357,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           <MapAddressStep
             mapPlotData={mapPlotData}
             onChange={handleMapChange}
+            isNewInspection={!stopId}
+            clientName={clientName}
+            clientEmail={clientEmail}
+            clientPhone={clientPhone}
+            onClientNameChange={setClientName}
+            onClientEmailChange={setClientEmail}
+            onClientPhoneChange={setClientPhone}
+            companyId={selectedCompany?.id ?? ''}
           />
         );
       case 1:
@@ -504,6 +520,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       {/* Address step footer */}
       {currentStep === 0 && (
         <div className={styles.footer}>
+          {stepSaveError && (
+            <p className={styles.stepSaveError}>{stepSaveError}</p>
+          )}
           <button
             type="button"
             className={styles.prevBtn}

@@ -11,6 +11,8 @@ import {
   Lock,
   Unlock,
   Move3d,
+  RotateCcw,
+  RotateCw,
   Ruler,
   Undo2,
   Trash2,
@@ -153,6 +155,7 @@ function StepMapPlot({
       }
     | null
   >(null);
+  const mapRotateRef = useRef<{ lastAngle: number | null; baseHeading: number }>({ lastAngle: null, baseHeading: 0 });
 
   const latitude = getMapLatitude(mapPlotData);
   const longitude = getMapLongitude(mapPlotData);
@@ -189,6 +192,8 @@ function StepMapPlot({
     },
     [mapPlotData, onChange]
   );
+  const updateMapPlotDataRef = useRef(updateMapPlotData);
+  updateMapPlotDataRef.current = updateMapPlotData;
 
   useEffect(() => {
     if (!isSatelliteMode || googleMapsApiKey || mapsError) return;
@@ -239,6 +244,55 @@ function StepMapPlot({
     }
     wasViewSetRef.current = mapPlotData.isViewSet;
   }, [mapPlotData.isViewSet, updateMapPlotData]);
+
+  // Passive two-finger rotation gesture for the satellite map (view setup phase only).
+  // Accumulated heading is committed to React state on touchend so the controlled
+  // <Map heading={...}> prop drives the actual rotation (avoids raster-map warnings).
+  useEffect(() => {
+    const container = mapRef.current;
+    if (!isSatelliteMode || !container) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (mapPlotDataRef.current.isViewSet) return;
+      if (e.touches.length === 2) {
+        const dx = e.touches[1].clientX - e.touches[0].clientX;
+        const dy = e.touches[1].clientY - e.touches[0].clientY;
+        mapRotateRef.current.lastAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+        mapRotateRef.current.baseHeading = mapPlotDataRef.current.heading ?? 0;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (mapPlotDataRef.current.isViewSet) return;
+      if (e.touches.length !== 2 || mapRotateRef.current.lastAngle === null) return;
+      const dx = e.touches[1].clientX - e.touches[0].clientX;
+      const dy = e.touches[1].clientY - e.touches[0].clientY;
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      let delta = angle - mapRotateRef.current.lastAngle;
+      // Normalize delta to [-180, 180] to avoid jumps at the ±180° boundary
+      delta = ((delta + 540) % 360) - 180;
+      mapRotateRef.current.lastAngle = angle;
+      mapRotateRef.current.baseHeading += delta;
+      // Commit to state each frame — the controlled heading prop drives the map rotation
+      updateMapPlotDataRef.current({ heading: mapRotateRef.current.baseHeading });
+    };
+
+    const handleTouchEnd = () => {
+      mapRotateRef.current.lastAngle = null;
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true });
+    container.addEventListener('touchmove', handleTouchMove, { passive: true });
+    container.addEventListener('touchend', handleTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.removeEventListener('touchmove', handleTouchMove);
+      container.removeEventListener('touchend', handleTouchEnd);
+      container.removeEventListener('touchcancel', handleTouchEnd);
+    };
+  }, [isSatelliteMode]);
 
   useEffect(() => {
     const container = mapRef.current;
@@ -448,8 +502,13 @@ function StepMapPlot({
     const dyPx = point.y * canvasSize.height - canvasSize.height / 2;
     const worldWidth = 256;
 
-    let worldX = centerWorld.x + dxPx / scale;
-    const worldY = centerWorld.y + dyPx / scale;
+    // Un-rotate screen offsets back to north-up Mercator world offsets
+    const headingRad = ((map.getHeading() ?? 0) * Math.PI) / 180;
+    const worldDxPx = dxPx * Math.cos(headingRad) - dyPx * Math.sin(headingRad);
+    const worldDyPx = dxPx * Math.sin(headingRad) + dyPx * Math.cos(headingRad);
+
+    let worldX = centerWorld.x + worldDxPx / scale;
+    const worldY = centerWorld.y + worldDyPx / scale;
     worldX = ((worldX % worldWidth) + worldWidth) % worldWidth;
 
     const latLng = projection.fromPointToLatLng(new google.maps.Point(worldX, worldY));
@@ -482,9 +541,14 @@ function StepMapPlot({
     if (dx < -worldWidth / 2) dx += worldWidth;
     const dy = pointWorld.y - centerWorld.y;
 
+    // Rotate world offsets (north-up Mercator) into rotated screen space
+    const headingRad = ((map.getHeading() ?? 0) * Math.PI) / 180;
+    const screenDx = dx * Math.cos(headingRad) + dy * Math.sin(headingRad);
+    const screenDy = -dx * Math.sin(headingRad) + dy * Math.cos(headingRad);
+
     return {
-      x: (dx * scale + canvasSize.width / 2) / canvasSize.width,
-      y: (dy * scale + canvasSize.height / 2) / canvasSize.height,
+      x: (screenDx * scale + canvasSize.width / 2) / canvasSize.width,
+      y: (screenDy * scale + canvasSize.height / 2) / canvasSize.height,
     };
   }, [canvasSize.height, canvasSize.width, googleMapInstance, isSatelliteMode]);
 
@@ -1417,6 +1481,7 @@ function StepMapPlot({
                 minZoom={MAP_MIN_ZOOM}
                 heading={mapPlotData.heading}
                 tilt={mapPlotData.tilt}
+                mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? 'DEMO_MAP_ID'}
                 mapTypeId="satellite"
                 onCameraChanged={onCameraChanged}
                 gestureHandling={mapPlotData.isViewSet ? 'none' : 'greedy'}
@@ -1518,6 +1583,34 @@ function StepMapPlot({
 		              >
 		                <Ruler size={16} />
 		              </button>
+		              {isSatelliteMode && !mapPlotData.isViewSet && (
+		                <>
+		                  <button
+		                    type="button"
+		                    className={`${styles.mapIconBtn} ${styles.mapRotateBtn}`}
+		                    onClick={() => {
+		                      const newHeading = ((mapPlotData.heading ?? 0) - 15 + 360) % 360;
+		                      updateMapPlotData({ heading: newHeading });
+		                    }}
+		                    title="Rotate Left 15°"
+		                    aria-label="Rotate Left 15°"
+		                  >
+		                    <RotateCcw size={16} />
+		                  </button>
+		                  <button
+		                    type="button"
+		                    className={`${styles.mapIconBtn} ${styles.mapRotateBtn}`}
+		                    onClick={() => {
+		                      const newHeading = ((mapPlotData.heading ?? 0) + 15) % 360;
+		                      updateMapPlotData({ heading: newHeading });
+		                    }}
+		                    title="Rotate Right 15°"
+		                    aria-label="Rotate Right 15°"
+		                  >
+		                    <RotateCw size={16} />
+		                  </button>
+		                </>
+		              )}
 		            </div>
 		          </div>}
 
@@ -2167,17 +2260,19 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
 
   // ── Gesture + zoom state for the read-only map ─────────────────────────────
-  const [roTransform, setRoTransform] = useState({ scale: 2, tx: 0, ty: 0 });
+  const [roTransform, setRoTransform] = useState({ scale: 2, tx: 0, ty: 0, rotation: mapPlotData.heading ?? 0 });
   const [roAnimating, setRoAnimating] = useState(false);
-  const roSavedTransform = useRef<{ scale: number; tx: number; ty: number } | null>(null);
+  const roSavedTransform = useRef<{ scale: number; tx: number; ty: number; rotation: number } | null>(null);
   const roGesture = useRef<{
     pointers: Map<number, { x: number; y: number }>;
     lastDist: number | null;
+    lastAngle: number | null;
     pan: { pointerId: number; startX: number; startY: number; startTx: number; startTy: number } | null;
     moved: boolean;
   }>({
     pointers: new globalThis.Map(),
     lastDist: null,
+    lastAngle: null,
     pan: null,
     moved: false,
   });
@@ -2210,6 +2305,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       const dx = vals[1].x - vals[0].x;
       const dy = vals[1].y - vals[0].y;
       g.lastDist = Math.hypot(dx, dy);
+      g.lastAngle = Math.atan2(dy, dx) * (180 / Math.PI);
     }
   };
 
@@ -2238,6 +2334,16 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       const dy = vals[1].y - vals[0].y;
       const dist = Math.hypot(dx, dy);
       const scaleDelta = g.lastDist && g.lastDist > 0 ? dist / g.lastDist : 1;
+
+      const angle = Math.atan2(dy, dx) * (180 / Math.PI);
+      let angleDelta = 0;
+      if (g.lastAngle !== null) {
+        angleDelta = angle - g.lastAngle;
+        // Normalize to [-180, 180] to prevent jumps at the ±180° boundary
+        angleDelta = ((angleDelta + 540) % 360) - 180;
+      }
+      g.lastAngle = angle;
+
       setRoTransform(prev => {
         const newScale = Math.max(1, Math.min(8, prev.scale * scaleDelta));
         const maxTx = previewSize.width * (newScale - 1) / 2;
@@ -2246,6 +2352,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
           scale: newScale,
           tx: Math.max(-maxTx, Math.min(maxTx, prev.tx)),
           ty: Math.max(-maxTy, Math.min(maxTy, prev.ty)),
+          rotation: prev.rotation + angleDelta,
         };
       });
       g.lastDist = dist;
@@ -2255,7 +2362,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const handleRoPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
     const g = roGesture.current;
     g.pointers.delete(e.pointerId);
-    if (g.pointers.size < 2) { g.lastDist = null; }
+    if (g.pointers.size < 2) { g.lastDist = null; g.lastAngle = null; }
     if (g.pointers.size === 0) { g.pan = null; }
   };
 
@@ -2268,6 +2375,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       const maxTx = previewSize.width * (newScale - 1) / 2;
       const maxTy = previewSize.height * (newScale - 1) / 2;
       return {
+        ...prev,
         scale: newScale,
         tx: Math.max(-maxTx, Math.min(maxTx, prev.tx)),
         ty: Math.max(-maxTy, Math.min(maxTy, prev.ty)),
@@ -2286,7 +2394,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
     const targetTx = -(targetScale * (point.x - cx));
     const targetTy = -(targetScale * (point.y - cy));
     setRoAnimating(true);
-    setRoTransform({ scale: targetScale, tx: targetTx, ty: targetTy });
+    setRoTransform(prev => ({ ...prev, scale: targetScale, tx: targetTx, ty: targetTy }));
     setSelectedStampId(stampId);
   };
 
@@ -2515,7 +2623,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
           <div
             className={styles.readOnlyMapContent}
             style={{
-              transform: `translate(${roTransform.tx}px, ${roTransform.ty}px) scale(${roTransform.scale})`,
+              transform: `rotate(${roTransform.rotation}deg) translate(${roTransform.tx}px, ${roTransform.ty}px) scale(${roTransform.scale})`,
               transition: roAnimating ? 'transform 0.4s ease' : 'none',
               transformOrigin: 'center center',
               willChange: roAnimating ? 'transform' : 'auto',
@@ -2628,6 +2736,27 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
             </div>
           )}
           </div>{/* end readOnlyMapContent */}
+
+          <div className={styles.readOnlyRotateControls}>
+            <button
+              type="button"
+              className={styles.readOnlyRotateBtn}
+              onClick={() => setRoTransform(prev => ({ ...prev, rotation: prev.rotation - 15 }))}
+              title="Rotate Left 15°"
+              aria-label="Rotate Left 15°"
+            >
+              <RotateCcw size={16} />
+            </button>
+            <button
+              type="button"
+              className={styles.readOnlyRotateBtn}
+              onClick={() => setRoTransform(prev => ({ ...prev, rotation: prev.rotation + 15 }))}
+              title="Rotate Right 15°"
+              aria-label="Rotate Right 15°"
+            >
+              <RotateCw size={16} />
+            </button>
+          </div>
         </div>
       </div>
 

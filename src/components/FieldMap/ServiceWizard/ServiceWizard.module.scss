@@ -587,6 +587,156 @@
   }
 }
 
+// ── MapAddressStep title / desc ──────────────────────────────────────────────
+
+.mapAddressStepTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-satoshi);
+}
+
+.mapAddressStepDesc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+// ── Customer info section (new inspections only) ─────────────────────────────
+
+.customerInfoSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.customerInfoTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gray-800);
+  font-family: var(--font-satoshi);
+}
+
+.customerSearchWrapper {
+  position: relative;
+}
+
+.customerSearchInput {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: var(--gray-900);
+  background: var(--white);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.customerSearchSpinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
+.customerSearchResults {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--white);
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.customerSearchResultItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
+.customerResultName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  font-family: var(--font-satoshi);
+}
+
+.customerResultMeta {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+.customerTextInput {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--font-satoshi);
+  color: var(--gray-900);
+  background: var(--white);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.customerRequiredMark {
+  color: var(--error-500, #ef4444);
+  margin-left: 2px;
+}
+
 .prevBtn {
   height: 48px;
   border-radius: 12px;
