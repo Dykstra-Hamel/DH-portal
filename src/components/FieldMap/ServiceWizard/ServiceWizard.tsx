@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
@@ -216,6 +216,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const pestTypes = getPlottedPestTypes(mapPlotData);
   const plottedPests = getPlottedPests(mapPlotData);
 
+  const mapMeasurements = useMemo(() => ({
+    byOutline: mapPlotData.outlines
+      .filter(o => o.sqft != null || o.linearFt != null)
+      .map(o => ({ id: o.id, type: o.type, sqft: o.sqft ?? 0, linearFt: o.linearFt ?? 0 })),
+  }), [mapPlotData.outlines]);
+
   const handleMapChange = useCallback((data: MapPlotData) => {
     setMapPlotData(data);
   }, []);
@@ -401,6 +407,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               onChange={setQuoteLineItems}
               plottedPests={plottedPests}
               companyId={selectedCompany?.id ?? ''}
+              mapMeasurements={mapMeasurements}
             />
           </div>
         );

@@ -79,6 +79,7 @@ export async function POST(
         eligibility_mode: body.eligibility_mode || 'all',
         is_active: body.is_active !== undefined ? body.is_active : true,
         requires_quote: body.requires_quote || false,
+        price_per_unit: body.price_per_unit ?? null,
       })
       .select()
       .single();

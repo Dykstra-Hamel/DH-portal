@@ -28,6 +28,9 @@ interface ServicePlan {
   plan_image_url: string | null;
   plan_disclaimer: string | null;
   plan_terms: string | null;
+  pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
+  price_per_unit: number | null;
+  minimum_price: number | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -332,6 +335,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_video_url: null as string | null,
     is_active: true,
     allow_custom_pricing: false,
+    pricing_unit: null as 'sqft' | 'linear_feet' | 'acres' | null,
+    price_per_unit: null as number | null,
+    minimum_price: null as number | null,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
     home_size_pricing: {
       pricing_mode: 'linear' as 'linear' | 'custom',
@@ -378,6 +384,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_video_url: (plan as any).plan_video_url || null,
         is_active: plan.is_active,
         allow_custom_pricing: (plan as any).allow_custom_pricing || false,
+        pricing_unit: (plan as any).pricing_unit ?? null,
+        price_per_unit: (plan as any).price_per_unit ?? null,
+        minimum_price: (plan as any).minimum_price ?? null,
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
           coverage_level: pc.coverage_level,
@@ -421,6 +430,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_video_url: null,
         is_active: true,
         allow_custom_pricing: false,
+        pricing_unit: null,
+        price_per_unit: null,
+        minimum_price: null,
         pest_coverage: [],
         home_size_pricing: {
           pricing_mode: 'linear' as 'linear' | 'custom',
@@ -627,16 +639,17 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       return;
     }
 
-    // Allow $0 initial price if linear feet pricing is configured
+    // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
     const hasLinearFeetPricing = formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined;
+    const hasPerUnitPricing = !!formData.pricing_unit;
 
     if (formData.initial_price === null || formData.initial_price === undefined || formData.initial_price < 0) {
       alert('Initial price is required and cannot be negative');
       return;
     }
 
-    if (!hasLinearFeetPricing && formData.initial_price === 0) {
-      alert('Initial price must be greater than 0 unless linear feet pricing is configured');
+    if (!hasLinearFeetPricing && !hasPerUnitPricing && formData.initial_price === 0) {
+      alert('Initial price must be greater than 0 unless linear feet or per-unit pricing is configured');
       return;
     }
 
@@ -656,7 +669,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     if (formData.plan_category !== 'one-time') {
       // Allow $0 recurring price if linear feet pricing is configured
       if (!hasLinearFeetPricing && (!formData.recurring_price || formData.recurring_price <= 0)) {
-        alert('Recurring price is required for subscription plans and must be greater than 0 unless linear feet pricing is configured');
+        alert('Recurring price is required for subscription plans and must be greater than 0 unless linear feet or per-unit pricing is configured');
         return;
       }
       if (!formData.billing_frequency) {
@@ -1413,6 +1426,74 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 <strong>Note:</strong> Home and yard size pricing adds fixed amounts per interval, while linear feet pricing
                 multiplies the actual measurement by the rate. For example, if a home is in the second interval (1501-2000 sq ft),
                 the initial cost increase would be 1 × Initial Cost Per Interval. But for 250 linear feet at $2.75/ft, the total is 250 × $2.75 = $687.50.
+              </div>
+
+              <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #e9ecef' }} />
+
+              <div className={styles.pricingSection}>
+                <h5>Simple Per-Unit Pricing</h5>
+                <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+                  Use this for flat per-unit plans (e.g. $X per sqft). Cannot be combined with linear feet pricing.
+                  Formula: <code>quantity × rate</code>, subject to the minimum price floor set in Basic Info.
+                </p>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label>Pricing Unit</label>
+                    <select
+                      value={formData.pricing_unit ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value as 'sqft' | 'linear_feet' | 'acres' | '';
+                        handleInputChange('pricing_unit', val || null);
+                        if (!val) handleInputChange('price_per_unit', null);
+                      }}
+                      disabled={formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined}
+                    >
+                      <option value="">— None —</option>
+                      <option value="sqft">Square Feet (sqft)</option>
+                      <option value="linear_feet">Linear Feet</option>
+                      <option value="acres">Acres</option>
+                    </select>
+                    {formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined && (
+                      <small style={{ color: '#d97706' }}>Disabled while tiered linear feet pricing is active.</small>
+                    )}
+                  </div>
+
+                  {formData.pricing_unit && (
+                    <div className={styles.formGroup}>
+                      <label>
+                        Price Per {formData.pricing_unit === 'sqft' ? 'Sq Ft' : formData.pricing_unit === 'linear_feet' ? 'Linear Ft' : 'Acre'} ($)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.price_per_unit ?? ''}
+                        onChange={(e) => handleInputChange('price_per_unit', parseFloat(e.target.value) || null)}
+                        placeholder="0.00"
+                      />
+                      <small>Rep enters quantity; price = qty × this rate (min price floor applies).</small>
+                    </div>
+                  )}
+                </div>
+
+                <div className={styles.formRow}>
+                  <div className={styles.formGroup}>
+                    <label>Minimum Price ($)</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.minimum_price ?? ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        handleInputChange('minimum_price', val === '' ? null : parseFloat(val) || null);
+                      }}
+                      placeholder="No minimum"
+                    />
+                    <small>If set, the computed price will never fall below this amount.</small>
+                  </div>
+                </div>
               </div>
 
               <hr style={{ margin: '24px 0', border: 'none', borderTop: '1px solid #e9ecef' }} />

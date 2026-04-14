@@ -842,6 +842,68 @@ function StepMapPlot({
     }
   }, [createStamp, mapPlotData.selectedStampType, mapPlotData.stamps, selectedDynamicPestOption, updateMapPlotData]);
 
+  // Sync computed sqft/linearFt onto each outline so downstream consumers
+  // (e.g. QuoteBuildStep) get values that exactly match the canvas labels.
+  useEffect(() => {
+    if (latitude === null) return;
+    const metersPerPixel = getMetersPerPixel(latitude, mapPlotData.zoom);
+    if (!Number.isFinite(metersPerPixel) || metersPerPixel <= 0) return;
+
+    let changed = false;
+    const updatedOutlines = mapPlotData.outlines.map(outline => {
+      const isFence = outline.type === 'fence';
+      const pts = outline.points;
+
+      // Area (non-fence closed outlines only)
+      let sqft: number | undefined;
+      if (!isFence && outline.isClosed && pts.length >= 3) {
+        let areaPx = 0;
+        if (isBlankGridMode && pts.every(p => Number.isFinite(p.xGrid) && Number.isFinite(p.yGrid))) {
+          let a = 0;
+          for (let i = 0; i < pts.length; i++) {
+            const j = (i + 1) % pts.length;
+            a += (pts[i].xGrid! * 8) * (pts[j].yGrid! * 8);
+            a -= (pts[j].xGrid! * 8) * (pts[i].yGrid! * 8);
+          }
+          areaPx = Math.abs(a) / 2;
+        } else if (canvasSize.width > 0 && canvasSize.height > 0) {
+          areaPx = getPolygonAreaInPixels(pts, canvasSize.width, canvasSize.height);
+        }
+        if (areaPx > 0) sqft = Math.round(areaPx * metersPerPixel * metersPerPixel * 10.76391041671);
+      }
+
+      // Perimeter (all closed outlines + open fence lines)
+      let linearFt: number | undefined;
+      const canPerimeter = outline.isClosed ? pts.length >= 3 : isFence && pts.length >= 2;
+      if (canPerimeter) {
+        const segCount = outline.isClosed ? pts.length : pts.length - 1;
+        let total = 0;
+        for (let i = 0; i < segCount; i++) {
+          const start = pts[i];
+          const end = pts[(i + 1) % pts.length];
+          let dxPx: number, dyPx: number;
+          if (isBlankGridMode && Number.isFinite(start.xGrid) && Number.isFinite(start.yGrid) &&
+              Number.isFinite(end.xGrid) && Number.isFinite(end.yGrid)) {
+            dxPx = (end.xGrid! - start.xGrid!) * 8;
+            dyPx = (end.yGrid! - start.yGrid!) * 8;
+          } else {
+            dxPx = (end.x - start.x) * canvasSize.width;
+            dyPx = (end.y - start.y) * canvasSize.height;
+          }
+          const feet = Math.hypot(dxPx, dyPx) * metersPerPixel * 3.280839895;
+          if (Number.isFinite(feet) && feet > 0) total += feet;
+        }
+        linearFt = Math.round(total);
+      }
+
+      if (sqft === outline.sqft && linearFt === outline.linearFt) return outline;
+      changed = true;
+      return { ...outline, sqft, linearFt };
+    });
+
+    if (changed) updateMapPlotData({ outlines: updatedOutlines });
+  }, [mapPlotData.outlines, latitude, mapPlotData.zoom, isBlankGridMode, canvasSize, updateMapPlotData]);
+
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!mapPlotData.isViewSet) return;
     if (Date.now() - lastDragAtRef.current < 180) return;

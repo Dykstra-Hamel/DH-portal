@@ -3,6 +3,27 @@
  * Add-on services are optional services that can be added to base service plans
  */
 
+/**
+ * A selectable variant that overrides the base price of an add-on or plan.
+ * For flat/per_hour/per_room pricing:  { label, initial_price }
+ * For per_sqft/per_linear_foot pricing: { label, price_per_unit }
+ */
+export interface ServiceVariant {
+  label: string;
+  initial_price?: number;
+  price_per_unit?: number;
+}
+
+/**
+ * Drives the quote-builder UI for add-ons priced as a percentage of a related job.
+ * Computed value: max(percentage * job_cost * years, minimum)
+ */
+export interface PercentagePricing {
+  percentage: number;
+  years?: number;
+  minimum?: number;
+}
+
 export interface AddOnService {
   // Identity
   id: string;
@@ -26,6 +47,14 @@ export interface AddOnService {
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
   } | null;
+
+  // Advanced Pricing
+  minimum_price: number | null;
+  pricing_type: 'flat' | 'per_sqft' | 'per_linear_foot' | 'per_acre' | 'per_hour' | 'per_room';
+  price_per_unit: number | null;
+  additional_unit_price: number | null;
+  variants: ServiceVariant[];
+  percentage_pricing: PercentagePricing | null;
 
   // Service Details
   treatment_frequency: 'monthly' | 'bi-monthly' | 'quarterly' | 'on-demand' | null;
