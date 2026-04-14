@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from 'react';
 import { CircleOff } from 'lucide-react';
+import { MAP_ELEMENT_STAMP_OPTIONS } from '@/components/FieldMap/MapPlot/types';
 import styles from './QuoteBuildStep.module.scss';
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -21,11 +22,30 @@ export interface QuoteLineItem {
   initialCost: number | null;
   recurringCost: number | null;
   frequency: string | null;
+  // Advanced pricing
+  selectedVariantLabel?: string | null;
+  quantity?: number | null;
+  percentageJobCost?: number | null;
+  percentagePricingNote?: string | null;
+  is_custom_priced?: boolean;
+  custom_initial_price?: number | null;
 }
 
 export interface PlottedPest {
   id: string;
   label: string;
+}
+
+interface CatalogVariant {
+  label: string;
+  initial_price?: number;
+  price_per_unit?: number;
+}
+
+interface CatalogPercentagePricing {
+  percentage: number;
+  years?: number;
+  minimum?: number;
 }
 
 interface CatalogItem {
@@ -37,6 +57,14 @@ interface CatalogItem {
   billingFrequency: string | null;
   planCategory: string | null;
   pestCoverageIds: string[];
+  // Advanced pricing
+  minimumPrice: number | null;
+  pricingType: 'flat' | 'per_sqft' | 'per_linear_foot' | 'per_acre' | 'per_hour' | 'per_room';
+  pricePerUnit: number | null;
+  pricingUnit: 'sqft' | 'linear_feet' | 'acres' | null;
+  additionalUnitPrice: number | null;
+  variants: CatalogVariant[];
+  percentagePricing: CatalogPercentagePricing | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────
@@ -107,11 +135,16 @@ function parseCost(raw: string): number | null {
 
 // ── Props ──────────────────────────────────────────────────────────────────
 
+interface MapMeasurements {
+  byOutline: Array<{ id: string; type: string; sqft: number; linearFt: number }>;
+}
+
 interface QuoteBuildStepProps {
   lineItems: QuoteLineItem[];
   onChange: (items: QuoteLineItem[]) => void;
   plottedPests: PlottedPest[];
   companyId: string;
+  mapMeasurements?: MapMeasurements;
 }
 
 // ── Line item card ─────────────────────────────────────────────────────────
@@ -122,14 +155,99 @@ interface LineItemCardProps {
   baseId: string;
   catalog: CatalogItem[];
   plottedPests: PlottedPest[];
+  mapMeasurements?: MapMeasurements;
   onUpdate: (patch: Partial<QuoteLineItem>) => void;
   onRemove: () => void;
 }
 
-function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, onRemove }: LineItemCardProps) {
+function LineItemCard({ item, index, baseId, catalog, plottedPests, mapMeasurements, onUpdate, onRemove }: LineItemCardProps) {
   const plans = catalog.filter(c => c.kind === 'plan');
   const addons = catalog.filter(c => c.kind === 'addon');
   const bundles = catalog.filter(c => c.kind === 'bundle');
+
+  // Find the selected catalog item to drive advanced pricing UI
+  const selectedCatalogItem = item.catalogItemId
+    ? catalog.find(c => c.id === item.catalogItemId) ?? null
+    : null;
+  const hasVariants = (selectedCatalogItem?.variants?.length ?? 0) > 0;
+  const isPerHour = selectedCatalogItem?.pricingType === 'per_hour';
+  const isPerRoom = selectedCatalogItem?.pricingType === 'per_room';
+  const isPerUnit = ['per_sqft', 'per_linear_foot', 'per_acre'].includes(selectedCatalogItem?.pricingType ?? '') ||
+    (selectedCatalogItem?.kind === 'plan' && selectedCatalogItem?.pricingUnit != null);
+  const hasPercentagePricing = selectedCatalogItem?.percentagePricing != null;
+
+  const PER_UNIT_LABEL: Record<string, string> = {
+    per_sqft: 'Square Feet',
+    per_linear_foot: 'Linear Feet',
+    per_acre: 'Acres',
+    sqft: 'Square Feet',
+    linear_feet: 'Linear Feet',
+    acres: 'Acres',
+  };
+
+  function getPerUnitLabel(): string {
+    if (!selectedCatalogItem) return 'Units';
+    if (selectedCatalogItem.kind === 'plan' && selectedCatalogItem.pricingUnit) {
+      return PER_UNIT_LABEL[selectedCatalogItem.pricingUnit] ?? 'Units';
+    }
+    return PER_UNIT_LABEL[selectedCatalogItem.pricingType] ?? 'Units';
+  }
+
+  function handleVariantChange(label: string) {
+    if (!selectedCatalogItem) return;
+    const variant = selectedCatalogItem.variants.find(v => v.label === label);
+    // For per-unit items, keep initialCost null until qty is entered
+    if (isPerUnit) {
+      onUpdate({ selectedVariantLabel: label || null });
+      return;
+    }
+    const resolvedPrice = variant?.initial_price != null
+      ? variant.initial_price
+      : selectedCatalogItem.initialPrice;
+    onUpdate({
+      selectedVariantLabel: label || null,
+      initialCost: resolvedPrice,
+    });
+  }
+
+  function handleQuantityChange(qty: number) {
+    if (!selectedCatalogItem) return;
+    let computed = 0;
+    const min = selectedCatalogItem.minimumPrice;
+
+    if (isPerUnit) {
+      // Effective rate: prefer variant's price_per_unit, fall back to catalog pricePerUnit
+      const variant = item.selectedVariantLabel
+        ? selectedCatalogItem.variants.find(v => v.label === item.selectedVariantLabel)
+        : null;
+      const effectiveRate = (variant?.price_per_unit ?? selectedCatalogItem.pricePerUnit) ?? 0;
+      computed = qty * effectiveRate;
+    } else if (isPerHour) {
+      const rate = selectedCatalogItem.initialPrice ?? 0;
+      computed = qty * rate;
+    } else if (isPerRoom) {
+      const rate = selectedCatalogItem.initialPrice ?? 0;
+      const additionalRate = selectedCatalogItem.additionalUnitPrice ?? 0;
+      computed = qty <= 0 ? 0 : rate + Math.max(0, qty - 1) * additionalRate;
+    }
+
+    const final = min != null ? Math.max(computed, min) : computed;
+    onUpdate({ quantity: qty, initialCost: final });
+  }
+
+  function handleJobCostChange(jobCost: number) {
+    if (!selectedCatalogItem?.percentagePricing) return;
+    const { percentage, years = 1, minimum = 0 } = selectedCatalogItem.percentagePricing;
+    const computed = Math.max((percentage / 100) * jobCost * years, minimum);
+    const note = `${percentage}% of $${jobCost.toLocaleString('en-US')}${years > 1 ? ` × ${years} yrs` : ''} = $${computed.toFixed(2)}`;
+    onUpdate({
+      percentageJobCost: jobCost,
+      percentagePricingNote: note,
+      is_custom_priced: true,
+      custom_initial_price: computed,
+      initialCost: computed,
+    });
+  }
 
   function selectCatalogItem(ci: CatalogItem) {
     const isOneTime = ci.planCategory === 'one-time' || ci.billingFrequency === 'one-time';
@@ -142,6 +260,13 @@ function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, on
       frequency: isOneTime ? 'one-time' : (ci.billingFrequency ?? 'monthly'),
       coveredPestIds: ci.pestCoverageIds,
       coveredPestLabels: [],
+      // Reset advanced pricing state on new selection
+      selectedVariantLabel: null,
+      quantity: null,
+      percentageJobCost: null,
+      percentagePricingNote: null,
+      is_custom_priced: false,
+      custom_initial_price: null,
     });
   }
 
@@ -279,6 +404,155 @@ function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, on
         </>
       )}
 
+      {/* Variant selector */}
+      {item.type === 'plan-addon' && hasVariants && (
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel} htmlFor={`${baseId}-variant-${item.id}`}>
+            Option
+          </label>
+          <select
+            id={`${baseId}-variant-${item.id}`}
+            className={styles.selectInput}
+            value={item.selectedVariantLabel ?? ''}
+            onChange={e => handleVariantChange(e.target.value)}
+          >
+            <option value="">— Select option —</option>
+            {(selectedCatalogItem?.variants ?? []).map(v => (
+              <option key={v.label} value={v.label}>{v.label}</option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {/* Quantity input for per_unit (per_sqft, per_linear_foot, per_acre, plan with pricing_unit) */}
+      {item.type === 'plan-addon' && isPerUnit && (
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel} htmlFor={`${baseId}-qty-${item.id}`}>
+            {getPerUnitLabel()}
+          </label>
+          {(() => {
+            const pricingType = selectedCatalogItem?.pricingType;
+            const pricingUnit = selectedCatalogItem?.pricingUnit;
+            const wantsSqFt = pricingType === 'per_sqft' || pricingUnit === 'sqft';
+            const wantsLinFt = pricingType === 'per_linear_foot' || pricingUnit === 'linear_feet';
+            const unitLabel = wantsSqFt ? 'sq ft' : 'linear ft';
+            const suggestions = (mapMeasurements?.byOutline ?? []).filter(o =>
+              wantsSqFt ? o.sqft > 0 : wantsLinFt ? o.linearFt > 0 : false
+            );
+            if (!suggestions.length) return null;
+            return (
+              <div className={styles.mapSuggestions}>
+                {suggestions.map(o => {
+                  const label = MAP_ELEMENT_STAMP_OPTIONS.find(e => e.type === o.type)?.label ?? o.type;
+                  const value = wantsSqFt ? o.sqft : o.linearFt;
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      className={styles.mapSuggestion}
+                      onClick={() => handleQuantityChange(value)}
+                    >
+                      {label}: {value.toLocaleString()} {unitLabel}
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })()}
+          <input
+            id={`${baseId}-qty-${item.id}`}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step="1"
+            className={styles.textInput}
+            value={item.quantity ?? ''}
+            onChange={e => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v) && v >= 0) handleQuantityChange(v);
+            }}
+            placeholder="0"
+          />
+          {selectedCatalogItem && (() => {
+            const variant = item.selectedVariantLabel
+              ? selectedCatalogItem.variants.find(v => v.label === item.selectedVariantLabel)
+              : null;
+            const effectiveRate = variant?.price_per_unit ?? selectedCatalogItem.pricePerUnit;
+            const qty = item.quantity ?? 0;
+            if (effectiveRate == null) return null;
+            const raw = qty * effectiveRate;
+            const min = selectedCatalogItem.minimumPrice;
+            const final = min != null ? Math.max(raw, min) : raw;
+            return (
+              <span className={styles.pricingHint}>
+                {qty} × {formatCurrency(effectiveRate)} = {formatCurrency(raw)}
+                {min != null && raw < min && ` → floors to ${formatCurrency(min)}`}
+                {' '}= {formatCurrency(final)}
+              </span>
+            );
+          })()}
+        </div>
+      )}
+
+      {/* Quantity input for per_hour and per_room */}
+      {item.type === 'plan-addon' && !isPerUnit && (isPerHour || isPerRoom) && (
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel} htmlFor={`${baseId}-qty-${item.id}`}>
+            {isPerHour ? 'Hours' : 'Rooms'}
+          </label>
+          <input
+            id={`${baseId}-qty-${item.id}`}
+            type="number"
+            inputMode="decimal"
+            min="0"
+            step={isPerHour ? '0.5' : '1'}
+            className={styles.textInput}
+            value={item.quantity ?? ''}
+            onChange={e => {
+              const v = parseFloat(e.target.value);
+              if (Number.isFinite(v) && v >= 0) handleQuantityChange(v);
+            }}
+            placeholder={isPerHour ? '0.0' : '1'}
+          />
+          {isPerRoom && selectedCatalogItem && (
+            <span className={styles.pricingHint}>
+              First room: {formatCurrency(selectedCatalogItem.initialPrice)}
+              {selectedCatalogItem.additionalUnitPrice != null &&
+                ` · Each additional: ${formatCurrency(selectedCatalogItem.additionalUnitPrice)}`}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Percentage pricing input */}
+      {item.type === 'plan-addon' && hasPercentagePricing && (
+        <div className={styles.fieldGroup}>
+          <label className={styles.fieldLabel} htmlFor={`${baseId}-jobcost-${item.id}`}>
+            Job Total ($)
+          </label>
+          <div className={styles.currencyWrap}>
+            <span className={styles.currencySign}>$</span>
+            <input
+              id={`${baseId}-jobcost-${item.id}`}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              className={styles.numberInput}
+              value={item.percentageJobCost ?? ''}
+              onChange={e => {
+                const v = parseCost(e.target.value);
+                if (v != null) handleJobCostChange(v);
+              }}
+              placeholder="0.00"
+            />
+          </div>
+          {item.percentagePricingNote && (
+            <span className={styles.pricingHint}>{item.percentagePricingNote}</span>
+          )}
+        </div>
+      )}
+
       {/* Pricing */}
       <div className={styles.pricingRow}>
         <div className={styles.fieldGroup}>
@@ -344,7 +618,7 @@ function LineItemCard({ item, index, baseId, catalog, plottedPests, onUpdate, on
 
 // ── Main component ─────────────────────────────────────────────────────────
 
-export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }: QuoteBuildStepProps) {
+export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId, mapMeasurements }: QuoteBuildStepProps) {
   const baseId = useId();
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
 
@@ -365,6 +639,13 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
         billingFrequency: p.billing_frequency ?? null,
         planCategory: p.plan_category ?? null,
         pestCoverageIds: (p.pest_coverage ?? []).map((c: any) => c.pest_id as string),
+        minimumPrice: p.minimum_price ?? null,
+        pricingType: 'flat' as const,
+        pricePerUnit: p.price_per_unit ?? null,
+        pricingUnit: p.pricing_unit ?? null,
+        additionalUnitPrice: null,
+        variants: Array.isArray(p.variants) ? p.variants : [],
+        percentagePricing: null,
       }));
 
       // Add-ons don't have a pest_coverage table — coverage is always empty
@@ -377,6 +658,13 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
         billingFrequency: a.billing_frequency ?? null,
         planCategory: null,
         pestCoverageIds: [],
+        minimumPrice: a.minimum_price ?? null,
+        pricingType: (a.pricing_type ?? 'flat') as CatalogItem['pricingType'],
+        pricePerUnit: a.price_per_unit ?? null,
+        pricingUnit: null,
+        additionalUnitPrice: a.additional_unit_price ?? null,
+        variants: Array.isArray(a.variants) ? a.variants : [],
+        percentagePricing: a.percentage_pricing ?? null,
       }));
 
       // Bundles reference plan IDs in bundled_service_plans JSONB — resolve coverage
@@ -398,6 +686,13 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
           billingFrequency: b.billing_frequency ?? null,
           planCategory: null,
           pestCoverageIds: pestIds,
+          minimumPrice: null,
+          pricingType: 'flat' as const,
+          pricePerUnit: null,
+          pricingUnit: null,
+          additionalUnitPrice: null,
+          variants: [],
+          percentagePricing: null,
         };
       });
 
@@ -441,6 +736,7 @@ export function QuoteBuildStep({ lineItems, onChange, plottedPests, companyId }:
               baseId={baseId}
               catalog={catalog}
               plottedPests={plottedPests}
+              mapMeasurements={mapMeasurements}
               onUpdate={patch => updateItem(item.id, patch)}
               onRemove={() => removeItem(item.id)}
             />
