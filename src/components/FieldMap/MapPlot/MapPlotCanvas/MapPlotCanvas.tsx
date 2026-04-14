@@ -114,6 +114,9 @@ function StepMapPlot({
   const [selectedDynamicPestOption, setSelectedDynamicPestOption] = useState<CompanyPestOption | null>(null);
   const [blankGridScale, setBlankGridScale] = useState(1);
   const [blankGridOffset, setBlankGridOffset] = useState({ x: 0, y: 0 });
+  const [satFocusTransform, setSatFocusTransform] = useState<{ scale: number; tx: number; ty: number } | null>(null);
+  const [satFocusAnimating, setSatFocusAnimating] = useState(false);
+  const stampFocusPendingRef = useRef<{ stampX: number; stampY: number } | null>(null);
   const mapPlotDataRef = useRef(mapPlotData);
   mapPlotDataRef.current = mapPlotData;
   const dragMovedRef = useRef(false);
@@ -348,7 +351,9 @@ function StepMapPlot({
       const values = Array.from(pointers.values());
       const first = values[0];
       const second = values[1];
-      const distance = Math.hypot(second.x - first.x, second.y - first.y);
+      const dx = second.x - first.x;
+      const dy = second.y - first.y;
+      const distance = Math.hypot(dx, dy);
       const centerX = (first.x + second.x) / 2;
       const centerY = (first.y + second.y) / 2;
       const lastDistance = blankGridPinchRef.current.lastDistance;
@@ -848,6 +853,18 @@ function StepMapPlot({
       return;
     }
 
+    // Store pending coords before addStampAtPoint (which calls setPestModalStampId)
+    // so handleSheetReady can apply the correct transform once the modal measures itself
+    if (
+      (isMapPestStampType(mapPlotData.selectedStampType) || isMapConditionStampType(mapPlotData.selectedStampType)) &&
+      mapRef.current
+    ) {
+      const canvasRect = mapRef.current.getBoundingClientRect();
+      stampFocusPendingRef.current = {
+        stampX: event.clientX - canvasRect.left,
+        stampY: event.clientY - canvasRect.top,
+      };
+    }
     addStampAtPoint(point);
   };
 
@@ -1339,11 +1356,52 @@ function StepMapPlot({
     }
   }, [getOutlineSegmentDimensions, mapPlotData.outlines, selectedWallMeasurement, showDimensions]);
 
+  const closeStampFocus = useCallback(() => {
+    stampFocusPendingRef.current = null;
+    setSatFocusAnimating(true);
+    setSatFocusTransform(null);
+    setTimeout(() => {
+      setSatFocusAnimating(false);
+      setPestModalStampId(null);
+    }, 420);
+  }, []);
+
+  const handleSheetReady = useCallback((sheetHeight: number) => {
+    const pending = stampFocusPendingRef.current;
+    if (!pending || !mapRef.current) return;
+    stampFocusPendingRef.current = null;
+    const canvasRect = mapRef.current.getBoundingClientRect();
+    const { stampX, stampY } = pending;
+    const cx = canvasRect.width / 2;
+    const cy = canvasRect.height / 2;
+    const s = 1.5;
+    // Center stamp in the visible canvas area above the modal sheet
+    const sheetTopInViewport = window.innerHeight - sheetHeight;
+    const visibleBottom = Math.min(canvasRect.bottom, sheetTopInViewport) - canvasRect.top;
+    const targetY = Math.max(40, visibleBottom / 2);
+    const tx = -(stampX - cx) * s;
+    const ty = targetY - cy - (stampY - cy) * s;
+    setSatFocusAnimating(true);
+    setSatFocusTransform({ scale: s, tx, ty });
+  }, []);
+
   return (
     <>
     <div className={styles.mapStepContent}>
       <div className={styles.mapCanvasCard}>
-        <div ref={mapRef} className={`${styles.mapInteractiveCanvas} ${pestModalStampId ? styles.mapInteractiveCanvasOverlay : ''}`}>
+        <div ref={mapRef} className={styles.mapInteractiveCanvas}>
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              position: 'relative',
+              transform: satFocusTransform
+                ? `translate(${satFocusTransform.tx}px, ${satFocusTransform.ty}px) scale(${satFocusTransform.scale})`
+                : 'none',
+              transition: satFocusAnimating ? 'transform 0.4s ease' : 'none',
+              transformOrigin: 'center center',
+            }}
+          >
           {isBlankGridMode && <div className={styles.mapBlankCanvas} />}
           {isSatelliteMode && mapsError && (
             <div className={styles.mapEmptyState}>{mapsError}</div>
@@ -1390,7 +1448,7 @@ function StepMapPlot({
             />
           )}
 	          <div className={styles.mapGridOverlay} style={blankGridWorkspaceStyle} />
-            <div className={styles.mapLegendControls}>
+            {!satFocusTransform && <div className={styles.mapLegendControls}>
               <button
                 type="button"
                 className={`${styles.mapLegendBtn} ${showLegendLabels ? styles.mapLegendBtnActive : ''}`}
@@ -1401,8 +1459,8 @@ function StepMapPlot({
                 <List size={14} />
                 <span>Legend</span>
               </button>
-            </div>
-	          <div className={styles.mapViewControls}>
+            </div>}
+            {!satFocusTransform && <div className={styles.mapViewControls}>
 	            <div className={styles.mapViewControlGroup}>
 	              <div className={styles.mapToolToggle}>
 	                <button
@@ -1461,7 +1519,9 @@ function StepMapPlot({
 		                <Ruler size={16} />
 		              </button>
 		            </div>
-		          </div>
+		          </div>}
+
+          {pestModalStampId && <div className={styles.mapStampModalDimmer} />}
 
 	          <div
 	            className={`${styles.mapPlotOverlay} ${mapPlotData.isViewSet ? styles.mapPlotOverlayActive : ''}`}
@@ -1652,7 +1712,7 @@ function StepMapPlot({
                       </>
                     )}
 
-                    {(!outline.isClosed || isActive) && outline.points.slice(1).map((point, i) => (
+                    {(!outline.isClosed || isActive) && (!isFence || isActive) && outline.points.slice(1).map((point, i) => (
                       <circle
                         key={`${outline.id}-mid-${i + 1}`}
                         cx={gx(point)}
@@ -1665,7 +1725,7 @@ function StepMapPlot({
                       />
                     ))}
 
-                    {(!outline.isClosed || isActive) && outline.points.length >= 1 && (
+                    {(!outline.isClosed || isActive) && (!isFence || isActive) && outline.points.length >= 1 && (
                       <>
                         {isActive && !outline.isClosed && snapToFirst && (
                           <circle
@@ -1760,6 +1820,14 @@ function StepMapPlot({
                         ),
                       });
                     } else if (isPestStamp || isConditionStamp || isBaitStation) {
+                      if (mapRef.current) {
+                        const canvasRect = mapRef.current.getBoundingClientRect();
+                        const btnRect = event.currentTarget.getBoundingClientRect();
+                        stampFocusPendingRef.current = {
+                          stampX: btnRect.left + btnRect.width / 2 - canvasRect.left,
+                          stampY: btnRect.top + btnRect.height / 2 - canvasRect.top,
+                        };
+                      }
                       setPestModalStampId(stamp.id);
                     }
                   }}
@@ -1770,7 +1838,7 @@ function StepMapPlot({
             })}
           </div>
 
-          <div className={styles.mapToolbarDock} ref={toolbarDockRef}>
+          {!satFocusTransform && <div className={styles.mapToolbarDock} ref={toolbarDockRef}>
             {canRenderActiveStampMenu && activeStampMenu && (
               <div
                 className={`${styles.mapStampPicker} ${activeStampMenu === 'pest' ? styles.mapStampPickerPest : ''} ${activeStampMenu === 'condition' ? styles.mapStampPickerCondition : ''}`}
@@ -1990,8 +2058,9 @@ function StepMapPlot({
                 <ArrowRight size={16} />
               </button>
             </div>
-          </div>
+          </div>}
 
+          </div>{/* end inner CSS-transform wrapper */}
         </div>
       </div>
     </div>
@@ -2007,15 +2076,16 @@ function StepMapPlot({
               s.id === id ? { ...s, notes, photoUrls, ...(customConditionText != null ? { customConditionText } : {}) } : s
             ),
           });
-          setPestModalStampId(null);
+          closeStampFocus();
         }}
         onDelete={(id) => {
           updateMapPlotData({
             stamps: mapPlotData.stamps.filter(s => s.id !== id),
           });
-          setPestModalStampId(null);
+          closeStampFocus();
         }}
-        onClose={() => setPestModalStampId(null)}
+        onClose={() => closeStampFocus()}
+        onSheetReady={handleSheetReady}
       />
     )}
   </>
@@ -2047,7 +2117,7 @@ const STATIC_MAP_MAX_DIMENSION = 640;
 const SATELLITE_STAMP_BASE_ZOOM = 20;
 const SATELLITE_STAMP_MIN_SCALE = 0.4;
 const SATELLITE_STAMP_MAX_SCALE = 0.75;
-const BLANK_GRID_STAMP_SCALE = 0.6;
+const BLANK_GRID_STAMP_SCALE = 0.75;
 
 function isFiniteNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isFinite(value);
@@ -2096,6 +2166,139 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const [previewSize, setPreviewSize] = useState({ width: 0, height: 0 });
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
 
+  // ── Gesture + zoom state for the read-only map ─────────────────────────────
+  const [roTransform, setRoTransform] = useState({ scale: 2, tx: 0, ty: 0 });
+  const [roAnimating, setRoAnimating] = useState(false);
+  const roSavedTransform = useRef<{ scale: number; tx: number; ty: number } | null>(null);
+  const roGesture = useRef<{
+    pointers: Map<number, { x: number; y: number }>;
+    lastDist: number | null;
+    pan: { pointerId: number; startX: number; startY: number; startTx: number; startTy: number } | null;
+    moved: boolean;
+  }>({
+    pointers: new globalThis.Map(),
+    lastDist: null,
+    pan: null,
+    moved: false,
+  });
+  // Keep a ref in sync so gesture handlers always read the latest transform
+  const roTransformRef = useRef(roTransform);
+  useEffect(() => { roTransformRef.current = roTransform; }, [roTransform]);
+
+  const handleRoPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Don't capture when the touch started on a stamp button — we need
+    // the browser to fire the click event on the button naturally.
+    if (!(e.target as HTMLElement).closest('button')) {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    }
+    setRoAnimating(false);
+    const g = roGesture.current;
+    g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (g.pointers.size === 1) {
+      g.moved = false;
+      g.pan = {
+        pointerId: e.pointerId,
+        startX: e.clientX,
+        startY: e.clientY,
+        startTx: roTransformRef.current.tx,
+        startTy: roTransformRef.current.ty,
+      };
+    } else if (g.pointers.size === 2) {
+      g.pan = null;
+      const vals = Array.from(g.pointers.values());
+      const dx = vals[1].x - vals[0].x;
+      const dy = vals[1].y - vals[0].y;
+      g.lastDist = Math.hypot(dx, dy);
+    }
+  };
+
+  const handleRoPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = roGesture.current;
+    if (!g.pointers.has(e.pointerId)) return;
+    g.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (g.pointers.size === 1 && g.pan && g.pan.pointerId === e.pointerId) {
+      const pan = g.pan;
+      const dx = e.clientX - pan.startX;
+      const dy = e.clientY - pan.startY;
+      if (Math.abs(dx) > 3 || Math.abs(dy) > 3) g.moved = true;
+      setRoTransform(prev => {
+        const maxTx = previewSize.width * (prev.scale - 1) / 2;
+        const maxTy = previewSize.height * (prev.scale - 1) / 2;
+        return {
+          ...prev,
+          tx: Math.max(-maxTx, Math.min(maxTx, pan.startTx + dx)),
+          ty: Math.max(-maxTy, Math.min(maxTy, pan.startTy + dy)),
+        };
+      });
+    } else if (g.pointers.size === 2) {
+      const vals = Array.from(g.pointers.values());
+      const dx = vals[1].x - vals[0].x;
+      const dy = vals[1].y - vals[0].y;
+      const dist = Math.hypot(dx, dy);
+      const scaleDelta = g.lastDist && g.lastDist > 0 ? dist / g.lastDist : 1;
+      setRoTransform(prev => {
+        const newScale = Math.max(1, Math.min(8, prev.scale * scaleDelta));
+        const maxTx = previewSize.width * (newScale - 1) / 2;
+        const maxTy = previewSize.height * (newScale - 1) / 2;
+        return {
+          scale: newScale,
+          tx: Math.max(-maxTx, Math.min(maxTx, prev.tx)),
+          ty: Math.max(-maxTy, Math.min(maxTy, prev.ty)),
+        };
+      });
+      g.lastDist = dist;
+    }
+  };
+
+  const handleRoPointerEnd = (e: React.PointerEvent<HTMLDivElement>) => {
+    const g = roGesture.current;
+    g.pointers.delete(e.pointerId);
+    if (g.pointers.size < 2) { g.lastDist = null; }
+    if (g.pointers.size === 0) { g.pan = null; }
+  };
+
+  const handleRoWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setRoAnimating(false);
+    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    setRoTransform(prev => {
+      const newScale = Math.max(1, Math.min(8, prev.scale * factor));
+      const maxTx = previewSize.width * (newScale - 1) / 2;
+      const maxTy = previewSize.height * (newScale - 1) / 2;
+      return {
+        scale: newScale,
+        tx: Math.max(-maxTx, Math.min(maxTx, prev.tx)),
+        ty: Math.max(-maxTy, Math.min(maxTy, prev.ty)),
+      };
+    });
+  };
+
+  const focusRoStamp = (stampId: string, point: { x: number; y: number }) => {
+    if (roGesture.current.moved) return;
+    // Snapshot current transform for animated return
+    roSavedTransform.current = { ...roTransformRef.current };
+    const cx = previewSize.width / 2;
+    const cy = previewSize.height / 2;
+    const t = roTransformRef.current;
+    const targetScale = Math.min(t.scale * 2, 4);
+    const targetTx = -(targetScale * (point.x - cx));
+    const targetTy = -(targetScale * (point.y - cy));
+    setRoAnimating(true);
+    setRoTransform({ scale: targetScale, tx: targetTx, ty: targetTy });
+    setSelectedStampId(stampId);
+  };
+
+  const closeRoModal = () => {
+    if (roSavedTransform.current) {
+      setRoAnimating(true);
+      setRoTransform(roSavedTransform.current);
+      roSavedTransform.current = null;
+    }
+    setSelectedStampId(null);
+  };
+
   useEffect(() => {
     fetch('/api/google-places-key')
       .then(r => r.ok ? r.json() : null)
@@ -2142,6 +2345,9 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const centerLng = getMapLongitude(mapPlotData);
   const hasCoords = centerLat !== null && centerLng !== null;
   const previewZoom = Math.max(Math.min(Math.round(mapPlotData.zoom ?? 20), 20), MAP_MIN_ZOOM);
+  // Request static map 1 zoom level wider so there's geographic area to pan/zoom around.
+  // Initial CSS scale (2×) compensates so the user sees the same view they saved.
+  const wideZoom = Math.max(previewZoom - 1, MAP_MIN_ZOOM);
   const readOnlyStampScale = getSatelliteStampScale(previewZoom);
   const stampCount = mapPlotData.stamps.length;
   const outlineCount = mapPlotData.outlines.length;
@@ -2166,7 +2372,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
     return {
       centerLat,
       centerLng,
-      zoom: previewZoom,
+      zoom: wideZoom,
       width: staticRequestSize.width,
       height: staticRequestSize.height,
     };
@@ -2175,7 +2381,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const staticMapUrl = hasCoords && apiKey && staticRequestSize ? (() => {
     const params = new URLSearchParams({
       center: `${centerLat},${centerLng}`,
-      zoom: String(previewZoom),
+      zoom: String(wideZoom),
       size: `${staticRequestSize.width}x${staticRequestSize.height}`,
       maptype: 'satellite',
       scale: '2',
@@ -2295,7 +2501,29 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   return (
     <>
       <div className={styles.readOnlyThumbnail}>
-        <div ref={previewFrameRef} className={styles.readOnlyMapFrame}>
+        <div
+          ref={previewFrameRef}
+          className={styles.readOnlyMapFrame}
+          onPointerDown={handleRoPointerDown}
+          onPointerMove={handleRoPointerMove}
+          onPointerUp={handleRoPointerEnd}
+          onPointerCancel={handleRoPointerEnd}
+          onPointerLeave={handleRoPointerEnd}
+          onWheel={handleRoWheel}
+          style={{ cursor: 'grab', touchAction: 'none', overflow: 'hidden' }}
+        >
+          <div
+            className={styles.readOnlyMapContent}
+            style={{
+              transform: `translate(${roTransform.tx}px, ${roTransform.ty}px) scale(${roTransform.scale})`,
+              transition: roAnimating ? 'transform 0.4s ease' : 'none',
+              transformOrigin: 'center center',
+              willChange: roAnimating ? 'transform' : 'auto',
+              width: '100%',
+              height: '100%',
+            }}
+            onTransitionEnd={() => setRoAnimating(false)}
+          >
           {staticMapUrl ? (
             <>
               <img src={staticMapUrl} alt="Map preview" className={styles.readOnlyMapImg} />
@@ -2380,7 +2608,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                       style={{
                         left: `${point.x}px`,
                         top: `${point.y}px`,
-                        transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${readOnlyStampScale})`,
+                        transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${readOnlyStampScale / roTransform.scale})`,
                         ...(isConditionStamp
                           ? { color: 'var(--UI-Alert-500, #FD484F)' }
                           : isPestStamp || isBaitStation
@@ -2390,7 +2618,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                           : { backgroundColor: option.color, color: '#ffffff' }),
                       }}
                       title={hasDetails ? `${stamp.customConditionText || stamp.displayLabel || option.label} finding` : `${stamp.customConditionText || stamp.displayLabel || option.label} (no notes/photos)`}
-                      onClick={() => setSelectedStampId(stamp.id)}
+                      onClick={() => focusRoStamp(stamp.id, point)}
                     >
                       {stampIcon}
                     </button>
@@ -2399,6 +2627,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
               </div>
             </div>
           )}
+          </div>{/* end readOnlyMapContent */}
         </div>
       </div>
 
@@ -2410,7 +2639,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
               <button
                 type="button"
                 className={styles.readOnlyStampModalClose}
-                onClick={() => setSelectedStampId(null)}
+                onClick={closeRoModal}
               >
                 Close
               </button>

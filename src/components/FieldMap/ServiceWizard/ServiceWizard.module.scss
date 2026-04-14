@@ -27,7 +27,9 @@
 }
 
 @keyframes spinWizard {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .header {
@@ -96,7 +98,6 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  overflow-x: auto;
   scrollbar-width: none;
 
   &::-webkit-scrollbar {
@@ -123,7 +124,19 @@
   white-space: nowrap;
   background: var(--gray-100);
   color: var(--gray-400);
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  border: none;
+  cursor: default;
+
+  &:is(button) {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--green-100);
+    }
+  }
 }
 
 .stepLabelActive {
@@ -134,6 +147,11 @@
 .stepLabelDone {
   background: var(--green-50, #f0fdf4);
   color: var(--green-600, #16a34a);
+}
+
+.stepLabelViewing {
+  outline: 2px solid var(--green-400, #4ade80);
+  outline-offset: -1px;
 }
 
 .stepLine {
@@ -320,7 +338,9 @@
   border-radius: 12px;
   padding: 16px;
   cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
   background: var(--white);
 
   &:active {
@@ -521,8 +541,9 @@
   flex-shrink: 0;
   background: var(--white);
 
-  .nextBtn {
-    flex-grow: 1;
+  .nextBtn,
+  .prevBtn {
+    flex: 1;
   }
 }
 
@@ -552,7 +573,9 @@
   cursor: pointer;
   font-family: var(--font-satoshi);
   white-space: nowrap;
-  transition: opacity 0.15s ease, transform 0.1s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
 
   &:disabled {
     opacity: 0.45;
@@ -566,7 +589,6 @@
 
 .prevBtn {
   height: 48px;
-  width: 48px;
   border-radius: 12px;
   border: 1px solid var(--gray-200);
   background: transparent;
@@ -600,7 +622,9 @@
   font-weight: 600;
   cursor: pointer;
   font-family: var(--font-satoshi);
-  transition: opacity 0.15s ease, transform 0.1s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
 
   &:disabled {
     opacity: 0.45;
@@ -623,7 +647,9 @@
   font-weight: 600;
   cursor: pointer;
   font-family: var(--font-satoshi);
-  transition: opacity 0.15s ease, transform 0.1s ease;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
 
   &:disabled {
     opacity: 0.45;
@@ -698,7 +724,9 @@
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .errorMsg {
@@ -761,4 +789,86 @@
   gap: 10px;
   padding-top: 8px;
   border-top: 1px solid var(--gray-200);
+}
+
+/* ── Exit confirmation modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+
+.modalSheet {
+  width: 100%;
+  max-width: 360px;
+  background: var(--white);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-satoshi);
+}
+
+.modalBody {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modalConfirmBtn {
+  width: 100%;
+  height: 50px;
+  border-radius: 13px;
+  border: none;
+  background: var(--error-600, #dc2626);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.modalCancelBtn {
+  width: 100%;
+  height: 50px;
+  border-radius: 13px;
+  border: 1.5px solid var(--gray-200);
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:active {
+    background: var(--gray-50);
+  }
 }

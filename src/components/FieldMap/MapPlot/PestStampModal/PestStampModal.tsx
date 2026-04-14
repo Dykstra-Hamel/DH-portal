@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useLayoutEffect } from 'react';
 import { MapStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import { isMapPestStampType } from '@/components/FieldMap/MapPlot/types';
 import { Mic, MicOff } from 'lucide-react';
@@ -123,9 +123,10 @@ interface PestStampModalProps {
   onSave: (stampId: string, notes: string, photoUrls: string[], customConditionText?: string) => void;
   onDelete: (stampId: string) => void;
   onClose: () => void;
+  onSheetReady?: (sheetHeight: number) => void;
 }
 
-export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, onClose }: PestStampModalProps) {
+export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, onClose, onSheetReady }: PestStampModalProps) {
   const option = getMapStampOption(stamp.type);
   const isCondition = isMapConditionStampType(stamp.type);
   const isOtherCondition = stamp.type === 'other-condition';
@@ -162,7 +163,7 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
       )
     : null;
 
-  function startDictation(currentNotes: string, onUpdate: (v: string) => void) {
+  function startDictation(onAppend: (text: string) => void) {
     const SpeechRecognitionAPI =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) return;
@@ -170,11 +171,14 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
     recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = 'en-US';
+    let lastResultIndex = 0;
     recognition.onresult = (event: any) => {
-      const transcript = Array.from(event.results as any[])
-        .map((r: any) => r[0].transcript)
-        .join(' ');
-      onUpdate(currentNotes + (currentNotes ? ' ' : '') + transcript);
+      const newText = Array.from(
+        { length: event.results.length - lastResultIndex },
+        (_: unknown, i: number) => (event.results[lastResultIndex + i][0].transcript as string)
+      ).join(' ').trim();
+      lastResultIndex = event.results.length;
+      if (newText) onAppend(newText);
     };
     recognition.onend = () => setIsDictating(false);
     recognition.onerror = () => setIsDictating(false);
@@ -292,9 +296,17 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
 
   const isBusy = uploading || aiAnalyzing;
 
+  const sheetRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (sheetRef.current && onSheetReady) {
+      onSheetReady(sheetRef.current.getBoundingClientRect().height);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className={styles.overlay} onClick={onClose}>
-      <div className={styles.sheet} onClick={e => e.stopPropagation()}>
+      <div ref={sheetRef} className={styles.sheet} onClick={e => e.stopPropagation()}>
 
         {/* Full-modal loading overlay */}
         {isBusy && (
@@ -493,7 +505,7 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
               <button
                 type="button"
                 className={`${styles.dictateBtn} ${isDictating ? styles.dictateBtnActive : ''}`}
-                onClick={() => isDictating ? stopDictation() : startDictation(notes, setNotes)}
+                onClick={() => isDictating ? stopDictation() : startDictation(text => setNotes(prev => prev ? `${prev} ${text}` : text))}
                 aria-label={isDictating ? 'Stop dictation' : 'Dictate notes'}
               >
                 {isDictating ? <MicOff size={13} /> : <Mic size={13} />}

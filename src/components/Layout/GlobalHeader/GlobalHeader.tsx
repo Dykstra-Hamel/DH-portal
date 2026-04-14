@@ -31,6 +31,7 @@ export function GlobalHeader({
   const isTechLeads = pathname.startsWith('/tech-leads');
   const isFieldMap = pathname.startsWith('/field-map');
   const isFieldOps = pathname.startsWith('/field-ops');
+  const isServiceWizard = pathname.startsWith('/field-ops/field-map/service/') && pathname.endsWith('/wizard');
   const isAppShell = isTechLeads || isFieldMap || isFieldOps;
   const showAppShellTitle = isAppShell && !!pageHeader?.title;
   const hideSearch =
@@ -69,7 +70,7 @@ export function GlobalHeader({
               <Menu size={24} />
             </button>
           )}
-          {isAppShell && (
+          {isAppShell && !isServiceWizard && (
             <button
               type="button"
               className={styles.backButton}

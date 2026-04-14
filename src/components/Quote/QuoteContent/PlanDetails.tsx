@@ -239,24 +239,32 @@ export default function PlanDetails({
                 <h3 className={styles.planHeaderTitle}>{item.plan_name}</h3>
                 <div className={styles.addonHeaderRight}>
                   <div className={styles.planHeaderPricing}>
-                    <span className={styles.planHeaderRecurring}>
-                      <sup>$</sup>
-                      {formatCurrency(
-                        item.final_recurring_price || item.recurring_price || 0
-                      )}
-                      <span className={styles.planRecurringFrequency}>
-                        /
-                        {abbreviateFrequency(item.billing_frequency || 'monthly')}
+                    {(item.final_recurring_price || item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
+                      <>
+                        <span className={styles.planHeaderRecurring}>
+                          <sup>$</sup>
+                          {formatCurrency(
+                            item.final_recurring_price || item.recurring_price || 0
+                          )}
+                          <span className={styles.planRecurringFrequency}>
+                            /
+                            {abbreviateFrequency(item.billing_frequency || 'monthly')}
+                          </span>
+                        </span>
+                        {(item.final_initial_price || item.initial_price || 0) > 0 && (
+                          <span className={styles.planHeaderDivider}>|</span>
+                        )}
+                      </>
+                    )}
+                    {(item.final_initial_price || item.initial_price || 0) > 0 && (
+                      <span className={styles.planHeaderInitial}>
+                        <sup>$</sup>
+                        {formatCurrency(
+                          item.final_initial_price || item.initial_price || 0
+                        )}
+                        <span className={styles.initialText}>{item.billing_frequency === 'one-time' ? ' One Time' : ' Initial'}</span>
                       </span>
-                    </span>
-                    <span className={styles.planHeaderDivider}>|</span>
-                    <span className={styles.planHeaderInitial}>
-                      <sup>$</sup>
-                      {formatCurrency(
-                        item.final_initial_price || item.initial_price || 0
-                      )}
-                      <span className={styles.initialText}> Initial</span>
-                    </span>
+                    )}
                   </div>
                   {planHasContent && (
                     <span className={styles.planHeaderIcon}>
@@ -368,31 +376,33 @@ export default function PlanDetails({
                       {/* Pricing Section */}
                       <div className={styles.pricingSection}>
                         <div className={styles.priceContainer}>
-                          {/* Left: Recurring Price */}
-                          <div className={styles.priceLeft}>
-                            <div className={styles.priceRecurring}>
-                              <sup>$</sup>
-                              {formatCurrency(
-                                item.final_recurring_price ||
-                                  item.recurring_price ||
-                                  0
-                              )}
-                              <sup className={styles.priceAsterisk}>*</sup>
-                              <span className={styles.priceFrequency}>
-                                /
-                                {abbreviateFrequency(
-                                  item.billing_frequency || 'monthly'
+                          {/* Left: Recurring Price — hidden for one-time or zero recurring */}
+                          {(item.final_recurring_price || item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
+                            <div className={styles.priceLeft}>
+                              <div className={styles.priceRecurring}>
+                                <sup>$</sup>
+                                {formatCurrency(
+                                  item.final_recurring_price ||
+                                    item.recurring_price ||
+                                    0
                                 )}
-                              </span>
+                                <sup className={styles.priceAsterisk}>*</sup>
+                                <span className={styles.priceFrequency}>
+                                  /
+                                  {abbreviateFrequency(
+                                    item.billing_frequency || 'monthly'
+                                  )}
+                                </span>
+                              </div>
                             </div>
-                          </div>
+                          )}
 
                           {/* Right: Initial Price */}
                           <div className={styles.priceRight}>
                             {hasDiscount ? (
                               <>
                                 <div className={styles.priceInitialInline}>
-                                  <span className={styles.initialLabel}>Initial Only</span>
+                                  <span className={styles.initialLabel}>{item.billing_frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
                                   {' '}
                                   <span className={styles.priceNumber}>
                                     <sup>$</sup>
@@ -409,7 +419,7 @@ export default function PlanDetails({
                               </>
                             ) : (
                               <div className={styles.priceInitial}>
-                                <span className={styles.initialLabel}>Initial Only</span>
+                                <span className={styles.initialLabel}>{item.billing_frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
                                 <span className={styles.priceNumber}>
                                   <sup>$</sup>
                                   {formatCurrency(item.initial_price || 0)}
@@ -550,23 +560,27 @@ export default function PlanDetails({
                       <span className={styles.addedToPlanPill}>Added To Plan</span>
                     )}
                     <div className={styles.planHeaderPricing}>
-                      <span className={styles.planHeaderRecurring}>
-                        <sup>$</sup>
-                        {formatCurrency(item.recurring_price || 0)}
-                        <span className={styles.planRecurringFrequency}>
-                          /
-                          {abbreviateFrequency(item.billing_frequency || 'monthly')}
-                        </span>
-                      </span>
-                      {(item.initial_price ?? 0) > 0 && (
+                      {(item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
                         <>
-                          <span className={styles.planHeaderDivider}>|</span>
-                          <span className={styles.planHeaderInitial}>
+                          <span className={styles.planHeaderRecurring}>
                             <sup>$</sup>
-                            {formatCurrency(item.initial_price)}
-                            <span className={styles.initialText}> Initial</span>
+                            {formatCurrency(item.recurring_price || 0)}
+                            <span className={styles.planRecurringFrequency}>
+                              /
+                              {abbreviateFrequency(item.billing_frequency || 'monthly')}
+                            </span>
                           </span>
+                          {(item.initial_price ?? 0) > 0 && (
+                            <span className={styles.planHeaderDivider}>|</span>
+                          )}
                         </>
+                      )}
+                      {(item.initial_price ?? 0) > 0 && (
+                        <span className={styles.planHeaderInitial}>
+                          <sup>$</sup>
+                          {formatCurrency(item.initial_price)}
+                          <span className={styles.initialText}>{item.billing_frequency === 'one-time' ? ' One Time' : ' Initial'}</span>
+                        </span>
                       )}
                     </div>
                   </div>

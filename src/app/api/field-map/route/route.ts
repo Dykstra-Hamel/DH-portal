@@ -250,7 +250,7 @@ function mapDbStopToRouteStop(stop: any, routeMap: Record<string, any>) {
     accessInstructions:  stop.access_instructions ?? undefined,
     lat:                 stop.lat ?? null,
     lng:                 stop.lng ?? null,
-    inspectionStatus:    'not_started' as const,
+    inspectionStatus:    'not_started' as 'not_started' | 'in_progress' | 'done',
     leadId:              null as string | null,
     leadStatus:          null as string | null,
   };

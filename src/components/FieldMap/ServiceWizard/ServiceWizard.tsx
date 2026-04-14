@@ -5,10 +5,19 @@ import { Check } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
-import { DEFAULT_MAP_PLOT_DATA, getMapLatitude, getMapLongitude, MapPlotData } from '@/components/FieldMap/MapPlot/types';
+import {
+  DEFAULT_MAP_PLOT_DATA,
+  getMapLatitude,
+  getMapLongitude,
+  MapPlotData,
+} from '@/components/FieldMap/MapPlot/types';
 import { MapAddressStep } from './steps/MapAddressStep';
 import { HousePhotoStep } from './steps/HousePhotoStep';
-import { MapPlotStep, getPlottedPestTypes, getPlottedPests } from './steps/MapPlotStep';
+import {
+  MapPlotStep,
+  getPlottedPestTypes,
+  getPlottedPests,
+} from './steps/MapPlotStep';
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem } from './steps/QuoteBuildStep';
 import { ReviewStep } from './steps/ReviewStep';
@@ -37,31 +46,51 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   // When launched from a service order the address is already known — skip step 0
   const hasPrefilledAddress = Boolean(stopId && address);
 
-  const inspectorName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Inspector';
+  const inspectorName =
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
+    'Inspector';
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
-  const [currentStep, setCurrentStep] = useState(() => (resumeReview ? 4 : hasPrefilledAddress ? 1 : 0));
+  const initialStep = hasPrefilledAddress ? 1 : 0;
+  const [maxStepReached, setMaxStepReached] = useState(initialStep);
+  const [currentStep, setCurrentStep] = useState(() =>
+    resumeReview ? 4 : hasPrefilledAddress ? 1 : 0
+  );
   const [mapPlotData, setMapPlotData] = useState<MapPlotData>(() => ({
     ...DEFAULT_MAP_PLOT_DATA,
     addressInput: address,
   }));
-  const [isGeocoding, setIsGeocoding] = useState(hasPrefilledAddress && !resumeReview);
+  const [isGeocoding, setIsGeocoding] = useState(
+    hasPrefilledAddress && !resumeReview
+  );
   const [isLoadingResume, setIsLoadingResume] = useState(resumeReview);
-  const [brandPrimaryColor, setBrandPrimaryColor] = useState<string | undefined>(undefined);
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState<
+    string | undefined
+  >(undefined);
 
   // Fetch brand primary color for stamp icons
   useEffect(() => {
     const companyId = selectedCompany?.id;
     if (!companyId) return;
     fetch(`/api/companies/${companyId}/field-map-branding`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { primary_color?: string | null; quote_accent_color_preference?: string | null; secondary_color?: string | null } | null) => {
-        if (!data) return;
-        const isReversed = data.quote_accent_color_preference === 'secondary';
-        const primary = isReversed ? data.secondary_color : data.primary_color;
-        if (primary) setBrandPrimaryColor(primary);
-      })
+      .then(r => (r.ok ? r.json() : null))
+      .then(
+        (
+          data: {
+            primary_color?: string | null;
+            quote_accent_color_preference?: string | null;
+            secondary_color?: string | null;
+          } | null
+        ) => {
+          if (!data) return;
+          const isReversed = data.quote_accent_color_preference === 'secondary';
+          const primary = isReversed
+            ? data.secondary_color
+            : data.primary_color;
+          if (primary) setBrandPrimaryColor(primary);
+        }
+      )
       .catch(() => {});
   }, [selectedCompany?.id]);
 
@@ -86,12 +115,22 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         }
       })
       .finally(() => setIsGeocoding(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
+  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>(() => [
+    {
+      id: crypto.randomUUID(),
+      type: 'plan-addon',
+      coveredPestIds: [],
+      coveredPestLabels: [],
+      initialCost: null,
+      recurringCost: null,
+      frequency: 'monthly',
+    },
+  ]);
   const [notes, setNotes] = useState('');
-  const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] = useState(false);
+  const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] =
+    useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
@@ -111,26 +150,45 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         const quoteData = await quoteRes.json();
 
         if (lead.map_plot_data) {
-          setMapPlotData({ ...DEFAULT_MAP_PLOT_DATA, ...lead.map_plot_data, addressInput: address });
+          setMapPlotData({
+            ...DEFAULT_MAP_PLOT_DATA,
+            ...lead.map_plot_data,
+            addressInput: address,
+          });
         }
 
         const lineItems: any[] = quoteData?.data?.line_items ?? [];
-        setQuoteLineItems(lineItems.map((item: any): QuoteLineItem => {
-          const catalogItemId = item.service_plan_id ?? item.addon_service_id ?? item.bundle_plan_id ?? undefined;
-          const catalogItemKind: QuoteLineItem['catalogItemKind'] = item.service_plan_id ? 'plan' : item.addon_service_id ? 'addon' : item.bundle_plan_id ? 'bundle' : undefined;
-          return {
-            id: item.id,
-            type: catalogItemId ? 'plan-addon' : 'custom',
-            catalogItemKind,
-            catalogItemId,
-            catalogItemName: item.plan_name,
-            coveredPestIds: [],
-            coveredPestLabels: [],
-            initialCost: item.final_initial_price ?? item.initial_price ?? null,
-            recurringCost: item.final_recurring_price ?? item.recurring_price ?? null,
-            frequency: item.billing_frequency ?? null,
-          };
-        }));
+        setQuoteLineItems(
+          lineItems.map((item: any): QuoteLineItem => {
+            const catalogItemId =
+              item.service_plan_id ??
+              item.addon_service_id ??
+              item.bundle_plan_id ??
+              undefined;
+            const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+              item.service_plan_id
+                ? 'plan'
+                : item.addon_service_id
+                  ? 'addon'
+                  : item.bundle_plan_id
+                    ? 'bundle'
+                    : undefined;
+            return {
+              id: item.id,
+              type: catalogItemId ? 'plan-addon' : 'custom',
+              catalogItemKind,
+              catalogItemId,
+              catalogItemName: item.plan_name,
+              coveredPestIds: [],
+              coveredPestLabels: [],
+              initialCost:
+                item.final_initial_price ?? item.initial_price ?? null,
+              recurringCost:
+                item.final_recurring_price ?? item.recurring_price ?? null,
+              frequency: item.billing_frequency ?? null,
+            };
+          })
+        );
 
         setLeadId(lead.id);
         if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
@@ -143,14 +201,17 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     }
 
     loadExistingInspection();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const selectedAddressFromComponents =
-    mapPlotData.addressComponents && typeof mapPlotData.addressComponents.formatted_address === 'string'
+    mapPlotData.addressComponents &&
+    typeof mapPlotData.addressComponents.formatted_address === 'string'
       ? mapPlotData.addressComponents.formatted_address
       : '';
-  const selectedAddress = selectedAddressFromComponents || mapPlotData.addressInput || '';
+  const selectedAddress =
+    selectedAddressFromComponents || mapPlotData.addressInput || '';
   const inspectionAddress = selectedAddress || address;
   const pestTypes = getPlottedPestTypes(mapPlotData);
   const plottedPests = getPlottedPests(mapPlotData);
@@ -162,7 +223,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   function canAdvance(): boolean {
     switch (currentStep) {
       case 0:
-        return getMapLatitude(mapPlotData) !== null && getMapLongitude(mapPlotData) !== null;
+        return (
+          getMapLatitude(mapPlotData) !== null &&
+          getMapLongitude(mapPlotData) !== null
+        );
       case 1:
         return mapPlotData.housePhotos.length >= 1;
       case 2:
@@ -174,6 +238,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       default:
         return false;
     }
+  }
+
+  function advanceStep(target: number) {
+    setCurrentStep(target);
+    setMaxStepReached(prev => Math.max(prev, target));
   }
 
   async function handleNext() {
@@ -202,18 +271,20 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (!res.ok) throw new Error(data.error ?? 'Failed to save inspection');
         setLeadId(data.leadId);
       } catch (err) {
-        setStepSaveError(err instanceof Error ? err.message : 'Failed to save inspection');
+        setStepSaveError(
+          err instanceof Error ? err.message : 'Failed to save inspection'
+        );
         setIsSavingStep(false);
         return;
       }
       setIsSavingStep(false);
 
       if (returnToReviewAfterMapEdit) {
-        setCurrentStep(4);
+        advanceStep(4);
         setReturnToReviewAfterMapEdit(false);
         return;
       }
-      setCurrentStep(s => s + 1);
+      advanceStep(currentStep + 1);
       return;
     }
 
@@ -241,16 +312,18 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (!res.ok) throw new Error(data.error ?? 'Failed to save quote');
         setQuoteId(data.quoteId);
       } catch (err) {
-        setStepSaveError(err instanceof Error ? err.message : 'Failed to save quote');
+        setStepSaveError(
+          err instanceof Error ? err.message : 'Failed to save quote'
+        );
         setIsSavingStep(false);
         return;
       }
       setIsSavingStep(false);
-      setCurrentStep(s => s + 1);
+      advanceStep(currentStep + 1);
       return;
     }
 
-    if (currentStep < STEP_COUNT - 1) setCurrentStep(s => s + 1);
+    if (currentStep < STEP_COUNT - 1) advanceStep(currentStep + 1);
   }
 
   function handleBack() {
@@ -283,7 +356,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           <div className={styles.stepScrollable}>
             <HousePhotoStep
               photoUrls={mapPlotData.housePhotos}
-              onChange={urls => setMapPlotData(prev => ({ ...prev, housePhotos: urls }))}
+              onChange={urls =>
+                setMapPlotData(prev => ({ ...prev, housePhotos: urls }))
+              }
               companyId={selectedCompany?.id ?? ''}
             />
           </div>
@@ -367,38 +442,64 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         <button
           type="button"
           className={styles.backBtn}
-          onClick={handleBack}
+          onClick={() => setShowExitConfirm(true)}
           aria-label="Go back"
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M19 12H5M5 12l7 7M5 12l7-7"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <div className={styles.headerGrid}>
           <div className={styles.headerInfo}>
-            <p className={styles.headerTitle}>{clientName || 'New Inspection'}</p>
-            {inspectionAddress && <p className={styles.headerSub}>{inspectionAddress}</p>}
+            <p className={styles.headerTitle}>
+              {clientName || 'New Inspection'}
+            </p>
+            {inspectionAddress && (
+              <p className={styles.headerSub}>{inspectionAddress}</p>
+            )}
           </div>
           <div className={styles.stepTrack}>
-            {STEP_LABELS.map((label, i) => (
-              <div key={i} className={styles.stepTrackItem}>
-                {i > 0 && <div className={styles.stepLine} />}
-                <div
-                  className={`${styles.stepLabel} ${i === currentStep ? styles.stepLabelActive : i < currentStep ? styles.stepLabelDone : ''}`}
-                >
-                  {i < currentStep && <Check size={11} strokeWidth={2.5} />}
-                  {label}
+            {STEP_LABELS.map((label, i) => {
+              const isDone = i < maxStepReached;
+              const isActive = i === maxStepReached;
+              const isViewing = i === currentStep && i < maxStepReached;
+              const isClickable = i <= maxStepReached;
+              return (
+                <div key={i} className={styles.stepTrackItem}>
+                  {i > 0 && <div className={styles.stepLine} />}
+                  {isClickable ? (
+                    <button
+                      type="button"
+                      className={`${styles.stepLabel} ${isActive ? styles.stepLabelActive : isDone ? styles.stepLabelDone : ''} ${isViewing ? styles.stepLabelViewing : ''}`}
+                      onClick={() => setCurrentStep(i)}
+                    >
+                      {isDone && <Check size={11} strokeWidth={2.5} />}
+                      {label}
+                    </button>
+                  ) : (
+                    <div className={styles.stepLabel}>{label}</div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
 
       {/* Step content */}
-      <div className={styles.stepContent}>
-        {renderStepContent()}
-      </div>
+      <div className={styles.stepContent}>{renderStepContent()}</div>
 
       {/* Address step footer */}
       {currentStep === 0 && (
@@ -409,9 +510,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             onClick={handleBack}
             aria-label="Previous step"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            Go Back
           </button>
           <button
             type="button"
@@ -437,9 +536,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             aria-label="Previous step"
             disabled={isSavingStep}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            Go Back
           </button>
           <button
             type="button"
@@ -449,6 +546,36 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           >
             {isSavingStep ? 'Saving\u2026' : isLastStep ? 'Finish' : 'Continue'}
           </button>
+        </div>
+      )}
+      {/* Exit confirmation modal */}
+      {showExitConfirm && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowExitConfirm(false)}
+        >
+          <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.modalTitle}>Leave this service?</p>
+            <p className={styles.modalBody}>
+              Your progress will be lost if you go back now.
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.modalCancelBtn}
+                onClick={() => setShowExitConfirm(false)}
+              >
+                Keep Working
+              </button>
+              <button
+                type="button"
+                className={styles.modalConfirmBtn}
+                onClick={() => router.back()}
+              >
+                Leave
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
