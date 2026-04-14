@@ -1,5 +1,10 @@
+import { Suspense } from 'react';
 import { NewOpportunityWizard } from '@/components/TechLeads/NewOpportunityWizard/NewOpportunityWizard';
 
 export default function NewOpportunityPage() {
-  return <NewOpportunityWizard />;
+  return (
+    <Suspense>
+      <NewOpportunityWizard />
+    </Suspense>
+  );
 }

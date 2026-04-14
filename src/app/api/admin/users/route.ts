@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    const { searchParams } = new URL(request.url);
+    const allUsers = searchParams.get('all') === 'true';
+
     // Get all users from auth.users
     const { data: authUsers, error: usersError } =
       await supabase.auth.admin.listUsers();
@@ -23,10 +26,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Get all profiles
-    const { data: profiles, error: profilesError } = await supabase
-      .from('profiles')
-      .select('*');
+    // Get profiles — filtered to internal roles by default, all if ?all=true
+    const profilesQuery = supabase.from('profiles').select('*');
+    const { data: profiles, error: profilesError } = allUsers
+      ? await profilesQuery
+      : await profilesQuery.in('role', ['admin', 'super_admin', 'project_manager']);
 
     if (profilesError) {
       return NextResponse.json(
@@ -35,10 +39,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Combine auth users with their profiles
+    // Combine auth users with their profiles, filtering to internal users when not ?all=true
+    const internalIds = new Set(profiles?.map(p => p.id) || []);
     const usersWithProfiles =
       authUsers.users
-        ?.map(user => ({
+        ?.filter(u => allUsers || internalIds.has(u.id))
+        .map(user => ({
           ...user,
           profiles: profiles?.find(profile => profile.id === user.id),
         })) || [];

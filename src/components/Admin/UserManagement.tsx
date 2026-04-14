@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { adminAPI } from '@/lib/api-client';
+import { adminAPI, authenticatedFetch } from '@/lib/api-client';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
 import { Department, canHaveDepartments } from '@/types/user';
@@ -71,7 +71,7 @@ export default function UserManagement() {
     try {
       setError(null);
       const [usersData, relData, companiesData] = await Promise.all([
-        adminAPI.getUsers(),
+        authenticatedFetch('/api/admin/users?all=true'),
         adminAPI.getUserCompanies(),
         adminAPI.getCompanies(),
       ]);
