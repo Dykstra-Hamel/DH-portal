@@ -515,12 +515,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             mapPlotData={mapPlotData}
             onChange={handleMapChange}
             isNewInspection={!stopId}
-            clientName={clientName}
-            clientEmail={clientEmail}
-            clientPhone={clientPhone}
-            onClientNameChange={setClientName}
-            onClientEmailChange={setClientEmail}
-            onClientPhoneChange={setClientPhone}
+            clientName={clientInfo.name}
+            clientEmail={clientInfo.email}
+            clientPhone={clientInfo.phone}
+            onClientNameChange={v => setClientInfo(prev => ({ ...prev, name: v }))}
+            onClientEmailChange={v => setClientInfo(prev => ({ ...prev, email: v }))}
+            onClientPhoneChange={v => setClientInfo(prev => ({ ...prev, phone: v }))}
             companyId={selectedCompany?.id ?? ''}
           />
         );
