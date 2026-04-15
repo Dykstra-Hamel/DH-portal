@@ -4,14 +4,18 @@
  */
 
 /**
- * A selectable variant that overrides the base price of an add-on or plan.
- * For flat/per_hour/per_room pricing:  { label, initial_price }
- * For per_sqft/per_linear_foot pricing: { label, price_per_unit }
+ * A selectable variant that overrides the base pricing of an add-on or plan.
+ * For flat/per_hour/per_room pricing:  initial_price and/or recurring_price
+ * For per_sqft/per_linear_foot pricing: price_per_unit
+ * Leave any field undefined to inherit the add-on's base value.
  */
 export interface ServiceVariant {
   label: string;
   initial_price?: number;
+  recurring_price?: number;
   price_per_unit?: number;
+  minimum_price?: number;
+  billing_frequency?: string;
 }
 
 /**
@@ -105,6 +109,12 @@ export interface AddOnServiceFormData {
   eligible_plan_ids: string[];
   is_active: boolean;
   requires_quote: boolean;
+  pricing_type: 'flat' | 'per_sqft' | 'per_linear_foot' | 'per_acre' | 'per_hour' | 'per_room';
+  price_per_unit: number | null;
+  additional_unit_price: number | null;
+  minimum_price: number | null;
+  variants: ServiceVariant[];
+  percentage_pricing: PercentagePricing | null;
 }
 
 /**

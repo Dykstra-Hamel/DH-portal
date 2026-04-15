@@ -37,6 +37,12 @@ export default function AddOnServiceEditor({
     eligible_plan_ids: [],
     is_active: true,
     requires_quote: false,
+    pricing_type: 'flat',
+    price_per_unit: null,
+    additional_unit_price: null,
+    minimum_price: null,
+    variants: [],
+    percentage_pricing: null,
   });
 
   const [servicePlans, setServicePlans] = useState<any[]>([]);
@@ -63,6 +69,12 @@ export default function AddOnServiceEditor({
           eligible_plan_ids: addon.eligible_plan_ids || [],
           is_active: addon.is_active,
           requires_quote: addon.requires_quote ?? false,
+          pricing_type: addon.pricing_type ?? 'flat',
+          price_per_unit: addon.price_per_unit ?? null,
+          additional_unit_price: addon.additional_unit_price ?? null,
+          minimum_price: addon.minimum_price ?? null,
+          variants: addon.variants ?? [],
+          percentage_pricing: addon.percentage_pricing ?? null,
         });
       } else {
         // Reset form for new addon
@@ -81,6 +93,12 @@ export default function AddOnServiceEditor({
           eligible_plan_ids: [],
           is_active: true,
           requires_quote: false,
+          pricing_type: 'flat',
+          price_per_unit: null,
+          additional_unit_price: null,
+          minimum_price: null,
+          variants: [],
+          percentage_pricing: null,
         });
       }
     }
@@ -304,6 +322,299 @@ export default function AddOnServiceEditor({
               <p className={styles.helpText}>
                 When enabled, pricing will not be shown. A custom quote must be entered for each customer.
               </p>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label htmlFor="pricing_type">Pricing Type</label>
+              <select
+                id="pricing_type"
+                value={formData.pricing_type}
+                onChange={e =>
+                  setFormData({
+                    ...formData,
+                    pricing_type: e.target.value as AddOnServiceFormData['pricing_type'],
+                    price_per_unit: null,
+                    additional_unit_price: null,
+                  })
+                }
+              >
+                <option value="flat">Flat Rate</option>
+                <option value="per_sqft">Per Square Foot</option>
+                <option value="per_linear_foot">Per Linear Foot</option>
+                <option value="per_acre">Per Acre</option>
+                <option value="per_hour">Per Hour</option>
+                <option value="per_room">Per Room</option>
+              </select>
+            </div>
+
+            {['per_sqft', 'per_linear_foot', 'per_acre'].includes(formData.pricing_type) && (
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label htmlFor="price_per_unit">
+                    Price Per {formData.pricing_type === 'per_sqft' ? 'Sq Ft' : formData.pricing_type === 'per_linear_foot' ? 'Linear Ft' : 'Acre'} ($)
+                  </label>
+                  <input
+                    id="price_per_unit"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.price_per_unit ?? ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        price_per_unit: e.target.value ? parseFloat(e.target.value) : null,
+                      })
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label htmlFor="minimum_price_addon">Minimum Price ($)</label>
+                  <input
+                    id="minimum_price_addon"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.minimum_price ?? ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        minimum_price: e.target.value ? parseFloat(e.target.value) : null,
+                      })
+                    }
+                    placeholder="No minimum"
+                  />
+                </div>
+              </div>
+            )}
+
+            {formData.pricing_type === 'per_room' && (
+              <div className={styles.formGroup}>
+                <label htmlFor="additional_unit_price">Price Per Additional Room ($)</label>
+                <input
+                  id="additional_unit_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={formData.additional_unit_price ?? ''}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      additional_unit_price: e.target.value ? parseFloat(e.target.value) : null,
+                    })
+                  }
+                  placeholder="0.00"
+                />
+                <p className={styles.helpText}>First room uses the Initial Price above. Each additional room adds this amount.</p>
+              </div>
+            )}
+
+            <div className={styles.formGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={formData.percentage_pricing !== null}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      percentage_pricing: e.target.checked
+                        ? { percentage: 0, years: undefined, minimum: undefined }
+                        : null,
+                    })
+                  }
+                />
+                <span>Percentage-Based Pricing</span>
+              </label>
+              <p className={styles.helpText}>
+                Price is calculated as a percentage of the related job cost (e.g. a warranty add-on).
+              </p>
+            </div>
+
+            {formData.percentage_pricing !== null && (
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label>Percentage (%)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                    value={formData.percentage_pricing.percentage}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        percentage_pricing: {
+                          ...formData.percentage_pricing!,
+                          percentage: parseFloat(e.target.value) || 0,
+                        },
+                      })
+                    }
+                    placeholder="0.00"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Years (optional)</label>
+                  <input
+                    type="number"
+                    step="1"
+                    min="1"
+                    value={formData.percentage_pricing.years ?? ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        percentage_pricing: {
+                          ...formData.percentage_pricing!,
+                          years: e.target.value ? parseInt(e.target.value) : undefined,
+                        },
+                      })
+                    }
+                    placeholder="e.g. 2"
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label>Minimum ($)</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.percentage_pricing.minimum ?? ''}
+                    onChange={e =>
+                      setFormData({
+                        ...formData,
+                        percentage_pricing: {
+                          ...formData.percentage_pricing!,
+                          minimum: e.target.value ? parseFloat(e.target.value) : undefined,
+                        },
+                      })
+                    }
+                    placeholder="No minimum"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className={styles.formGroup}>
+              <label>Variants (Optional)</label>
+              <p className={styles.helpText}>
+                Variants let reps choose a named option (e.g. &quot;Small&quot;, &quot;Large&quot;) with different pricing when building a quote. Leave any field blank to inherit the add-on&apos;s default.
+              </p>
+              {formData.variants.map((variant, index) => {
+                const isPerUnit = ['per_sqft', 'per_linear_foot', 'per_acre'].includes(formData.pricing_type);
+                const updateVariant = (patch: Partial<typeof variant>) => {
+                  const updated = [...formData.variants];
+                  updated[index] = { ...updated[index], ...patch };
+                  setFormData({ ...formData, variants: updated });
+                };
+                return (
+                  <div key={index} className={styles.variantCard}>
+                    <div className={styles.variantCardHeader}>
+                      <input
+                        type="text"
+                        value={variant.label}
+                        onChange={e => updateVariant({ label: e.target.value })}
+                        placeholder="e.g. Small, Large"
+                        className={styles.variantLabelInput}
+                      />
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setFormData({
+                            ...formData,
+                            variants: formData.variants.filter((_, i) => i !== index),
+                          })
+                        }
+                        className={styles.removeButton}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <div className={styles.variantFields}>
+                      {isPerUnit ? (
+                        <div className={styles.formGroup}>
+                          <label>Price Per Unit ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={variant.price_per_unit ?? ''}
+                            onChange={e =>
+                              updateVariant({ price_per_unit: e.target.value === '' ? undefined : parseFloat(e.target.value) })
+                            }
+                            placeholder="Add-on default"
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div className={styles.formGroup}>
+                            <label>Initial Price ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={variant.initial_price ?? ''}
+                              onChange={e =>
+                                updateVariant({ initial_price: e.target.value === '' ? undefined : parseFloat(e.target.value) })
+                              }
+                              placeholder="Add-on default"
+                            />
+                          </div>
+                          <div className={styles.formGroup}>
+                            <label>Recurring Price ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={variant.recurring_price ?? ''}
+                              onChange={e =>
+                                updateVariant({ recurring_price: e.target.value === '' ? undefined : parseFloat(e.target.value) })
+                              }
+                              placeholder="Add-on default"
+                            />
+                          </div>
+                        </>
+                      )}
+                      <div className={styles.formGroup}>
+                        <label>Minimum Price ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variant.minimum_price ?? ''}
+                          onChange={e =>
+                            updateVariant({ minimum_price: e.target.value === '' ? undefined : parseFloat(e.target.value) })
+                          }
+                          placeholder="No minimum"
+                        />
+                      </div>
+                      <div className={styles.formGroup}>
+                        <label>Billing Frequency</label>
+                        <select
+                          value={variant.billing_frequency ?? ''}
+                          onChange={e =>
+                            updateVariant({ billing_frequency: e.target.value || undefined })
+                          }
+                        >
+                          <option value="">Add-on default</option>
+                          <option value="one-time">One-Time</option>
+                          <option value="monthly">Monthly</option>
+                          <option value="quarterly">Quarterly</option>
+                          <option value="semi-annually">Semi-Annually</option>
+                          <option value="annually">Annually</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={() =>
+                  setFormData({ ...formData, variants: [...formData.variants, { label: '' }] })
+                }
+                className={styles.addButton}
+              >
+                + Add Variant
+              </button>
             </div>
           </div>
 

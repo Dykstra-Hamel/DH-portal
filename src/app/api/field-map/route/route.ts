@@ -251,8 +251,10 @@ function mapDbStopToRouteStop(stop: any, routeMap: Record<string, any>) {
     lat:                 stop.lat ?? null,
     lng:                 stop.lng ?? null,
     inspectionStatus:    'not_started' as 'not_started' | 'in_progress' | 'done',
-    leadId:              null as string | null,
+    leadId:              (stop.lead_id as string | null) ?? null,
     leadStatus:          null as string | null,
+    referredToSales:     !!(stop.referred_to_sales),
+    routeStopId:         stop.id as string,
   };
 }
 
@@ -261,36 +263,38 @@ async function attachInspectionStatus(
   companyId: string,
   stops: ReturnType<typeof mapDbStopToRouteStop>[]
 ): Promise<void> {
-  const stopIds = stops.map(s => s.stopId).filter(Boolean) as string[];
-  if (stopIds.length === 0) return;
+  const leadIds = stops.map(s => s.leadId).filter(Boolean) as string[];
+
+  const DONE_STATUSES = new Set(['quoted', 'scheduling', 'won']);
+
+  if (leadIds.length === 0) {
+    for (const stop of stops) stop.inspectionStatus = 'not_started';
+    return;
+  }
 
   const { data: matchedLeads } = await adminSupabase
     .from('leads')
-    .select('id, pestpac_stop_id, lead_status')
+    .select('id, lead_status')
     .eq('company_id', companyId)
-    .in('pestpac_stop_id', stopIds);
+    .in('id', leadIds);
 
-  const DONE_STATUSES = new Set(['quoted', 'scheduling', 'won']);
-  const leadsByStopId: Record<string, { leadId: string; leadStatus: string }> = {};
+  const leadsById: Record<string, string> = {};
   (matchedLeads ?? []).forEach((lead: any) => {
-    if (lead.pestpac_stop_id) {
-      leadsByStopId[lead.pestpac_stop_id] = { leadId: lead.id, leadStatus: lead.lead_status };
-    }
+    leadsById[lead.id] = lead.lead_status;
   });
 
   for (const stop of stops) {
-    const linked = stop.stopId ? leadsByStopId[stop.stopId] : undefined;
-    if (!linked) {
+    if (!stop.leadId || !(stop.leadId in leadsById)) {
       stop.inspectionStatus = 'not_started';
       stop.leadId = null;
-    } else if (DONE_STATUSES.has(linked.leadStatus)) {
-      stop.inspectionStatus = 'done';
-      stop.leadId = linked.leadId;
-      stop.leadStatus = linked.leadStatus ?? null;
     } else {
-      stop.inspectionStatus = 'in_progress';
-      stop.leadId = linked.leadId;
-      stop.leadStatus = linked.leadStatus ?? null;
+      const leadStatus = leadsById[stop.leadId];
+      stop.leadStatus = leadStatus ?? null;
+      if (DONE_STATUSES.has(leadStatus)) {
+        stop.inspectionStatus = 'done';
+      } else {
+        stop.inspectionStatus = 'in_progress';
+      }
     }
   }
 }
@@ -323,6 +327,10 @@ interface EnrichedStop {
   inspectionStatus: 'not_started' | 'in_progress' | 'done';
   leadId: string | null;
   leadStatus?: string | null;
+  referredToSales?: boolean;
+  routeStopId?: string | null;
+  lineItems?: any[] | null;
+  pestpacRawData?: any;
 }
 
 async function fetchAndSyncFromPestPac(
@@ -463,10 +471,11 @@ async function fetchAndSyncFromPestPac(
         }
       }
 
+      let loc: any;
       if (locationId && (!address || lat == null || lng == null)) {
         const res = await fetch(`${PESTPAC_BASE_URL}/Locations/${encodeURIComponent(String(locationId))}`, { headers });
         if (res.ok) {
-          const loc = await res.json();
+          loc = await res.json();
           if (!addressStreet) addressStreet = loc.Address ?? loc.Street ?? loc.address ?? loc.street ?? '';
           if (!addressCity)   addressCity   = loc.City  ?? loc.city  ?? '';
           if (!addressState)  addressState  = loc.State ?? loc.state ?? '';
@@ -507,6 +516,14 @@ async function fetchAndSyncFromPestPac(
         inspectionStatus: 'not_started',
         leadId: null,
         leadStatus: null,
+        lineItems: (stop.lineItems ?? stop.LineItems ?? stop.lineitem ?? stop.LineItem ?? null) as any[] | null,
+        pestpacRawData: {
+          ...stop,
+          ...(loc != null ? {
+            LocationType: loc.LocationType ?? loc.locationType ?? null,
+            LocationNotes: loc.Notes ?? loc.notes ?? null,
+          } : {}),
+        },
       });
     } catch {
       // Skip problematic rows
@@ -572,7 +589,7 @@ export async function GET(request: NextRequest) {
       const { data: stopsData, error: stopsError } = await adminSupabase
         .from('route_stops')
         .select(`
-          id, route_id, stop_order, pestpac_stop_id, service_type,
+          id, route_id, stop_order, pestpac_stop_id, lead_id, referred_to_sales, service_type,
           notes, access_instructions, scheduled_arrival, status, lat, lng, address_display,
           customers ( id, pestpac_client_id, first_name, last_name ),
           service_addresses ( id, pestpac_location_id, street_address, city, state, zip_code )
@@ -627,33 +644,50 @@ export async function GET(request: NextRequest) {
       .filter((id): id is string => Boolean(id));
 
     if (stopIds.length > 0) {
-      const { data: matchedLeads } = await adminSupabase
-        .from('leads')
-        .select('id, pestpac_stop_id, lead_status')
+      // After sync, read referred_to_sales, lead_id, and DB id from route_stops
+      const { data: syncedStops } = await adminSupabase
+        .from('route_stops')
+        .select('id, pestpac_stop_id, lead_id, referred_to_sales')
         .eq('company_id', userCompany.company_id)
         .in('pestpac_stop_id', stopIds);
 
-      const DONE_STATUSES = new Set(['quoted', 'scheduling', 'won']);
-      const leadsByStopId: Record<string, { leadId: string; leadStatus: string }> = {};
-      (matchedLeads ?? []).forEach((lead: any) => {
-        if (lead.pestpac_stop_id) {
-          leadsByStopId[lead.pestpac_stop_id] = { leadId: lead.id, leadStatus: lead.lead_status };
+      const stopDataMap: Record<string, { id: string; leadId: string | null; referredToSales: boolean }> = {};
+      (syncedStops ?? []).forEach((row: any) => {
+        if (row.pestpac_stop_id) {
+          stopDataMap[row.pestpac_stop_id] = {
+            id: row.id,
+            leadId: row.lead_id ?? null,
+            referredToSales: !!row.referred_to_sales,
+          };
         }
       });
 
+      const linkedLeadIds = Object.values(stopDataMap)
+        .map(d => d.leadId)
+        .filter(Boolean) as string[];
+      const leadsById: Record<string, string> = {};
+      if (linkedLeadIds.length > 0) {
+        const { data: leadsData } = await adminSupabase
+          .from('leads')
+          .select('id, lead_status')
+          .in('id', linkedLeadIds);
+        (leadsData ?? []).forEach((l: any) => { leadsById[l.id] = l.lead_status; });
+      }
+
+      const DONE_STATUSES = new Set(['quoted', 'scheduling', 'won']);
       for (const stop of pestpacStops) {
-        const linked = stop.stopId ? leadsByStopId[stop.stopId] : undefined;
-        if (!linked) {
+        const dbStop = stop.stopId ? stopDataMap[stop.stopId] : undefined;
+        stop.referredToSales = dbStop?.referredToSales ?? false;
+        stop.routeStopId = dbStop?.id ?? null;
+        const leadId = dbStop?.leadId;
+        if (!leadId) {
           stop.inspectionStatus = 'not_started';
           stop.leadId = null;
-        } else if (DONE_STATUSES.has(linked.leadStatus)) {
-          stop.inspectionStatus = 'done';
-          stop.leadId = linked.leadId;
-          stop.leadStatus = linked.leadStatus ?? null;
         } else {
-          stop.inspectionStatus = 'in_progress';
-          stop.leadId = linked.leadId;
-          stop.leadStatus = linked.leadStatus ?? null;
+          const leadStatus = leadsById[leadId];
+          stop.leadId = leadId;
+          stop.leadStatus = leadStatus ?? null;
+          stop.inspectionStatus = DONE_STATUSES.has(leadStatus) ? 'done' : 'in_progress';
         }
       }
     }

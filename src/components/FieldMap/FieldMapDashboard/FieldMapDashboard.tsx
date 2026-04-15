@@ -131,11 +131,14 @@ export function FieldMapDashboard({
     s => s.leadStatus === 'scheduling' || s.leadStatus === 'won'
   ).length;
 
+  const techReferred = stops.filter(s => s.referredToSales).length;
+
   const totalDisplay = useCountUp(stops.length);
   const completedDisplay = useCountUp(completed);
   const remainingDisplay = useCountUp(remaining);
   const quotedDisplay = useCountUp(quoted);
   const wonDisplay = useCountUp(won);
+  const techReferredDisplay = useCountUp(techReferred);
 
   const visibleStops = (() => {
     switch (activeFilter) {
@@ -195,51 +198,69 @@ export function FieldMapDashboard({
 
         {/* Stats */}
         {!loading && !needsSetup && !error && stops.length > 0 && (
-          <div className={styles.statsRow}>
-            <button
-              className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
-              onClick={() => setActiveFilter('total')}
-            >
-              <span className={styles.statNumber}>{totalDisplay}</span>
-              <span className={styles.statLabel}>Total</span>
-            </button>
-            <button
-              className={`${styles.statCard} ${activeFilter === 'completed' ? styles.statCardActive : ''}`}
-              onClick={() => setActiveFilter('completed')}
-            >
-              <span className={`${styles.statNumber} ${styles.statDone}`}>
-                {completedDisplay}
-              </span>
-              <span className={styles.statLabel}>Completed</span>
-            </button>
-            <button
-              className={`${styles.statCard} ${activeFilter === 'left' ? styles.statCardActive : ''}`}
-              onClick={() => setActiveFilter('left')}
-            >
-              <span className={`${styles.statNumber} ${styles.statRemaining}`}>
-                {remainingDisplay}
-              </span>
-              <span className={styles.statLabel}>Left</span>
-            </button>
-            <button
-              className={`${styles.statCard} ${activeFilter === 'quoted' ? styles.statCardActive : ''}`}
-              onClick={() => setActiveFilter('quoted')}
-            >
-              <span className={`${styles.statNumber} ${styles.statQuoted}`}>
-                {quotedDisplay}
-              </span>
-              <span className={styles.statLabel}>Quoted</span>
-            </button>
-            <button
-              className={`${styles.statCard} ${activeFilter === 'won' ? styles.statCardActive : ''}`}
-              onClick={() => setActiveFilter('won')}
-            >
-              <span className={`${styles.statNumber} ${styles.statWon}`}>
-                {wonDisplay}
-              </span>
-              <span className={styles.statLabel}>Won</span>
-            </button>
-          </div>
+          isTechnicianOnly ? (
+            <div className={styles.statsRowTech}>
+              <button
+                className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
+                onClick={() => setActiveFilter('total')}
+              >
+                <span className={styles.statNumber}>{totalDisplay}</span>
+                <span className={styles.statLabel}>Total</span>
+              </button>
+              <Link href="/tech-leads" className={styles.statCard}>
+                <span className={`${styles.statNumber} ${styles.statWon}`}>
+                  {techReferredDisplay}
+                </span>
+                <span className={styles.statLabel}>Leads Referred</span>
+              </Link>
+            </div>
+          ) : (
+            <div className={styles.statsRow}>
+              <button
+                className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
+                onClick={() => setActiveFilter('total')}
+              >
+                <span className={styles.statNumber}>{totalDisplay}</span>
+                <span className={styles.statLabel}>Total</span>
+              </button>
+              <button
+                className={`${styles.statCard} ${activeFilter === 'completed' ? styles.statCardActive : ''}`}
+                onClick={() => setActiveFilter('completed')}
+              >
+                <span className={`${styles.statNumber} ${styles.statDone}`}>
+                  {completedDisplay}
+                </span>
+                <span className={styles.statLabel}>Completed</span>
+              </button>
+              <button
+                className={`${styles.statCard} ${activeFilter === 'left' ? styles.statCardActive : ''}`}
+                onClick={() => setActiveFilter('left')}
+              >
+                <span className={`${styles.statNumber} ${styles.statRemaining}`}>
+                  {remainingDisplay}
+                </span>
+                <span className={styles.statLabel}>Left</span>
+              </button>
+              <button
+                className={`${styles.statCard} ${activeFilter === 'quoted' ? styles.statCardActive : ''}`}
+                onClick={() => setActiveFilter('quoted')}
+              >
+                <span className={`${styles.statNumber} ${styles.statQuoted}`}>
+                  {quotedDisplay}
+                </span>
+                <span className={styles.statLabel}>Quoted</span>
+              </button>
+              <button
+                className={`${styles.statCard} ${activeFilter === 'won' ? styles.statCardActive : ''}`}
+                onClick={() => setActiveFilter('won')}
+              >
+                <span className={`${styles.statNumber} ${styles.statWon}`}>
+                  {wonDisplay}
+                </span>
+                <span className={styles.statLabel}>Won</span>
+              </button>
+            </div>
+          )
         )}
 
         {/* States */}

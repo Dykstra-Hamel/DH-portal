@@ -6,6 +6,8 @@ import { useCompany } from '@/contexts/CompanyContext';
 import styles from './ServiceStopDetail.module.scss';
 
 interface StopDetail {
+  routeStopId?: string | null;
+  leadId?: string | null;
   stopId: string;
   routeId: string;
   clientId?: string;
@@ -49,7 +51,11 @@ interface StopDetail {
 function formatTime(time: string | null): string {
   if (!time) return '';
   try {
-    const date = new Date(time.includes('T') ? time : `1970-01-01T${time}`);
+    // Strip any timezone suffix so no UTC conversion occurs — times are already in local time.
+    const timePart = time.includes('T')
+      ? time.split('T')[1].replace(/Z$/i, '').split('+')[0].split('-')[0]
+      : time;
+    const date = new Date(`1970-01-01T${timePart}`);
     return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
   } catch {
     return time;
@@ -59,7 +65,9 @@ function formatTime(time: string | null): string {
 function formatDate(time: string | null): string {
   if (!time) return '';
   try {
-    const date = new Date(time);
+    // Strip timezone suffix before parsing to avoid UTC conversion.
+    const stripped = time.replace(/Z$/i, '').split('+')[0];
+    const date = new Date(stripped);
     return date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
   } catch {
     return '';
@@ -74,8 +82,6 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const routeId = searchParams.get('routeId');
-  const leadId = searchParams.get('leadId');
-  const inspectionStatus = searchParams.get('inspectionStatus');
   const { selectedCompany } = useCompany();
 
   const [stop, setStop] = useState<StopDetail | null>(null);
@@ -105,21 +111,13 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
     fetchStop();
   }, [stopId, routeId, selectedCompany?.id]);
 
+  const hasExistingInspection = Boolean(stop?.leadId);
+
   function handleStartService() {
     if (!stop) return;
-    const params = new URLSearchParams({
-      stopId: stop.stopId,
-      routeId: stop.routeId ?? '',
-      address: stop.address,
-      clientName: stop.clientName ?? '',
-      clientEmail: stop.clientEmail ?? '',
-      clientPhone: stop.clientPhone ?? '',
-    });
+    const params = new URLSearchParams();
     if (selectedCompany?.id) params.set('companyId', selectedCompany.id);
-    if (inspectionStatus === 'done' && leadId) {
-      params.set('leadId', leadId);
-      params.set('resumeReview', 'true');
-    }
+    if (stop.routeStopId) params.set('routeStopId', stop.routeStopId);
     router.push(`/field-ops/field-map/service/${stopId}/wizard?${params.toString()}`);
   }
 
@@ -415,7 +413,7 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
 
       <div className={styles.footer}>
         <button onClick={handleStartService} className={styles.startBtn}>
-          {inspectionStatus === 'done' ? 'Review Quote' : 'Start Service'}
+          {hasExistingInspection ? 'Review Quote' : 'Start Service'}
         </button>
       </div>
     </div>

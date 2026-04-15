@@ -14,6 +14,7 @@ interface QuoteLineItem {
   initialCost: number | null;
   recurringCost: number | null;
   frequency: string | null;
+  isPrimary?: boolean;
 }
 
 function getLineItemLabel(item: QuoteLineItem): string {
@@ -216,6 +217,7 @@ export async function POST(request: NextRequest) {
             is_optional: false,
             is_selected: true,
             display_order: idx,
+            is_primary: item.isPrimary !== false,
           };
         })
       );

@@ -160,8 +160,7 @@ export function SecondarySideNav({
     });
   }, [selectedCompany?.id]);
 
-  const shouldShowRouting =
-    isAdmin || ['owner', 'admin', 'manager'].includes(companyRole ?? '');
+  const shouldShowRouting = false;
 
   // Handle client-side hydration
   useEffect(() => {

@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
       signedBy,
       scheduleOption,
       assignedTo,
-      preferredDate,
+      preferredDayOfWeek,
       preferredTime,
     } = body;
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       .from('leads')
       .update({
         lead_status: 'scheduling',
-        requested_date: preferredDate ?? null,
+        requested_date: preferredDayOfWeek ?? null,
         requested_time: preferredTime ?? null,
         assigned_scheduler: assignedScheduler,
       })

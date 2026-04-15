@@ -47,9 +47,9 @@
 }
 
 .pestTagUncovered {
-  background: #FFE3E2;
-  border: 1px solid #FB2C36;
-  color: #C10007;
+  background: #ffe3e2;
+  border: 1px solid #fb2c36;
+  color: #c10007;
 }
 
 /* ── Empty state ── */
@@ -141,7 +141,9 @@
   background: var(--gray-50);
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 
   & + & {
     border-left: 1px solid var(--gray-200);
@@ -151,6 +153,205 @@
 .typeBtnActive {
   background: var(--blue-500);
   color: var(--white);
+}
+
+/* ── Section toggle switch (Primary / Secondary) ── */
+.sectionToggleWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 2px;
+}
+
+.sectionToggleText {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  color: var(--gray-600);
+  letter-spacing: 0.02em;
+}
+
+.sectionToggleSwitch {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  background: var(--gray-300);
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    background: var(--white);
+    border-radius: 50%;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+    transition: transform 0.2s ease;
+  }
+}
+
+.sectionToggleSwitchOn {
+  background: var(--blue-500);
+
+  &::after {
+    transform: translateX(24px);
+  }
+}
+
+/* ── Pest filter chips (inside line item card) ── */
+.pestFilterRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pestFilterChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--gray-300);
+  background: var(--white);
+  color: var(--gray-600);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: var(--font-satoshi);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+
+  &:hover {
+    border-color: var(--blue-400);
+    color: var(--blue-600);
+  }
+}
+
+.pestFilterChipActive {
+  background: var(--blue-500);
+  border-color: var(--blue-500);
+  color: var(--white);
+
+  &:hover {
+    background: var(--blue-600);
+    border-color: var(--blue-600);
+    color: var(--white);
+  }
+}
+
+/* ── Add-on picker (shown after service selection) ── */
+.addonPickerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--gray-50);
+}
+
+.addonPickerToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  gap: 8px;
+}
+
+.addonPickerLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gray-500);
+  font-family: var(--font-satoshi);
+}
+
+.addonPickerChevron {
+  color: var(--gray-400);
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.addonPickerChevronOpen {
+  transform: rotate(180deg);
+}
+
+.addonPickerList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.addonPickerRow {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.addonPickerItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+
+  &:hover {
+    background: var(--gray-100);
+  }
+}
+
+.addonPickerCheckbox {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  accent-color: var(--blue-500);
+  cursor: pointer;
+}
+
+.addonPickerName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font-satoshi);
+  color: var(--gray-800);
+}
+
+.addonPickerPrice {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-satoshi);
+  color: var(--gray-500);
+}
+
+.addonVariantSelect {
+  margin-left: 31px; // align with name (checkbox width + gap)
+  padding: 5px 8px;
+  font-size: 12px;
+  font-family: var(--font-satoshi);
+  color: var(--gray-700);
+  background: var(--white);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+  }
 }
 
 /* ── Fields ── */
@@ -345,7 +546,6 @@
   }
 }
 
-
 /* ── Map suggestion pills ── */
 .mapSuggestions {
   display: flex;
@@ -367,7 +567,9 @@
   font-family: var(--font-satoshi);
   cursor: pointer;
   align-self: flex-start;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover {
     background: #dbeafe;
@@ -391,7 +593,9 @@
   font-weight: 600;
   font-family: var(--font-satoshi);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover {
     background: color-mix(in srgb, var(--blue-100) 60%, white);

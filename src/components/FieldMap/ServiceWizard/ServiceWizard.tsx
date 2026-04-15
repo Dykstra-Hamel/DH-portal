@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
@@ -36,21 +36,15 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const { profile, getAvatarUrl } = useUser();
   const { selectedCompany } = useCompany();
 
-  const [clientName, setClientName] = useState(
-    searchParams.get('clientName') ?? ''
-  );
-  const [clientEmail, setClientEmail] = useState(
-    searchParams.get('clientEmail') ?? ''
-  );
-  const [clientPhone, setClientPhone] = useState(
-    searchParams.get('clientPhone') ?? ''
-  );
-  const address = searchParams.get('address') ?? '';
-  const resumeReview = searchParams.get('resumeReview') === 'true';
-  const resumeLeadId = searchParams.get('leadId') ?? null;
+  const companyIdParam = searchParams.get('companyId') ?? null;
+  const routeStopId = searchParams.get('routeStopId') ?? null;
 
-  // When launched from a service order the address is already known — skip step 0
-  const hasPrefilledAddress = Boolean(stopId && address);
+  const [clientInfo, setClientInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+  });
 
   const inspectorName =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
@@ -58,19 +52,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
-  const initialStep = hasPrefilledAddress ? 1 : 0;
+  const initialStep = stopId ? 1 : 0;
   const [maxStepReached, setMaxStepReached] = useState(initialStep);
-  const [currentStep, setCurrentStep] = useState(() =>
-    resumeReview ? 4 : hasPrefilledAddress ? 1 : 0
-  );
+  const [currentStep, setCurrentStep] = useState(initialStep);
   const [mapPlotData, setMapPlotData] = useState<MapPlotData>(() => ({
     ...DEFAULT_MAP_PLOT_DATA,
-    addressInput: address,
   }));
-  const [isGeocoding, setIsGeocoding] = useState(
-    hasPrefilledAddress && !resumeReview
-  );
-  const [isLoadingResume, setIsLoadingResume] = useState(resumeReview);
+  const [isGeocoding, setIsGeocoding] = useState(false);
+  const [isLoadingResume, setIsLoadingResume] = useState(Boolean(stopId));
   const [brandPrimaryColor, setBrandPrimaryColor] = useState<
     string | undefined
   >(undefined);
@@ -100,27 +89,144 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       .catch(() => {});
   }, [selectedCompany?.id]);
 
-  // When skipping the address step, geocode the pre-filled address to get coordinates
+  // Mount effect: fetch stop data, populate clientInfo, auto-resume if lead exists
   useEffect(() => {
-    if (!hasPrefilledAddress) return;
-    if (resumeReview) return;
-    setIsGeocoding(true);
-    fetch(`/api/internal/geocode?address=${encodeURIComponent(address)}`)
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && data.coordinates) {
+    if (!stopId) return;
+
+    const resolvedCompanyId = selectedCompany?.id ?? companyIdParam ?? '';
+
+    async function loadStopData() {
+      try {
+        const qs = new URLSearchParams();
+        if (resolvedCompanyId) qs.set('companyId', resolvedCompanyId);
+        const res = await fetch(
+          `/api/field-map/service/${stopId}?${qs.toString()}`
+        );
+        if (!res.ok) return;
+        const stopData = await res.json();
+
+        setClientInfo({
+          name: stopData.clientName ?? '',
+          email: stopData.clientEmail ?? '',
+          phone: stopData.clientPhone ?? '',
+          address: stopData.address ?? '',
+        });
+
+        // Set map center from DB coordinates if available, else geocode
+        if (stopData.lat != null && stopData.lng != null) {
           setMapPlotData(prev => ({
             ...prev,
-            centerLat: data.coordinates.latitude,
-            centerLng: data.coordinates.longitude,
+            addressInput: stopData.address ?? '',
+            centerLat: stopData.lat,
+            centerLng: stopData.lng,
             zoom: 20,
             heading: 0,
             tilt: 0,
             backgroundMode: 'satellite',
           }));
+        } else if (stopData.address) {
+          setIsGeocoding(true);
+          try {
+            const geoRes = await fetch(
+              `/api/internal/geocode?address=${encodeURIComponent(stopData.address)}`
+            );
+            const geoData = await geoRes.json();
+            if (geoData.success && geoData.coordinates) {
+              setMapPlotData(prev => ({
+                ...prev,
+                addressInput: stopData.address ?? '',
+                centerLat: geoData.coordinates.latitude,
+                centerLng: geoData.coordinates.longitude,
+                zoom: 20,
+                heading: 0,
+                tilt: 0,
+                backgroundMode: 'satellite',
+              }));
+            }
+          } finally {
+            setIsGeocoding(false);
+          }
+        } else {
+          setMapPlotData(prev => ({
+            ...prev,
+            addressInput: stopData.address ?? '',
+          }));
         }
-      })
-      .finally(() => setIsGeocoding(false));
+
+        // If an existing lead is linked, restore state and fast-forward
+        if (stopData.leadId) {
+          const [leadRes, quoteRes] = await Promise.all([
+            fetch(`/api/leads/${stopData.leadId}`),
+            fetch(`/api/leads/${stopData.leadId}/quote`),
+          ]);
+
+          if (leadRes.ok && quoteRes.ok) {
+            const lead = await leadRes.json();
+            const quoteData = await quoteRes.json();
+
+            if (lead.map_plot_data) {
+              setMapPlotData({
+                ...DEFAULT_MAP_PLOT_DATA,
+                ...lead.map_plot_data,
+                addressInput: stopData.address ?? '',
+              });
+            }
+
+            const lineItems: any[] = quoteData?.data?.line_items ?? [];
+            if (lineItems.length > 0) {
+              setQuoteLineItems(
+                lineItems.map((item: any): QuoteLineItem => {
+                  const catalogItemId =
+                    item.service_plan_id ??
+                    item.addon_service_id ??
+                    item.bundle_plan_id ??
+                    undefined;
+                  const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+                    item.service_plan_id
+                      ? 'plan'
+                      : item.addon_service_id
+                        ? 'addon'
+                        : item.bundle_plan_id
+                          ? 'bundle'
+                          : undefined;
+                  return {
+                    id: item.id,
+                    type: catalogItemId ? 'plan-addon' : 'custom',
+                    catalogItemKind,
+                    catalogItemId,
+                    catalogItemName: item.plan_name,
+                    coveredPestIds: [],
+                    coveredPestLabels: [],
+                    initialCost:
+                      item.final_initial_price ?? item.initial_price ?? null,
+                    recurringCost:
+                      item.final_recurring_price ??
+                      item.recurring_price ??
+                      null,
+                    frequency: item.billing_frequency ?? null,
+                  };
+                })
+              );
+              setCurrentStep(4);
+              setMaxStepReached(4);
+            } else {
+              // Lead exists but no quote items — resume at Map step
+              setCurrentStep(2);
+              setMaxStepReached(2);
+            }
+
+            setLeadId(stopData.leadId);
+            if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
+          }
+        }
+      } catch {
+        // Graceful fallback: stay on step 1
+      } finally {
+        setIsLoadingResume(false);
+      }
+    }
+
+    loadStopData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>(() => [
@@ -141,74 +247,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // When resuming a completed inspection, load existing lead + quote data
-  useEffect(() => {
-    if (!resumeReview || !resumeLeadId) return;
-
-    async function loadExistingInspection() {
-      try {
-        const [leadRes, quoteRes] = await Promise.all([
-          fetch(`/api/leads/${resumeLeadId}`),
-          fetch(`/api/leads/${resumeLeadId}/quote`),
-        ]);
-        const lead = await leadRes.json();
-        const quoteData = await quoteRes.json();
-
-        if (lead.map_plot_data) {
-          setMapPlotData({
-            ...DEFAULT_MAP_PLOT_DATA,
-            ...lead.map_plot_data,
-            addressInput: address,
-          });
-        }
-
-        const lineItems: any[] = quoteData?.data?.line_items ?? [];
-        setQuoteLineItems(
-          lineItems.map((item: any): QuoteLineItem => {
-            const catalogItemId =
-              item.service_plan_id ??
-              item.addon_service_id ??
-              item.bundle_plan_id ??
-              undefined;
-            const catalogItemKind: QuoteLineItem['catalogItemKind'] =
-              item.service_plan_id
-                ? 'plan'
-                : item.addon_service_id
-                  ? 'addon'
-                  : item.bundle_plan_id
-                    ? 'bundle'
-                    : undefined;
-            return {
-              id: item.id,
-              type: catalogItemId ? 'plan-addon' : 'custom',
-              catalogItemKind,
-              catalogItemId,
-              catalogItemName: item.plan_name,
-              coveredPestIds: [],
-              coveredPestLabels: [],
-              initialCost:
-                item.final_initial_price ?? item.initial_price ?? null,
-              recurringCost:
-                item.final_recurring_price ?? item.recurring_price ?? null,
-              frequency: item.billing_frequency ?? null,
-            };
-          })
-        );
-
-        setLeadId(lead.id);
-        if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
-      } catch {
-        // Graceful fallback: start from step 1
-        setCurrentStep(hasPrefilledAddress ? 1 : 0);
-      } finally {
-        setIsLoadingResume(false);
-      }
-    }
-
-    loadExistingInspection();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const selectedAddressFromComponents =
@@ -218,7 +258,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       : '';
   const selectedAddress =
     selectedAddressFromComponents || mapPlotData.addressInput || '';
-  const inspectionAddress = selectedAddress || address;
+  const inspectionAddress = selectedAddress || clientInfo.address;
   const pestTypes = getPlottedPestTypes(mapPlotData);
   const plottedPests = getPlottedPests(mapPlotData);
 
@@ -239,6 +279,69 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const handleMapChange = useCallback((data: MapPlotData) => {
     setMapPlotData(data);
   }, []);
+
+  // Debounced background save while plotting on the map step
+  useEffect(() => {
+    if (currentStep !== 2 || !leadId) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      fetch('/api/field-map/save-inspection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          clientName: clientInfo.name,
+          clientEmail: clientInfo.email,
+          clientPhone: clientInfo.phone,
+          address: inspectionAddress,
+          pestTypes,
+          mapPlotData,
+          companyId: selectedCompany?.id ?? '',
+          leadId,
+          stopId: stopId ?? undefined,
+          routeStopId: routeStopId ?? undefined,
+        }),
+      }).catch(() => {});
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapPlotData, currentStep, leadId]);
+
+  // Debounced background save while editing quote line items
+  useEffect(() => {
+    if (currentStep !== 3 || !leadId) return;
+
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+
+    autoSaveTimerRef.current = setTimeout(() => {
+      fetch('/api/field-map/save-quote', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          leadId,
+          companyId: selectedCompany?.id ?? '',
+          quoteLineItems,
+          discountTarget: 'initial',
+          discountAmount: null,
+          discountType: '$',
+        }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.quoteId && !quoteId) setQuoteId(data.quoteId);
+        })
+        .catch(() => {});
+    }, 1500);
+
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quoteLineItems, currentStep, leadId]);
 
   function canAdvance(): boolean {
     switch (currentStep) {
@@ -270,13 +373,46 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
     // After Address step (new inspection only) — validate customer name
     if (currentStep === 0 && !stopId) {
-      if (!clientName.trim()) {
+      if (!clientInfo.name.trim()) {
         setStepSaveError('Customer name is required before continuing.');
         return;
       }
     }
 
-    // After Map step — save inspection (creates/updates lead)
+    // After Photos step — create lead and store house photo(s)
+    if (currentStep === 1) {
+      setIsSavingStep(true);
+      try {
+        const res = await fetch('/api/field-map/save-inspection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            clientName: clientInfo.name,
+            clientEmail: clientInfo.email,
+            clientPhone: clientInfo.phone,
+            address: inspectionAddress,
+            pestTypes: [],
+            mapPlotData,
+            companyId: selectedCompany?.id ?? '',
+            leadId: leadId ?? undefined,
+            stopId: stopId ?? undefined,
+            routeStopId: routeStopId ?? undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error ?? 'Failed to save');
+        setLeadId(data.leadId);
+      } catch (err) {
+        setStepSaveError(err instanceof Error ? err.message : 'Failed to save');
+        setIsSavingStep(false);
+        return;
+      }
+      setIsSavingStep(false);
+      advanceStep(currentStep + 1);
+      return;
+    }
+
+    // After Map step — update lead with map data and pest types
     if (currentStep === 2) {
       setIsSavingStep(true);
       try {
@@ -284,15 +420,16 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            clientName,
-            clientEmail,
-            clientPhone,
+            clientName: clientInfo.name,
+            clientEmail: clientInfo.email,
+            clientPhone: clientInfo.phone,
             address: inspectionAddress,
             pestTypes,
             mapPlotData,
             companyId: selectedCompany?.id ?? '',
             leadId: leadId ?? undefined,
             stopId: stopId ?? undefined,
+            routeStopId: routeStopId ?? undefined,
           }),
         });
         const data = await res.json();
@@ -319,7 +456,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     // After Quote step — save quote (creates/updates quote + line items)
     if (currentStep === 3) {
       if (!leadId) {
-        setStepSaveError('No lead found. Please go back to the map step.');
+        setStepSaveError('No lead found. Please go back to the photos step.');
         return;
       }
       setIsSavingStep(true);
@@ -360,7 +497,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       setReturnToReviewAfterMapEdit(false);
       return;
     }
-    const firstStep = hasPrefilledAddress ? 1 : 0;
+    const firstStep = stopId ? 1 : 0;
     if (currentStep > firstStep) {
       setCurrentStep(s => s - 1);
     } else {
@@ -378,12 +515,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             mapPlotData={mapPlotData}
             onChange={handleMapChange}
             isNewInspection={!stopId}
-            clientName={clientName}
-            clientEmail={clientEmail}
-            clientPhone={clientPhone}
-            onClientNameChange={setClientName}
-            onClientEmailChange={setClientEmail}
-            onClientPhoneChange={setClientPhone}
+            clientName={clientInfo.name}
+            clientEmail={clientInfo.email}
+            clientPhone={clientInfo.phone}
+            onClientNameChange={v => setClientInfo(prev => ({ ...prev, name: v }))}
+            onClientEmailChange={v => setClientInfo(prev => ({ ...prev, email: v }))}
+            onClientPhoneChange={v => setClientInfo(prev => ({ ...prev, phone: v }))}
             companyId={selectedCompany?.id ?? ''}
           />
         );
@@ -428,9 +565,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       case 4:
         return (
           <ReviewStep
-            clientName={clientName}
-            clientEmail={clientEmail}
-            clientPhone={clientPhone}
+            clientName={clientInfo.name}
+            clientEmail={clientInfo.email}
+            clientPhone={clientInfo.phone}
             address={inspectionAddress}
             pestTypes={pestTypes}
             quoteLineItems={quoteLineItems}
@@ -502,7 +639,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         <div className={styles.headerGrid}>
           <div className={styles.headerInfo}>
             <p className={styles.headerTitle}>
-              {clientName || 'New Inspection'}
+              {clientInfo.name || 'New Inspection'}
             </p>
             {inspectionAddress && (
               <p className={styles.headerSub}>{inspectionAddress}</p>
@@ -598,7 +735,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
             <p className={styles.modalTitle}>Leave this service?</p>
             <p className={styles.modalBody}>
-              Your progress will be lost if you go back now.
+              Your progress has been saved and will be here when you return.
             </p>
             <div className={styles.modalActions}>
               <button

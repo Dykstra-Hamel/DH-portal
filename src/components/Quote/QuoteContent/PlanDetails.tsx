@@ -52,7 +52,8 @@ interface PlanDetailsProps {
   expandedPlanIndexes: number[];
   setExpandedPlanIndexes: (indexes: number[]) => void;
   onContinue: () => void;
-  regularLineItems: any[];
+  primaryLineItems: any[];
+  secondaryLineItems: any[];
   availableAddons: any[];
   expandedAddonIndexes: number[];
   setExpandedAddonIndexes: (indexes: number[]) => void;
@@ -136,7 +137,8 @@ export default function PlanDetails({
   expandedPlanIndexes,
   setExpandedPlanIndexes,
   onContinue,
-  regularLineItems,
+  primaryLineItems,
+  secondaryLineItems,
   availableAddons,
   expandedAddonIndexes,
   setExpandedAddonIndexes,
@@ -149,8 +151,10 @@ export default function PlanDetails({
   const [activeFaqTab, setActiveFaqTab] = useState(0);
   const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
 
+  const allPlanItems = [...primaryLineItems, ...secondaryLineItems];
+
   // Get plans with FAQs — only for selected plans
-  const plansWithFaqs = regularLineItems.filter((item: any) => {
+  const plansWithFaqs = allPlanItems.filter((item: any) => {
     const faqs = getAllFaqsFromLineItem(item);
     return faqs.length > 0 && selectedPlanIds.includes(item.id);
   });
@@ -179,332 +183,342 @@ export default function PlanDetails({
   // Clamp active tab in case selected addons change
   const clampedFaqTab = Math.min(activeFaqTab, Math.max(0, allFaqItems.length - 1));
 
-  return (
-    <>
-      {/* Plans Container */}
-      <div className={styles.plansContainer} id="pestProtectionPlans">
-        <h2>Pest Protection Plans</h2>
-        {regularLineItems.map((item: any, index: number) => {
-          const hasDiscount =
-            item.discount_amount > 0 || item.discount_percentage > 0;
-          const isExpanded = expandedPlanIndexes.includes(index);
-          const isPlanSelected = selectedPlanIds.includes(item.id);
-          const isOnlySelected = selectedPlanIds.length === 1 && isPlanSelected;
-          const planHasContent = Boolean(
-            item.plan_description ||
-            item.bundle_plan?.bundle_description ||
-            getAllFeaturesFromLineItem(item).length > 0 ||
-            getAllFaqsFromLineItem(item).length > 0 ||
-            item.service_plan?.plan_image_url ||
-            item.bundle_plan?.bundle_image_url ||
-            item.service_plan?.plan_disclaimer ||
-            item.service_plan?.plan_video_url
-          );
+  const renderPlanCard = (item: any, index: number) => {
+    const hasDiscount =
+      item.discount_amount > 0 || item.discount_percentage > 0;
+    const isExpanded = expandedPlanIndexes.includes(index);
+    const isPlanSelected = selectedPlanIds.includes(item.id);
+    const isOnlySelected = selectedPlanIds.length === 1 && isPlanSelected;
+    const planHasContent = Boolean(
+      item.plan_description ||
+      item.bundle_plan?.bundle_description ||
+      getAllFeaturesFromLineItem(item).length > 0 ||
+      getAllFaqsFromLineItem(item).length > 0 ||
+      item.service_plan?.plan_image_url ||
+      item.bundle_plan?.bundle_image_url ||
+      item.service_plan?.plan_disclaimer ||
+      item.service_plan?.plan_video_url
+    );
 
-          return (
-            <div
-              key={index}
-              className={`${styles.planCard} ${styles.collapsible} ${
-                isExpanded ? styles.expanded : ''
-              } ${isPlanSelected ? styles.selectedCard : ''}`}
+    return (
+      <div
+        key={index}
+        className={`${styles.planCard} ${styles.collapsible} ${
+          isExpanded ? styles.expanded : ''
+        } ${isPlanSelected ? styles.selectedCard : ''}`}
+      >
+        {/* Collapsible Header */}
+        <div
+          className={styles.planHeader}
+          onClick={planHasContent ? () => {
+            if (isExpanded) {
+              setExpandedPlanIndexes(
+                expandedPlanIndexes.filter(i => i !== index)
+              );
+            } else {
+              setExpandedPlanIndexes([...expandedPlanIndexes, index]);
+            }
+          } : undefined}
+          style={{ cursor: planHasContent ? 'pointer' : 'default' }}
+        >
+          {allPlanItems.length > 1 && (
+            <label
+              className={`${styles.addonCheckbox} ${isOnlySelected ? styles.addonCheckboxLastPlan : ''}`}
+              onClick={e => e.stopPropagation()}
             >
-              {/* Collapsible Header */}
-              <div
-                className={styles.planHeader}
-                onClick={planHasContent ? () => {
-                  if (isExpanded) {
-                    setExpandedPlanIndexes(
-                      expandedPlanIndexes.filter(i => i !== index)
-                    );
-                  } else {
-                    setExpandedPlanIndexes([...expandedPlanIndexes, index]);
-                  }
-                } : undefined}
-                style={{ cursor: planHasContent ? 'pointer' : 'default' }}
-              >
-                {regularLineItems.length > 1 && (
-                  <label
-                    className={`${styles.addonCheckbox} ${isOnlySelected ? styles.addonCheckboxLastPlan : ''}`}
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isPlanSelected}
-                      onChange={() => onTogglePlan(item.id)}
-                      disabled={isOnlySelected}
-                    />
-                    <span className={`${styles.addonCheckboxCustom} ${isOnlySelected ? styles.addonCheckboxDisabled : ''}`} />
-                  </label>
-                )}
-                <h3 className={styles.planHeaderTitle}>{item.plan_name}</h3>
-                <div className={styles.addonHeaderRight}>
-                  <div className={styles.planHeaderPricing}>
-                    {(item.final_recurring_price || item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
-                      <>
-                        <span className={styles.planHeaderRecurring}>
-                          <sup>$</sup>
-                          {formatCurrency(
-                            item.final_recurring_price || item.recurring_price || 0
-                          )}
-                          <span className={styles.planRecurringFrequency}>
-                            /
-                            {abbreviateFrequency(item.billing_frequency || 'monthly')}
-                          </span>
-                        </span>
-                        {(item.final_initial_price || item.initial_price || 0) > 0 && (
-                          <span className={styles.planHeaderDivider}>|</span>
-                        )}
-                      </>
+              <input
+                type="checkbox"
+                checked={isPlanSelected}
+                onChange={() => onTogglePlan(item.id)}
+                disabled={isOnlySelected}
+              />
+              <span className={`${styles.addonCheckboxCustom} ${isOnlySelected ? styles.addonCheckboxDisabled : ''}`} />
+            </label>
+          )}
+          <h3 className={styles.planHeaderTitle}>{item.plan_name}</h3>
+          <div className={styles.addonHeaderRight}>
+            <div className={styles.planHeaderPricing}>
+              {(item.final_recurring_price || item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
+                <>
+                  <span className={styles.planHeaderRecurring}>
+                    <sup>$</sup>
+                    {formatCurrency(
+                      item.final_recurring_price || item.recurring_price || 0
                     )}
-                    {(item.final_initial_price || item.initial_price || 0) > 0 && (
-                      <span className={styles.planHeaderInitial}>
-                        <sup>$</sup>
-                        {formatCurrency(
-                          item.final_initial_price || item.initial_price || 0
-                        )}
-                        <span className={styles.initialText}>{item.billing_frequency === 'one-time' ? ' One Time' : ' Initial'}</span>
-                      </span>
-                    )}
-                  </div>
-                  {planHasContent && (
-                    <span className={styles.planHeaderIcon}>
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="32"
-                        height="32"
-                        viewBox="0 0 32 32"
-                        fill="none"
-                      >
-                        <circle cx="16" cy="16" r="16" fill="#000" />
-                        <path
-                          d="M10 14L16 20L22 14"
-                          stroke="white"
-                          strokeWidth="1.75"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                    <span className={styles.planRecurringFrequency}>
+                      /
+                      {abbreviateFrequency(item.billing_frequency || 'monthly')}
                     </span>
+                  </span>
+                  {(item.final_initial_price || item.initial_price || 0) > 0 && (
+                    <span className={styles.planHeaderDivider}>|</span>
                   )}
+                </>
+              )}
+              {(item.final_initial_price || item.initial_price || 0) > 0 && (
+                <span className={styles.planHeaderInitial}>
+                  <sup>$</sup>
+                  {formatCurrency(
+                    item.final_initial_price || item.initial_price || 0
+                  )}
+                  <span className={styles.initialText}>{item.billing_frequency === 'one-time' ? ' One Time' : ' Initial'}</span>
+                </span>
+              )}
+            </div>
+            {planHasContent && (
+              <span className={styles.planHeaderIcon}>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="32"
+                  height="32"
+                  viewBox="0 0 32 32"
+                  fill="none"
+                >
+                  <circle cx="16" cy="16" r="16" fill="#000" />
+                  <path
+                    d="M10 14L16 20L22 14"
+                    stroke="white"
+                    strokeWidth="1.75"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Plan Content */}
+        <div
+          className={styles.planContentWrapper}
+          style={{
+            maxHeight: isExpanded ? '3000px' : '0',
+          }}
+        >
+          <div className={styles.planContent}>
+            <div className={styles.planContentGrid}>
+              {/* Left Column - Content */}
+              <div className={styles.planContentLeft}>
+                {/* Plan Image - mobile only */}
+                <div className={styles.planImageWrapperMobile}>
+                  {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
+                    <Image
+                      src={item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url}
+                      alt={item.plan_name || 'Plan image'}
+                      fill={true}
+                      className={styles.planImage}
+                    />
+                  ) : null}
                 </div>
-              </div>
 
-              {/* Plan Content */}
-              <div
-                className={styles.planContentWrapper}
-                style={{
-                  maxHeight: isExpanded ? '3000px' : '0',
-                }}
-              >
-                <div className={styles.planContent}>
-                  <div className={styles.planContentGrid}>
-                    {/* Left Column - Content */}
-                    <div className={styles.planContentLeft}>
-                      {/* Plan Image - mobile only */}
-                      <div className={styles.planImageWrapperMobile}>
-                        {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
-                          <Image
-                            src={item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url}
-                            alt={item.plan_name || 'Plan image'}
-                            fill={true}
-                            className={styles.planImage}
-                          />
-                        ) : null}
-                      </div>
+                {/* Plan Description */}
+                {(item.plan_description || item.bundle_plan?.bundle_description) && (
+                  <p className={styles.planDescription}>
+                    {item.plan_description || item.bundle_plan?.bundle_description}
+                  </p>
+                )}
 
-                      {/* Plan Description */}
-                      {(item.plan_description || item.bundle_plan?.bundle_description) && (
-                        <p className={styles.planDescription}>
-                          {item.plan_description || item.bundle_plan?.bundle_description}
-                        </p>
-                      )}
-
-                      {/* Features List */}
-                      {getAllFeaturesFromLineItem(item).length > 0 && (
-                        <div className={styles.planIncluded}>
-                          <h4>What&apos;s Included:</h4>
-                          <ul className={styles.featuresList}>
-                            {getAllFeaturesFromLineItem(item).map(
-                              (feature: string, fIndex: number) => (
-                                <li
-                                  key={fIndex}
-                                  className={styles.feature}
-                                >
-                                  <span className={styles.featureCheckmark}>
-                                    <svg
-                                      xmlns="http://www.w3.org/2000/svg"
+                {/* Features List */}
+                {getAllFeaturesFromLineItem(item).length > 0 && (
+                  <div className={styles.planIncluded}>
+                    <h4>What&apos;s Included:</h4>
+                    <ul className={styles.featuresList}>
+                      {getAllFeaturesFromLineItem(item).map(
+                        (feature: string, fIndex: number) => (
+                          <li
+                            key={fIndex}
+                            className={styles.feature}
+                          >
+                            <span className={styles.featureCheckmark}>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="20"
+                                height="20"
+                                viewBox="0 0 20 20"
+                                fill="none"
+                              >
+                                <g clipPath="url(#clip0_6146_560)">
+                                  <path
+                                    d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
+                                    stroke="#000"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                  <path
+                                    d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
+                                    stroke="#000"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </g>
+                                <defs>
+                                  <clipPath id="clip0_6146_560">
+                                    <rect
                                       width="20"
                                       height="20"
-                                      viewBox="0 0 20 20"
-                                      fill="none"
-                                    >
-                                      <g clipPath="url(#clip0_6146_560)">
-                                        <path
-                                          d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
-                                          stroke="#000"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
-                                        <path
-                                          d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
-                                          stroke="#000"
-                                          strokeWidth="2"
-                                          strokeLinecap="round"
-                                          strokeLinejoin="round"
-                                        />
-                                      </g>
-                                      <defs>
-                                        <clipPath id="clip0_6146_560">
-                                          <rect
-                                            width="20"
-                                            height="20"
-                                            fill="white"
-                                          />
-                                        </clipPath>
-                                      </defs>
-                                    </svg>
-                                  </span>
-                                  {feature}
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        </div>
+                                      fill="white"
+                                    />
+                                  </clipPath>
+                                </defs>
+                              </svg>
+                            </span>
+                            {feature}
+                          </li>
+                        )
                       )}
+                    </ul>
+                  </div>
+                )}
 
-                      {/* Pricing Section */}
-                      <div className={styles.pricingSection}>
-                        <div className={styles.priceContainer}>
-                          {/* Left: Recurring Price — hidden for one-time or zero recurring */}
-                          {(item.final_recurring_price || item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
-                            <div className={styles.priceLeft}>
-                              <div className={styles.priceRecurring}>
-                                <sup>$</sup>
-                                {formatCurrency(
-                                  item.final_recurring_price ||
-                                    item.recurring_price ||
-                                    0
-                                )}
-                                <sup className={styles.priceAsterisk}>*</sup>
-                                <span className={styles.priceFrequency}>
-                                  /
-                                  {abbreviateFrequency(
-                                    item.billing_frequency || 'monthly'
-                                  )}
-                                </span>
-                              </div>
-                            </div>
+                {/* Pricing Section */}
+                <div className={styles.pricingSection}>
+                  <div className={styles.priceContainer}>
+                    {/* Left: Recurring Price — hidden for one-time or zero recurring */}
+                    {(item.final_recurring_price || item.recurring_price || 0) > 0 && item.billing_frequency !== 'one-time' && (
+                      <div className={styles.priceLeft}>
+                        <div className={styles.priceRecurring}>
+                          <sup>$</sup>
+                          {formatCurrency(
+                            item.final_recurring_price ||
+                              item.recurring_price ||
+                              0
                           )}
-
-                          {/* Right: Initial Price */}
-                          <div className={styles.priceRight}>
-                            {hasDiscount ? (
-                              <>
-                                <div className={styles.priceInitialInline}>
-                                  <span className={styles.initialLabel}>{item.billing_frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
-                                  {' '}
-                                  <span className={styles.priceNumber}>
-                                    <sup>$</sup>
-                                    {formatCurrency(item.final_initial_price || item.initial_price || 0)}
-                                  </span>
-                                </div>
-                                <div className={styles.priceNormally}>
-                                  Normally{' '}
-                                  <span className={styles.priceCrossed}>
-                                    <sup>$</sup>
-                                    {formatCurrency(item.initial_price || 0)}
-                                  </span>
-                                </div>
-                              </>
-                            ) : (
-                              <div className={styles.priceInitial}>
-                                <span className={styles.initialLabel}>{item.billing_frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
-                                <span className={styles.priceNumber}>
-                                  <sup>$</sup>
-                                  {formatCurrency(item.initial_price || 0)}
-                                </span>
-                              </div>
+                          <sup className={styles.priceAsterisk}>*</sup>
+                          <span className={styles.priceFrequency}>
+                            /
+                            {abbreviateFrequency(
+                              item.billing_frequency || 'monthly'
                             )}
-                          </div>
+                          </span>
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    {/* Right Column - Image and Disclaimer */}
-                    <div className={styles.planContentRight}>
-                      {/* Plan Image - desktop only */}
-                      <div className={styles.planImageWrapper}>
-                        {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
-                          <Image
-                            src={item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url}
-                            alt={item.plan_name || 'Plan image'}
-                            fill={true}
-                            className={styles.planImage}
-                          />
-                        ) : (
-                          <div className={styles.planImagePlaceholder}>
-                            <svg
-                              width="100"
-                              height="100"
-                              viewBox="0 0 100 100"
-                              fill="none"
-                              xmlns="http://www.w3.org/2000/svg"
-                            >
-                              <rect width="100" height="100" fill="#E5E7EB" />
-                              <path
-                                d="M50 30L60 50H40L50 30Z"
-                                fill="#9CA3AF"
-                              />
-                              <circle cx="50" cy="65" r="10" fill="#9CA3AF" />
-                            </svg>
+                    {/* Right: Initial Price */}
+                    <div className={styles.priceRight}>
+                      {hasDiscount ? (
+                        <>
+                          <div className={styles.priceInitialInline}>
+                            <span className={styles.initialLabel}>{item.billing_frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
+                            {' '}
+                            <span className={styles.priceNumber}>
+                              <sup>$</sup>
+                              {formatCurrency(item.final_initial_price || item.initial_price || 0)}
+                            </span>
                           </div>
-                        )}
-                      </div>
-
-                      {/* Disclaimer + Video */}
-                      {(item.service_plan?.plan_disclaimer || item.service_plan?.plan_video_url) && (
-                        <div className={`${styles.planDisclaimerVideoRow}${item.service_plan?.plan_video_url ? ` ${styles.hasVideo}` : ''}`}>
-                          {item.service_plan?.plan_disclaimer && (
-                            <div className={styles.planDisclaimer}>
-                              <p
-                                dangerouslySetInnerHTML={{
-                                  __html: item.service_plan.plan_disclaimer,
-                                }}
-                              ></p>
-                            </div>
-                          )}
-                          {item.service_plan?.plan_video_url && (
-                            <button
-                              type="button"
-                              className={styles.planVideoThumbnail}
-                              onClick={() => setVideoLightboxUrl(item.service_plan.plan_video_url)}
-                              aria-label="Play plan video"
-                            >
-                              <video
-                                src={item.service_plan.plan_video_url}
-                                muted
-                                preload="metadata"
-                                className={styles.planVideoThumbnailVideo}
-                              />
-                              <span className={styles.planVideoPlayOverlay}>
-                                <svg width="45" height="45" viewBox="0 0 45 45" fill="none">
-                                  <circle cx="22.5" cy="22.5" r="22.5" fill="rgba(0,0,0,0.5)" />
-                                  <path d="M18 14.5L32 22.5L18 30.5V14.5Z" fill="white" />
-                                </svg>
-                              </span>
-                            </button>
-                          )}
+                          <div className={styles.priceNormally}>
+                            Normally{' '}
+                            <span className={styles.priceCrossed}>
+                              <sup>$</sup>
+                              {formatCurrency(item.initial_price || 0)}
+                            </span>
+                          </div>
+                        </>
+                      ) : (
+                        <div className={styles.priceInitial}>
+                          <span className={styles.initialLabel}>{item.billing_frequency === 'one-time' ? 'One Time' : 'Initial Only'}</span>
+                          <span className={styles.priceNumber}>
+                            <sup>$</sup>
+                            {formatCurrency(item.initial_price || 0)}
+                          </span>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
               </div>
+
+              {/* Right Column - Image and Disclaimer */}
+              <div className={styles.planContentRight}>
+                {/* Plan Image - desktop only */}
+                <div className={styles.planImageWrapper}>
+                  {(item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url) ? (
+                    <Image
+                      src={item.bundle_plan?.bundle_image_url || item.service_plan?.plan_image_url}
+                      alt={item.plan_name || 'Plan image'}
+                      fill={true}
+                      className={styles.planImage}
+                    />
+                  ) : (
+                    <div className={styles.planImagePlaceholder}>
+                      <svg
+                        width="100"
+                        height="100"
+                        viewBox="0 0 100 100"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                      >
+                        <rect width="100" height="100" fill="#E5E7EB" />
+                        <path
+                          d="M50 30L60 50H40L50 30Z"
+                          fill="#9CA3AF"
+                        />
+                        <circle cx="50" cy="65" r="10" fill="#9CA3AF" />
+                      </svg>
+                    </div>
+                  )}
+                </div>
+
+                {/* Disclaimer + Video */}
+                {(item.service_plan?.plan_disclaimer || item.service_plan?.plan_video_url) && (
+                  <div className={`${styles.planDisclaimerVideoRow}${item.service_plan?.plan_video_url ? ` ${styles.hasVideo}` : ''}`}>
+                    {item.service_plan?.plan_disclaimer && (
+                      <div className={styles.planDisclaimer}>
+                        <p
+                          dangerouslySetInnerHTML={{
+                            __html: item.service_plan.plan_disclaimer,
+                          }}
+                        ></p>
+                      </div>
+                    )}
+                    {item.service_plan?.plan_video_url && (
+                      <button
+                        type="button"
+                        className={styles.planVideoThumbnail}
+                        onClick={() => setVideoLightboxUrl(item.service_plan.plan_video_url)}
+                        aria-label="Play plan video"
+                      >
+                        <video
+                          src={item.service_plan.plan_video_url}
+                          muted
+                          preload="metadata"
+                          className={styles.planVideoThumbnailVideo}
+                        />
+                        <span className={styles.planVideoPlayOverlay}>
+                          <svg width="45" height="45" viewBox="0 0 45 45" fill="none">
+                            <circle cx="22.5" cy="22.5" r="22.5" fill="rgba(0,0,0,0.5)" />
+                            <path d="M18 14.5L32 22.5L18 30.5V14.5Z" fill="white" />
+                          </svg>
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
-          );
-        })}
+          </div>
+        </div>
       </div>
+    );
+  };
+
+  return (
+    <>
+      {/* Primary Plans Container */}
+      <div className={styles.plansContainer} id="pestProtectionPlans">
+        <h2>Service Quote</h2>
+        {primaryLineItems.map((item: any, i: number) => renderPlanCard(item, i))}
+      </div>
+
+      {/* Secondary Plans Container */}
+      {secondaryLineItems.length > 0 && (
+        <div className={styles.plansContainer}>
+          <h2>Additional Recommendations</h2>
+          {secondaryLineItems.map((item: any, i: number) => renderPlanCard(item, primaryLineItems.length + i))}
+        </div>
+      )}
 
       {/* Add-On Services Section */}
       {availableAddons.length > 0 && (
@@ -634,7 +648,8 @@ export default function PlanDetails({
       )}
 
       <QuoteTotalPricing
-        regularLineItems={regularLineItems}
+        primaryLineItems={primaryLineItems}
+        secondaryLineItems={secondaryLineItems}
         availableAddons={availableAddons}
         selectedAddonIds={selectedAddonIds}
         onToggleAddon={onToggleAddon}

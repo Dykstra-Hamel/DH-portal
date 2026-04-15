@@ -35,6 +35,7 @@ export async function POST(request: NextRequest) {
       companyId: bodyCompanyId,
       leadId: existingLeadId,
       stopId,
+      routeStopId,
     } = body;
 
     if (!clientName || !address) {
@@ -143,10 +144,22 @@ export async function POST(request: NextRequest) {
       serviceAddressId = newAddress?.id ?? null;
     }
 
+    // ── Resolve lead ID — check route_stops to avoid duplicates ──────────
+    let resolvedLeadId: string | null = existingLeadId ?? null;
+
+    if (!resolvedLeadId && routeStopId) {
+      const { data: stopRow } = await adminClient
+        .from('route_stops')
+        .select('lead_id')
+        .eq('id', routeStopId)
+        .maybeSingle();
+      if (stopRow?.lead_id) resolvedLeadId = stopRow.lead_id;
+    }
+
     // ── Create or update lead ─────────────────────────────────────────────
     let leadId: string;
 
-    if (existingLeadId) {
+    if (resolvedLeadId) {
       // Update existing lead (re-editing map)
       const { error: updateError } = await adminClient
         .from('leads')
@@ -157,13 +170,13 @@ export async function POST(request: NextRequest) {
           map_plot_data: mapPlotData ?? null,
           ...(stopId ? { pestpac_stop_id: String(stopId) } : {}),
         })
-        .eq('id', existingLeadId);
+        .eq('id', resolvedLeadId);
 
       if (updateError) {
         console.error('[save-inspection] lead update error:', updateError);
         return NextResponse.json({ error: updateError.message ?? 'Failed to update lead' }, { status: 500 });
       }
-      leadId = existingLeadId;
+      leadId = resolvedLeadId as string;
     } else {
       const { data: newLead, error: leadError } = await adminClient
         .from('leads')
@@ -201,6 +214,15 @@ export async function POST(request: NextRequest) {
         notes: 'Field map inspection created',
         metadata: { source: 'field_map' },
       });
+    }
+
+    // ── Link lead back to route stop ──────────────────────────────────────
+    if (routeStopId && leadId) {
+      await adminClient
+        .from('route_stops')
+        .update({ lead_id: leadId })
+        .eq('id', routeStopId)
+        .eq('company_id', companyId);
     }
 
     return NextResponse.json({ success: true, leadId, customerId, serviceAddressId });

@@ -83,7 +83,7 @@ export function generateLeadSchedulingEmailTemplate(
                           </p>
                           ${leadData.requestedDate ? `
                           <p style="margin: 0 0 20px 0; font-size: 16px; font-weight: 400; line-height: 22px; color: #000000;">
-                            <strong>Requested Date:</strong> ${new Date(leadData.requestedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                            <strong>Requested Day:</strong> ${leadData.requestedDate.charAt(0).toUpperCase() + leadData.requestedDate.slice(1)}
                           </p>
                           ` : ''}
                           <a href="${leadData.leadUrl || '#'}" style="display: inline-block; padding: 12px 30px; background-color: #0080F0; color: #ffffff; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: 700; line-height: 18px;">Open Lead Ticket</a>

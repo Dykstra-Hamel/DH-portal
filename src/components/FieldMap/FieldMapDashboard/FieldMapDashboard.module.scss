@@ -183,6 +183,13 @@
   gap: 10px;
 }
 
+.statsRowTech {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
 .statCard {
   background: var(--white);
   border: 1px solid var(--border-color);

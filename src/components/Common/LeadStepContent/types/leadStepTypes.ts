@@ -1,4 +1,5 @@
 import { Lead } from '@/types/lead';
+import { TimeOption } from '@/lib/time-options';
 
 // Common callback types
 export type ShowToastCallback = (
@@ -71,6 +72,7 @@ export interface LeadSchedulingSectionProps {
   onFinalizeSale: () => void;
   onEmailQuote: () => void;
   isSidebarExpanded?: boolean;
+  timeOptions?: TimeOption[];
 }
 
 // Lead Contact Section Props
@@ -132,4 +134,5 @@ export interface LeadQuoteSectionProps {
   isSidebarExpanded?: boolean;
   startExpanded?: boolean;
   forceCollapse?: boolean;
+  timeOptions?: TimeOption[];
 }

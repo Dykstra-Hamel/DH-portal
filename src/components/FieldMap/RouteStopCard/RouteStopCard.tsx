@@ -22,6 +22,8 @@ export interface RouteStop {
   inspectionStatus?: InspectionStatus;
   leadId?: string | null;
   leadStatus?: string | null;
+  referredToSales?: boolean;
+  routeStopId?: string | null;
 }
 
 interface RouteStopCardProps {
@@ -83,8 +85,8 @@ export function RouteStopCard({
     : null;
 
   const href = isTechnicianOnly
-    ? `/field-ops/tech-leads/new?type=upsell${stop.clientId ? `&pestpacClientId=${stop.clientId}` : ''}${stop.locationId ? `&pestpacLocationId=${stop.locationId}` : ''}${stop.stopId ? `&stopId=${stop.stopId}` : ''}${stop.clientName ? `&clientName=${encodeURIComponent(stop.clientName)}` : ''}`
-    : `/field-ops/field-map/service/${stop.stopId}?routeId=${stop.routeId}${companyId ? `&companyId=${companyId}` : ''}${stop.leadId ? `&leadId=${stop.leadId}` : ''}${stop.inspectionStatus ? `&inspectionStatus=${stop.inspectionStatus}` : ''}`;
+    ? `/field-ops/tech-leads/new?type=upsell${stop.routeStopId ? `&routeStopId=${stop.routeStopId}` : ''}`
+    : `/field-ops/field-map/service/${stop.stopId}${companyId ? `?companyId=${companyId}` : ''}`;
 
   return (
     <Link href={href} className={styles.card}>

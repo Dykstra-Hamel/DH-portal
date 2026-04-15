@@ -197,7 +197,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
           {lead.comments && (
             <div className={styles.transcriptSection}>
               <div className={styles.transcriptHeader}>
-                <h4 className={cardStyles.dataLabel}>AI Summary</h4>
+                <h4 className={cardStyles.dataLabel}>Summary</h4>
               </div>
               <div className={styles.summaryPlainContent}>
                 <span className={cardStyles.transcriptText}>{lead.comments}</span>
