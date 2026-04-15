@@ -94,6 +94,14 @@
   font-family: var(--font-satoshi);
 }
 
+.appShellTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-satoshi);
+  white-space: nowrap;
+}
+
 .rightSection {
   flex: 1;
   display: flex;

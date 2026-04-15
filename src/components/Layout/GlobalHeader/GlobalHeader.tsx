@@ -11,6 +11,7 @@ import { GlobalCompanyDropdown } from './CompanyDropdown/GlobalCompanyDropdown';
 import { MobileCompanySwitcher } from './CompanyDropdown/MobileCompanySwitcher';
 import { useWizard } from '@/contexts/WizardContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import styles from './GlobalHeader.module.scss';
 
 interface GlobalHeaderProps {
@@ -26,11 +27,13 @@ export function GlobalHeader({
   const router = useRouter();
   const { wizardTitle, backInterceptor } = useWizard();
   const { isProjectManager } = useCompany();
+  const { pageHeader } = usePageActions();
   const isTechLeads = pathname.startsWith('/tech-leads');
   const isFieldMap = pathname.startsWith('/field-map');
   const isFieldOps = pathname.startsWith('/field-ops');
   const isServiceWizard = pathname.startsWith('/field-ops/field-map/service/') && pathname.endsWith('/wizard');
   const isAppShell = isTechLeads || isFieldMap || isFieldOps;
+  const showAppShellTitle = isAppShell && !!pageHeader?.title;
   const hideSearch =
     isAppShell ||
     pathname === '/project-management' ||
@@ -84,6 +87,9 @@ export function GlobalHeader({
             </button>
           )}
           {!hideBreadcrumbs && <Breadcrumbs />}
+          {showAppShellTitle && (
+            <span className={styles.appShellTitle}>{pageHeader!.title}</span>
+          )}
         </div>
         <div className={styles.centerSection}></div>
         <div className={styles.rightSection}>

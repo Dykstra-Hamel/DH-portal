@@ -49,6 +49,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const isFieldOpsPage = pathname.startsWith('/field-ops');
   const isAppShellPage = isTechLeadsPage || isFieldMapPage || isFieldOpsPage;
   const hideSecondarySidebar = isTechLeadsPage || isFieldMapPage;
+  const isFieldMapWizardPage = Boolean(
+    pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
+    pathname.match(/^\/field-ops\/field-map\/service\/[^\/]+\/wizard$/)
+  );
 
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
@@ -603,7 +607,11 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             className={[
               styles.mainContent,
               isProjectManagementPage ? styles.projectManagementMainContent : '',
-              isAppShellPage ? styles.techLeadsMainContent : '',
+              isFieldMapWizardPage
+                ? styles.fieldMapWizardMainContent
+                : isAppShellPage
+                ? styles.techLeadsMainContent
+                : '',
             ].filter(Boolean).join(' ')}
             data-scroll-container="main"
           >
@@ -611,6 +619,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               className={`pageWrapper ${
                 isProjectManagementPage
                   ? styles.projectManagementPageWrapper
+                  : isFieldMapWizardPage
+                  ? styles.fieldMapWizardPageWrapper
                   : isAppShellPage
                   ? styles.techLeadsPageWrapper
                   : ''

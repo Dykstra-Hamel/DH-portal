@@ -45,6 +45,8 @@ export interface MapElementOutline {
   type: MapElementStampType;
   points: MapOutlinePoint[];
   isClosed: boolean;
+  sqft?: number;      // set by canvas; matches displayed label exactly
+  linearFt?: number;  // set by canvas; matches displayed label exactly
 }
 
 export interface MapPlotData {

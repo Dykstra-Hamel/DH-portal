@@ -498,7 +498,7 @@ export function ReviewStep({
           </div>
           <h2 className={styles.successTitle}>Quote Sent!</h2>
           <p className={styles.successSub}>A lead has been created and the quote email is on its way.</p>
-          <button type="button" className={styles.successBtn} onClick={() => router.push('/field-ops/field-map')}>
+          <button type="button" className={styles.successBtn} onClick={() => router.push('/field-ops/dashboard')}>
             Back to Route
           </button>
         </div>
@@ -519,7 +519,7 @@ export function ReviewStep({
           </div>
           <h2 className={styles.successTitle}>Ready to Schedule</h2>
           <p className={styles.successSub}>{scheduleSuccessMsg}</p>
-          <button type="button" className={styles.successBtn} onClick={() => router.push('/field-ops/field-map')}>
+          <button type="button" className={styles.successBtn} onClick={() => router.push('/field-ops/dashboard')}>
             Back to Route
           </button>
         </div>

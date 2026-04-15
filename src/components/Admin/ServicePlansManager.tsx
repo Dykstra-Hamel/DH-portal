@@ -27,6 +27,9 @@ interface ServicePlan {
   plan_image_url: string | null;
   plan_disclaimer: string | null;
   plan_terms: string | null;
+  pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
+  price_per_unit: number | null;
+  minimum_price: number | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;

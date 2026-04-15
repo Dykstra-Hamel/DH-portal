@@ -4,6 +4,7 @@ import {
   SizeOption,
   PricingCalculation,
 } from '@/types/pricing';
+import type { ServiceVariant } from '@/types/addon-service';
 
 /**
  * Generate home size dropdown options based on company intervals
@@ -445,14 +446,16 @@ export function calculateLinearFeetPrice(
 }
 
 /**
- * Calculate total pricing based on selected home size, yard size, and linear feet intervals
+ * Calculate total pricing based on selected home size, yard size, and linear feet intervals.
+ * Applies an optional minimum_price floor to the computed totals.
  */
 export function calculateTotalPricing(
   baseInitialPrice: number,
   baseRecurringPrice: number,
   homeSizeOption?: SizeOption,
   yardSizeOption?: SizeOption,
-  linearFeetOption?: SizeOption
+  linearFeetOption?: SizeOption,
+  minimumPrice?: number | null
 ): PricingCalculation {
   const homeSizeInitialIncrease = homeSizeOption?.initialIncrease || 0;
   const homeSizeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
@@ -464,6 +467,18 @@ export function calculateTotalPricing(
   // Handle null/undefined baseRecurringPrice for one-time services
   const safeBaseRecurringPrice = baseRecurringPrice || 0;
 
+  const rawInitial =
+    baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease + linearFeetInitialIncrease;
+  const rawRecurring =
+    safeBaseRecurringPrice +
+    homeSizeRecurringIncrease +
+    yardSizeRecurringIncrease +
+    linearFeetRecurringIncrease;
+
+  // Apply minimum price floor to the initial (one-time or setup) cost
+  const totalInitialPrice =
+    minimumPrice != null ? Math.max(rawInitial, minimumPrice) : rawInitial;
+
   return {
     baseInitialPrice,
     baseRecurringPrice: safeBaseRecurringPrice,
@@ -473,14 +488,31 @@ export function calculateTotalPricing(
     yardSizeRecurringIncrease,
     linearFeetInitialIncrease,
     linearFeetRecurringIncrease,
-    totalInitialPrice:
-      baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease + linearFeetInitialIncrease,
-    totalRecurringPrice:
-      safeBaseRecurringPrice +
-      homeSizeRecurringIncrease +
-      yardSizeRecurringIncrease +
-      linearFeetRecurringIncrease,
+    totalInitialPrice,
+    totalRecurringPrice: rawRecurring,
   };
+}
+
+/**
+ * Resolve the effective price from a variant selection.
+ * Returns the variant's price if a matching variant exists; falls back to the base price.
+ *
+ * @param variants   - The add-on's or plan's variants array
+ * @param selectedLabel - The label the user selected (or null if no selection)
+ * @param basePrice  - The base initial_price or price_per_unit to fall back to
+ * @param field      - Which variant field to read ('initial_price' or 'price_per_unit')
+ */
+export function resolveVariantPrice(
+  variants: ServiceVariant[],
+  selectedLabel: string | null | undefined,
+  basePrice: number | null,
+  field: 'initial_price' | 'price_per_unit' = 'initial_price'
+): number | null {
+  if (!selectedLabel || !variants.length) return basePrice;
+  const match = variants.find(v => v.label === selectedLabel);
+  if (!match) return basePrice;
+  const value = match[field];
+  return value != null ? value : basePrice;
 }
 
 /**
@@ -517,6 +549,19 @@ export function calculateIntervalCount(
     : generateLinearFeetOptions(settings);
 
   return options.length;
+}
+
+/**
+ * Calculate price for per-unit pricing (per_sqft, per_linear_foot, per_acre).
+ * Formula: max(quantity × pricePerUnit, minimumPrice ?? 0)
+ */
+export function calculatePerUnitPrice(
+  quantity: number,
+  pricePerUnit: number,
+  minimumPrice?: number | null
+): number {
+  const raw = quantity * pricePerUnit;
+  return minimumPrice != null ? Math.max(raw, minimumPrice) : raw;
 }
 
 /**

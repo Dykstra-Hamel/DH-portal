@@ -1,14 +1,23 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
-import { DEFAULT_MAP_PLOT_DATA, getMapLatitude, getMapLongitude, MapPlotData } from '@/components/FieldMap/MapPlot/types';
+import {
+  DEFAULT_MAP_PLOT_DATA,
+  getMapLatitude,
+  getMapLongitude,
+  MapPlotData,
+} from '@/components/FieldMap/MapPlot/types';
 import { MapAddressStep } from './steps/MapAddressStep';
 import { HousePhotoStep } from './steps/HousePhotoStep';
-import { MapPlotStep, getPlottedPestTypes, getPlottedPests } from './steps/MapPlotStep';
+import {
+  MapPlotStep,
+  getPlottedPestTypes,
+  getPlottedPests,
+} from './steps/MapPlotStep';
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem } from './steps/QuoteBuildStep';
 import { ReviewStep } from './steps/ReviewStep';
@@ -27,46 +36,74 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const { profile, getAvatarUrl } = useUser();
   const { selectedCompany } = useCompany();
 
-  const [clientName, setClientName] = useState(searchParams.get('clientName') ?? '');
-  const [clientEmail, setClientEmail] = useState(searchParams.get('clientEmail') ?? '');
-  const [clientPhone, setClientPhone] = useState(searchParams.get('clientPhone') ?? '');
+  const [clientName, setClientName] = useState(
+    searchParams.get('clientName') ?? ''
+  );
+  const [clientEmail, setClientEmail] = useState(
+    searchParams.get('clientEmail') ?? ''
+  );
+  const [clientPhone, setClientPhone] = useState(
+    searchParams.get('clientPhone') ?? ''
+  );
   const address = searchParams.get('address') ?? '';
+  const resumeReview = searchParams.get('resumeReview') === 'true';
+  const resumeLeadId = searchParams.get('leadId') ?? null;
 
   // When launched from a service order the address is already known — skip step 0
   const hasPrefilledAddress = Boolean(stopId && address);
 
-  const inspectorName = [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') || 'Inspector';
+  const inspectorName =
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
+    'Inspector';
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
   const initialStep = hasPrefilledAddress ? 1 : 0;
-  const [currentStep, setCurrentStep] = useState(initialStep);
   const [maxStepReached, setMaxStepReached] = useState(initialStep);
+  const [currentStep, setCurrentStep] = useState(() =>
+    resumeReview ? 4 : hasPrefilledAddress ? 1 : 0
+  );
   const [mapPlotData, setMapPlotData] = useState<MapPlotData>(() => ({
     ...DEFAULT_MAP_PLOT_DATA,
     addressInput: address,
   }));
-  const [isGeocoding, setIsGeocoding] = useState(hasPrefilledAddress);
-  const [brandPrimaryColor, setBrandPrimaryColor] = useState<string | undefined>(undefined);
+  const [isGeocoding, setIsGeocoding] = useState(
+    hasPrefilledAddress && !resumeReview
+  );
+  const [isLoadingResume, setIsLoadingResume] = useState(resumeReview);
+  const [brandPrimaryColor, setBrandPrimaryColor] = useState<
+    string | undefined
+  >(undefined);
 
   // Fetch brand primary color for stamp icons
   useEffect(() => {
     const companyId = selectedCompany?.id;
     if (!companyId) return;
     fetch(`/api/companies/${companyId}/field-map-branding`)
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { primary_color?: string | null; quote_accent_color_preference?: string | null; secondary_color?: string | null } | null) => {
-        if (!data) return;
-        const isReversed = data.quote_accent_color_preference === 'secondary';
-        const primary = isReversed ? data.secondary_color : data.primary_color;
-        if (primary) setBrandPrimaryColor(primary);
-      })
+      .then(r => (r.ok ? r.json() : null))
+      .then(
+        (
+          data: {
+            primary_color?: string | null;
+            quote_accent_color_preference?: string | null;
+            secondary_color?: string | null;
+          } | null
+        ) => {
+          if (!data) return;
+          const isReversed = data.quote_accent_color_preference === 'secondary';
+          const primary = isReversed
+            ? data.secondary_color
+            : data.primary_color;
+          if (primary) setBrandPrimaryColor(primary);
+        }
+      )
       .catch(() => {});
   }, [selectedCompany?.id]);
 
   // When skipping the address step, geocode the pre-filled address to get coordinates
   useEffect(() => {
     if (!hasPrefilledAddress) return;
+    if (resumeReview) return;
     setIsGeocoding(true);
     fetch(`/api/internal/geocode?address=${encodeURIComponent(address)}`)
       .then(r => r.json())
@@ -84,33 +121,120 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         }
       })
       .finally(() => setIsGeocoding(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>(() => [{
-    id: crypto.randomUUID(),
-    type: 'plan-addon',
-    coveredPestIds: [],
-    coveredPestLabels: [],
-    initialCost: null,
-    recurringCost: null,
-    frequency: 'monthly',
-  }]);
+  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>(() => [
+    {
+      id: crypto.randomUUID(),
+      type: 'plan-addon',
+      coveredPestIds: [],
+      coveredPestLabels: [],
+      initialCost: null,
+      recurringCost: null,
+      frequency: 'monthly',
+    },
+  ]);
   const [notes, setNotes] = useState('');
-  const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] = useState(false);
+  const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] =
+    useState(false);
   const [leadId, setLeadId] = useState<string | null>(null);
   const [quoteId, setQuoteId] = useState<string | null>(null);
   const [isSavingStep, setIsSavingStep] = useState(false);
   const [stepSaveError, setStepSaveError] = useState<string | null>(null);
+
+  // When resuming a completed inspection, load existing lead + quote data
+  useEffect(() => {
+    if (!resumeReview || !resumeLeadId) return;
+
+    async function loadExistingInspection() {
+      try {
+        const [leadRes, quoteRes] = await Promise.all([
+          fetch(`/api/leads/${resumeLeadId}`),
+          fetch(`/api/leads/${resumeLeadId}/quote`),
+        ]);
+        const lead = await leadRes.json();
+        const quoteData = await quoteRes.json();
+
+        if (lead.map_plot_data) {
+          setMapPlotData({
+            ...DEFAULT_MAP_PLOT_DATA,
+            ...lead.map_plot_data,
+            addressInput: address,
+          });
+        }
+
+        const lineItems: any[] = quoteData?.data?.line_items ?? [];
+        setQuoteLineItems(
+          lineItems.map((item: any): QuoteLineItem => {
+            const catalogItemId =
+              item.service_plan_id ??
+              item.addon_service_id ??
+              item.bundle_plan_id ??
+              undefined;
+            const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+              item.service_plan_id
+                ? 'plan'
+                : item.addon_service_id
+                  ? 'addon'
+                  : item.bundle_plan_id
+                    ? 'bundle'
+                    : undefined;
+            return {
+              id: item.id,
+              type: catalogItemId ? 'plan-addon' : 'custom',
+              catalogItemKind,
+              catalogItemId,
+              catalogItemName: item.plan_name,
+              coveredPestIds: [],
+              coveredPestLabels: [],
+              initialCost:
+                item.final_initial_price ?? item.initial_price ?? null,
+              recurringCost:
+                item.final_recurring_price ?? item.recurring_price ?? null,
+              frequency: item.billing_frequency ?? null,
+            };
+          })
+        );
+
+        setLeadId(lead.id);
+        if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
+      } catch {
+        // Graceful fallback: start from step 1
+        setCurrentStep(hasPrefilledAddress ? 1 : 0);
+      } finally {
+        setIsLoadingResume(false);
+      }
+    }
+
+    loadExistingInspection();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
   const selectedAddressFromComponents =
-    mapPlotData.addressComponents && typeof mapPlotData.addressComponents.formatted_address === 'string'
+    mapPlotData.addressComponents &&
+    typeof mapPlotData.addressComponents.formatted_address === 'string'
       ? mapPlotData.addressComponents.formatted_address
       : '';
-  const selectedAddress = selectedAddressFromComponents || mapPlotData.addressInput || '';
+  const selectedAddress =
+    selectedAddressFromComponents || mapPlotData.addressInput || '';
   const inspectionAddress = selectedAddress || address;
   const pestTypes = getPlottedPestTypes(mapPlotData);
   const plottedPests = getPlottedPests(mapPlotData);
+
+  const mapMeasurements = useMemo(
+    () => ({
+      byOutline: mapPlotData.outlines
+        .filter(o => o.sqft != null || o.linearFt != null)
+        .map(o => ({
+          id: o.id,
+          type: o.type,
+          sqft: o.sqft ?? 0,
+          linearFt: o.linearFt ?? 0,
+        })),
+    }),
+    [mapPlotData.outlines]
+  );
 
   const handleMapChange = useCallback((data: MapPlotData) => {
     setMapPlotData(data);
@@ -119,7 +243,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   function canAdvance(): boolean {
     switch (currentStep) {
       case 0:
-        return getMapLatitude(mapPlotData) !== null && getMapLongitude(mapPlotData) !== null;
+        return (
+          getMapLatitude(mapPlotData) !== null &&
+          getMapLongitude(mapPlotData) !== null
+        );
       case 1:
         return mapPlotData.housePhotos.length >= 1;
       case 2:
@@ -172,7 +299,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (!res.ok) throw new Error(data.error ?? 'Failed to save inspection');
         setLeadId(data.leadId);
       } catch (err) {
-        setStepSaveError(err instanceof Error ? err.message : 'Failed to save inspection');
+        setStepSaveError(
+          err instanceof Error ? err.message : 'Failed to save inspection'
+        );
         setIsSavingStep(false);
         return;
       }
@@ -211,7 +340,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (!res.ok) throw new Error(data.error ?? 'Failed to save quote');
         setQuoteId(data.quoteId);
       } catch (err) {
-        setStepSaveError(err instanceof Error ? err.message : 'Failed to save quote');
+        setStepSaveError(
+          err instanceof Error ? err.message : 'Failed to save quote'
+        );
         setIsSavingStep(false);
         return;
       }
@@ -261,7 +392,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           <div className={styles.stepScrollable}>
             <HousePhotoStep
               photoUrls={mapPlotData.housePhotos}
-              onChange={urls => setMapPlotData(prev => ({ ...prev, housePhotos: urls }))}
+              onChange={urls =>
+                setMapPlotData(prev => ({ ...prev, housePhotos: urls }))
+              }
               companyId={selectedCompany?.id ?? ''}
             />
           </div>
@@ -288,6 +421,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               onChange={setQuoteLineItems}
               plottedPests={plottedPests}
               companyId={selectedCompany?.id ?? ''}
+              mapMeasurements={mapMeasurements}
             />
           </div>
         );
@@ -327,6 +461,17 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     );
   }
 
+  if (isLoadingResume) {
+    return (
+      <div className={styles.wizard}>
+        <div className={styles.geocodingState}>
+          <div className={styles.geocodingSpinner} />
+          <p>Loading your inspection&hellip;</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={styles.wizard}>
       {/* Header */}
@@ -337,14 +482,31 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           onClick={() => setShowExitConfirm(true)}
           aria-label="Close"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M13 1L1 13M1 1L13 13" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
+            fill="none"
+            aria-hidden="true"
+          >
+            <path
+              d="M13 1L1 13M1 1L13 13"
+              stroke="white"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
           </svg>
         </button>
         <div className={styles.headerGrid}>
           <div className={styles.headerInfo}>
-            <p className={styles.headerTitle}>{clientName || 'New Inspection'}</p>
-            {inspectionAddress && <p className={styles.headerSub}>{inspectionAddress}</p>}
+            <p className={styles.headerTitle}>
+              {clientName || 'New Inspection'}
+            </p>
+            {inspectionAddress && (
+              <p className={styles.headerSub}>{inspectionAddress}</p>
+            )}
           </div>
           <div className={styles.stepTrack}>
             {STEP_LABELS.map((label, i) => {
@@ -365,9 +527,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                       {label}
                     </button>
                   ) : (
-                    <div className={styles.stepLabel}>
-                      {label}
-                    </div>
+                    <div className={styles.stepLabel}>{label}</div>
                   )}
                 </div>
               );
@@ -377,9 +537,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       </div>
 
       {/* Step content */}
-      <div className={styles.stepContent}>
-        {renderStepContent()}
-      </div>
+      <div className={styles.stepContent}>{renderStepContent()}</div>
 
       {/* Address step footer */}
       {currentStep === 0 && (
@@ -433,10 +591,15 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       )}
       {/* Exit confirmation modal */}
       {showExitConfirm && (
-        <div className={styles.modalOverlay} onClick={() => setShowExitConfirm(false)}>
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowExitConfirm(false)}
+        >
           <div className={styles.modalSheet} onClick={e => e.stopPropagation()}>
             <p className={styles.modalTitle}>Leave this service?</p>
-            <p className={styles.modalBody}>Your progress will be lost if you go back now.</p>
+            <p className={styles.modalBody}>
+              Your progress will be lost if you go back now.
+            </p>
             <div className={styles.modalActions}>
               <button
                 type="button"

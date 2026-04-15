@@ -15,6 +15,10 @@ export interface ServicePlan {
   plan_terms: string | null;
   highlight_badge: string | null;
   display_order: number | null;
+  minimum_price: number | null;
+  pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
+  price_per_unit: number | null;
+  variants: Array<{ label: string; initial_price?: number; price_per_unit?: number }>;
   pest_coverage?: Array<{
     pest_id: string;
     pest_name: string;

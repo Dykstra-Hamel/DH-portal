@@ -8,6 +8,7 @@ import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
+import { createClient } from '@/lib/supabase/client';
 import styles from './secondarySidenav.module.scss';
 
 // Simple RedDot component for new item indicators
@@ -141,6 +142,26 @@ export function SecondarySideNav({
   const shouldShowScheduling = isAdmin || hasSchedulingAccess;
   const shouldShowSupport = isAdmin || hasSupportAccess;
   const shouldShowTechLeads = isAdmin || hasTechnicianAccess;
+
+  // Company role check for routing (owner/admin/manager at company level)
+  const [companyRole, setCompanyRole] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      supabase
+        .from('user_companies')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .eq('company_id', selectedCompany.id)
+        .single()
+        .then(({ data: uc }) => setCompanyRole(uc?.role ?? null));
+    });
+  }, [selectedCompany?.id]);
+
+  const shouldShowRouting =
+    isAdmin || ['owner', 'admin', 'manager'].includes(companyRole ?? '');
 
   // Handle client-side hydration
   useEffect(() => {
@@ -659,6 +680,13 @@ export function SecondarySideNav({
               { text: 'Reports', href: '/field-ops/field-map/reports' },
             ],
           },
+          ...(shouldShowRouting ? [{
+            title: 'Routing',
+            items: [
+              { text: 'Routes', href: '/field-ops/routes' },
+              { text: 'Schedules', href: '/field-ops/schedules' },
+            ],
+          }] : []),
         ];
       case 'tickets':
       default:

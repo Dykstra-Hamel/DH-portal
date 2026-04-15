@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { adminAPI } from '@/lib/api-client';
+import { adminAPI, authenticatedFetch } from '@/lib/api-client';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
 import { Department, canHaveDepartments } from '@/types/user';
 import styles from './AdminManager.module.scss';
@@ -55,7 +55,7 @@ export default function UsersManager() {
     try {
       setError(null);
       const [usersData, companiesData] = await Promise.all([
-        adminAPI.getUsers(),
+        authenticatedFetch('/api/admin/users?all=true'),
         adminAPI.getCompanies(),
       ]);
       setUsers(Array.isArray(usersData) ? usersData : []);
@@ -70,7 +70,7 @@ export default function UsersManager() {
   const loadUsers = async () => {
     try {
       setError(null);
-      const usersData = await adminAPI.getUsers();
+      const usersData = await authenticatedFetch('/api/admin/users?all=true');
       setUsers(Array.isArray(usersData) ? usersData : []);
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load users');

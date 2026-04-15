@@ -170,8 +170,9 @@ export async function POST(
       );
     }
 
-    // Check if linear feet pricing is configured
+    // Check if linear feet pricing or simple per-unit pricing is configured
     const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
+    const hasPerUnitPricing = !!(planData as any).pricing_unit;
 
     if (planData.plan_category === 'one-time') {
       // One-time service validation
@@ -185,10 +186,10 @@ export async function POST(
       planData.billing_frequency = null;
     } else {
       // Subscription plan validation
-      // Allow $0 initial price if linear feet pricing is configured
-      if (!hasLinearFeetPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
+      // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
         return NextResponse.json(
-          { error: 'Initial price must be greater than 0 unless linear feet pricing is configured' },
+          { error: 'Initial price must be greater than 0 unless linear feet or per-unit pricing is configured' },
           { status: 400 }
         );
       }
@@ -281,8 +282,9 @@ export async function PUT(
       );
     }
 
-    // Check if linear feet pricing is configured
+    // Check if linear feet pricing or simple per-unit pricing is configured
     const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
+    const hasPerUnitPricing = !!(planData as any).pricing_unit;
 
     // Validate and enforce recurring field rules based on plan_category
     if (planData.plan_category === 'one-time') {
@@ -291,10 +293,10 @@ export async function PUT(
       planData.billing_frequency = null;
     } else if (planData.plan_category && planData.plan_category !== 'one-time') {
       // Validate subscription plans have required fields
-      // Allow $0 initial price if linear feet pricing is configured
-      if (!hasLinearFeetPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
+      // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
         return NextResponse.json(
-          { error: 'Initial price must be greater than 0 unless linear feet pricing is configured' },
+          { error: 'Initial price must be greater than 0 unless linear feet or per-unit pricing is configured' },
           { status: 400 }
         );
       }
