@@ -4,9 +4,10 @@ export type MapPestStampType = 'ant' | 'termite' | 'cockroach' | 'spider' | 'mos
 export type MapObjectStampType = 'door' | 'window' | 'sentricon-bait-station';
 export type MapElementStampType = 'house' | 'garage' | 'patio' | 'deck' | 'fence' | 'water';
 export type MapConditionStampType = 'excessive-moisture' | 'faulty-grade' | 'earth-wood-contact' | 'inaccessible-areas' | 'other-condition';
-export type MapStampType = MapPestStampType | MapObjectStampType | MapElementStampType | MapConditionStampType;
+export type MapStationStampType = 'rodent-station' | 'bird-spikes' | 'bird-netting' | 'smart-defense';
+export type MapStampType = MapPestStampType | MapObjectStampType | MapElementStampType | MapConditionStampType | MapStationStampType;
 export type MapLegacyStampType = 'activity' | 'entry' | 'nest' | 'recommendation';
-export type MapStampCategory = 'pest' | 'object' | 'element' | 'condition';
+export type MapStampCategory = 'pest' | 'object' | 'element' | 'condition' | 'station';
 export type MapDrawTool = 'stamp' | 'outline';
 export type MapBackgroundMode = 'satellite' | 'blank-grid';
 
@@ -63,6 +64,7 @@ export interface MapPlotData {
   selectedObjectType: MapObjectStampType;
   selectedElementType: MapElementStampType;
   selectedConditionType: MapConditionStampType;
+  selectedStationStampType: MapStationStampType;
   backgroundMode: MapBackgroundMode;
   stamps: MapPlotStamp[];
   outlines: MapElementOutline[];
@@ -90,6 +92,7 @@ export const DEFAULT_PEST_STAMP_TYPE: MapPestStampType = 'ant';
 export const DEFAULT_OBJECT_STAMP_TYPE: MapObjectStampType = 'door';
 export const DEFAULT_ELEMENT_STAMP_TYPE: MapElementStampType = 'house';
 export const DEFAULT_CONDITION_TYPE: MapConditionStampType = 'excessive-moisture';
+export const DEFAULT_STATION_STAMP_TYPE: MapStationStampType = 'rodent-station';
 
 export const MAP_PEST_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'ant', label: 'Ant', category: 'pest', color: '#b91c1c' },
@@ -112,8 +115,14 @@ export const MAP_ELEMENT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'house', label: 'Home', category: 'element', color: '#1d4ed8' },
   { type: 'garage', label: 'Garage', category: 'element', color: '#4338ca' },
   { type: 'deck', label: 'Deck/Patio', category: 'element', color: '#7c3aed' },
-  { type: 'fence', label: 'Fence', category: 'element', color: '#64748b' },
   { type: 'water', label: 'Water', category: 'element', color: '#0284c7' },
+];
+
+export const MAP_STATION_STAMP_OPTIONS: MapStampOption[] = [
+  { type: 'rodent-station', label: 'Rodent Station', category: 'station', color: '#1d4ed8' },
+  { type: 'bird-spikes', label: 'Bird Spikes', category: 'station', color: '#1d4ed8' },
+  { type: 'bird-netting', label: 'Bird Netting', category: 'station', color: '#1d4ed8' },
+  { type: 'smart-defense', label: 'Smart Defense', category: 'station', color: '#1d4ed8' },
 ];
 
 export const MAP_CONDITION_STAMP_OPTIONS: MapStampOption[] = [
@@ -128,6 +137,7 @@ export const MAP_STAMP_OPTIONS: MapStampOption[] = [
   ...MAP_PEST_STAMP_OPTIONS,
   ...MAP_OBJECT_STAMP_OPTIONS,
   ...MAP_ELEMENT_STAMP_OPTIONS,
+  ...MAP_STATION_STAMP_OPTIONS,
 ];
 
 export const LEGACY_MAP_STAMP_TYPE_MAP: Record<MapLegacyStampType, MapStampType> = {
@@ -152,6 +162,7 @@ export const DEFAULT_MAP_PLOT_DATA: MapPlotData = {
   selectedObjectType: DEFAULT_OBJECT_STAMP_TYPE,
   selectedElementType: DEFAULT_ELEMENT_STAMP_TYPE,
   selectedConditionType: DEFAULT_CONDITION_TYPE,
+  selectedStationStampType: DEFAULT_STATION_STAMP_TYPE,
   backgroundMode: 'satellite',
   stamps: [],
   outlines: [],
@@ -237,8 +248,11 @@ export function isMapElementStampType(value: unknown): value is MapElementStampT
 export function isMapConditionStampType(value: unknown): value is MapConditionStampType {
   return typeof value === 'string' && MAP_CONDITION_STAMP_OPTIONS.some(o => o.type === value);
 }
+export function isMapStationStampType(value: unknown): value is MapStationStampType {
+  return typeof value === 'string' && MAP_STATION_STAMP_OPTIONS.some(o => o.type === value);
+}
 export function isMapStampType(value: unknown): value is MapStampType {
-  return isMapPestStampType(value) || isMapObjectStampType(value) || isMapElementStampType(value) || isMapConditionStampType(value);
+  return isMapPestStampType(value) || isMapObjectStampType(value) || isMapElementStampType(value) || isMapConditionStampType(value) || isMapStationStampType(value);
 }
 
 export function normalizeMapStampType(value: unknown): MapStampType | null {
@@ -252,6 +266,7 @@ export function normalizeMapStampType(value: unknown): MapStampType | null {
 export function getMapStampOption(type: MapStampType): MapStampOption {
   return (
     MAP_CONDITION_STAMP_OPTIONS.find(o => o.type === type) ??
+    MAP_STATION_STAMP_OPTIONS.find(o => o.type === type) ??
     MAP_STAMP_OPTIONS.find(o => o.type === type) ??
     MAP_STAMP_OPTIONS[0]
   );
