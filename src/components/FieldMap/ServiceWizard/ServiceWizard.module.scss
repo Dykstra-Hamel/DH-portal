@@ -54,9 +54,9 @@
   width: 36px;
   height: 36px;
   border-radius: 10px;
-  border: 1px solid var(--gray-200);
-  background: transparent;
-  color: var(--gray-600);
+  border: none;
+  background: var(--error-600, #dc2626);
+  color: #ffffff;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -64,7 +64,7 @@
   flex-shrink: 0;
 
   &:active {
-    background: var(--gray-100);
+    opacity: 0.85;
   }
 }
 
@@ -160,6 +160,7 @@
   background: var(--gray-200);
   border-radius: 1px;
   flex-shrink: 0;
+  margin-left: 6px;
 }
 
 .stepContent {
