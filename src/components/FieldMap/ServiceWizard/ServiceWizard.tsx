@@ -36,9 +36,15 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const { profile, getAvatarUrl } = useUser();
   const { selectedCompany } = useCompany();
 
-  const [clientName, setClientName] = useState(searchParams.get('clientName') ?? '');
-  const [clientEmail, setClientEmail] = useState(searchParams.get('clientEmail') ?? '');
-  const [clientPhone, setClientPhone] = useState(searchParams.get('clientPhone') ?? '');
+  const [clientName, setClientName] = useState(
+    searchParams.get('clientName') ?? ''
+  );
+  const [clientEmail, setClientEmail] = useState(
+    searchParams.get('clientEmail') ?? ''
+  );
+  const [clientPhone, setClientPhone] = useState(
+    searchParams.get('clientPhone') ?? ''
+  );
   const address = searchParams.get('address') ?? '';
   const resumeReview = searchParams.get('resumeReview') === 'true';
   const resumeLeadId = searchParams.get('leadId') ?? null;
@@ -216,11 +222,19 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const pestTypes = getPlottedPestTypes(mapPlotData);
   const plottedPests = getPlottedPests(mapPlotData);
 
-  const mapMeasurements = useMemo(() => ({
-    byOutline: mapPlotData.outlines
-      .filter(o => o.sqft != null || o.linearFt != null)
-      .map(o => ({ id: o.id, type: o.type, sqft: o.sqft ?? 0, linearFt: o.linearFt ?? 0 })),
-  }), [mapPlotData.outlines]);
+  const mapMeasurements = useMemo(
+    () => ({
+      byOutline: mapPlotData.outlines
+        .filter(o => o.sqft != null || o.linearFt != null)
+        .map(o => ({
+          id: o.id,
+          type: o.type,
+          sqft: o.sqft ?? 0,
+          linearFt: o.linearFt ?? 0,
+        })),
+    }),
+    [mapPlotData.outlines]
+  );
 
   const handleMapChange = useCallback((data: MapPlotData) => {
     setMapPlotData(data);
@@ -466,18 +480,19 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           type="button"
           className={styles.backBtn}
           onClick={() => setShowExitConfirm(true)}
-          aria-label="Go back"
+          aria-label="Close"
         >
           <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 14 14"
             fill="none"
             aria-hidden="true"
           >
             <path
-              d="M19 12H5M5 12l7 7M5 12l7-7"
-              stroke="currentColor"
+              d="M13 1L1 13M1 1L13 13"
+              stroke="white"
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"

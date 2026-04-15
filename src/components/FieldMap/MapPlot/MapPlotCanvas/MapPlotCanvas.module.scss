@@ -101,12 +101,369 @@
 .mapGridOverlay {
   position: absolute;
   inset: 0;
-  z-index: 2;
+  z-index: 3;
   pointer-events: none;
   background-image:
     linear-gradient(to right, rgba(148, 163, 184, 0.32) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(148, 163, 184, 0.32) 1px, transparent 1px);
   background-size: 8px 8px;
+}
+
+.mapDarkOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(99, 99, 99, 0.68);
+  z-index: 2;
+  pointer-events: none;
+}
+
+// ─── Side Panel Shared Styles ─────────────────────────────────────────────────
+
+.mapToolGroupsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+
+.mapGroupRow {
+  position: relative;
+}
+
+.mapCancelToolBtn {
+  position: absolute;
+  left: calc(100% + 9px);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 104px;
+  height: 34px;
+  border-radius: 8px;
+  border: none;
+  background: var(--blue-500);
+  color: #ffffff;
+  font-family: var(--font-satoshi);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mapSidePanelGroup {
+  border-radius: 8px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 9px 7px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mapSideBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: 1px solid #b8b8b8;
+  background: #fafafa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+
+  svg {
+    width: 20px;
+    height: 20px;
+    stroke: #7a7a7a;
+    stroke-width: 2px;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+}
+
+.mapSideBtnLabel {
+  color: #2b2b2b;
+  text-align: center;
+  font-family: var(--font-satoshi);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 9px;
+}
+
+.mapSideBtnActive {
+  background: var(--blue-500);
+  border-color: var(--blue-500);
+
+  svg {
+    stroke: #ffffff;
+  }
+
+  .mapSideBtnLabel {
+    color: #ffffff;
+  }
+}
+
+.mapSideBtnDanger {
+  svg {
+    stroke: #e7000b;
+  }
+}
+
+.mapSideBtnDesktop {
+  @media (hover: none) and (pointer: coarse) {
+    display: none;
+  }
+}
+
+// ─── Left Panel ───────────────────────────────────────────────────────────────
+
+.mapLeftPanel {
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  z-index: 10;
+  display: flex;
+  flex-direction: row;
+  gap: 9px;
+  align-items: flex-start;
+}
+
+// ─── Right Panel ──────────────────────────────────────────────────────────────
+
+.mapRightPanel {
+  position: absolute;
+  right: 12px;
+  top: 14px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  align-items: flex-end;
+}
+
+// ─── Secondary Picker Menu ────────────────────────────────────────────────────
+
+.mapSecondaryMenu {
+  border-radius: 8px;
+  background: linear-gradient(
+    160deg,
+    rgba(255, 255, 255, 0.55) 0%,
+    rgba(255, 255, 255, 0.28) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  box-shadow:
+    0 2px 16px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  padding: 11px 9px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 340px;
+}
+
+.mapSecondaryBtn {
+  width: 59px;
+  height: 64px;
+  border-radius: 8px;
+  border: 2px solid var(--gray-500);
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  padding: 4px 2px;
+  color: var(--gray-500);
+
+  svg {
+    width: 36px;
+    height: 36px;
+    flex-shrink: 0;
+    stroke: currentColor;
+  }
+
+  img {
+    width: 36px;
+    height: 36px;
+  }
+
+  .mapStampDynamicIcon {
+    width: 36px;
+    height: 36px;
+
+    svg {
+      width: 36px !important;
+      height: 36px !important;
+    }
+  }
+}
+
+.mapSecondaryBtnLabel {
+  color: #2b2b2b;
+  text-align: center;
+  font-family: var(--font-satoshi);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 9px;
+}
+
+.mapSecondaryBtnActive {
+  border: 2px solid var(--blue-500);
+  color: var(--blue-500);
+
+  svg {
+    stroke: var(--blue-500);
+  }
+
+  .mapSecondaryBtnLabel {
+    color: var(--blue-500);
+  }
+}
+
+// ─── Lock Button ──────────────────────────────────────────────────────────────
+
+.mapLockBtn {
+  width: 48px;
+  height: 48px;
+  border-radius: 8px;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 0;
+
+  svg {
+    stroke: #ffffff;
+    fill: none;
+    stroke-width: 2px;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+.mapLockBtnLabel {
+  color: #ffffff;
+  text-align: center;
+  font-family: var(--font-satoshi);
+  font-size: 8px;
+  font-weight: 700;
+  line-height: 9px;
+}
+
+.mapLockBtnLocked {
+  background: #e7000b;
+}
+
+.mapLockBtnUnlocked {
+  background: #7a7a7a;
+}
+
+// ─── Bottom Bar ───────────────────────────────────────────────────────────────
+
+.mapBottomBar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  background: linear-gradient(
+    to bottom,
+    rgba(255, 255, 255, 0.35) 0%,
+    rgba(255, 255, 255, 0.18) 100%
+  );
+  border-top: 1px solid rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  pointer-events: none;
+
+  > * {
+    pointer-events: auto;
+  }
+}
+
+.mapBackBtn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid #b8b8b8;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-satoshi);
+  font-size: 13px;
+  font-weight: 600;
+  color: #2b2b2b;
+  cursor: pointer;
+
+  svg {
+    stroke: #7a7a7a;
+    stroke-width: 2px;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    flex-shrink: 0;
+  }
+}
+
+.mapContinueBtn {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: none;
+  flex: 1;
+  background: var(--blue-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-satoshi);
+  font-size: 13px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+
+  svg {
+    stroke: #ffffff;
+    stroke-width: 2px;
+    width: 16px;
+    height: 16px;
+    fill: none;
+    flex-shrink: 0;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
 }
 
 .mapViewAdjustLayer {
@@ -119,75 +476,6 @@
 
   &:active {
     cursor: grabbing;
-  }
-}
-
-.mapLegendControls {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  left: 12px;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.mapLegendBtn {
-  height: 32px;
-  padding: 0 10px;
-  border-radius: 12px;
-  border: 1px solid rgba(209, 213, 219, 0.95);
-  background: rgba(249, 250, 251, 0.94);
-  color: var(--gray-700);
-  font-size: 12px;
-  font-weight: 600;
-  font-family: var(--font-satoshi);
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
-  pointer-events: auto;
-
-  svg {
-    width: 14px;
-    height: 14px;
-    flex-shrink: 0;
-  }
-}
-
-.mapLegendBtnActive {
-  background: var(--blue-500);
-  border-color: var(--blue-500);
-  color: var(--white);
-}
-
-.mapViewControls {
-  position: absolute;
-  top: calc(12px + env(safe-area-inset-top, 0px));
-  right: 12px;
-  z-index: 10;
-  pointer-events: none;
-}
-
-.mapViewControlGroup {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  pointer-events: auto;
-  background: rgba(249, 250, 251, 0.94);
-  border: 1px solid rgba(209, 213, 219, 0.95);
-  border-radius: 12px;
-  padding: 3px 8px;
-  box-sizing: border-box;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
-
-  .mapIconBtn {
-    width: 32px;
-    height: 32px;
-    border-radius: 9px;
-
-    svg {
-      width: 16px;
-      height: 16px;
-    }
   }
 }
 
@@ -294,29 +582,6 @@
   }
 }
 
-// Picker menu buttons — icons are gray by default, blue only when active
-.mapPickerBtn .mapStampDynamicIcon svg,
-.mapPickerBtn .mapStampDynamicIcon svg *,
-.mapPickerBtn .mapStampDynamicIcon svg path,
-.mapPickerBtn .mapStampDynamicIcon svg circle,
-.mapPickerBtn .mapStampDynamicIcon svg rect,
-.mapPickerBtn .mapStampDynamicIcon svg polygon,
-.mapPickerBtn .mapStampDynamicIcon svg ellipse,
-.mapPickerBtn .mapStampDynamicIcon svg polyline,
-.mapPickerBtn .mapStampDynamicIcon svg line,
-.mapPickerBtn > svg rect,
-.mapPickerBtn > svg path,
-.mapPickerBtn > svg circle {
-  fill: var(--gray-500) !important;
-}
-
-// Object picker buttons — turn blue when active
-.mapPickerBtn.mapIconBtnActive > svg rect,
-.mapPickerBtn.mapIconBtnActive > svg path,
-.mapPickerBtn.mapIconBtnActive > svg circle {
-  fill: #0069e0 !important;
-}
-
 .mapStampNoBorder {
   border: none !important;
 }
@@ -391,43 +656,6 @@
   }
 }
 
-.mapToolbarDock {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 12px calc(50px + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(
-    180deg,
-    rgba(15, 23, 42, 0) 0%,
-    rgba(15, 23, 42, 0.18) 82%
-  );
-  pointer-events: none;
-  z-index: 9;
-}
-
-.mapStampPicker {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
-  gap: 8px;
-  width: min(92vw, 520px);
-  pointer-events: auto;
-  background: rgba(249, 250, 251, 0.94);
-  border: 1px solid rgba(209, 213, 219, 0.95);
-  border-radius: 18px;
-  padding: 14px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
-}
-
-.mapStampPickerCondition {
-  max-width: min(92vw, 380px);
-}
-
 .mapStampCondition {
   width: 34px;
   height: 34px;
@@ -439,67 +667,6 @@
   svg {
     width: 18px;
     height: 18px;
-  }
-}
-
-.mapPickerBtnLabeled {
-  width: auto !important;
-  min-width: 75px;
-  height: auto !important;
-  min-height: 80px;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px 6px;
-
-  svg,
-  img {
-    width: 60% !important;
-    height: auto !important;
-    max-width: 48px !important;
-    aspect-ratio: 1;
-    flex-shrink: 0;
-  }
-
-  .mapStampDynamicIcon {
-    width: 35px;
-    height: 35px;
-
-    svg {
-      width: 35px !important;
-      height: 35px !important;
-      max-width: unset !important;
-    }
-  }
-}
-
-.mapPickerBtnLabel {
-  font-size: 10px;
-  font-weight: 600;
-  font-family: var(--font-satoshi);
-  color: #3d3d3d;
-  text-align: center;
-  line-height: 1.2;
-  max-width: 72px;
-  white-space: normal;
-  word-break: break-word;
-}
-
-.mapIconToolbar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  scrollbar-width: none;
-  pointer-events: auto;
-  background: rgba(249, 250, 251, 0.94);
-  border: 1px solid rgba(209, 213, 219, 0.95);
-  border-radius: 14px;
-  padding: 4px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.2);
-
-  &::-webkit-scrollbar {
-    display: none;
   }
 }
 
@@ -556,12 +723,6 @@
   }
 }
 
-// Picker buttons override the default active style (no blue bg, blue icon instead)
-.mapPickerBtn.mapIconBtnActive {
-  background: #f0f0f0 !important;
-  color: #0069e0 !important;
-}
-
 .mapIconBtnPrimary {
   background: var(--blue-500);
   color: var(--white);
@@ -570,73 +731,6 @@
 .mapIconBtnWarn {
   color: var(--error-700);
   background: color-mix(in srgb, var(--error-100) 85%, var(--white));
-}
-
-.mapStampTypeBtn {
-  svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .mapStampDynamicIcon {
-    width: 18px;
-    height: 18px;
-
-    svg {
-      width: 18px !important;
-      height: 18px !important;
-    }
-  }
-}
-
-.mapPickerBtn {
-  width: 52px;
-  height: 52px;
-  border-radius: 8px !important;
-  border: 1px solid var(--gray-500) !important;
-  background: #f0f0f0 !important;
-  color: var(--gray-800);
-
-  svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  &.mapIconBtnActive {
-    border-color: #0069e0 !important;
-    background: #f0f0f0 !important;
-    color: #0069e0 !important;
-
-    // Force color cascade on all descendants so fill="currentColor" resolves to blue
-    * {
-      color: #0069e0 !important;
-    }
-
-    // Directly set fill on all SVG shape elements
-    svg,
-    svg *,
-    svg path,
-    svg circle,
-    svg rect,
-    svg ellipse,
-    svg polygon,
-    svg line,
-    svg polyline,
-    svg g {
-      fill: #0069e0 !important;
-      color: #0069e0 !important;
-    }
-
-    // Images can't be recolored with fill — leave them
-    img {
-      filter: none;
-    }
-  }
-}
-
-.mapStampPickerPest .mapPickerBtn {
-  width: 64px;
-  height: 64px;
 }
 
 .mapSnapRing {
@@ -673,37 +767,6 @@
   stroke: rgba(148, 163, 184, 0.7);
   stroke-width: 1px;
   pointer-events: none;
-}
-
-.mapToolToggle {
-  display: flex;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-  border-radius: 10px;
-  overflow: hidden;
-  gap: 0;
-  flex-shrink: 0;
-
-  .mapIconBtn {
-    border-radius: 0;
-    border-right: 1px solid rgba(0, 0, 0, 0.1);
-
-    &:last-child {
-      border-right: none;
-    }
-  }
-}
-
-.mapToolToggleDisabled {
-  opacity: 0.4;
-  pointer-events: none;
-}
-
-.mapToggleFirst {
-  border-radius: 9px 0 0 9px !important;
-}
-
-.mapToggleLast {
-  border-radius: 0 9px 9px 0 !important;
 }
 
 @keyframes mapSnapPulse {
@@ -794,6 +857,9 @@
   height: 100%;
   object-fit: cover;
   display: block;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-drag: none;
 }
 
 .readOnlyDarkOverlay {
@@ -824,6 +890,7 @@
   position: absolute;
   inset: 0;
   pointer-events: auto;
+  touch-action: none;
   z-index: 3;
 }
 

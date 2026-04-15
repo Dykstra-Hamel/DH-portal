@@ -3,23 +3,13 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { APIProvider, Map, useMap } from '@vis.gl/react-google-maps';
 import {
-  ArrowLeft,
-  ArrowRight,
-  Grid3x3,
-  List,
   LocateFixed,
-  Lock,
-  Unlock,
-  Move3d,
   RotateCcw,
   RotateCw,
-  Ruler,
-  Undo2,
-  Trash2,
   Map as MapIcon,
-  MapPinned,
+  KeyRound,
 } from 'lucide-react';
-import { MapStampGlyph, PlotObjectBlueprintGlyph, ConditionStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
+import { MapStampGlyph, PlotObjectBlueprintGlyph, ConditionStampGlyph, StationStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import { PestStampModal } from '@/components/FieldMap/MapPlot/PestStampModal/PestStampModal';
 import {
   BLANK_GRID_MAX_SCALE,
@@ -29,6 +19,7 @@ import {
   DEFAULT_ELEMENT_STAMP_TYPE,
   DEFAULT_OBJECT_STAMP_TYPE,
   DEFAULT_PEST_STAMP_TYPE,
+  DEFAULT_STATION_STAMP_TYPE,
   getMapLatitude,
   getMapLongitude,
   getMapStampOption,
@@ -40,11 +31,13 @@ import {
   isMapElementStampType,
   isMapObjectStampType,
   isMapPestStampType,
+  isMapStationStampType,
   MAP_CONDITION_STAMP_OPTIONS,
   MAP_ELEMENT_STAMP_OPTIONS,
   MAP_MIN_ZOOM,
   MAP_OBJECT_STAMP_OPTIONS,
   MAP_PEST_STAMP_OPTIONS,
+  MAP_STATION_STAMP_OPTIONS,
   OUTLINE_SNAP_GRID_PX,
   type MapConditionStampType,
   type MapElementOutline,
@@ -55,6 +48,7 @@ import {
   type MapPlotStamp,
   type MapStampCategory,
   type MapStampType,
+  type MapStationStampType,
   type MapOutlinePoint,
 } from '@/components/FieldMap/MapPlot/types';
 import styles from './MapPlotCanvas.module.scss';
@@ -112,6 +106,7 @@ function StepMapPlot({
   const [showLegendLabels, setShowLegendLabels] = useState(false);
   const [snapToFirst, setSnapToFirst] = useState(false);
   const [activeStampMenu, setActiveStampMenu] = useState<MapStampCategory | null>(null);
+  const [drawActive, setDrawActive] = useState(false);
   const [companyPestOptions, setCompanyPestOptions] = useState<CompanyPestOption[]>([]);
   const [selectedDynamicPestOption, setSelectedDynamicPestOption] = useState<CompanyPestOption | null>(null);
   const [blankGridScale, setBlankGridScale] = useState(1);
@@ -172,6 +167,9 @@ function StepMapPlot({
   const selectedConditionType = isMapConditionStampType(mapPlotData.selectedConditionType)
     ? mapPlotData.selectedConditionType
     : DEFAULT_CONDITION_TYPE;
+  const selectedStationStampType = isMapStationStampType(mapPlotData.selectedStationStampType)
+    ? mapPlotData.selectedStationStampType
+    : DEFAULT_STATION_STAMP_TYPE;
   const isBlankGridMode = mapPlotData.backgroundMode === 'blank-grid';
   const isSatelliteMode = !isBlankGridMode;
   const canSetView = isBlankGridMode || hasCoordinates;
@@ -520,7 +518,8 @@ function StepMapPlot({
   const getNormalizedPointFromLatLng = useCallback((
     lat: number,
     lng: number,
-    map = googleMapInstance
+    map = googleMapInstance,
+    headingOverride?: number
   ): { x: number; y: number } | null => {
     if (!isSatelliteMode || !map) return null;
     if (canvasSize.width <= 0 || canvasSize.height <= 0) return null;
@@ -542,7 +541,7 @@ function StepMapPlot({
     const dy = pointWorld.y - centerWorld.y;
 
     // Rotate world offsets (north-up Mercator) into rotated screen space
-    const headingRad = ((map.getHeading() ?? 0) * Math.PI) / 180;
+    const headingRad = ((headingOverride ?? map.getHeading() ?? 0) * Math.PI) / 180;
     const screenDx = dx * Math.cos(headingRad) + dy * Math.sin(headingRad);
     const screenDy = -dx * Math.sin(headingRad) + dy * Math.cos(headingRad);
 
@@ -616,21 +615,22 @@ function StepMapPlot({
   const reprojectAnchoredGeometry = useCallback((
     stamps: MapPlotStamp[],
     outlines: MapElementOutline[],
-    map = googleMapInstance
+    map = googleMapInstance,
+    headingOverride?: number
   ): { stamps: MapPlotStamp[]; outlines: MapElementOutline[] } => {
     if (!isSatelliteMode || !map) return { stamps, outlines };
 
     return {
       stamps: stamps.map(stamp => {
         if (!Number.isFinite(stamp.lat) || !Number.isFinite(stamp.lng)) return stamp;
-        const projected = getNormalizedPointFromLatLng(stamp.lat as number, stamp.lng as number, map);
+        const projected = getNormalizedPointFromLatLng(stamp.lat as number, stamp.lng as number, map, headingOverride);
         return projected ? { ...stamp, x: projected.x, y: projected.y } : stamp;
       }),
       outlines: outlines.map(outline => ({
         ...outline,
         points: outline.points.map(point => {
           if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return point;
-          const projected = getNormalizedPointFromLatLng(point.lat as number, point.lng as number, map);
+          const projected = getNormalizedPointFromLatLng(point.lat as number, point.lng as number, map, headingOverride);
           return projected ? { ...point, x: projected.x, y: projected.y } : point;
         }),
       })),
@@ -906,6 +906,7 @@ function StepMapPlot({
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (!mapPlotData.isViewSet) return;
+    if (!drawActive) return;
     if (Date.now() - lastDragAtRef.current < 180) return;
 
     const point = getNormalizedPoint(event.clientX, event.clientY);
@@ -995,7 +996,7 @@ function StepMapPlot({
   };
 
   const handleOverlayPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!mapPlotData.isViewSet || mapPlotData.drawTool !== 'outline' || showDimensions) return;
+    if (!mapPlotData.isViewSet || !drawActive || mapPlotData.drawTool !== 'outline' || showDimensions) return;
 
     const point = getNormalizedPoint(event.clientX, event.clientY);
     const container = mapRef.current;
@@ -1237,6 +1238,7 @@ function StepMapPlot({
   };
 
   const activatePestTool = useCallback((type: MapPestStampType) => {
+    setDrawActive(true);
     updateMapPlotData({
       drawTool: 'stamp',
       selectedPestType: type,
@@ -1245,6 +1247,7 @@ function StepMapPlot({
   }, [updateMapPlotData]);
 
   const activateDynamicPestTool = useCallback((option: CompanyPestOption) => {
+    setDrawActive(true);
     setSelectedDynamicPestOption(option);
     updateMapPlotData({
       drawTool: 'stamp',
@@ -1254,6 +1257,7 @@ function StepMapPlot({
   }, [updateMapPlotData]);
 
   const activateObjectTool = useCallback((type: MapObjectStampType) => {
+    setDrawActive(true);
     updateMapPlotData({
       drawTool: 'stamp',
       selectedObjectType: type,
@@ -1262,6 +1266,7 @@ function StepMapPlot({
   }, [updateMapPlotData]);
 
   const activateElementTool = useCallback((type: MapElementStampType) => {
+    setDrawActive(true);
     updateMapPlotData({
       drawTool: 'outline',
       selectedElementType: type,
@@ -1271,9 +1276,19 @@ function StepMapPlot({
   }, [updateMapPlotData]);
 
   const activateConditionTool = useCallback((type: MapConditionStampType) => {
+    setDrawActive(true);
     updateMapPlotData({
       drawTool: 'stamp',
       selectedConditionType: type,
+      selectedStampType: type,
+    });
+  }, [updateMapPlotData]);
+
+  const activateStationTool = useCallback((type: MapStationStampType) => {
+    setDrawActive(true);
+    updateMapPlotData({
+      drawTool: 'stamp',
+      selectedStationStampType: type,
       selectedStampType: type,
     });
   }, [updateMapPlotData]);
@@ -1400,17 +1415,7 @@ function StepMapPlot({
   };
 
   const handleClear = () => {
-    if (mapPlotData.drawTool === 'outline') {
-      clearOutline();
-      return;
-    }
-
-    if (mapPlotData.stamps.length === 0 && mapPlotData.outlines.length > 0) {
-      updateMapPlotData({ outlines: [], activeOutlineId: null });
-      return;
-    }
-
-    updateMapPlotData({ stamps: [] });
+    updateMapPlotData({ stamps: [], outlines: [], activeOutlineId: null });
   };
 
   const hasUndo = mapPlotData.outlines.length > 0 || mapPlotData.stamps.length > 0;
@@ -1421,32 +1426,14 @@ function StepMapPlot({
     canvasSize.height > 0 &&
     latitude !== null;
 
-  const canShowStampMenus = mapPlotData.isViewSet && mapPlotData.drawTool === 'stamp';
-  const canShowPestMenu = canShowStampMenus;
-  const canShowObjectMenu = canShowStampMenus;
-  const canShowConditionMenu = canShowStampMenus;
-  const canShowElementMenu = mapPlotData.isViewSet && mapPlotData.drawTool === 'outline';
-  const canRenderActiveStampMenu =
-    (activeStampMenu === 'pest' && canShowPestMenu) ||
-    (activeStampMenu === 'object' && canShowObjectMenu) ||
-    (activeStampMenu === 'condition' && canShowConditionMenu) ||
-    (activeStampMenu === 'element' && canShowElementMenu);
-  const isPestSelected = isMapPestStampType(mapPlotData.selectedStampType);
-  const isObjectSelected = isMapObjectStampType(mapPlotData.selectedStampType);
-  const isConditionSelected = isMapConditionStampType(mapPlotData.selectedStampType);
-  const isElementSelected = isMapElementStampType(mapPlotData.selectedStampType);
+  const canRenderActiveStampMenu = mapPlotData.isViewSet && activeStampMenu !== null;
   const satelliteStampScale = isSatelliteMode ? getSatelliteStampScale(mapPlotData.zoom) : 1;
 
   useEffect(() => {
-    if (
-      (activeStampMenu === 'pest' && !canShowPestMenu) ||
-      (activeStampMenu === 'object' && !canShowObjectMenu) ||
-      (activeStampMenu === 'condition' && !canShowConditionMenu) ||
-      (activeStampMenu === 'element' && !canShowElementMenu)
-    ) {
+    if (activeStampMenu !== null && !mapPlotData.isViewSet) {
       setActiveStampMenu(null);
     }
-  }, [activeStampMenu, canShowConditionMenu, canShowElementMenu, canShowObjectMenu, canShowPestMenu]);
+  }, [activeStampMenu, mapPlotData.isViewSet]);
 
   // Close stamp picker when clicking outside the toolbar dock
   useEffect(() => {
@@ -1574,107 +1561,373 @@ function StepMapPlot({
               onPointerLeave={handleBlankGridPointerEnd}
             />
           )}
+          <div className={styles.mapDarkOverlay} />
 	          <div className={styles.mapGridOverlay} style={blankGridWorkspaceStyle} />
-            {!satFocusTransform && <div className={styles.mapLegendControls}>
-              <button
-                type="button"
-                className={`${styles.mapLegendBtn} ${showLegendLabels ? styles.mapLegendBtnActive : ''}`}
-                onClick={() => setShowLegendLabels(prev => !prev)}
-                title={showLegendLabels ? 'Hide Legend Labels' : 'Show Legend Labels'}
-                aria-label={showLegendLabels ? 'Hide Legend Labels' : 'Show Legend Labels'}
-              >
-                <List size={14} />
-                <span>Legend</span>
-              </button>
-            </div>}
-            {!satFocusTransform && <div className={styles.mapViewControls}>
-	            <div className={styles.mapViewControlGroup}>
-	              <div className={styles.mapToolToggle}>
-	                <button
-	                  type="button"
-	                  className={`${styles.mapIconBtn} ${styles.mapToggleFirst} ${isSatelliteMode ? styles.mapIconBtnActive : ''}`}
-	                  onClick={() => updateMapPlotData({ backgroundMode: 'satellite' })}
-	                  title="Satellite Background"
-	                  aria-label="Satellite Background"
-	                >
-	                  <MapIcon size={16} />
-	                </button>
-	                <button
-	                  type="button"
-	                  className={`${styles.mapIconBtn} ${styles.mapToggleLast} ${isBlankGridMode ? styles.mapIconBtnActive : ''}`}
-	                  onClick={() => updateMapPlotData({ backgroundMode: 'blank-grid' })}
-	                  title="Blank Grid Background"
-	                  aria-label="Blank Grid Background"
-	                >
-	                  <Grid3x3 size={16} />
-	                </button>
-	              </div>
+            {/* ── Left Panel: Drawing Tools ── */}
+            {!satFocusTransform && (
+              <div className={styles.mapLeftPanel}>
+                <div className={styles.mapToolGroupsColumn}>
+                  {/* Group 1: Outline + Features */}
+                  <div className={styles.mapGroupRow}>
+                  <div className={styles.mapSidePanelGroup}>
+                    {/* Outline */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${drawActive && mapPlotData.drawTool === 'outline' ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet}
+                      onClick={() => {
+                        activateElementTool(selectedElementType);
+                        setActiveStampMenu(prev => prev === 'element' ? null : 'element');
+                      }}
+                      title="Outline Tool"
+                      aria-label="Outline Tool"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 21 21" fill="none" aria-hidden="true">
+                        <path d="M10 1.99632H3C2.46957 1.99632 1.96086 2.20703 1.58579 2.58211C1.21071 2.95718 1 3.46589 1 3.99632V17.9963C1 18.5268 1.21071 19.0355 1.58579 19.4105C1.96086 19.7856 2.46957 19.9963 3 19.9963H17C17.5304 19.9963 18.0391 19.7856 18.4142 19.4105C18.7893 19.0355 19 18.5268 19 17.9963V10.9963M16.375 1.62132C16.7728 1.2235 17.3124 1 17.875 1C18.4376 1 18.9772 1.2235 19.375 1.62132C19.7728 2.01914 19.9963 2.55871 19.9963 3.12132C19.9963 3.68393 19.7728 4.2235 19.375 4.62132L10.362 13.6353C10.1245 13.8726 9.83121 14.0462 9.509 14.1403L6.636 14.9803C6.54995 15.0054 6.45874 15.0069 6.37191 14.9847C6.28508 14.9624 6.20583 14.9173 6.14245 14.8539C6.07907 14.7905 6.03389 14.7112 6.01164 14.6244C5.9894 14.5376 5.9909 14.4464 6.016 14.3603L6.856 11.4873C6.95053 11.1654 7.12453 10.8724 7.362 10.6353L16.375 1.62132Z" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Outline</span>
+                    </button>
+                    {/* Features */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'object' || (mapPlotData.drawTool === 'stamp' && isMapObjectStampType(mapPlotData.selectedStampType)) || (mapPlotData.drawTool === 'outline' && mapPlotData.selectedStampType === 'fence')) ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet}
+                      onClick={() => {
+                        const safeObjectType = selectedObjectType === 'sentricon-bait-station' ? 'door' : selectedObjectType;
+                        activateObjectTool(safeObjectType);
+                        setActiveStampMenu(prev => prev === 'object' ? null : 'object');
+                      }}
+                      title="Features"
+                      aria-label="Features"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="20" viewBox="0 0 22 20" fill="none" aria-hidden="true">
+                        <path d="M5 6H9M5 16H9M13 6H17M13 16H17M3 1L1 3V18C1 18.6 1.4 19 2 19H4C4.6 19 5 18.6 5 18V3L3 1ZM11 1L9 3V18C9 18.6 9.4 19 10 19H12C12.6 19 13 18.6 13 18V3L11 1ZM19 1L17 3V18C17 18.6 17.4 19 18 19H20C20.6 19 21 18.6 21 18V3L19 1Z" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Features</span>
+                    </button>
+                  </div>
+                  {drawActive && !activeStampMenu && (mapPlotData.drawTool === 'outline' || (mapPlotData.drawTool === 'stamp' && (mapPlotData.selectedStampType === 'door' || mapPlotData.selectedStampType === 'window'))) && (
+                    <button
+                      type="button"
+                      className={styles.mapCancelToolBtn}
+                      onClick={() => setDrawActive(false)}
+                    >
+                      {mapPlotData.drawTool === 'outline' ? 'Cancel Outline' : 'Cancel Stamp'}
+                    </button>
+                  )}
+                  </div>
 
+                  {/* Group 2: Pests + Stations + Conditions */}
+                  <div className={styles.mapGroupRow}>
+                  <div className={styles.mapSidePanelGroup}>
+                    {/* Pests */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'pest' || (mapPlotData.drawTool === 'stamp' && isMapPestStampType(mapPlotData.selectedStampType))) ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet}
+                      onClick={() => {
+                        if (selectedDynamicPestOption) {
+                          activateDynamicPestTool(selectedDynamicPestOption);
+                        } else {
+                          activatePestTool(selectedPestType);
+                        }
+                        setActiveStampMenu(prev => prev === 'pest' ? null : 'pest');
+                      }}
+                      title="Pests"
+                      aria-label="Pests"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="21" viewBox="0 0 22 21" fill="none" aria-hidden="true">
+                        <path d="M11 19V10M11 19C12.5913 19 14.1174 18.3679 15.2426 17.2426C16.3679 16.1174 17 14.5913 17 13V10C17 8.93913 16.5786 7.92172 15.8284 7.17157C15.0783 6.42143 14.0609 6 13 6H9C7.93913 6 6.92172 6.42143 6.17157 7.17157C5.42143 7.92172 5 8.93913 5 10V13C5 14.5913 5.63214 16.1174 6.75736 17.2426C7.88258 18.3679 9.4087 19 11 19ZM13.12 2.88L15 1M20 20C20.0012 18.9712 19.6059 17.9816 18.8964 17.2367C18.1868 16.4918 17.2176 16.0489 16.19 16M20 4C19.9989 4.98215 19.6364 5.92956 18.9818 6.66169C18.3271 7.39383 17.4259 7.85951 16.45 7.97M21 12H17M2 20C1.99884 18.9712 2.39409 17.9816 3.10362 17.2367C3.81315 16.4918 4.78241 16.0489 5.81 16M2 4C2.00113 4.98215 2.36357 5.92956 3.01825 6.66169C3.67293 7.39383 4.57408 7.85951 5.55 7.97M5 12H1M7 1L8.88 2.88M8 6.13V5C8 4.20435 8.31607 3.44129 8.87868 2.87868C9.44129 2.31607 10.2044 2 11 2C11.7956 2 12.5587 2.31607 13.1213 2.87868C13.6839 3.44129 14 4.20435 14 5V6.13" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Pests</span>
+                    </button>
+                    {/* Stations */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'station' || (mapPlotData.drawTool === 'stamp' && (isMapStationStampType(mapPlotData.selectedStampType) || mapPlotData.selectedStampType === 'sentricon-bait-station'))) ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet}
+                      onClick={() => {
+                        activateStationTool(selectedStationStampType);
+                        setActiveStampMenu(prev => prev === 'station' ? null : 'station');
+                      }}
+                      title="Stations"
+                      aria-label="Stations"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="27" height="23" viewBox="0 0 27 23" fill="none" aria-hidden="true">
+                        <path d="M0 19.667V17.333C0.000175197 16.7809 0.447823 16.333 1 16.333C1.55218 16.333 1.99982 16.7809 2 17.333V19.667C2.0001 19.9587 2.13699 20.2819 2.45703 20.5508C2.78228 20.8239 3.25517 20.9999 3.77734 21H6.55566C7.1079 21.0001 7.55566 21.4478 7.55566 22C7.55566 22.5522 7.1079 22.9999 6.55566 23H3.77734C2.82647 22.9999 1.88634 22.6838 1.16992 22.082C0.448538 21.4759 0.000103109 20.6126 0 19.667ZM25 19.667V17.333C25.0002 16.7809 25.4478 16.333 26 16.333C26.5522 16.333 26.9998 16.7809 27 17.333V19.667C26.9999 20.6126 26.5515 21.4759 25.8301 22.082C25.1137 22.6838 24.1735 22.9999 23.2227 23H20.4443C19.8921 22.9999 19.4443 22.5522 19.4443 22C19.4443 21.4478 19.8921 21.0001 20.4443 21H23.2227C23.7448 20.9999 24.2177 20.8239 24.543 20.5508C24.863 20.2819 24.9999 19.9587 25 19.667ZM0 5.66699V3.33301C0.000102883 2.3874 0.448538 1.52411 1.16992 0.917969C1.88634 0.316179 2.82647 9.6054e-05 3.77734 0H6.55566C7.1079 5.87515e-05 7.55566 0.447751 7.55566 1C7.55566 1.55225 7.1079 1.99994 6.55566 2H3.77734C3.25517 2.0001 2.78228 2.17605 2.45703 2.44922C2.13699 2.71806 2.0001 3.04133 2 3.33301V5.66699C1.99982 6.21913 1.55218 6.66699 1 6.66699C0.447824 6.66699 0.000175969 6.21913 0 5.66699ZM25 5.66699V3.33301C24.9999 3.04133 24.863 2.71806 24.543 2.44922C24.2177 2.17605 23.7448 2.0001 23.2227 2H20.4443C19.8921 1.99994 19.4443 1.55225 19.4443 1C19.4443 0.447751 19.8921 5.77208e-05 20.4443 0H23.2227C24.1735 9.62652e-05 25.1137 0.316179 25.8301 0.917969C26.5515 1.52411 26.9999 2.3874 27 3.33301V5.66699C26.9998 6.21913 26.5522 6.66699 26 6.66699C25.4478 6.66699 25.0002 6.21913 25 5.66699Z" fill="currentColor"/>
+                        <path d="M20 9.36621L13 13.5654V17.4824L19.7568 13.4287C19.8309 13.3843 19.893 13.3212 19.9355 13.2461C19.978 13.1711 20 13.0862 20 13V9.36621ZM15.0117 5C14.9173 4.99786 14.8242 5.02269 14.7432 5.07129L7.98828 9.12305L12.0273 11.8164L19.0537 7.60059L15.2773 5.08399C15.1986 5.03155 15.1063 5.00221 15.0117 5ZM7.00391 14.5615C7.01142 14.6225 7.03041 14.6818 7.05957 14.7363C7.09838 14.8088 7.1543 14.8704 7.22266 14.916V14.917L11 17.4336V13.5352L7 10.8682V14.5L7.00391 14.5615ZM22 13C22 13.4316 21.8884 13.8559 21.6758 14.2314C21.4631 14.6071 21.1563 14.9214 20.7861 15.1436L13.2861 19.6436C12.9074 19.8709 12.4757 19.9908 12.0352 19.9971C12.0235 19.9975 12.0118 20 12 20C11.9918 20 11.9837 19.9982 11.9756 19.998C11.9642 19.9979 11.9528 19.9993 11.9414 19.999C11.4684 19.988 11.0081 19.8432 10.6143 19.5811H10.6133L6.11328 16.5811C5.77068 16.3527 5.49016 16.0427 5.2959 15.6797C5.10171 15.3168 4.99994 14.9116 5 14.5V10C5.00001 9.56842 5.11163 9.14414 5.32422 8.76856C5.35312 8.71752 5.38471 8.66783 5.41699 8.61914C5.41818 8.61733 5.41872 8.61509 5.41992 8.61328C5.42397 8.60721 5.42944 8.60166 5.43359 8.5957C5.63697 8.29645 5.90221 8.04343 6.21387 7.85645L13.7139 3.35645C14.1194 3.11304 14.5857 2.98996 15.0586 3.00098C15.5316 3.01204 15.9919 3.15678 16.3857 3.41895H16.3867L20.8867 6.41895C21.192 6.62242 21.4471 6.8913 21.6367 7.2041C21.6388 7.20748 21.6415 7.21046 21.6436 7.21387C21.6475 7.22047 21.6505 7.22772 21.6543 7.23438C21.671 7.26286 21.6885 7.29112 21.7041 7.32031C21.8983 7.68324 22.0001 8.08839 22 8.5V13Z" fill="currentColor"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Stations</span>
+                    </button>
+                    {/* Conditions */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${drawActive && isMapConditionStampType(mapPlotData.selectedStampType) && mapPlotData.drawTool === 'stamp' ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet}
+                      onClick={() => {
+                        activateConditionTool('other-condition');
+                        setActiveStampMenu(null);
+                      }}
+                      title="Conditions"
+                      aria-label="Conditions"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+                        <path d="M11 7V11M11 15H11.01M21 11C21 16.5228 16.5228 21 11 21C5.47715 21 1 16.5228 1 11C1 5.47715 5.47715 1 11 1C16.5228 1 21 5.47715 21 11Z" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Conditions</span>
+                    </button>
+                  </div>
+                  {drawActive && !activeStampMenu && mapPlotData.drawTool === 'stamp' && (isMapPestStampType(mapPlotData.selectedStampType) || isMapConditionStampType(mapPlotData.selectedStampType) || isMapStationStampType(mapPlotData.selectedStampType) || mapPlotData.selectedStampType === 'sentricon-bait-station') && (
+                    <button
+                      type="button"
+                      className={styles.mapCancelToolBtn}
+                      onClick={() => setDrawActive(false)}
+                    >
+                      Cancel Stamp
+                    </button>
+                  )}
+                  </div>
 
-		              {!mapPlotData.isViewSet ? (
-		                <button
-		                  type="button"
-		                  className={`${styles.mapIconBtn} ${styles.mapIconBtnActive}`}
-	                  onClick={setView}
-	                  disabled={!canSetView}
-	                  title="Set View"
-	                  aria-label="Set View"
-	                >
-	                  <Lock size={16} />
-	                </button>
-	              ) : (
-	                <button
-	                  type="button"
-	                  className={styles.mapIconBtn}
-	                  onClick={unsetView}
-	                  title="Unset View"
-	                  aria-label="Unset View"
-		                >
-		                  <Unlock size={16} />
-		                </button>
-		              )}
-		              <button
-		                type="button"
-		                className={`${styles.mapIconBtn} ${showDimensions ? styles.mapIconBtnActive : ''}`}
-		                onClick={() => {
-                      setSelectedWallMeasurement(null);
-                      setShowDimensions(prev => !prev);
+                  {/* Group 3: Undo + Trash */}
+                  <div className={styles.mapSidePanelGroup}>
+                    {/* Undo */}
+                    <button
+                      type="button"
+                      className={styles.mapSideBtn}
+                      disabled={!mapPlotData.isViewSet || !hasUndo}
+                      onClick={handleUndo}
+                      title="Undo"
+                      aria-label="Undo"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+                        <path d="M6 11L1 6M1 6L6 1M1 6H11.5C12.2223 6 12.9375 6.14226 13.6048 6.41866C14.272 6.69506 14.8784 7.10019 15.3891 7.61091C15.8998 8.12163 16.3049 8.72795 16.5813 9.39524C16.8577 10.0625 17 10.7777 17 11.5C17 12.2223 16.8577 12.9375 16.5813 13.6048C16.3049 14.272 15.8998 14.8784 15.3891 15.3891C14.8784 15.8998 14.272 16.3049 13.6048 16.5813C12.9375 16.8577 12.2223 17 11.5 17H8" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Undo</span>
+                    </button>
+                    {/* Trash */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${styles.mapSideBtnDanger}`}
+                      disabled={!mapPlotData.isViewSet || !hasClear}
+                      onClick={handleClear}
+                      title="Clear All"
+                      aria-label="Clear All"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 20 22" fill="none" aria-hidden="true">
+                        <path d="M8 10V16M12 10V16M17 5V19C17 19.5304 16.7893 20.0391 16.4142 20.4142C16.0391 20.7893 15.5304 21 15 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V5M1 5H19M6 5V3C6 2.46957 6.21071 1.96086 6.58579 1.58579C6.96086 1.21071 7.46957 1 8 1H12C12.5304 1 13.0391 1.21071 13.4142 1.58579C13.7893 1.96086 14 2.46957 14 3V5" stroke="#E7000B" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Trash</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Secondary picker menu — appears to the right of the tool group */}
+                {canRenderActiveStampMenu && activeStampMenu && (
+                  <div className={styles.mapSecondaryMenu} role="menu">
+                    {activeStampMenu === 'element' && MAP_ELEMENT_STAMP_OPTIONS.map(opt => (
+                      <button
+                        key={opt.type}
+                        type="button"
+                        className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === opt.type ? styles.mapSecondaryBtnActive : ''}`}
+                        onClick={() => { activateElementTool(opt.type as MapElementStampType); setActiveStampMenu(null); }}
+                        title={opt.label}
+                      >
+                        <MapStampGlyph type={opt.type} size={28} />
+                        <span className={styles.mapSecondaryBtnLabel}>{opt.label}</span>
+                      </button>
+                    ))}
+                    {activeStampMenu === 'object' && MAP_OBJECT_STAMP_OPTIONS.filter(o => o.type !== 'sentricon-bait-station').map(opt => (
+                      <button
+                        key={opt.type}
+                        type="button"
+                        className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === opt.type ? styles.mapSecondaryBtnActive : ''}`}
+                        onClick={() => { activateObjectTool(opt.type as MapObjectStampType); setActiveStampMenu(null); }}
+                        title={opt.label}
+                      >
+                        <PlotObjectBlueprintGlyph type={opt.type as MapObjectStampType} />
+                        <span className={styles.mapSecondaryBtnLabel}>{opt.label}</span>
+                      </button>
+                    ))}
+                    {activeStampMenu === 'object' && (
+                      <button
+                        type="button"
+                        className={`${styles.mapSecondaryBtn} ${mapPlotData.drawTool === 'outline' && mapPlotData.selectedStampType === 'fence' ? styles.mapSecondaryBtnActive : ''}`}
+                        onClick={() => { activateElementTool('fence'); setActiveStampMenu(null); }}
+                        title="Fence"
+                      >
+                        <MapStampGlyph type="fence" size={28} />
+                        <span className={styles.mapSecondaryBtnLabel}>Fence</span>
+                      </button>
+                    )}
+                    {activeStampMenu === 'pest' && (
+                      companyPestOptions.length > 0
+                        ? companyPestOptions.map(opt => (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === 'dynamic-pest' && selectedDynamicPestOption?.id === opt.id ? styles.mapSecondaryBtnActive : ''}`}
+                            onClick={() => { activateDynamicPestTool(opt); setActiveStampMenu(null); }}
+                            title={opt.custom_label}
+                          >
+                            {opt.icon_svg
+                              ? <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: opt.icon_svg }} />
+                              : <MapStampGlyph type="dynamic-pest" size={28} />}
+                            <span className={styles.mapSecondaryBtnLabel}>{opt.custom_label}</span>
+                          </button>
+                        ))
+                        : MAP_PEST_STAMP_OPTIONS.map(opt => (
+                          <button
+                            key={opt.type}
+                            type="button"
+                            className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === opt.type ? styles.mapSecondaryBtnActive : ''}`}
+                            onClick={() => { activatePestTool(opt.type as MapPestStampType); setActiveStampMenu(null); }}
+                            title={opt.label}
+                          >
+                            <MapStampGlyph type={opt.type} size={28} />
+                            <span className={styles.mapSecondaryBtnLabel}>{opt.label}</span>
+                          </button>
+                        ))
+                    )}
+                    {activeStampMenu === 'station' && (
+                      <>
+                        {MAP_STATION_STAMP_OPTIONS.map(opt => (
+                          <button
+                            key={opt.type}
+                            type="button"
+                            className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === opt.type ? styles.mapSecondaryBtnActive : ''}`}
+                            onClick={() => { activateStationTool(opt.type as MapStationStampType); setActiveStampMenu(null); }}
+                            title={opt.label}
+                          >
+                            <StationStampGlyph type={opt.type as MapStationStampType} />
+                            <span className={styles.mapSecondaryBtnLabel}>{opt.label}</span>
+                          </button>
+                        ))}
+                        <button
+                          type="button"
+                          className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === 'sentricon-bait-station' ? styles.mapSecondaryBtnActive : ''}`}
+                          onClick={() => { activateObjectTool('sentricon-bait-station'); setActiveStampMenu(null); }}
+                          title="Sentricon"
+                        >
+                          <PlotObjectBlueprintGlyph type="sentricon-bait-station" />
+                          <span className={styles.mapSecondaryBtnLabel}>Sentricon</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Right Panel: View Controls + Lock ── */}
+            {!satFocusTransform && (
+              <div className={styles.mapRightPanel}>
+                <div className={styles.mapSidePanelGroup}>
+                  {/* Legend */}
+                  <button
+                    type="button"
+                    className={`${styles.mapSideBtn} ${showLegendLabels ? styles.mapSideBtnActive : ''}`}
+                    onClick={() => setShowLegendLabels(prev => !prev)}
+                    title={showLegendLabels ? 'Hide Legend' : 'Show Legend'}
+                    aria-label={showLegendLabels ? 'Hide Legend' : 'Show Legend'}
+                  >
+                    <KeyRound size={20} aria-hidden="true" />
+                    <span className={styles.mapSideBtnLabel}>Legend</span>
+                  </button>
+                  {/* Map (satellite) */}
+                  <button
+                    type="button"
+                    className={`${styles.mapSideBtn} ${isSatelliteMode ? styles.mapSideBtnActive : ''}`}
+                    onClick={() => updateMapPlotData({ backgroundMode: 'satellite' })}
+                    title="Satellite View"
+                    aria-label="Satellite View"
+                  >
+                    <MapIcon size={20} />
+                    <span className={styles.mapSideBtnLabel}>Map</span>
+                  </button>
+                  {/* Grid (blank-grid) */}
+                  <button
+                    type="button"
+                    className={`${styles.mapSideBtn} ${isBlankGridMode ? styles.mapSideBtnActive : ''}`}
+                    onClick={() => updateMapPlotData({ backgroundMode: 'blank-grid' })}
+                    title="Grid View"
+                    aria-label="Grid View"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                      <path d="M1 7H19M1 13H19M7 1V19M13 1V19M3 1H17C18.1046 1 19 1.89543 19 3V17C19 18.1046 18.1046 19 17 19H3C1.89543 19 1 18.1046 1 17V3C1 1.89543 1.89543 1 3 1Z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className={styles.mapSideBtnLabel}>Grid</span>
+                  </button>
+                  {/* Ruler */}
+                  <button
+                    type="button"
+                    className={`${styles.mapSideBtn} ${showDimensions ? styles.mapSideBtnActive : ''}`}
+                    onClick={() => { setSelectedWallMeasurement(null); setShowDimensions(prev => !prev); }}
+                    title="Toggle Dimensions"
+                    aria-label="Toggle Dimensions"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden="true">
+                      <path d="M13.5018 11.5018L15.5018 9.50175M10.5018 8.50176L12.5018 6.50176M7.50176 5.50176L9.50175 3.50176M16.5018 14.5018L18.5018 12.5018M20.3018 14.3018C20.5255 14.5247 20.703 14.7897 20.8242 15.0814C20.9453 15.3731 21.0076 15.6859 21.0076 16.0018C21.0076 16.3176 20.9453 16.6304 20.8242 16.9221C20.703 17.2138 20.5255 17.4788 20.3018 17.7018L17.7018 20.3018C17.4788 20.5255 17.2138 20.703 16.9221 20.8242C16.6304 20.9453 16.3176 21.0076 16.0018 21.0076C15.6859 21.0076 15.3731 20.9453 15.0814 20.8242C14.7897 20.703 14.5247 20.5255 14.3018 20.3018L1.70176 7.70176C1.25231 7.25013 1 6.63891 1 6.00176C1 5.3646 1.25231 4.75338 1.70176 4.30176L4.30176 1.70176C4.75338 1.25231 5.3646 1 6.00176 1C6.63891 1 7.25013 1.25231 7.70176 1.70176L20.3018 14.3018Z" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    <span className={styles.mapSideBtnLabel}>Ruler</span>
+                  </button>
+                  {/* Rotate CCW - desktop only */}
+                  <button
+                    type="button"
+                    className={`${styles.mapSideBtn} ${styles.mapSideBtnDesktop}`}
+                    onClick={() => {
+                      const newHeading = ((mapPlotData.heading ?? 0) - 15 + 360) % 360;
+                      const reprojected = reprojectAnchoredGeometry(mapPlotData.stamps, mapPlotData.outlines, googleMapInstance ?? undefined, newHeading);
+                      updateMapPlotData({ heading: newHeading, stamps: reprojected.stamps, outlines: reprojected.outlines });
                     }}
-		                title="Toggle Dimensions"
-		                aria-label="Toggle Dimensions"
-		              >
-		                <Ruler size={16} />
-		              </button>
-		              {isSatelliteMode && !mapPlotData.isViewSet && (
-		                <>
-		                  <button
-		                    type="button"
-		                    className={`${styles.mapIconBtn} ${styles.mapRotateBtn}`}
-		                    onClick={() => {
-		                      const newHeading = ((mapPlotData.heading ?? 0) - 15 + 360) % 360;
-		                      updateMapPlotData({ heading: newHeading });
-		                    }}
-		                    title="Rotate Left 15°"
-		                    aria-label="Rotate Left 15°"
-		                  >
-		                    <RotateCcw size={16} />
-		                  </button>
-		                  <button
-		                    type="button"
-		                    className={`${styles.mapIconBtn} ${styles.mapRotateBtn}`}
-		                    onClick={() => {
-		                      const newHeading = ((mapPlotData.heading ?? 0) + 15) % 360;
-		                      updateMapPlotData({ heading: newHeading });
-		                    }}
-		                    title="Rotate Right 15°"
-		                    aria-label="Rotate Right 15°"
-		                  >
-		                    <RotateCw size={16} />
-		                  </button>
-		                </>
-		              )}
-		            </div>
-		          </div>}
+                    title="Rotate Left 15°"
+                    aria-label="Rotate Left 15°"
+                  >
+                    <RotateCcw size={20} />
+                    <span className={styles.mapSideBtnLabel}>Rotate</span>
+                  </button>
+                  {/* Rotate CW - desktop only */}
+                  <button
+                    type="button"
+                    className={`${styles.mapSideBtn} ${styles.mapSideBtnDesktop}`}
+                    onClick={() => {
+                      const newHeading = ((mapPlotData.heading ?? 0) + 15) % 360;
+                      const reprojected = reprojectAnchoredGeometry(mapPlotData.stamps, mapPlotData.outlines, googleMapInstance ?? undefined, newHeading);
+                      updateMapPlotData({ heading: newHeading, stamps: reprojected.stamps, outlines: reprojected.outlines });
+                    }}
+                    title="Rotate Right 15°"
+                    aria-label="Rotate Right 15°"
+                  >
+                    <RotateCw size={20} />
+                    <span className={styles.mapSideBtnLabel}>Rotate</span>
+                  </button>
+                </div>
+
+                {/* Lock / Unlock button */}
+                <div className={styles.mapSidePanelGroup}>
+                  <button
+                    type="button"
+                    className={`${styles.mapLockBtn} ${mapPlotData.isViewSet ? styles.mapLockBtnLocked : styles.mapLockBtnUnlocked}`}
+                    onClick={mapPlotData.isViewSet ? unsetView : setView}
+                    disabled={!mapPlotData.isViewSet && !canSetView}
+                    title={mapPlotData.isViewSet ? 'Unlock View' : 'Lock View'}
+                    aria-label={mapPlotData.isViewSet ? 'Unlock View' : 'Lock View'}
+                  >
+                    {mapPlotData.isViewSet ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 20 22" fill="none" aria-hidden="true">
+                        <path d="M5 10V6C5 4.67392 5.52678 3.40215 6.46447 2.46447C7.40215 1.52678 8.67392 1 10 1C11.3261 1 12.5979 1.52678 13.5355 2.46447C14.4732 3.40215 15 4.67392 15 6V10M3 10H17C18.1046 10 19 10.8954 19 12V19C19 20.1046 18.1046 21 17 21H3C1.89543 21 1 20.1046 1 19V12C1 10.8954 1.89543 10 3 10Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 20 22" fill="none" aria-hidden="true">
+                        <path d="M5 10.005V6.00504C4.99875 4.76508 5.45828 3.5689 6.28937 2.6487C7.12047 1.7285 8.26383 1.14994 9.4975 1.02533C10.7312 0.900712 11.9671 1.23894 12.9655 1.97435C13.9638 2.70976 14.6533 3.78988 14.9 5.00504M3 10.005H17C18.1046 10.005 19 10.9005 19 12.005V19.005C19 20.1096 18.1046 21.005 17 21.005H3C1.89543 21.005 1 20.1096 1 19.005V12.005C1 10.9005 1.89543 10.005 3 10.005Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                    <span className={styles.mapLockBtnLabel}>
+                      {mapPlotData.isViewSet ? 'Locked' : 'Unlocked'}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            )}
 
           {pestModalStampId && <div className={styles.mapStampModalDimmer} />}
 
@@ -1915,6 +2168,7 @@ function StepMapPlot({
               const isPestStamp = option.category === 'pest';
               const isObjectStamp = option.category === 'object';
               const isConditionStamp = option.category === 'condition';
+              const isStationStamp = option.category === 'station';
               const isBaitStation = stamp.type === 'sentricon-bait-station';
               const isActiveStamp = stamp.id === pestModalStampId;
               const stampScale = (isBlankGridMode ? (1 / blankGridScale) * BLANK_GRID_STAMP_SCALE : 1) * satelliteStampScale;
@@ -1922,6 +2176,8 @@ function StepMapPlot({
               let stampIcon: React.ReactNode;
               if (isBaitStation) {
                 stampIcon = <PlotObjectBlueprintGlyph type="sentricon-bait-station" />;
+              } else if (isStationStamp) {
+                stampIcon = <StationStampGlyph type={stamp.type as MapStationStampType} />;
               } else if (isConditionStamp) {
                 stampIcon = <ConditionStampGlyph />;
               } else if (isObjectStamp) {
@@ -1941,16 +2197,18 @@ function StepMapPlot({
                 <button
                   key={stamp.id}
                   type="button"
-                  className={`${styles.mapStamp} ${isPestStamp || isBaitStation || isConditionStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''} ${isActiveStamp ? styles.mapStampActive : ''} ${isSatelliteMode && !isActiveStamp && (isPestStamp || isBaitStation || isConditionStamp) ? styles.mapStampNoBorder : ''}`}
+                  className={`${styles.mapStamp} ${isPestStamp || isBaitStation || isConditionStamp || isStationStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''} ${isActiveStamp ? styles.mapStampActive : ''} ${isSatelliteMode && !isActiveStamp && (isPestStamp || isBaitStation || isConditionStamp || isStationStamp) ? styles.mapStampNoBorder : ''}`}
                   style={{
                     left: `${stamp.x * 100}%`,
                     top: `${stamp.y * 100}%`,
                     transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${stampScale})`,
-                    ...(pestModalStampId && (isPestStamp || isBaitStation || isConditionStamp) ? { opacity: 1 } : {}),
+                    ...(pestModalStampId && (isPestStamp || isBaitStation || isConditionStamp || isStationStamp) ? { opacity: 1 } : {}),
                     ...(!isActiveStamp && isConditionStamp
                       ? { color: 'var(--UI-Alert-500, #FD484F)' }
                       : !isActiveStamp && (isPestStamp || isBaitStation)
                       ? { color: stampColor ?? 'var(--blue-500, #0075de)' }
+                      : !isActiveStamp && isStationStamp
+                      ? { color: 'var(--blue-500, #0075de)' }
                       : !isActiveStamp && isObjectStamp
                       ? { color: '#ffffff' }
                       : !isActiveStamp
@@ -1993,227 +2251,33 @@ function StepMapPlot({
             })}
           </div>
 
-          {!satFocusTransform && <div className={styles.mapToolbarDock} ref={toolbarDockRef}>
-            {canRenderActiveStampMenu && activeStampMenu && (
-              <div
-                className={`${styles.mapStampPicker} ${activeStampMenu === 'pest' ? styles.mapStampPickerPest : ''} ${activeStampMenu === 'condition' ? styles.mapStampPickerCondition : ''}`}
-                role="menu"
-                aria-label={
-                  activeStampMenu === 'pest'
-                    ? 'Pest stamps'
-                    : activeStampMenu === 'object'
-                    ? 'Object stamps'
-                    : activeStampMenu === 'condition'
-                    ? 'Condition stamps'
-                    : 'Element stamps'
-                }
-              >
-                {activeStampMenu === 'pest' ? (
-                  companyPestOptions.length > 0 ? (
-                    companyPestOptions.map(option => (
-                      <button
-                        key={option.id}
-                        type="button"
-                        className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${styles.mapPickerBtnLabeled} ${mapPlotData.selectedStampType === 'dynamic-pest' && selectedDynamicPestOption?.id === option.id ? styles.mapIconBtnActive : ''}`}
-                        onClick={() => {
-                          activateDynamicPestTool(option);
-                          setActiveStampMenu(null);
-                        }}
-                        title={option.custom_label}
-                        aria-label={option.custom_label}
-                      >
-                        {option.icon_svg ? (
-                          <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: option.icon_svg }} />
-                        ) : (
-                          <MapStampGlyph type="dynamic-pest" size={18} />
-                        )}
-                        <span className={styles.mapPickerBtnLabel}>{option.custom_label}</span>
-                      </button>
-                    ))
-                  ) : (
-                    MAP_PEST_STAMP_OPTIONS.map(option => (
-                      <button
-                        key={option.type}
-                        type="button"
-                        className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${styles.mapPickerBtnLabeled} ${mapPlotData.selectedStampType === option.type ? styles.mapIconBtnActive : ''}`}
-                        onClick={() => {
-                          activatePestTool(option.type as MapPestStampType);
-                          setActiveStampMenu(null);
-                        }}
-                        title={option.label}
-                        aria-label={option.label}
-                      >
-                        <MapStampGlyph type={option.type} size={22} />
-                        <span className={styles.mapPickerBtnLabel}>{option.label}</span>
-                      </button>
-                    ))
-                  )
-                ) : (
-                  (activeStampMenu === 'object' ? MAP_OBJECT_STAMP_OPTIONS : MAP_ELEMENT_STAMP_OPTIONS).map(option => (
-                    <button
-                      key={option.type}
-                      type="button"
-                      className={`${styles.mapIconBtn} ${styles.mapPickerBtn} ${styles.mapPickerBtnLabeled} ${mapPlotData.selectedStampType === option.type ? styles.mapIconBtnActive : ''}`}
-                      onClick={() => {
-                        if (activeStampMenu === 'object') {
-                          activateObjectTool(option.type as MapObjectStampType);
-                        } else {
-                          activateElementTool(option.type as MapElementStampType);
-                        }
-                        setActiveStampMenu(null);
-                      }}
-                      title={option.label}
-                      aria-label={option.label}
-                    >
-                      <MapStampGlyph type={option.type} size={22} />
-                      <span className={styles.mapPickerBtnLabel}>{option.label}</span>
-                    </button>
-                  ))
-                )}
-              </div>
-            )}
-
-	            <div className={styles.mapIconToolbar}>
-	              <button
-	                type="button"
-                className={styles.mapIconBtn}
+          {/* ── Bottom Bar ── */}
+          {!satFocusTransform && (
+            <div className={styles.mapBottomBar}>
+              <button
+                type="button"
+                className={styles.mapBackBtn}
                 onClick={onBack}
-                title="Back"
-                aria-label="Back"
-	              >
-	                <ArrowLeft size={16} />
-	              </button>
-
-	              <div className={`${styles.mapToolToggle} ${!mapPlotData.isViewSet ? styles.mapToolToggleDisabled : ''}`}>
-                <button
-                  type="button"
-                  className={`${styles.mapIconBtn} ${styles.mapToggleFirst} ${mapPlotData.drawTool === 'outline' ? styles.mapIconBtnActive : ''}`}
-                  onClick={() => updateMapPlotData({ drawTool: 'outline', selectedStampType: selectedElementType })}
-                  disabled={!mapPlotData.isViewSet}
-                  title="Outline Tool"
-                  aria-label="Outline Tool"
-                >
-                  <Move3d size={16} />
-                </button>
-                <button
-                  type="button"
-                  className={`${styles.mapIconBtn} ${styles.mapToggleLast} ${mapPlotData.drawTool === 'stamp' ? styles.mapIconBtnActive : ''}`}
-                  onClick={() =>
-                    updateMapPlotData({
-                      drawTool: 'stamp',
-                      selectedStampType: isMapPestStampType(mapPlotData.selectedStampType) || isMapObjectStampType(mapPlotData.selectedStampType)
-                        ? mapPlotData.selectedStampType
-                        : selectedPestType,
-                    })
-                  }
-                  disabled={!mapPlotData.isViewSet}
-                  title="Stamp Tool"
-                  aria-label="Stamp Tool"
-                >
-                  <MapPinned size={16} />
-                </button>
-              </div>
-
-              {canShowPestMenu && (
-                <div className={styles.mapToolToggle}>
-                  <button
-                    type="button"
-                    className={`${styles.mapIconBtn} ${styles.mapToggleFirst} ${styles.mapStampTypeBtn} ${isPestSelected || activeStampMenu === 'pest' ? styles.mapIconBtnActive : ''}`}
-                    onClick={() => {
-                      if (selectedDynamicPestOption) {
-                        activateDynamicPestTool(selectedDynamicPestOption);
-                      } else {
-                        activatePestTool(selectedPestType);
-                      }
-                      setActiveStampMenu(prev => (prev === 'pest' ? null : 'pest'));
-                    }}
-                    title="Pest Stamps"
-                    aria-label="Pest Stamps"
-                  >
-                    {selectedDynamicPestOption?.icon_svg ? (
-                      <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: selectedDynamicPestOption.icon_svg }} />
-                    ) : (
-                      <MapStampGlyph type={selectedPestType} size={18} />
-                    )}
-                  </button>
-                  <button
-                    type="button"
-                    className={`${styles.mapIconBtn} ${styles.mapStampTypeBtn} ${isObjectSelected || activeStampMenu === 'object' ? styles.mapIconBtnActive : ''}`}
-                    onClick={() => {
-                      activateObjectTool(selectedObjectType);
-                      setActiveStampMenu(prev => (prev === 'object' ? null : 'object'));
-                    }}
-                    title="Object Stamps"
-                    aria-label="Object Stamps"
-                  >
-                    <MapStampGlyph type={selectedObjectType} size={18} />
-                  </button>
-                  {canShowConditionMenu && (
-                    <button
-                      type="button"
-                      className={`${styles.mapIconBtn} ${styles.mapToggleLast} ${styles.mapStampTypeBtn} ${isConditionSelected ? styles.mapIconBtnActive : ''}`}
-                      onClick={() => {
-                        activateConditionTool('other-condition');
-                        setActiveStampMenu(null);
-                      }}
-                      title="Conducive Condition"
-                      aria-label="Conducive Condition"
-                    >
-                      <ConditionStampGlyph />
-                    </button>
-                  )}
-                </div>
-              )}
-
-              {canShowElementMenu && (
-                <button
-                  type="button"
-                  className={`${styles.mapIconBtn} ${styles.mapStampTypeBtn} ${isElementSelected || activeStampMenu === 'element' ? styles.mapIconBtnActive : ''}`}
-                  onClick={() => {
-                    activateElementTool(selectedElementType);
-                    setActiveStampMenu(prev => (prev === 'element' ? null : 'element'));
-                  }}
-                  title="Elements"
-                  aria-label="Elements"
-                >
-                  <MapStampGlyph type={selectedElementType} size={18} />
-                </button>
-              )}
-
-              <button
-                type="button"
-                className={styles.mapIconBtn}
-                onClick={handleUndo}
-                disabled={!mapPlotData.isViewSet || !hasUndo}
-                title="Undo"
-                aria-label="Undo"
+                title="Go Back"
+                aria-label="Go Back"
               >
-                <Undo2 size={16} />
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M8 15L1 8M1 8L8 1M1 8H15" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                Go Back
               </button>
-
               <button
                 type="button"
-                className={`${styles.mapIconBtn} ${styles.mapIconBtnWarn}`}
-                onClick={handleClear}
-                disabled={!mapPlotData.isViewSet || !hasClear}
-                title="Clear"
-                aria-label="Clear"
-              >
-                <Trash2 size={16} />
-              </button>
-
-              <button
-                type="button"
-                className={`${styles.mapIconBtn} ${styles.mapIconBtnPrimary}`}
+                className={styles.mapContinueBtn}
                 onClick={onNext}
                 disabled={!canNext}
-                title="Next"
-                aria-label="Next"
+                title="Continue"
+                aria-label="Continue"
               >
-                <ArrowRight size={16} />
+                Continue
               </button>
             </div>
-          </div>}
+          )}
 
           </div>{/* end inner CSS-transform wrapper */}
         </div>
@@ -2382,12 +2446,20 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       const dy = e.clientY - pan.startY;
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) g.moved = true;
       setRoTransform(prev => {
+        // The transform is rotate(r) translate(tx, ty) scale(s), so translation is
+        // in the rotated coordinate space. Counter-rotate the screen-space delta to
+        // get the correct tx/ty adjustment.
+        const rad = (prev.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const correctedDx = cos * dx + sin * dy;
+        const correctedDy = -sin * dx + cos * dy;
         const maxTx = previewSize.width * (prev.scale - 1) / 2;
         const maxTy = previewSize.height * (prev.scale - 1) / 2;
         return {
           ...prev,
-          tx: Math.max(-maxTx, Math.min(maxTx, pan.startTx + dx)),
-          ty: Math.max(-maxTy, Math.min(maxTy, pan.startTy + dy)),
+          tx: Math.max(-maxTx, Math.min(maxTx, pan.startTx + correctedDx)),
+          ty: Math.max(-maxTy, Math.min(maxTy, pan.startTy + correctedDy)),
         };
       });
     } else if (g.pointers.size === 2) {
@@ -2509,6 +2581,31 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
     const observer = new ResizeObserver(updateSize);
     observer.observe(container);
     return () => observer.disconnect();
+  }, []);
+
+  // Prevent the browser from stealing touch gestures as page-scroll or viewport-zoom.
+  // React's synthetic pointer events can't call preventDefault(), so we attach
+  // non-passive native listeners directly on the map frame.
+  useEffect(() => {
+    const frame = previewFrameRef.current;
+    if (!frame) return;
+
+    const onTouchStart = (e: TouchEvent) => {
+      // Always block multi-touch (prevents iOS viewport pinch-to-zoom from intercepting)
+      if (e.touches.length >= 2) e.preventDefault();
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      // Block all move defaults so the page won't scroll while the user pans the map
+      e.preventDefault();
+    };
+
+    frame.addEventListener('touchstart', onTouchStart, { passive: false });
+    frame.addEventListener('touchmove', onTouchMove, { passive: false });
+    return () => {
+      frame.removeEventListener('touchstart', onTouchStart);
+      frame.removeEventListener('touchmove', onTouchMove);
+    };
   }, []);
 
   const centerLat = getMapLatitude(mapPlotData);
@@ -2691,12 +2788,13 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
               willChange: roAnimating ? 'transform' : 'auto',
               width: '100%',
               height: '100%',
+              touchAction: 'none',
             }}
             onTransitionEnd={() => setRoAnimating(false)}
           >
           {staticMapUrl ? (
             <>
-              <img src={staticMapUrl} alt="Map preview" className={styles.readOnlyMapImg} />
+              <img src={staticMapUrl} alt="Map preview" className={styles.readOnlyMapImg} draggable={false} />
               <div className={styles.readOnlyDarkOverlay} />
             </>
           ) : (
@@ -2747,6 +2845,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                   const isPestStamp = option.category === 'pest';
                   const isObjectStamp = option.category === 'object';
                   const isConditionStamp = option.category === 'condition';
+                  const isStationStamp = option.category === 'station';
                   const hasDetails = Boolean(
                     (stamp.notes && stamp.notes.trim().length > 0) ||
                     (stamp.photoUrls && stamp.photoUrls.length > 0)
@@ -2757,6 +2856,8 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                   let stampIcon: React.ReactNode;
                   if (isBaitStation) {
                     stampIcon = <PlotObjectBlueprintGlyph type="sentricon-bait-station" />;
+                  } else if (isStationStamp) {
+                    stampIcon = <StationStampGlyph type={stamp.type as MapStationStampType} />;
                   } else if (isConditionStamp) {
                     stampIcon = <ConditionStampGlyph />;
                   } else if (isObjectStamp) {
@@ -2774,7 +2875,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                     <button
                       key={stamp.id}
                       type="button"
-                      className={`${styles.mapStamp} ${styles.readOnlyStamp} ${isPestStamp || isBaitStation || isConditionStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''}`}
+                      className={`${styles.mapStamp} ${styles.readOnlyStamp} ${isPestStamp || isBaitStation || isConditionStamp || isStationStamp ? styles.mapStampPest : ''} ${isObjectStamp && !isBaitStation ? styles.mapStampObject : ''}`}
                       style={{
                         left: `${point.x}px`,
                         top: `${point.y}px`,
@@ -2782,6 +2883,8 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                         ...(isConditionStamp
                           ? { color: 'var(--UI-Alert-500, #FD484F)' }
                           : isPestStamp || isBaitStation
+                          ? { color: stampColor ?? 'var(--blue-500, #0075de)' }
+                          : isStationStamp
                           ? { color: stampColor ?? 'var(--blue-500, #0075de)' }
                           : isObjectStamp
                           ? { color: '#ffffff' }
