@@ -39,7 +39,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const companyIdParam = searchParams.get('companyId') ?? null;
   const routeStopId = searchParams.get('routeStopId') ?? null;
 
-  const [clientInfo, setClientInfo] = useState({ name: '', email: '', phone: '', address: '' });
+  const [clientInfo, setClientInfo] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+  });
 
   const inspectorName =
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
@@ -94,7 +99,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       try {
         const qs = new URLSearchParams();
         if (resolvedCompanyId) qs.set('companyId', resolvedCompanyId);
-        const res = await fetch(`/api/field-map/service/${stopId}?${qs.toString()}`);
+        const res = await fetch(
+          `/api/field-map/service/${stopId}?${qs.toString()}`
+        );
         if (!res.ok) return;
         const stopData = await res.json();
 
@@ -120,7 +127,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         } else if (stopData.address) {
           setIsGeocoding(true);
           try {
-            const geoRes = await fetch(`/api/internal/geocode?address=${encodeURIComponent(stopData.address)}`);
+            const geoRes = await fetch(
+              `/api/internal/geocode?address=${encodeURIComponent(stopData.address)}`
+            );
             const geoData = await geoRes.json();
             if (geoData.success && geoData.coordinates) {
               setMapPlotData(prev => ({
@@ -138,7 +147,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             setIsGeocoding(false);
           }
         } else {
-          setMapPlotData(prev => ({ ...prev, addressInput: stopData.address ?? '' }));
+          setMapPlotData(prev => ({
+            ...prev,
+            addressInput: stopData.address ?? '',
+          }));
         }
 
         // If an existing lead is linked, restore state and fast-forward
@@ -165,12 +177,18 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               setQuoteLineItems(
                 lineItems.map((item: any): QuoteLineItem => {
                   const catalogItemId =
-                    item.service_plan_id ?? item.addon_service_id ?? item.bundle_plan_id ?? undefined;
+                    item.service_plan_id ??
+                    item.addon_service_id ??
+                    item.bundle_plan_id ??
+                    undefined;
                   const catalogItemKind: QuoteLineItem['catalogItemKind'] =
-                    item.service_plan_id ? 'plan'
-                    : item.addon_service_id ? 'addon'
-                    : item.bundle_plan_id ? 'bundle'
-                    : undefined;
+                    item.service_plan_id
+                      ? 'plan'
+                      : item.addon_service_id
+                        ? 'addon'
+                        : item.bundle_plan_id
+                          ? 'bundle'
+                          : undefined;
                   return {
                     id: item.id,
                     type: catalogItemId ? 'plan-addon' : 'custom',
@@ -179,8 +197,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                     catalogItemName: item.plan_name,
                     coveredPestIds: [],
                     coveredPestLabels: [],
-                    initialCost: item.final_initial_price ?? item.initial_price ?? null,
-                    recurringCost: item.final_recurring_price ?? item.recurring_price ?? null,
+                    initialCost:
+                      item.final_initial_price ?? item.initial_price ?? null,
+                    recurringCost:
+                      item.final_recurring_price ??
+                      item.recurring_price ??
+                      null,
                     frequency: item.billing_frequency ?? null,
                   };
                 })
@@ -240,11 +262,19 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const pestTypes = getPlottedPestTypes(mapPlotData);
   const plottedPests = getPlottedPests(mapPlotData);
 
-  const mapMeasurements = useMemo(() => ({
-    byOutline: mapPlotData.outlines
-      .filter(o => o.sqft != null || o.linearFt != null)
-      .map(o => ({ id: o.id, type: o.type, sqft: o.sqft ?? 0, linearFt: o.linearFt ?? 0 })),
-  }), [mapPlotData.outlines]);
+  const mapMeasurements = useMemo(
+    () => ({
+      byOutline: mapPlotData.outlines
+        .filter(o => o.sqft != null || o.linearFt != null)
+        .map(o => ({
+          id: o.id,
+          type: o.type,
+          sqft: o.sqft ?? 0,
+          linearFt: o.linearFt ?? 0,
+        })),
+    }),
+    [mapPlotData.outlines]
+  );
 
   const handleMapChange = useCallback((data: MapPlotData) => {
     setMapPlotData(data);
@@ -278,7 +308,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapPlotData, currentStep, leadId]);
 
   // Debounced background save while editing quote line items
@@ -299,15 +329,18 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           discountAmount: null,
           discountType: '$',
         }),
-      }).then(r => r.json()).then(data => {
-        if (data.quoteId && !quoteId) setQuoteId(data.quoteId);
-      }).catch(() => {});
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.quoteId && !quoteId) setQuoteId(data.quoteId);
+        })
+        .catch(() => {});
     }, 1500);
 
     return () => {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quoteLineItems, currentStep, leadId]);
 
   function canAdvance(): boolean {
@@ -338,6 +371,22 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   async function handleNext() {
     setStepSaveError(null);
 
+    // After Address step (new inspection only) — validate customer name
+    if (currentStep === 0 && !stopId) {
+      if (!clientName.trim()) {
+        setStepSaveError('Customer name is required before continuing.');
+        return;
+      }
+    }
+
+    // After Address step (new inspection only) — validate customer name
+    if (currentStep === 0 && !stopId) {
+      if (!clientName.trim()) {
+        setStepSaveError('Customer name is required before continuing.');
+        return;
+      }
+    }
+
     // After Photos step — create lead and store house photo(s)
     if (currentStep === 1) {
       setIsSavingStep(true);
@@ -362,9 +411,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (!res.ok) throw new Error(data.error ?? 'Failed to save');
         setLeadId(data.leadId);
       } catch (err) {
-        setStepSaveError(
-          err instanceof Error ? err.message : 'Failed to save'
-        );
+        setStepSaveError(err instanceof Error ? err.message : 'Failed to save');
         setIsSavingStep(false);
         return;
       }
@@ -475,6 +522,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           <MapAddressStep
             mapPlotData={mapPlotData}
             onChange={handleMapChange}
+            isNewInspection={!stopId}
+            clientName={clientName}
+            clientEmail={clientEmail}
+            clientPhone={clientPhone}
+            onClientNameChange={setClientName}
+            onClientEmailChange={setClientEmail}
+            onClientPhoneChange={setClientPhone}
+            companyId={selectedCompany?.id ?? ''}
           />
         );
       case 1:
@@ -631,6 +686,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       {/* Address step footer */}
       {currentStep === 0 && (
         <div className={styles.footer}>
+          {stepSaveError && (
+            <p className={styles.stepSaveError}>{stepSaveError}</p>
+          )}
           <button
             type="button"
             className={styles.prevBtn}
