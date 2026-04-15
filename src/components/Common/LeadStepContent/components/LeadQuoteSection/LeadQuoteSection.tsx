@@ -22,6 +22,7 @@ import { useUser } from '@/hooks/useUser';
 import { useActiveSection } from '@/contexts/ActiveSectionContext';
 import { LeadQuoteSectionProps } from '../../types/leadStepTypes';
 import { adminAPI } from '@/lib/api-client';
+import { DEFAULT_TIME_OPTIONS, getEnabledTimeOptions } from '@/lib/time-options';
 import {
   generateHomeSizeOptions,
   generateYardSizeOptions,
@@ -68,6 +69,7 @@ export function LeadQuoteSection({
   isSidebarExpanded,
   startExpanded = true,
   forceCollapse = false,
+  timeOptions,
 }: LeadQuoteSectionProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   // Refs
@@ -3677,14 +3679,20 @@ export function LeadQuoteSection({
                     <div className={styles.preferredDateTimeColumn}>
                       <div className={styles.formField}>
                         <label className={styles.fieldLabel}>
-                          Preferred Date
+                          Preferred Day
                         </label>
-                        <input
-                          type="date"
+                        <select
                           className={styles.dateInput}
                           value={preferredDate}
                           onChange={e => onPreferredDateChange(e.target.value)}
-                        />
+                        >
+                          <option value="">No preference</option>
+                          <option value="monday">Monday</option>
+                          <option value="tuesday">Tuesday</option>
+                          <option value="wednesday">Wednesday</option>
+                          <option value="thursday">Thursday</option>
+                          <option value="friday">Friday</option>
+                        </select>
                       </div>
                       <div className={styles.formField}>
                         <label className={styles.fieldLabel}>
@@ -3696,13 +3704,7 @@ export function LeadQuoteSection({
                           placeholder="Select time"
                           options={[
                             { value: '', label: 'Select time' },
-                            { value: 'morning', label: 'Morning (8AM-12PM)' },
-                            {
-                              value: 'afternoon',
-                              label: 'Afternoon (12PM-5PM)',
-                            },
-                            { value: 'evening', label: 'Evening (5PM-8PM)' },
-                            { value: 'flexible', label: 'Flexible' },
+                            ...getEnabledTimeOptions(timeOptions || DEFAULT_TIME_OPTIONS),
                           ]}
                         />
                       </div>

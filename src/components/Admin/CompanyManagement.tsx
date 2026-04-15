@@ -38,6 +38,7 @@ import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
+import { DEFAULT_TIME_OPTIONS } from '@/lib/time-options';
 import PestPacSettingsManager from './PestPacSettingsManager';
 import FieldMapSettingsManager from './FieldMapSettingsManager';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -348,6 +349,11 @@ export default function CompanyManagement({
                 value: updatedData.quote_accent_color_preference || 'primary',
                 type: 'string',
                 description: 'Which brand color is used as the primary accent on the public quote page',
+              },
+              requested_time_options: {
+                value: JSON.stringify(updatedData.requested_time_options || DEFAULT_TIME_OPTIONS),
+                type: 'json',
+                description: 'Time slot options shown on scheduling forms',
               },
             },
           }),

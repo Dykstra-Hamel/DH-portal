@@ -570,6 +570,7 @@
   border-radius: 8px;
   overflow: hidden;
   background: #fff;
+  padding: 0 4px 0 8px;
   width: 110px;
 
   &:focus-within {
@@ -1110,7 +1111,6 @@
     cursor: pointer;
     flex: 1;
   }
-
 }
 
 .termsCheckboxLocked {
@@ -1130,4 +1130,17 @@
   color: #16a34a;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+.variantBadge {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.02em;
 }

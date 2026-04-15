@@ -12,6 +12,7 @@ import PlanDetails from './PlanDetails';
 import FooterSection from './FooterSection';
 import QuoteTotalPricing from './QuoteTotalPricing';
 import Link from 'next/link';
+import { TimeOption, DEFAULT_TIME_OPTIONS, getEnabledTimeOptions } from '@/lib/time-options';
 
 interface AlternativeColor {
   hex: string;
@@ -46,6 +47,7 @@ interface Company {
   wisetack_enabled?: boolean;
   wisetack_url?: string;
   quote_accent_color_preference?: 'primary' | 'secondary';
+  time_options?: TimeOption[];
 }
 
 interface Quote {
@@ -276,6 +278,8 @@ export default function QuoteContent({
   });
 
   const regularLineItems = sortedLineItems.filter(item => !item.addon_service_id);
+  const primaryLineItems = regularLineItems.filter(item => item.is_primary !== false);
+  const secondaryLineItems = regularLineItems.filter(item => item.is_primary === false);
   const availableAddons = quote.available_addons || [];
 
   // Pre-select any addons already saved as line items on the quote
@@ -395,12 +399,6 @@ export default function QuoteContent({
     }
   };
 
-  // Get minimum date for date picker (today)
-  const getMinDate = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
-
   // Handle saving customer comment
   const handleSaveComment = async () => {
     if (!token) {
@@ -449,7 +447,8 @@ export default function QuoteContent({
                 expandedPlanIndexes={expandedPlanIndexes}
                 setExpandedPlanIndexes={setExpandedPlanIndexes}
                 onContinue={handleNext}
-                regularLineItems={regularLineItems}
+                primaryLineItems={primaryLineItems}
+                secondaryLineItems={secondaryLineItems}
                 availableAddons={availableAddons}
                 expandedAddonIndexes={expandedAddonIndexes}
                 setExpandedAddonIndexes={setExpandedAddonIndexes}
@@ -478,10 +477,9 @@ export default function QuoteContent({
                     <div className={styles.formGroupRow}>
                       <div className={styles.formGroup}>
                         <label htmlFor="start-date">
-                          Preferred Start Date:
+                          Preferred Day:
                         </label>
-                        <input
-                          type="date"
+                        <select
                           id="start-date"
                           value={preferredDate}
                           onChange={e => {
@@ -489,9 +487,15 @@ export default function QuoteContent({
                             setPreferredDate(newValue);
                             updateLeadSchedule('requested_date', newValue);
                           }}
-                          min={getMinDate()}
-                          className={styles.input}
-                        />
+                          className={styles.select}
+                        >
+                          <option value="">No preference</option>
+                          <option value="monday">Monday</option>
+                          <option value="tuesday">Tuesday</option>
+                          <option value="wednesday">Wednesday</option>
+                          <option value="thursday">Thursday</option>
+                          <option value="friday">Friday</option>
+                        </select>
                       </div>
 
                       <div className={styles.formGroup}>
@@ -509,12 +513,9 @@ export default function QuoteContent({
                           className={styles.select}
                         >
                           <option value="">Select a time...</option>
-                          <option value="morning">Morning (8am - 12pm)</option>
-                          <option value="afternoon">
-                            Afternoon (12pm - 4pm)
-                          </option>
-                          <option value="evening">Evening (4pm - 8pm)</option>
-                          <option value="anytime">Anytime</option>
+                          {getEnabledTimeOptions(company.time_options || DEFAULT_TIME_OPTIONS).map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -671,7 +672,8 @@ export default function QuoteContent({
             <div className={styles.contentArea}>
               <h2 className={styles.stepHeading}>Review and Sign Agreement</h2>
               <QuoteTotalPricing
-                regularLineItems={regularLineItems}
+                primaryLineItems={primaryLineItems}
+                secondaryLineItems={secondaryLineItems}
                 availableAddons={availableAddons}
                 selectedAddonIds={selectedAddonIds}
                 onToggleAddon={toggleAddon}

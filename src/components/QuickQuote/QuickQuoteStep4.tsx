@@ -1,14 +1,8 @@
 'use client';
 
 import { CustomDropdown } from '@/components/Common/CustomDropdown/CustomDropdown';
+import { TimeOption, DEFAULT_TIME_OPTIONS, getEnabledTimeOptions } from '@/lib/time-options';
 import styles from './QuickQuoteStep4.module.scss';
-
-const TIME_PREFERENCE_OPTIONS = [
-  { value: 'morning', label: 'Morning (8am–12pm)' },
-  { value: 'afternoon', label: 'Afternoon (12pm–5pm)' },
-  { value: 'evening', label: 'Evening (5pm–8pm)' },
-  { value: 'anytime', label: 'Anytime' },
-];
 
 interface ServicePlan {
   id: string;
@@ -45,6 +39,7 @@ interface QuickQuoteStep4Props {
   isSubmitting: boolean;
   submitError: string | null;
   hasSchedulingPermission: boolean;
+  timeOptions?: TimeOption[];
 }
 
 function formatPrice(price: number): string {
@@ -74,6 +69,7 @@ export default function QuickQuoteStep4({
   isSubmitting,
   submitError,
   hasSchedulingPermission,
+  timeOptions,
 }: QuickQuoteStep4Props) {
   const customerName = [customerData.firstName, customerData.lastName]
     .filter(Boolean)
@@ -83,9 +79,6 @@ export default function QuickQuoteStep4({
     .join(', ');
   const pestLabel = selectedPest.custom_label || selectedPest.name;
   const isOneTime = selectedPlan?.plan_category === 'one-time';
-
-  // Minimum date is today
-  const today = new Date().toISOString().split('T')[0];
 
   return (
     <div className={styles.step}>
@@ -132,16 +125,19 @@ export default function QuickQuoteStep4({
           <p className={styles.sectionTitle}>Requested Appointment</p>
 
           <div className={styles.formGroup}>
-            <label className={styles.label}>
-              {hasSchedulingPermission ? 'Scheduled Date' : 'Preferred Date'}
-            </label>
-            <input
-              type="date"
+            <label className={styles.label}>Preferred Day</label>
+            <select
               className={styles.dateInput}
               value={requestedDate}
-              min={today}
               onChange={(e) => onDateChange(e.target.value)}
-            />
+            >
+              <option value="">No preference</option>
+              <option value="monday">Monday</option>
+              <option value="tuesday">Tuesday</option>
+              <option value="wednesday">Wednesday</option>
+              <option value="thursday">Thursday</option>
+              <option value="friday">Friday</option>
+            </select>
           </div>
 
           <div className={styles.formGroup}>
@@ -157,7 +153,7 @@ export default function QuickQuoteStep4({
               />
             ) : (
               <CustomDropdown
-                options={TIME_PREFERENCE_OPTIONS}
+                options={getEnabledTimeOptions(timeOptions || DEFAULT_TIME_OPTIONS)}
                 value={requestedTime}
                 onChange={onTimeChange}
                 placeholder="Select time preference"

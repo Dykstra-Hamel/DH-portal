@@ -1,5 +1,15 @@
 export type QuoteStatus = 'draft' | 'sent' | 'accepted' | 'declined' | 'expired';
 
+export interface PlanVariant {
+  label: string;
+  initial_price?: number;
+  recurring_price?: number;
+  price_per_unit?: number;
+  minimum_price?: number;
+  billing_frequency?: string;
+  treatment_frequency?: string;
+}
+
 export interface Quote {
   id: string;
   lead_id: string;
@@ -75,6 +85,7 @@ export interface QuoteLineItem {
   // Customer selection (for optional line items on the public quote page)
   is_optional: boolean;
   is_selected: boolean;
+  is_primary: boolean;
 
   // Display
   display_order: number;
@@ -116,6 +127,7 @@ export interface UpdateQuoteRequest {
     custom_recurring_price?: number;
     is_custom_priced?: boolean;
     is_optional?: boolean;  // Customer can toggle this item on/off
+    is_primary?: boolean;
   }>;
 }
 

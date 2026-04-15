@@ -65,6 +65,82 @@ export async function GET(
       return NextResponse.json({ error: 'No company found' }, { status: 404 });
     }
 
+    // ── DB-first lookup ────────────────────────────────────────────────────
+    const { data: dbStop } = await adminSupabase
+      .from('route_stops')
+      .select(`
+        id, service_type, notes, access_instructions,
+        scheduled_arrival, status, lat, lng,
+        pestpac_stop_id, estimated_duration, lead_id,
+        customers ( first_name, last_name, email, phone, pestpac_client_id ),
+        service_addresses ( street_address, city, state, zip_code )
+      `)
+      .eq('company_id', userCompany.company_id)
+      .eq('pestpac_stop_id', stopId)
+      .maybeSingle();
+
+    if (dbStop) {
+      // Attempt to read new columns separately — they may not exist before migration is applied.
+      // If the query fails (column not found), extra will be null and we fall back to empty defaults.
+      let lineItems: any[] | null = null;
+      let raw: any = {};
+      const { data: extra } = await adminSupabase
+        .from('route_stops')
+        .select('line_items, pestpac_raw_data')
+        .eq('id', (dbStop as any).id)
+        .maybeSingle();
+      if (extra) {
+        lineItems = (extra as any).line_items ?? null;
+        raw = (extra as any).pestpac_raw_data ?? {};
+      }
+
+      const cust = (dbStop as any).customers ?? {};
+      const addr = (dbStop as any).service_addresses ?? {};
+      return NextResponse.json({
+        routeStopId: dbStop.id,
+        leadId: (dbStop as any).lead_id ?? null,
+        stopId: dbStop.pestpac_stop_id ?? stopId,
+        routeId: routeId ?? '',
+        clientId: cust.pestpac_client_id ?? null,
+        locationId: null,
+        clientName: [cust.first_name, cust.last_name].filter(Boolean).join(' ') || null,
+        clientEmail: cust.email ?? '',
+        clientPhone: cust.phone ?? '',
+        address: [addr.street_address, addr.city, addr.state, addr.zip_code].filter(Boolean).join(', '),
+        street: addr.street_address ?? '',
+        city: addr.city ?? '',
+        state: addr.state ?? '',
+        zip: addr.zip_code ?? '',
+        lat: dbStop.lat ?? null,
+        lng: dbStop.lng ?? null,
+        scheduledTime: dbStop.scheduled_arrival ?? null,
+        serviceDate: null,
+        timeIn: null,
+        timeOut: null,
+        serviceStatus: dbStop.status ?? 'Scheduled',
+        serviceType: dbStop.service_type ?? '',
+        serviceNotes: dbStop.notes ?? '',
+        accessInstructions: dbStop.access_instructions ?? '',
+        technician: '',
+        technicianId: null,
+        duration: dbStop.estimated_duration ?? null,
+        serviceClass: raw.ServiceClass ?? raw.serviceClass ?? raw.ServiceClassName ?? raw.serviceClassName ?? '',
+        programCode: raw.ProgramCode ?? raw.programCode ?? raw.Program ?? raw.program ?? '',
+        locationNotes: raw.LocationNotes ?? raw.locationNotes ?? '',
+        amount: null,
+        balanceDue: null,
+        accountNumber: '',
+        lastServiceDate: null,
+        locationType: raw.LocationType ?? raw.locationType ?? raw.Type ?? '',
+        branch: raw.Branch ?? raw.branch ?? raw.BranchCode ?? raw.branchCode ?? raw.BranchName ?? raw.branchName ?? '',
+        services: Array.isArray(lineItems) ? lineItems : [],
+        targets: [],
+        attributes: [],
+        conditions: [],
+      });
+    }
+    // ── End DB-first lookup — fall through to PestPac ─────────────────────
+
     const { data: settingsRows } = await adminSupabase
       .from('company_settings')
       .select('setting_key, setting_value')
@@ -249,6 +325,7 @@ export async function GET(
         .join(', ');
 
     return NextResponse.json({
+      routeStopId: null,
       stopId: String(serviceOrderId),
       routeId: String(resolvedRouteId),
       clientId: clientId ? String(clientId) : null,

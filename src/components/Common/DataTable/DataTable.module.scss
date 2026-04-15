@@ -84,7 +84,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  min-width: 0;
+  min-width: max-content;
 }
 
 .headerRow {
@@ -418,31 +418,31 @@
 
 // Table-specific column configurations
 .ticketTable {
-  --table-columns: 120px 180px 140px 250px 100px 120px 150px 1fr;
+  --table-columns: 120px 180px 140px 250px 100px 120px 150px minmax(150px, 1fr);
 }
 
 .supportCaseTable {
-  --table-columns: 120px 180px 140px 250px 150px 120px 170px 1fr;
+  --table-columns: 120px 180px 140px 250px 150px 120px 170px minmax(150px, 1fr);
 }
 
 .leadTable {
-  --table-columns: 180px 180px 200px 220px 180px 90px 1fr;
+  --table-columns: 180px 180px 200px 220px 180px 90px minmax(150px, 1fr);
 }
 
 .callTable {
-  --table-columns: 180px 180px 150px 100px 100px 120px 100px 1fr;
+  --table-columns: 180px 180px 150px 100px 100px 120px 100px minmax(150px, 1fr);
 }
 
 .customerTable {
-  --table-columns: 320px 280px 120px 100px 100px 120px 150px 1fr;
+  --table-columns: 320px 280px 120px 100px 100px 120px 150px minmax(150px, 1fr);
 }
 
 .customerTableWithCompany {
-  --table-columns: 300px 240px 120px 140px 100px 100px 120px 120px 1fr;
+  --table-columns: 300px 240px 120px 140px 100px 100px 120px 120px minmax(150px, 1fr);
 }
 
 .taskTable {
-  --table-columns: 1fr 100px 90px 150px 150px 1fr;
+  --table-columns: minmax(200px, 1fr) 100px 90px 150px 150px minmax(150px, 1fr);
 }
 
 .taskTable .headerRow,

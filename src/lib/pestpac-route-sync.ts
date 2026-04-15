@@ -19,6 +19,8 @@ interface EnrichedStop {
   addressCity: string | null;
   addressState: string | null;
   addressZip: string | null;
+  lineItems?: any[] | null;
+  pestpacRawData?: any;
 }
 
 interface SyncParams {
@@ -324,6 +326,8 @@ export async function syncPestPacRoute({
               scheduled_arrival: stop.scheduledTime ?? null,
               customer_id: customerId,
               service_address_id: serviceAddressId,
+              line_items: stop.lineItems ?? null,
+              pestpac_raw_data: stop.pestpacRawData ?? null,
             },
             { onConflict: 'company_id,pestpac_stop_id' }
           );

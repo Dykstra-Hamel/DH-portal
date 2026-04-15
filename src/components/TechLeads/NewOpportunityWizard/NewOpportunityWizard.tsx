@@ -2160,9 +2160,8 @@ function StepReview({
 export function NewOpportunityWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const pestpacClientIdParam = searchParams.get('pestpacClientId');
-  const pestpacLocationIdParam = searchParams.get('pestpacLocationId');
-  const isFromRouteStop = searchParams.get('type') === 'upsell' && !!pestpacClientIdParam;
+  const routeStopIdParam = searchParams.get('routeStopId');
+  const isFromRouteStop = searchParams.get('type') === 'upsell' && !!routeStopIdParam;
   const { selectedCompany } = useCompany();
   const { setWizardTitle, setBackInterceptor } = useWizard();
 
@@ -2282,13 +2281,14 @@ export function NewOpportunityWizard() {
         'review',
       ];
     }
-    // Upsell: skip select-site when customer is pre-supplied from route stop
-    const steps: StepId[] = ['type-select', 'photos', 'ai-review'];
-    if (!isFromRouteStop) steps.push('select-site');
-    steps.push(isPestPacEnabled ? 'service-details' : 'service-plan-select');
-    steps.push('review', 'service-today-confirm');
-    return steps;
-  }, [leadType, isPestPacEnabled, isFromRouteStop]);
+    // Upsell: stop at ai-review (Refer To Sales); fuller flow preserved below for later
+    return ['type-select', 'photos', 'ai-review'];
+    // const steps: StepId[] = ['type-select', 'photos', 'ai-review'];
+    // if (!isFromRouteStop) steps.push('select-site');
+    // steps.push(isPestPacEnabled ? 'service-details' : 'service-plan-select');
+    // steps.push('review', 'service-today-confirm');
+    // return steps;
+  }, [leadType]);
 
   const currentStepId = wizardSteps[stepIndex];
   const draftKey = companyId ? `techleads_draft_${companyId}` : null;
@@ -2350,66 +2350,42 @@ export function NewOpportunityWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const triggerPestpacSync = useCallback(async () => {
-    if (!pestpacClientIdParam || !selectedCompany?.id) return;
+  const loadCustomerFromRouteStop = useCallback(async () => {
+    if (!routeStopIdParam || !selectedCompany?.id) return;
     setIsSyncingCustomer(true);
     setSyncError(null);
-
     try {
-      // Step 1: Fast path — look up by pestpac_client_id in local DB
-      const dbRes = await fetch(
-        `/api/customers/by-pestpac/${encodeURIComponent(pestpacClientIdParam)}?companyId=${selectedCompany.id}`
+      const res = await fetch(
+        `/api/field-map/route-stops/${routeStopIdParam}?companyId=${selectedCompany.id}`
       );
-      if (dbRes.ok) {
-        const data = await dbRes.json();
-        if (data.customer) {
-          setSelectedCustomer(data.customer);
-          addRecent(data.customer);
-          return;
-        }
-      }
-
-      // Step 2: Not in local DB — create via pestpac-sync using the location ID
-      if (!pestpacLocationIdParam) {
-        throw new Error('No location ID available for sync');
-      }
-      const syncRes = await fetch('/api/customers/pestpac-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          clientId: pestpacLocationIdParam, // location ID — correct for GET /Locations/{id}
-          companyId: selectedCompany.id,
-        }),
-      });
-      if (!syncRes.ok) throw new Error(`Sync failed (${syncRes.status})`);
-      const syncData = await syncRes.json();
-      if (syncData.customer) {
-        setSelectedCustomer(syncData.customer);
-        addRecent(syncData.customer);
+      if (!res.ok) throw new Error(`Failed to load stop (${res.status})`);
+      const data = await res.json();
+      if (data.customer) {
+        setSelectedCustomer(data.customer);
+        addRecent(data.customer);
       } else {
-        throw new Error(syncData.error ?? 'No customer returned');
+        throw new Error('No customer linked to this stop');
       }
     } catch {
       setSyncError('Failed to load customer data. Please retry.');
     } finally {
       setIsSyncingCustomer(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pestpacClientIdParam, pestpacLocationIdParam, selectedCompany?.id]);
+  }, [routeStopIdParam, selectedCompany?.id]);
 
   const handleSyncRetry = () => {
     isSyncFired.current = false;
     isSyncFired.current = true;
-    triggerPestpacSync();
+    loadCustomerFromRouteStop();
   };
 
-  // Pre-sync customer from route stop once selectedCompany is available
+  // Load customer from route stop once selectedCompany is available
   useEffect(() => {
-    if (!pestpacClientIdParam || !selectedCompany?.id || isSyncFired.current) return;
+    if (!routeStopIdParam || !selectedCompany?.id || isSyncFired.current) return;
     isSyncFired.current = true;
-    triggerPestpacSync();
+    loadCustomerFromRouteStop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pestpacClientIdParam, selectedCompany?.id]);
+  }, [routeStopIdParam, selectedCompany?.id]);
 
   // Auto-save draft whenever key state changes (skip at step 0 — nothing to save yet)
   useEffect(() => {
@@ -2693,6 +2669,7 @@ export function NewOpportunityWizard() {
         leadSource: 'technician',
         leadType: 'manual',
         serviceType: aiResult.service_category || undefined,
+        ...(routeStopIdParam ? { routeStopId: routeStopIdParam } : {}),
       };
 
       if (mode === 'schedule' || mode === 'service-today') {
@@ -3283,7 +3260,8 @@ export function NewOpportunityWizard() {
         {currentStepId !== 'type-select' &&
           currentStepId !== 'photos' &&
           currentStepId !== 'review' &&
-          currentStepId !== 'service-today-confirm' && (
+          currentStepId !== 'service-today-confirm' &&
+          !(currentStepId === 'ai-review' && leadType === 'upsell') && (
             <button
               className={styles.nextBtn}
               onClick={handleNext}
@@ -3299,6 +3277,23 @@ export function NewOpportunityWizard() {
               )}
             </button>
           )}
+
+        {currentStepId === 'ai-review' && leadType === 'upsell' && (
+          <button
+            className={styles.scheduleBtn}
+            onClick={() => handleSubmit('default')}
+            disabled={!canGoNext() || isSubmitting}
+          >
+            {isSubmitting ? (
+              <>
+                <span className={styles.spinner} />
+                Submitting…
+              </>
+            ) : (
+              <>Refer To Sales</>
+            )}
+          </button>
+        )}
 
         {currentStepId === 'review' && leadType === 'upsell' && (
           <div className={styles.reviewActions}>

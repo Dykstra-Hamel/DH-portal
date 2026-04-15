@@ -32,6 +32,15 @@ interface ServicePlan {
   price_per_unit: number | null;
   minimum_price: number | null;
   is_active: boolean;
+  variants?: Array<{
+    label: string;
+    initial_price?: number;
+    recurring_price?: number;
+    price_per_unit?: number;
+    minimum_price?: number;
+    billing_frequency?: string;
+    treatment_frequency?: string;
+  }>;
   pest_coverage?: Array<{
     pest_id: string;
     coverage_level: string;
@@ -338,6 +347,15 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     pricing_unit: null as 'sqft' | 'linear_feet' | 'acres' | null,
     price_per_unit: null as number | null,
     minimum_price: null as number | null,
+    variants: [] as Array<{
+      label: string;
+      initial_price?: number;
+      recurring_price?: number;
+      price_per_unit?: number;
+      minimum_price?: number;
+      billing_frequency?: string;
+      treatment_frequency?: string;
+    }>,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
     home_size_pricing: {
       pricing_mode: 'linear' as 'linear' | 'custom',
@@ -387,6 +405,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         pricing_unit: (plan as any).pricing_unit ?? null,
         price_per_unit: (plan as any).price_per_unit ?? null,
         minimum_price: (plan as any).minimum_price ?? null,
+        variants: (plan as any).variants ?? [],
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
           coverage_level: pc.coverage_level,
@@ -433,6 +452,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         pricing_unit: null,
         price_per_unit: null,
         minimum_price: null,
+        variants: [],
         pest_coverage: [],
         home_size_pricing: {
           pricing_mode: 'linear' as 'linear' | 'custom',
@@ -740,6 +760,13 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
             onClick={() => setActiveTab('pricing')}
           >
             Pricing
+          </button>
+          <button
+            type="button"
+            className={`${styles.tabButton} ${activeTab === 'variants' ? styles.active : ''}`}
+            onClick={() => setActiveTab('variants')}
+          >
+            Variants
           </button>
         </div>
 
@@ -1515,6 +1542,176 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   </div>
                 </label>
               </div>
+
+            </div>
+          )}
+
+          {activeTab === 'variants' && (
+            <div className={styles.tabContent}>
+              <h4>Plan Variants (Optional)</h4>
+              <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
+                Variants let sales reps choose a named option (e.g. &quot;Bi-Monthly&quot;, &quot;Quarterly&quot;) with different pricing or frequency when building a quote. Leave any field blank to inherit the plan&apos;s default.
+              </p>
+
+              {formData.variants.map((variant, index) => (
+                <div key={index} className={styles.pricingSection} style={{ position: 'relative', paddingTop: '16px' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updated = formData.variants.filter((_, i) => i !== index);
+                      handleInputChange('variants', updated);
+                    }}
+                    className={styles.removeButton}
+                    style={{ position: 'absolute', top: '12px', right: '0' }}
+                  >
+                    ✕
+                  </button>
+
+                  <div className={styles.formGroup}>
+                    <label>Variant Name *</label>
+                    <input
+                      type="text"
+                      value={variant.label}
+                      onChange={(e) => {
+                        const updated = [...formData.variants];
+                        updated[index] = { ...updated[index], label: e.target.value };
+                        handleInputChange('variants', updated);
+                      }}
+                      placeholder="e.g. Bi-Monthly, Quarterly"
+                      required
+                    />
+                  </div>
+
+                  <h5 style={{ marginBottom: '12px', color: '#374151' }}>Price Overrides</h5>
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>Leave blank to use plan default.</p>
+
+                  <div className={styles.formRow}>
+                    {!formData.pricing_unit && (
+                      <div className={styles.formGroup}>
+                        <label>Initial Price ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variant.initial_price ?? ''}
+                          onChange={(e) => {
+                            const updated = [...formData.variants];
+                            updated[index] = { ...updated[index], initial_price: e.target.value === '' ? undefined : parseFloat(e.target.value) };
+                            handleInputChange('variants', updated);
+                          }}
+                          placeholder="Plan default"
+                        />
+                      </div>
+                    )}
+
+                    {formData.plan_category !== 'one-time' && !formData.pricing_unit && (
+                      <div className={styles.formGroup}>
+                        <label>Recurring Price ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variant.recurring_price ?? ''}
+                          onChange={(e) => {
+                            const updated = [...formData.variants];
+                            updated[index] = { ...updated[index], recurring_price: e.target.value === '' ? undefined : parseFloat(e.target.value) };
+                            handleInputChange('variants', updated);
+                          }}
+                          placeholder="Plan default"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className={styles.formRow}>
+                    {formData.pricing_unit && (
+                      <div className={styles.formGroup}>
+                        <label>Price Per Unit ($)</label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={variant.price_per_unit ?? ''}
+                          onChange={(e) => {
+                            const updated = [...formData.variants];
+                            updated[index] = { ...updated[index], price_per_unit: e.target.value === '' ? undefined : parseFloat(e.target.value) };
+                            handleInputChange('variants', updated);
+                          }}
+                          placeholder="Plan default"
+                        />
+                      </div>
+                    )}
+
+                    <div className={styles.formGroup}>
+                      <label>Minimum Price ($)</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={variant.minimum_price ?? ''}
+                        onChange={(e) => {
+                          const updated = [...formData.variants];
+                          updated[index] = { ...updated[index], minimum_price: e.target.value === '' ? undefined : parseFloat(e.target.value) };
+                          handleInputChange('variants', updated);
+                        }}
+                        placeholder="Plan default"
+                      />
+                    </div>
+                  </div>
+
+                  {formData.plan_category !== 'one-time' && (
+                    <>
+                      <h5 style={{ marginBottom: '12px', marginTop: '16px', color: '#374151' }}>Frequency Overrides</h5>
+                      <p style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>Leave blank to use plan default.</p>
+
+                      <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
+                          <label>Billing Frequency</label>
+                          <select
+                            value={variant.billing_frequency ?? ''}
+                            onChange={(e) => {
+                              const updated = [...formData.variants];
+                              updated[index] = { ...updated[index], billing_frequency: e.target.value || undefined };
+                              handleInputChange('variants', updated);
+                            }}
+                          >
+                            <option value="">Plan default</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                            <option value="semi-annually">Semi-Annually</option>
+                            <option value="annually">Annually</option>
+                          </select>
+                        </div>
+
+                        <div className={styles.formGroup}>
+                          <label>Treatment Frequency</label>
+                          <select
+                            value={variant.treatment_frequency ?? ''}
+                            onChange={(e) => {
+                              const updated = [...formData.variants];
+                              updated[index] = { ...updated[index], treatment_frequency: e.target.value || undefined };
+                              handleInputChange('variants', updated);
+                            }}
+                          >
+                            <option value="">Plan default</option>
+                            <option value="monthly">Monthly</option>
+                            <option value="bi-monthly">Bi-Monthly</option>
+                            <option value="quarterly">Quarterly</option>
+                          </select>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={() => handleInputChange('variants', [...formData.variants, { label: '' }])}
+                className={styles.addButton}
+              >
+                + Add Variant
+              </button>
             </div>
           )}
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { parseTimeOptions } from '@/lib/time-options';
 
 export async function GET(
   _request: NextRequest,
@@ -31,7 +32,7 @@ export async function GET(
         .from('company_settings')
         .select('setting_key, setting_value')
         .eq('company_id', id)
-        .in('setting_key', ['quote_accent_color_preference', 'quote_terms']),
+        .in('setting_key', ['quote_accent_color_preference', 'quote_terms', 'requested_time_options']),
     ]);
 
     if (companyResult.error || !companyResult.data) {
@@ -62,6 +63,7 @@ export async function GET(
       company_email: company.email ?? null,
       quote_terms: quoteTerms,
       quote_accent_color_preference: accentPref,
+      time_options: parseTimeOptions(settingsMap['requested_time_options'] ?? null),
     });
   } catch (error) {
     console.error('Error fetching field-map branding:', error);

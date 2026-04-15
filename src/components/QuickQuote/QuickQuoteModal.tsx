@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { TimeOption, DEFAULT_TIME_OPTIONS, parseTimeOptions } from '@/lib/time-options';
 import { ArrowLeft, X, Check } from 'lucide-react';
 import { useCompanyRole } from '@/hooks/useCompanyRole';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
@@ -118,6 +119,7 @@ export default function QuickQuoteModal({
   const [step1Tips, setStep1Tips] = useState<string[]>([]);
   const [step2Script, setStep2Script] = useState('');
   const [step3Script, setStep3Script] = useState('');
+  const [timeOptions, setTimeOptions] = useState<TimeOption[]>(DEFAULT_TIME_OPTIONS);
 
   const DEFAULT_STEP1_SCRIPT = `\u201cThank you for calling ${companyName || 'us'} today! My name is [Your Name] and I\u2019d be happy to help you get a quote. Can I start by asking \u2014 what kind of pest issue are you dealing with?\u201d`;
   const DEFAULT_STEP1_TIPS = [
@@ -146,6 +148,7 @@ export default function QuickQuoteModal({
         setStep1Tips(t1 ? t1.split('\n').map((l: string) => l.trim()).filter(Boolean) : DEFAULT_STEP1_TIPS);
         setStep2Script(s2 || DEFAULT_STEP2_SCRIPT);
         setStep3Script(s3 || DEFAULT_STEP3_SCRIPT);
+        setTimeOptions(parseTimeOptions(settings?.requested_time_options?.value));
       } catch {
         setStep1Script(DEFAULT_STEP1_SCRIPT);
         setStep1Tips(DEFAULT_STEP1_TIPS);
@@ -607,6 +610,7 @@ export default function QuickQuoteModal({
               isSubmitting={isSubmitting}
               submitError={submitError}
               hasSchedulingPermission={hasSchedulingPermission}
+              timeOptions={timeOptions}
             />
           )}
         </div>

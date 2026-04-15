@@ -535,7 +535,7 @@
 .planHeaderDivider {
   font-size: 16px;
   font-weight: 400;
-  color: #9ca3af;
+  color: var(--gray-400);
 
   @media (max-width: 490px) {
     font-size: 14px;
@@ -1074,7 +1074,7 @@
 
 .originalPrice {
   text-decoration: line-through;
-  color: #9ca3af;
+  color: var(--gray-400);
   font-size: 14px;
 }
 
@@ -1134,6 +1134,8 @@
 
   .totalItemPriceAmount {
     font-weight: 600;
+    color: var(--gray-400);
+    font-size: 14px;
   }
 
   .totalItemPriceFreq {
@@ -1192,7 +1194,7 @@
 }
 
 .totalItemUnselected {
-  color: #9ca3af;
+  color: var(--gray-400);
 }
 
 .totalItemLeft {
@@ -1217,7 +1219,7 @@
 .totalItemPriceRecurring {
   font-size: 14px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--gray-400);
   white-space: nowrap;
 }
 
@@ -1228,7 +1230,7 @@
     font-size: 14px;
     font-weight: 600;
     line-height: 18px;
-    color: #9ca3af;
+    color: var(--gray-400);
   }
 }
 
@@ -1237,14 +1239,14 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 18px;
-    color: #9ca3af;
+    color: var(--gray-400);
   }
 }
 
 .totalItemPriceInitial {
   font-size: 14px;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--gray-400);
   white-space: nowrap;
 
   &::before {
@@ -1553,7 +1555,7 @@
 }
 
 .originalPriceText {
-  color: #9ca3af;
+  color: var(--gray-400);
   text-decoration: line-through;
   font-size: 16px;
 }
@@ -2792,7 +2794,7 @@
   }
 
   &:disabled {
-    background: #9ca3af;
+    background: var(--gray-400);
     cursor: not-allowed;
   }
 }

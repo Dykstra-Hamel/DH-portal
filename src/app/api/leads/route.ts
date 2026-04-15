@@ -375,6 +375,7 @@ export async function POST(request: NextRequest) {
       photoUrls,
       mapPlotData,
       branchId,
+      routeStopId,
     } = body;
 
     // Mutable assignment variables — may be updated by auto-assignment logic below
@@ -628,6 +629,16 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create lead' },
         { status: 500 }
       );
+    }
+
+    // Mark route stop as referred to sales when submitted from a technician's route
+    if (routeStopId) {
+      const adminSupabase = createAdminClient();
+      await adminSupabase
+        .from('route_stops')
+        .update({ referred_to_sales: true })
+        .eq('id', routeStopId)
+        .eq('company_id', companyId);
     }
 
     // Log lead creation activity

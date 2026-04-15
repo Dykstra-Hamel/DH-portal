@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Lead } from '@/types/lead';
+import { TimeOption, DEFAULT_TIME_OPTIONS, parseTimeOptions } from '@/lib/time-options';
 import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
 import { useUser } from '@/hooks/useUser';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
@@ -98,6 +99,7 @@ export function LeadStepContent({
 
   const [preferredDate, setPreferredDate] = useState<string>('');
   const [preferredTime, setPreferredTime] = useState<string>('');
+  const [timeOptions, setTimeOptions] = useState<TimeOption[]>(DEFAULT_TIME_OPTIONS);
 
   // Contact Log activity state
   const [activityNotes, setActivityNotes] = useState<string>('');
@@ -229,6 +231,13 @@ export function LeadStepContent({
   useEffect(() => {
     authenticatedFetch(`/api/companies/${lead.company_id}/sales-cadences`)
       .then(result => setAvailableCadences((result.data || []).filter((c: any) => c.is_active)))
+      .catch(() => {});
+  }, [lead.company_id]);
+
+  // Fetch company time options (non-fatal)
+  useEffect(() => {
+    authenticatedFetch(`/api/companies/${lead.company_id}/settings`)
+      .then(result => setTimeOptions(parseTimeOptions(result.settings?.requested_time_options?.value)))
       .catch(() => {});
   }, [lead.company_id]);
 
@@ -762,6 +771,7 @@ export function LeadStepContent({
                     onFinalizeSale={handleFinalizeSale}
                     onEmailQuote={handleEmailQuote}
                     isSidebarExpanded={isSidebarExpanded}
+                    timeOptions={timeOptions}
                   />
                 </div>
                 <div ref={quotingSectionRef}>
@@ -799,6 +809,7 @@ export function LeadStepContent({
                     isSidebarExpanded={isSidebarExpanded}
                     startExpanded={false}
                     forceCollapse={true}
+                    timeOptions={timeOptions}
                   />
                 </div>
               </>
@@ -837,6 +848,7 @@ export function LeadStepContent({
                     onNotInterested={onNotInterested || (() => {})}
                     onReadyToSchedule={onReadyToSchedule || (() => {})}
                     isSidebarExpanded={isSidebarExpanded}
+                    timeOptions={timeOptions}
                   />
                 </div>
                 <div ref={schedulingSectionRef}>
@@ -854,6 +866,7 @@ export function LeadStepContent({
                     onFinalizeSale={handleFinalizeSale}
                     onEmailQuote={handleEmailQuote}
                     isSidebarExpanded={isSidebarExpanded}
+                    timeOptions={timeOptions}
                   />
                 </div>
               </>

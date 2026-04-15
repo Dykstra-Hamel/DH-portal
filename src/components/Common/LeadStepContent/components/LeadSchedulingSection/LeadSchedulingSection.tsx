@@ -7,6 +7,7 @@ import { CalendarCheck } from 'lucide-react';
 import { useActiveSection } from '@/contexts/ActiveSectionContext';
 import { useUser } from '@/hooks/useUser';
 import { LeadSchedulingSectionProps } from '../../types/leadStepTypes';
+import { DEFAULT_TIME_OPTIONS } from '@/lib/time-options';
 import styles from './LeadSchedulingSection.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
@@ -34,6 +35,7 @@ export function LeadSchedulingSection({
   onFinalizeSale,
   onEmailQuote,
   isSidebarExpanded,
+  timeOptions,
 }: LeadSchedulingSectionProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   const { user } = useUser();
@@ -107,22 +109,12 @@ export function LeadSchedulingSection({
               <span className={styles.preferenceLabel}>Customer Preference:</span>
               {lead.requested_date && (
                 <span className={styles.preferenceValue}>
-                  {new Date(lead.requested_date + 'T00:00:00').toLocaleDateString(undefined, {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+                  {lead.requested_date.charAt(0).toUpperCase() + lead.requested_date.slice(1)}
                 </span>
               )}
               {lead.requested_time && (
                 <span className={styles.preferenceValue}>
-                  {lead.requested_time === 'morning'
-                    ? 'Morning (8am–12pm)'
-                    : lead.requested_time === 'afternoon'
-                      ? 'Afternoon (12pm–5pm)'
-                      : lead.requested_time === 'evening'
-                        ? 'Evening (5pm–8pm)'
-                        : lead.requested_time}
+                  {(timeOptions || DEFAULT_TIME_OPTIONS).find(o => o.value === lead.requested_time)?.label ?? lead.requested_time}
                 </span>
               )}
             </div>

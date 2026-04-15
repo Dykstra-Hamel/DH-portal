@@ -97,6 +97,12 @@ export async function PUT(
         eligibility_mode: body.eligibility_mode,
         is_active: body.is_active !== undefined ? body.is_active : true,
         requires_quote: body.requires_quote || false,
+        pricing_type: body.pricing_type || 'flat',
+        price_per_unit: body.price_per_unit ?? null,
+        additional_unit_price: body.additional_unit_price ?? null,
+        minimum_price: body.minimum_price ?? null,
+        variants: body.variants || [],
+        percentage_pricing: body.percentage_pricing || null,
       })
       .eq('id', addonId)
       .eq('company_id', companyId)
