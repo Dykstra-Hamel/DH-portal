@@ -373,15 +373,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
     // After Address step (new inspection only) — validate customer name
     if (currentStep === 0 && !stopId) {
-      if (!clientName.trim()) {
-        setStepSaveError('Customer name is required before continuing.');
-        return;
-      }
-    }
-
-    // After Address step (new inspection only) — validate customer name
-    if (currentStep === 0 && !stopId) {
-      if (!clientName.trim()) {
+      if (!clientInfo.name.trim()) {
         setStepSaveError('Customer name is required before continuing.');
         return;
       }
