@@ -96,7 +96,7 @@ export async function GET(
         ? `${(task.profiles as any).first_name ?? ''} ${(task.profiles as any).last_name ?? ''}`.trim() || null
         : null,
       task_assignee_email: task?.profiles ? (task.profiles as any).email ?? null : null,
-      task_assignee_avatar_url: task?.profiles ? (task.profiles as any).uploaded_avatar_url || (task.profiles as any).avatar_url ?? null : null,
+      task_assignee_avatar_url: task?.profiles ? ((task.profiles as any).uploaded_avatar_url || (task.profiles as any).avatar_url) ?? null : null,
       social_media_task_id: (piece as any).social_media_task_id ?? null,
       social_media_task_title: socialTask?.title ?? null,
       social_media_task_is_completed: socialTask?.is_completed ?? null,
@@ -106,7 +106,7 @@ export async function GET(
         ? `${(socialTask.profiles as any).first_name ?? ''} ${(socialTask.profiles as any).last_name ?? ''}`.trim() || null
         : null,
       social_media_task_assignee_email: socialTask?.profiles ? (socialTask.profiles as any).email ?? null : null,
-      social_media_task_assignee_avatar_url: socialTask?.profiles ? (socialTask.profiles as any).uploaded_avatar_url || (socialTask.profiles as any).avatar_url ?? null : null,
+      social_media_task_assignee_avatar_url: socialTask?.profiles ? ((socialTask.profiles as any).uploaded_avatar_url || (socialTask.profiles as any).avatar_url) ?? null : null,
     };
 
     return NextResponse.json({ contentPiece: result });

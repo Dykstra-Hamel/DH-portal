@@ -6,6 +6,7 @@ import {
   CircleAlert,
   Droplets,
   EyeOff,
+  SquareDashed,
   TrendingDown,
   TreePine,
 } from 'lucide-react';
@@ -241,13 +242,7 @@ export function MapStampGlyph({ type, size = 16 }: { type: MapStampType; size?: 
         </svg>
       );
     case 'yard':
-      return (
-        <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path d="M12 2C9 2 6.5 4.5 6.5 7.5C6.5 9.5 7.5 11.2 9 12.2V14H7V16H9V22H11V16H13V22H15V16H17V14H15V12.2C16.5 11.2 17.5 9.5 17.5 7.5C17.5 4.5 15 2 12 2Z" fill="currentColor"/>
-          <path d="M3 18C3 16.3 4.3 15 6 15H7V17H6C5.4 17 5 17.4 5 18V22H3V18Z" fill="currentColor"/>
-          <path d="M21 18C21 16.3 19.7 15 18 15H17V17H18C18.6 17 19 17.4 19 18V22H21V18Z" fill="currentColor"/>
-        </svg>
-      );
+      return <SquareDashed size={size} aria-hidden="true" />;
     case 'water':
       return (
         <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 34" fill="none" aria-hidden="true">

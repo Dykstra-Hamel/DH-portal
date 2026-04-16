@@ -124,6 +124,7 @@ export interface Ticket {
     last_name?: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   customer?: {
     id: string;

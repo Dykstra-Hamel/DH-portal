@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
           ? `${(task.profiles as any).first_name ?? ''} ${(task.profiles as any).last_name ?? ''}`.trim() || null
           : null,
         task_assignee_email: task?.profiles ? (task.profiles as any).email ?? null : null,
-        task_assignee_avatar_url: task?.profiles ? (task.profiles as any).uploaded_avatar_url || (task.profiles as any).avatar_url ?? null : null,
+        task_assignee_avatar_url: task?.profiles ? ((task.profiles as any).uploaded_avatar_url || (task.profiles as any).avatar_url) ?? null : null,
         social_media_task_id: (piece as any).social_media_task_id ?? null,
         social_media_task_is_completed: socialTask?.is_completed ?? null,
         social_media_task_due_date: socialTask?.due_date ?? null,
@@ -199,7 +199,7 @@ export async function GET(request: NextRequest) {
           ? `${(socialTask.profiles as any).first_name ?? ''} ${(socialTask.profiles as any).last_name ?? ''}`.trim() || null
           : null,
         social_media_task_assignee_email: socialTask?.profiles ? (socialTask.profiles as any).email ?? null : null,
-        social_media_task_assignee_avatar_url: socialTask?.profiles ? (socialTask.profiles as any).uploaded_avatar_url || (socialTask.profiles as any).avatar_url ?? null : null,
+        social_media_task_assignee_avatar_url: socialTask?.profiles ? ((socialTask.profiles as any).uploaded_avatar_url || (socialTask.profiles as any).avatar_url) ?? null : null,
       });
     }
 

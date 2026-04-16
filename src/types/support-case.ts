@@ -103,6 +103,7 @@ export interface SupportCase {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   company?: {
     id: string;

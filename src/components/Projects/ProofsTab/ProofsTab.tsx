@@ -29,6 +29,7 @@ interface MentionUser {
   last_name: string | null;
   email: string | null;
   avatar_url: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 const PROOF_ALLOWED_TYPES = [
@@ -830,7 +831,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                                 firstName={item.user_profile?.first_name || undefined}
                                 lastName={item.user_profile?.last_name || undefined}
                                 email=""
-                                avatarUrl={item.user_profile?.uploaded_avatar_url || item.user_profile?.avatar_url ?? null}
+                                avatarUrl={(item.user_profile?.uploaded_avatar_url || item.user_profile?.avatar_url) ?? null}
                                 size="small"
                                 showTooltip={false}
                                 className={styles.feedbackAvatar}

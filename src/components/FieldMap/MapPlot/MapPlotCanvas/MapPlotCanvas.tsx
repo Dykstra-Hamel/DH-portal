@@ -630,9 +630,23 @@ function StepMapPlot({
 
     return {
       stamps: stamps.map(stamp => {
-        if (!Number.isFinite(stamp.lat) || !Number.isFinite(stamp.lng)) return stamp;
-        const projected = getNormalizedPointFromLatLng(stamp.lat as number, stamp.lng as number, map, headingOverride);
-        return projected ? { ...stamp, x: projected.x, y: projected.y } : stamp;
+        let stampLat = stamp.lat;
+        let stampLng = stamp.lng;
+
+        // Stamp was created in blank-grid mode — no geo coords yet.
+        // Convert current x/y to lat/lng using the live satellite projection so
+        // all future pan/zoom reprojections can anchor it correctly.
+        if (!Number.isFinite(stampLat) || !Number.isFinite(stampLng)) {
+          const geo = getLatLngFromNormalizedPoint({ x: stamp.x, y: stamp.y }, map);
+          if (!geo) return stamp; // projection not ready yet, leave unchanged
+          stampLat = geo.lat;
+          stampLng = geo.lng;
+        }
+
+        const projected = getNormalizedPointFromLatLng(stampLat as number, stampLng as number, map, headingOverride);
+        return projected
+          ? { ...stamp, lat: stampLat, lng: stampLng, x: projected.x, y: projected.y }
+          : { ...stamp, lat: stampLat, lng: stampLng };
       }),
       outlines: outlines.map(outline => ({
         ...outline,
@@ -643,7 +657,7 @@ function StepMapPlot({
         }),
       })),
     };
-  }, [getNormalizedPointFromLatLng, googleMapInstance, isSatelliteMode]);
+  }, [getLatLngFromNormalizedPoint, getNormalizedPointFromLatLng, googleMapInstance, isSatelliteMode]);
 
   const getOutlineMetrics = useCallback((outline: MapElementOutline) => {
     const option = MAP_ELEMENT_STAMP_OPTIONS.find(element => element.type === outline.type) ?? MAP_ELEMENT_STAMP_OPTIONS[0];

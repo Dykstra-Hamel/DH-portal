@@ -1457,7 +1457,7 @@ function TicketsDashboardContent() {
                   duration_seconds, phone_number, from_number
                 ),
                 reviewed_by_profile:profiles!reviewed_by(
-                  id, first_name, last_name, email, avatar_url
+                  id, first_name, last_name, email, avatar_url, uploaded_avatar_url
                 )
               `
               )
@@ -1515,7 +1515,7 @@ function TicketsDashboardContent() {
                   duration_seconds, phone_number, from_number
                 ),
                 reviewed_by_profile:profiles!reviewed_by(
-                  id, first_name, last_name, email, avatar_url
+                  id, first_name, last_name, email, avatar_url, uploaded_avatar_url
                 )
               `
               )
@@ -1604,7 +1604,7 @@ function TicketsDashboardContent() {
                   duration_seconds, phone_number, from_number
                 ),
                 reviewed_by_profile:profiles!reviewed_by(
-                  id, first_name, last_name, email, avatar_url
+                  id, first_name, last_name, email, avatar_url, uploaded_avatar_url
                 )
               `
               )

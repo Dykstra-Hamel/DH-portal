@@ -46,6 +46,7 @@ interface MentionUser {
   last_name?: string | null;
   email?: string | null;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 interface ProjectTaskDetailProps {

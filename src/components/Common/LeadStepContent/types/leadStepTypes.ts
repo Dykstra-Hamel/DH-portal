@@ -24,6 +24,7 @@ export interface AssignableUser {
   email: string;
   display_name: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
   departments: string[];
 }
 

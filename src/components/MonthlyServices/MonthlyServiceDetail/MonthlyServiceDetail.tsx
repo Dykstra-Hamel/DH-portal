@@ -94,6 +94,7 @@ interface Profile {
   last_name?: string;
   email: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 interface TaskTemplate {
@@ -154,6 +155,7 @@ interface MonthlyServiceComment {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   attachments?: CommentAttachment[];
   reactions?: CommentReaction[];

@@ -150,6 +150,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
     departments?: string[];
   };
   scheduler_user?: {
@@ -158,6 +159,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   submitted_user?: {
     id: string;
@@ -165,6 +167,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   campaign?: {
     id: string;
