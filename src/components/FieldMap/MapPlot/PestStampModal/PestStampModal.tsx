@@ -292,9 +292,11 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
     setPhotoUrls(prev => prev.filter(u => u !== url));
   }
 
-  const canSave = true;
+  const canSave = !isCondition || photoUrls.length > 0;
 
   const isBusy = uploading || aiAnalyzing;
+  // For conducive conditions: gate the dropdown + notes until a photo has been uploaded and AI analysis is complete
+  const conditionReady = isOtherCondition ? (photoUrls.length > 0 && !aiAnalyzing) : true;
 
   const sheetRef = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -331,9 +333,11 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
               {isCondition ? 'Conducive Condition' : `${displayLabel} Finding`}
             </h3>
             <p className={styles.subtitle}>
-              {isCondition
-                ? 'Add notes and photos for this conducive condition'
-                : 'Add notes and photos for this pest location'}
+              {isOtherCondition
+                ? (conditionReady ? 'Add notes and photos for this conducive condition' : 'Upload a photo to get started')
+                : isCondition
+                  ? 'Add notes and photos for this conducive condition'
+                  : 'Add notes and photos for this pest location'}
             </p>
           </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Close">
@@ -343,8 +347,8 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
           </button>
         </div>
 
-        {/* Condition dropdown (required for all condition stamps) */}
-        {isOtherCondition && (
+        {/* Condition dropdown (shown only after photo uploaded + AI done) */}
+        {isOtherCondition && conditionReady && (
           <div className={styles.field}>
             <div className={styles.fieldLabelRow}>
               <span className={styles.fieldLabel}>
@@ -495,35 +499,37 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
           </div>
         )}
 
-        {/* Notes */}
-        <div className={styles.field}>
-          <div className={styles.fieldLabelRow}>
-            <label className={styles.fieldLabel} htmlFor={`pest-notes-${stamp.id}`}>
-              {isCondition ? 'Additional Notes' : 'Description'}
-            </label>
-            {hasSpeechSupport && (
-              <button
-                type="button"
-                className={`${styles.dictateBtn} ${isDictating ? styles.dictateBtnActive : ''}`}
-                onClick={() => isDictating ? stopDictation() : startDictation(text => setNotes(prev => prev ? `${prev} ${text}` : text))}
-                aria-label={isDictating ? 'Stop dictation' : 'Dictate notes'}
-              >
-                {isDictating ? <MicOff size={13} /> : <Mic size={13} />}
-                {isDictating ? 'Stop' : 'Dictate'}
-              </button>
-            )}
+        {/* Notes (for conditions: only shown after photo uploaded + AI done) */}
+        {(!isOtherCondition || conditionReady) && (
+          <div className={styles.field}>
+            <div className={styles.fieldLabelRow}>
+              <label className={styles.fieldLabel} htmlFor={`pest-notes-${stamp.id}`}>
+                {isCondition ? 'Additional Notes' : 'Description'}
+              </label>
+              {hasSpeechSupport && (
+                <button
+                  type="button"
+                  className={`${styles.dictateBtn} ${isDictating ? styles.dictateBtnActive : ''}`}
+                  onClick={() => isDictating ? stopDictation() : startDictation(text => setNotes(prev => prev ? `${prev} ${text}` : text))}
+                  aria-label={isDictating ? 'Stop dictation' : 'Dictate notes'}
+                >
+                  {isDictating ? <MicOff size={13} /> : <Mic size={13} />}
+                  {isDictating ? 'Stop' : 'Dictate'}
+                </button>
+              )}
+            </div>
+            <textarea
+              id={`pest-notes-${stamp.id}`}
+              className={styles.textarea}
+              value={notes}
+              onChange={e => setNotes(e.target.value)}
+              placeholder={isCondition
+                ? 'Any additional observations...'
+                : 'Describe the finding — severity, location details, activity observed...'}
+              rows={3}
+            />
           </div>
-          <textarea
-            id={`pest-notes-${stamp.id}`}
-            className={styles.textarea}
-            value={notes}
-            onChange={e => setNotes(e.target.value)}
-            placeholder={isCondition
-              ? 'Any additional observations...'
-              : 'Describe the finding — severity, location details, activity observed...'}
-            rows={3}
-          />
-        </div>
+        )}
 
         {/* Photos */}
         <div className={styles.field}>
@@ -577,33 +583,6 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
                 disabled={uploading}
               />
             </label>
-            <label
-              className={`${styles.photoActionBtn} ${uploading ? styles.photoActionBtnDisabled : ''}`}
-            >
-              {uploading ? (
-                <>
-                  <span className={styles.spinner} />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                    <rect x="3" y="3" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2" />
-                    <circle cx="8.5" cy="8.5" r="1.5" stroke="currentColor" strokeWidth="2" />
-                    <polyline points="21 15 16 10 5 21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Upload image
-                </>
-              )}
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                className={styles.actionInput}
-                onChange={handleUploadChange}
-                disabled={uploading}
-              />
-            </label>
           </div>
         </div>
 
@@ -619,6 +598,7 @@ export function PestStampModal({ stamp, companyId, iconSvg, onSave, onDelete, on
           <button
             type="button"
             className={styles.saveBtn}
+            disabled={!canSave}
             onClick={() => {
               if (isOtherCondition && !customConditionText.trim()) {
                 setConditionError(true);
