@@ -92,7 +92,7 @@ export async function GET(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
@@ -116,7 +116,7 @@ export async function GET(
     if (lead.assigned_scheduler) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', lead.assigned_scheduler)
         .single();
 
@@ -130,7 +130,7 @@ export async function GET(
     if (lead.submitted_by) {
       const { data: submittedProfileData, error: submittedProfileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', lead.submitted_by)
         .single();
 
@@ -397,7 +397,7 @@ export async function PUT(
     if (lead.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', lead.assigned_to)
         .single();
 
@@ -421,7 +421,7 @@ export async function PUT(
     if (lead.assigned_scheduler) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', lead.assigned_scheduler)
         .single();
 
@@ -435,7 +435,7 @@ export async function PUT(
     if (lead.submitted_by) {
       const { data: submittedProfileData, error: submittedProfileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', lead.submitted_by)
         .single();
 

@@ -655,7 +655,7 @@ export function ReviewStep({
           <button
             type="button"
             className={styles.successBtn}
-            onClick={() => router.push('/field-ops/dashboard')}
+            onClick={() => router.push('/field-sales/dashboard')}
           >
             Back to Route
           </button>
@@ -705,7 +705,7 @@ export function ReviewStep({
           <button
             type="button"
             className={styles.successBtn}
-            onClick={() => router.push('/field-ops/dashboard')}
+            onClick={() => router.push('/field-sales/dashboard')}
           >
             Back to Route
           </button>

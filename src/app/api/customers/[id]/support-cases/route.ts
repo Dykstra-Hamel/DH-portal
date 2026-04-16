@@ -92,7 +92,7 @@ export async function GET(
     if (assignedUserIds.length > 0) {
       const { data: profilesData } = await supabase
         .from('profiles')
-        .select('id, email, first_name, last_name, avatar_url')
+        .select('id, email, first_name, last_name, avatar_url, uploaded_avatar_url')
         .in('id', assignedUserIds);
 
       if (profilesData) {

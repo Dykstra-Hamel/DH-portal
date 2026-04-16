@@ -117,13 +117,14 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
         currentUser.email ||
         'Unknown',
       email: currentUser.email || '',
-      avatar: currentProfile.avatar_url || undefined,
+      avatar: currentProfile.uploaded_avatar_url || currentProfile.avatar_url || undefined,
     };
   }, [
     currentUser?.id,
     currentUser?.email,
     currentProfile?.first_name,
     currentProfile?.last_name,
+    currentProfile?.uploaded_avatar_url,
     currentProfile?.avatar_url,
   ]);
 
@@ -634,7 +635,7 @@ function LeadDetailPageContent({ params }: LeadPageProps) {
                   if (userIds.length > 0) {
                     const { data: profiles } = await supabase
                       .from('profiles')
-                      .select('id, email, first_name, last_name, avatar_url')
+                      .select('id, email, first_name, last_name, avatar_url, uploaded_avatar_url')
                       .in('id', userIds);
 
                     if (profiles) {

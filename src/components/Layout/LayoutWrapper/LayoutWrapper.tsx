@@ -46,12 +46,12 @@ function LayoutContent({ children }: LayoutWrapperProps) {
 
   const isTechLeadsPage = pathname.startsWith('/tech-leads');
   const isFieldMapPage = pathname.startsWith('/field-map');
-  const isFieldOpsPage = pathname.startsWith('/field-ops');
-  const isAppShellPage = isTechLeadsPage || isFieldMapPage || isFieldOpsPage;
+  const isFieldSalesPage = pathname.startsWith('/field-sales');
+  const isAppShellPage = isTechLeadsPage || isFieldMapPage || isFieldSalesPage;
   const hideSecondarySidebar = isTechLeadsPage || isFieldMapPage;
   const isFieldMapWizardPage = Boolean(
     pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
-    pathname.match(/^\/field-ops\/field-map\/service\/[^\/]+\/wizard$/)
+    pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/)
   );
 
   // Pages that should have the full layout (header + sidebar)
@@ -550,7 +550,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
         }
         if (
           pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
-          pathname.match(/^\/field-ops\/field-map\/service\/[^\/]+\/wizard$/)
+          pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/)
         ) {
           return null;
         }

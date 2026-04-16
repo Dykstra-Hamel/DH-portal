@@ -78,7 +78,7 @@ export function UserSelector({
                 firstName={selectedUser.first_name}
                 lastName={selectedUser.last_name}
                 email={selectedUser.email}
-                avatarUrl={selectedUser.avatar_url}
+                avatarUrl={selectedUser.uploaded_avatar_url || selectedUser.avatar_url}
                 size="small"
               />
               <span className={styles.userName}>{selectedUser.display_name}</span>
@@ -116,7 +116,7 @@ export function UserSelector({
                     firstName={user.first_name}
                     lastName={user.last_name}
                     email={user.email}
-                    avatarUrl={user.avatar_url}
+                    avatarUrl={user.uploaded_avatar_url || user.avatar_url}
                     size="small"
                   />
                   <div className={styles.userInfo}>

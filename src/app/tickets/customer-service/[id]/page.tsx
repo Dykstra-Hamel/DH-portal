@@ -67,7 +67,7 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
       id: currentUser.id,
       name: `${currentProfile.first_name || ''} ${currentProfile.last_name || ''}`.trim() || currentProfile.email || 'Unknown',
       email: currentProfile.email || currentUser.email || '',
-      avatar: currentProfile.avatar_url || undefined,
+      avatar: currentProfile.uploaded_avatar_url || currentProfile.avatar_url || undefined,
     };
   }, [currentUser, currentProfile]);
 

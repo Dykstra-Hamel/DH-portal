@@ -325,6 +325,7 @@ export function ActivityFeed({
                 lastName={activity.user?.last_name || undefined}
                 email={activity.user?.email || 'System'}
                 avatarUrl={activity.user?.avatar_url || null}
+                uploadedAvatarUrl={activity.user?.uploaded_avatar_url || null}
                 size="small"
                 showTooltip={true}
                 className={styles.activityAvatar}

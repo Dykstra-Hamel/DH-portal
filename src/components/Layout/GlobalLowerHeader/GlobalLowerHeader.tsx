@@ -17,6 +17,7 @@ interface AssignableUser {
   last_name?: string;
   display_name: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
   departments: string[];
 }
 
@@ -26,6 +27,7 @@ interface AssignedUser {
   first_name?: string;
   last_name?: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 interface BranchOption {
@@ -278,7 +280,7 @@ export function GlobalLowerHeader({
           `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() ||
           'Unknown',
         subtitle: assignedUser.email || '',
-        avatar: assignedUser.avatar_url || null,
+        avatar: assignedUser.uploaded_avatar_url || assignedUser.avatar_url || null,
         userId: assignedUser.id,
         email: assignedUser.email || '',
         firstName: assignedUser.first_name,
@@ -333,7 +335,7 @@ export function GlobalLowerHeader({
           `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() ||
           'Unknown',
         subtitle: assignedUser.email || '',
-        avatar: assignedUser.avatar_url || null,
+        avatar: assignedUser.uploaded_avatar_url || assignedUser.avatar_url || null,
         userId: assignedUser.id,
         email: assignedUser.email || '',
         firstName: assignedUser.first_name,
@@ -528,6 +530,7 @@ export function GlobalLowerHeader({
                                 email={user.email}
                                 userId={user.id}
                                 avatarUrl={user.avatar_url}
+                                uploadedAvatarUrl={user.uploaded_avatar_url}
                                 size="small"
                                 showTooltip={false}
                               />
@@ -648,6 +651,7 @@ export function GlobalLowerHeader({
                                   email={user.email}
                                   userId={user.id}
                                   avatarUrl={user.avatar_url}
+                                uploadedAvatarUrl={user.uploaded_avatar_url}
                                   size="small"
                                   showTooltip={false}
                                 />
@@ -866,6 +870,7 @@ export function GlobalLowerHeader({
                             email={user.email}
                             userId={user.id}
                             avatarUrl={user.avatar_url}
+                                uploadedAvatarUrl={user.uploaded_avatar_url}
                             size="small"
                             showTooltip={false}
                           />

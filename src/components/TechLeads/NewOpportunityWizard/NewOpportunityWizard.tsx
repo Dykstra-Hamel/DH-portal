@@ -2861,7 +2861,7 @@ export function NewOpportunityWizard() {
           </button>
           <button
             className={styles.secondaryBtn}
-            onClick={() => router.push('/field-ops/dashboard')}
+            onClick={() => router.push('/field-sales/dashboard')}
           >
             Go Home
           </button>
@@ -3228,7 +3228,7 @@ export function NewOpportunityWizard() {
         ) : (
           <button
             className={styles.backBtn}
-            onClick={() => router.push('/field-ops/dashboard')}
+            onClick={() => router.push('/field-sales/dashboard')}
           >
             ← Cancel
           </button>

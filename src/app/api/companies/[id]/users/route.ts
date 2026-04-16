@@ -59,6 +59,7 @@ export async function GET(
         last_name,
         email,
         avatar_url,
+        uploaded_avatar_url,
         user_departments!left(department)
       `)
       .in('id', userIds)
@@ -135,12 +136,13 @@ export async function GET(
       last_name: string;
       email: string;
       avatar_url: string | null;
+      uploaded_avatar_url: string | null;
     }) => ({
       id: profile.id,
       first_name: profile.first_name,
       last_name: profile.last_name,
       email: profile.email,
-      avatar_url: profile.avatar_url,
+      avatar_url: profile.uploaded_avatar_url || profile.avatar_url,
       display_name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email,
       departments: userDepartments[profile.id] || [],
       roles: userRoles[profile.id] || []

@@ -2291,8 +2291,8 @@ function StepMapPlot({
                       </g>
                     )}
 
-                    {/* House + Garage: show all wall labels at once when ruler is on */}
-                    {canRenderDimensions && outline.isClosed && (outline.type === 'house' || outline.type === 'garage') &&
+                    {/* House + Garage + Yard: show all wall labels at once when ruler is on */}
+                    {canRenderDimensions && outline.isClosed && (outline.type === 'house' || outline.type === 'garage' || outline.type === 'yard') &&
                       getOutlineSegmentDimensions(outline).map((seg, i) => {
                         const label = `${Math.round(seg.feet)} ft`;
                         const bubbleW = Math.max(46, label.length * 8 + 18);

@@ -60,7 +60,7 @@ export async function GET(
     if (supportCase.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', supportCase.assigned_to)
         .single();
 
@@ -159,7 +159,7 @@ export async function PUT(
     if (updatedSupportCase.assigned_to) {
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .eq('id', updatedSupportCase.assigned_to)
         .single();
 

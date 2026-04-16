@@ -26,7 +26,7 @@ export async function GET(
         ),
         activity:project_activity(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         categories:project_category_assignments(
           id,
@@ -45,7 +45,7 @@ export async function GET(
           added_by,
           created_at,
           updated_at,
-          user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         current_department:project_departments(
           id,
@@ -78,7 +78,7 @@ export async function GET(
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email, avatar_url')
+      .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
       .in('id', userIds);
 
     if (profilesError) {

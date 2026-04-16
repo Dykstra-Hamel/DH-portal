@@ -95,7 +95,7 @@ export async function PATCH(
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
       `
       )
       .single();

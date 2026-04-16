@@ -55,7 +55,7 @@ export async function GET(
       .from('project_proofs')
       .select(`
         *,
-        uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)
+        uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)
       `)
       .eq('project_id', projectId)
       .order('version', { ascending: true });
@@ -218,7 +218,7 @@ export async function POST(
       })
       .select(`
         *,
-        uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)
+        uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)
       `)
       .single();
 

@@ -11,6 +11,7 @@ interface MiniAvatarProps {
   email: string;
   userId?: string;
   avatarUrl?: string | null;
+  uploadedAvatarUrl?: string | null;
   size?: 'small' | 'medium' | 'large';
   className?: string;
   showTooltip?: boolean;
@@ -22,11 +23,13 @@ export function MiniAvatar({
   email,
   userId,
   avatarUrl,
+  uploadedAvatarUrl,
   size = 'medium',
   className = '',
   showTooltip = true,
 }: MiniAvatarProps) {
   const [imageError, setImageError] = useState(false);
+  const resolvedAvatarUrl = uploadedAvatarUrl || avatarUrl;
 
   const getInitials = (): string => {
     if (firstName && lastName) {
@@ -52,22 +55,14 @@ export function MiniAvatar({
   };
 
   useEffect(() => {
-    // Reset error state when avatarUrl changes
     setImageError(false);
-  }, [avatarUrl]);
+  }, [resolvedAvatarUrl]);
 
-  const handleImageError = (error: any) => {
-    console.log('MiniAvatar image error:', {
-      avatarUrl,
-      error,
-      firstName,
-      lastName,
-      email,
-    });
+  const handleImageError = () => {
     setImageError(true);
   };
 
-  const showImage = avatarUrl && !imageError;
+  const showImage = resolvedAvatarUrl && !imageError;
 
   return (
     <div className={styles.tooltipContainer}>
@@ -83,7 +78,7 @@ export function MiniAvatar({
         )}
         {showImage ? (
           <Image
-            src={avatarUrl}
+            src={resolvedAvatarUrl!}
             alt={`${firstName || ''} ${lastName || ''}`.trim() || email}
             className={styles.avatarImage}
             onError={handleImageError}

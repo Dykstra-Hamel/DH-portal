@@ -138,6 +138,7 @@ export function NotesSection({
                     lastName={activity.user?.last_name || undefined}
                     email={getUserEmail(activity)}
                     avatarUrl={activity.user?.avatar_url || null}
+                    uploadedAvatarUrl={activity.user?.uploaded_avatar_url || null}
                     size="small"
                     showTooltip={true}
                   />

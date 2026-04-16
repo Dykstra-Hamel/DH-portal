@@ -1794,7 +1794,7 @@ export function MonthlyServiceDetail({
                             comment.user_profile?.last_name || undefined
                           }
                           email={comment.user_profile?.email || ''}
-                          avatarUrl={comment.user_profile?.avatar_url || null}
+                          avatarUrl={comment.user_profile?.uploaded_avatar_url || comment.user_profile?.avatar_url || null}
                           size="small"
                           showTooltip={true}
                           className={styles.commentAvatarMini}

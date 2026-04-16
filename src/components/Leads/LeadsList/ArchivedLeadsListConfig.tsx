@@ -96,6 +96,7 @@ export const getArchivedLeadColumns = (): ColumnDefinition<Lead>[] => [
               lastName={lead.assigned_user.last_name}
               email={lead.assigned_user.email}
               avatarUrl={lead.assigned_user.avatar_url}
+              uploadedAvatarUrl={lead.assigned_user.uploaded_avatar_url}
               size="small"
             />
           )}

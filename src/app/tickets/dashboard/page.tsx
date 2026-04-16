@@ -553,7 +553,7 @@ function TicketsDashboardContent() {
             reviewedByEmail: ticket.reviewed_by_profile?.email,
             reviewedByFirstName: ticket.reviewed_by_profile?.first_name,
             reviewedByLastName: ticket.reviewed_by_profile?.last_name,
-            reviewedByAvatarUrl: ticket.reviewed_by_profile?.avatar_url,
+            reviewedByAvatarUrl: ticket.reviewed_by_profile?.uploaded_avatar_url || ticket.reviewed_by_profile?.avatar_url,
             expiresAt: ticket.review_expires_at,
           };
 

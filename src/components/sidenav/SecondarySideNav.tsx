@@ -393,7 +393,7 @@ export function SecondarySideNav({
         return <Truck size={24} />;
       case 'field-map':
         return <MapPinned size={24} />;
-      case 'field-ops':
+      case 'field-sales':
         return <Truck size={24} />;
       default:
         return null;
@@ -658,32 +658,32 @@ export function SecondarySideNav({
             ],
           },
         ];
-      case 'field-ops':
+      case 'field-sales':
         return [
           {
             items: [
-              { text: 'Dashboard', href: '/field-ops/dashboard' },
+              { text: 'Dashboard', href: '/field-sales/dashboard' },
             ],
           },
           ...(shouldShowTechLeads ? [{
             title: 'Tech Leads',
             items: [
-              { text: 'My Opportunities', href: '/field-ops/tech-leads/opportunities' },
-              { text: 'Reports', href: '/field-ops/tech-leads/reports' },
+              { text: 'My Opportunities', href: '/field-sales/tech-leads/opportunities' },
+              { text: 'Reports', href: '/field-sales/tech-leads/reports' },
             ],
           }] : []),
           {
             title: 'Field Map',
             items: [
-              { text: 'History', href: '/field-ops/field-map/history' },
-              { text: 'Reports', href: '/field-ops/field-map/reports' },
+              { text: 'History', href: '/field-sales/field-map/history' },
+              { text: 'Reports', href: '/field-sales/field-map/reports' },
             ],
           },
           ...(shouldShowRouting ? [{
             title: 'Routing',
             items: [
-              { text: 'Routes', href: '/field-ops/routes' },
-              { text: 'Schedules', href: '/field-ops/schedules' },
+              { text: 'Routes', href: '/field-sales/routes' },
+              { text: 'Schedules', href: '/field-sales/schedules' },
             ],
           }] : []),
         ];
@@ -821,8 +821,8 @@ export function SecondarySideNav({
           <h2 className={styles.sectionTitle}>
             {activePrimaryNav === 'project-management'
               ? 'Tracker'
-              : activePrimaryNav === 'field-ops'
-              ? 'FieldOps'
+              : activePrimaryNav === 'field-sales'
+              ? 'Field Sales'
               : activePrimaryNav.charAt(0).toUpperCase() +
                 activePrimaryNav.slice(1)}
           </h2>
@@ -862,7 +862,7 @@ export function SecondarySideNav({
                       pathname.startsWith(item.href)) ||
                     (item.href.startsWith('/tech-leads/') &&
                       pathname.startsWith(item.href)) ||
-                    (item.href.startsWith('/field-ops/') &&
+                    (item.href.startsWith('/field-sales/') &&
                       pathname.startsWith(item.href));
 
                   return (

@@ -15,7 +15,7 @@ export async function GET(
       .from('project_members')
       .select(`
         *,
-        user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url)
+        user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
       `)
       .eq('project_id', projectId)
       .order('created_at', { ascending: true });
@@ -61,7 +61,7 @@ export async function POST(
       })
       .select(`
         *,
-        user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url)
+        user_profile:profiles!project_members_user_id_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
       `)
       .single();
 

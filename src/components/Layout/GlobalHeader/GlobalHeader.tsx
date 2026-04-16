@@ -30,9 +30,9 @@ export function GlobalHeader({
   const { pageHeader } = usePageActions();
   const isTechLeads = pathname.startsWith('/tech-leads');
   const isFieldMap = pathname.startsWith('/field-map');
-  const isFieldOps = pathname.startsWith('/field-ops');
-  const isServiceWizard = pathname.startsWith('/field-ops/field-map/service/') && pathname.endsWith('/wizard');
-  const isAppShell = isTechLeads || isFieldMap || isFieldOps;
+  const isFieldSales = pathname.startsWith('/field-sales');
+  const isServiceWizard = pathname.startsWith('/field-sales/field-map/service/') && pathname.endsWith('/wizard');
+  const isAppShell = isTechLeads || isFieldMap || isFieldSales;
   const showAppShellTitle = isAppShell && !!pageHeader?.title;
   const hideSearch =
     isAppShell ||

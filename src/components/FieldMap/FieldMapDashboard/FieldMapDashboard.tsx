@@ -301,7 +301,7 @@ export function FieldMapDashboard({
               settings to see your daily route here.
             </p>
             <Link
-              href="/field-ops/field-map/new"
+              href="/field-sales/field-map/new"
               className={styles.stateAction}
             >
               Start a manual service stop

@@ -211,11 +211,11 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
       text: 'Tracker',
     },
     {
-      id: 'field-ops' as PrimaryNavItem,
-      href: '/field-ops/dashboard',
+      id: 'field-sales' as PrimaryNavItem,
+      href: '/field-sales/dashboard',
       disabled: false,
       icon: <Truck size={24} />,
-      text: 'FieldOps',
+      text: 'Field Sales',
     },
     {
       id: 'brand' as PrimaryNavItem,
@@ -300,8 +300,8 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
         pathname.startsWith('/admin/content-pieces')
       );
     }
-    if (href === '/field-ops/dashboard') {
-      return pathname.startsWith('/field-ops');
+    if (href === '/field-sales/dashboard') {
+      return pathname.startsWith('/field-sales');
     }
     return pathname.startsWith(href);
   };
@@ -311,16 +311,16 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
   const visibleMenuItems = menuItems.filter(item => {
     // Global admins always see everything — skip department-based restrictions
     if (!isHydrating && isAdmin) return true;
-    // Technician-only users only see field-ops and customers
+    // Technician-only users only see field-sales and customers
     if (isTechnicianOnly) {
-      return item.id === 'field-ops' || item.id === 'customers';
+      return item.id === 'field-sales' || item.id === 'customers';
     }
-    // Inspector-only users only see field-ops and customers
+    // Inspector-only users only see field-sales and customers
     if (isInspectorOnly) {
-      return item.id === 'field-ops' || item.id === 'customers';
+      return item.id === 'field-sales' || item.id === 'customers';
     }
-    // FieldOps is visible to technicians, inspectors, and admins
-    if (item.id === 'field-ops') {
+    // Field Sales is visible to technicians, inspectors, and admins
+    if (item.id === 'field-sales') {
       return isTechnician || isInspector || (!isHydrating && isAdmin);
     }
     // Project managers only see the Tracker nav item
