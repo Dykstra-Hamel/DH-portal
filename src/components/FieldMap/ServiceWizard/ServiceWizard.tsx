@@ -50,6 +50,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     [profile?.first_name, profile?.last_name].filter(Boolean).join(' ') ||
     'Inspector';
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
+  const inspectorTitle = profile?.title ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
   const initialStep = stopId ? 1 : 0;
@@ -575,6 +576,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             mapPlotData={mapPlotData}
             inspectorName={inspectorName}
             inspectorAvatarUrl={inspectorAvatarUrl}
+            inspectorTitle={inspectorTitle}
             companyName={companyName}
             companyId={selectedCompany?.id ?? ''}
             leadId={leadId}

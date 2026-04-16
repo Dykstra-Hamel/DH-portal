@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { adminAPI, authenticatedFetch } from '@/lib/api-client';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
 import { Department, canHaveDepartments } from '@/types/user';
@@ -12,6 +12,11 @@ interface Profile {
   last_name: string;
   email: string;
   created_at: string;
+  title?: string;
+  phone?: string;
+  contact_email?: string;
+  uploaded_avatar_url?: string;
+  avatar_url?: string;
 }
 
 interface AuthUser {
@@ -36,6 +41,9 @@ export default function UsersManager() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<Profile | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const editAvatarInputRef = useRef<HTMLInputElement>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState({
@@ -126,8 +134,12 @@ export default function UsersManager() {
         first_name: editingUser.first_name,
         last_name: editingUser.last_name,
         email: editingUser.email,
+        title: editingUser.title,
+        phone: editingUser.phone,
+        contact_email: editingUser.contact_email,
       });
       setEditingUser(null);
+      setAvatarPreview(null);
       loadUsers();
     } catch (error) {
       setError(
@@ -136,6 +148,37 @@ export default function UsersManager() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleAdminAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!editingUser) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch(`/api/admin/users/${editingUser.id}/avatar`, { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setAvatarPreview(data.url);
+      setEditingUser(prev => prev ? { ...prev, uploaded_avatar_url: data.url } : prev);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Avatar upload failed');
+      setAvatarPreview(null);
+    } finally {
+      setAvatarUploading(false);
+      if (editAvatarInputRef.current) editAvatarInputRef.current.value = '';
+    }
+  };
+
+  const getEditingAvatarUrl = () => {
+    if (avatarPreview) return avatarPreview;
+    if (editingUser?.uploaded_avatar_url) return editingUser.uploaded_avatar_url;
+    if (editingUser?.avatar_url) return editingUser.avatar_url;
+    return null;
   };
 
   const handleDeleteUser = async (userId: string) => {
@@ -304,6 +347,40 @@ export default function UsersManager() {
           <div className={styles.modalContent}>
             <h3>Edit User Profile</h3>
             <form onSubmit={handleUpdateProfile}>
+              {/* Avatar */}
+              <div className={styles.formGroup}>
+                <label>Profile Photo:</label>
+                <div className={styles.avatarEditRow}>
+                  {getEditingAvatarUrl() ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={getEditingAvatarUrl()!}
+                      alt="Avatar"
+                      className={styles.avatarThumb}
+                    />
+                  ) : (
+                    <div className={styles.avatarThumbPlaceholder}>
+                      {editingUser.first_name?.charAt(0)}{editingUser.last_name?.charAt(0)}
+                    </div>
+                  )}
+                  <button
+                    type="button"
+                    className={styles.uploadAvatarBtn}
+                    onClick={() => editAvatarInputRef.current?.click()}
+                    disabled={avatarUploading}
+                  >
+                    {avatarUploading ? 'Uploading…' : 'Upload Photo'}
+                  </button>
+                  <input
+                    ref={editAvatarInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    style={{ display: 'none' }}
+                    onChange={handleAdminAvatarChange}
+                  />
+                </div>
+              </div>
+
               <div className={styles.formGroup}>
                 <label>Email:</label>
                 <input
@@ -321,10 +398,7 @@ export default function UsersManager() {
                   type="text"
                   value={editingUser.first_name}
                   onChange={e =>
-                    setEditingUser({
-                      ...editingUser,
-                      first_name: e.target.value,
-                    })
+                    setEditingUser({ ...editingUser, first_name: e.target.value })
                   }
                   required
                 />
@@ -335,12 +409,42 @@ export default function UsersManager() {
                   type="text"
                   value={editingUser.last_name}
                   onChange={e =>
-                    setEditingUser({
-                      ...editingUser,
-                      last_name: e.target.value,
-                    })
+                    setEditingUser({ ...editingUser, last_name: e.target.value })
                   }
                   required
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Title:</label>
+                <input
+                  type="text"
+                  value={editingUser.title || ''}
+                  placeholder="e.g. Lead Sales Inspector"
+                  onChange={e =>
+                    setEditingUser({ ...editingUser, title: e.target.value })
+                  }
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Contact Phone:</label>
+                <input
+                  type="tel"
+                  value={editingUser.phone || ''}
+                  placeholder="e.g. (555) 867-5309"
+                  onChange={e =>
+                    setEditingUser({ ...editingUser, phone: e.target.value })
+                  }
+                />
+              </div>
+              <div className={styles.formGroup}>
+                <label>Contact Email:</label>
+                <input
+                  type="email"
+                  value={editingUser.contact_email || ''}
+                  placeholder="e.g. john@yourcompany.com"
+                  onChange={e =>
+                    setEditingUser({ ...editingUser, contact_email: e.target.value })
+                  }
                 />
               </div>
               <div className={styles.formActions}>
@@ -354,7 +458,7 @@ export default function UsersManager() {
                 <button
                   type="button"
                   className={styles.cancelButton}
-                  onClick={() => setEditingUser(null)}
+                  onClick={() => { setEditingUser(null); setAvatarPreview(null); }}
                   disabled={submitting}
                 >
                   Cancel
@@ -392,7 +496,7 @@ export default function UsersManager() {
                     {user.profiles && (
                       <button
                         className={styles.editButton}
-                        onClick={() => setEditingUser(user.profiles!)}
+                        onClick={() => { setAvatarPreview(null); setEditingUser(user.profiles!); }}
                       >
                         Edit
                       </button>

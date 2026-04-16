@@ -116,6 +116,7 @@ export const MAP_ELEMENT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'garage', label: 'Garage', category: 'element', color: '#4338ca' },
   { type: 'deck', label: 'Deck/Patio', category: 'element', color: '#7c3aed' },
   { type: 'water', label: 'Water', category: 'element', color: '#0284c7' },
+  { type: 'fence', label: 'Fence', category: 'element', color: '#92400e' },
 ];
 
 export const MAP_STATION_STAMP_OPTIONS: MapStampOption[] = [

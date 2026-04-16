@@ -128,6 +128,7 @@ interface ReviewStepProps {
   mapPlotData: MapPlotData;
   inspectorName: string;
   inspectorAvatarUrl?: string | null;
+  inspectorTitle?: string | null;
   companyName: string;
   companyId: string;
   leadId: string | null;
@@ -154,6 +155,7 @@ export function ReviewStep({
   mapPlotData,
   inspectorName,
   inspectorAvatarUrl,
+  inspectorTitle,
   companyName,
   companyId,
   leadId,
@@ -809,7 +811,7 @@ export function ReviewStep({
                   <div className={styles.inspectorText}>
                     <p className={styles.inspectorName}>{inspectorName}</p>
                     <p className={styles.inspectorTitle}>
-                      Lead Sales Inspector
+                      {inspectorTitle || 'Lead Sales Inspector'}
                     </p>
                   </div>
                 </div>

@@ -20,6 +20,10 @@ export interface Profile {
   email: string;
   role?: ProfileRole;
   avatar_url?: string;
+  uploaded_avatar_url?: string;
+  title?: string;
+  phone?: string;
+  contact_email?: string;
   created_at: string;
   updated_at: string;
 }

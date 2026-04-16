@@ -107,6 +107,12 @@ function StepMapPlot({
   const [snapToFirst, setSnapToFirst] = useState(false);
   const [activeStampMenu, setActiveStampMenu] = useState<MapStampCategory | null>(null);
   const [drawActive, setDrawActive] = useState(false);
+  const [eraserActive, setEraserActive] = useState(false);
+  const [erasedItems, setErasedItems] = useState<Array<
+    | { kind: 'stamp'; item: MapPlotStamp }
+    | { kind: 'outline'; item: MapElementOutline }
+  >>([]);
+  const [showTrashConfirm, setShowTrashConfirm] = useState(false);
   const [companyPestOptions, setCompanyPestOptions] = useState<CompanyPestOption[]>([]);
   const [selectedDynamicPestOption, setSelectedDynamicPestOption] = useState<CompanyPestOption | null>(null);
   const [blankGridScale, setBlankGridScale] = useState(1);
@@ -116,6 +122,8 @@ function StepMapPlot({
   const stampFocusPendingRef = useRef<{ stampX: number; stampY: number } | null>(null);
   const mapPlotDataRef = useRef(mapPlotData);
   mapPlotDataRef.current = mapPlotData;
+  const drawActiveRef = useRef(drawActive);
+  drawActiveRef.current = drawActive;
   const dragMovedRef = useRef(false);
   const lastDragAtRef = useRef<number>(0);
   const blankGridPanRef = useRef<{
@@ -361,14 +369,14 @@ function StepMapPlot({
   }, [clampBlankGridOffset, isBlankGridMode]);
 
   const handleBlankGridWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
-    if (!isBlankGridMode || mapPlotData.isViewSet) return;
+    if (!isBlankGridMode || drawActive || eraserActive) return;
     event.preventDefault();
     const scaleFactor = event.deltaY < 0 ? 1.08 : 1 / 1.08;
     applyBlankGridScaleAtClientPoint(scaleFactor, event.clientX, event.clientY);
-  }, [applyBlankGridScaleAtClientPoint, isBlankGridMode, mapPlotData.isViewSet]);
+  }, [applyBlankGridScaleAtClientPoint, drawActive, eraserActive, isBlankGridMode]);
 
   const handleBlankGridPointerDown = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isBlankGridMode || mapPlotData.isViewSet) return;
+    if (!isBlankGridMode || drawActive || eraserActive) return;
     event.currentTarget.setPointerCapture(event.pointerId);
 
     const pointers = blankGridPinchRef.current.pointers;
@@ -390,10 +398,10 @@ function StepMapPlot({
       startOffsetX: blankGridOffset.x,
       startOffsetY: blankGridOffset.y,
     };
-  }, [blankGridOffset.x, blankGridOffset.y, isBlankGridMode, mapPlotData.isViewSet]);
+  }, [blankGridOffset.x, blankGridOffset.y, drawActive, eraserActive, isBlankGridMode]);
 
   const handleBlankGridPointerMove = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-    if (!isBlankGridMode || mapPlotData.isViewSet) return;
+    if (!isBlankGridMode || drawActive || eraserActive) return;
     const pointers = blankGridPinchRef.current.pointers;
     if (!pointers.has(event.pointerId)) return;
 
@@ -428,7 +436,7 @@ function StepMapPlot({
         blankGridScale
       )
     );
-  }, [applyBlankGridScaleAtClientPoint, blankGridScale, clampBlankGridOffset, isBlankGridMode, mapPlotData.isViewSet]);
+  }, [applyBlankGridScaleAtClientPoint, blankGridScale, clampBlankGridOffset, drawActive, eraserActive, isBlankGridMode]);
 
   const handleBlankGridPointerEnd = useCallback((event: React.PointerEvent<HTMLDivElement>) => {
     const pointers = blankGridPinchRef.current.pointers;
@@ -444,11 +452,11 @@ function StepMapPlot({
   }, []);
 
   useEffect(() => {
-    if (isBlankGridMode && !mapPlotData.isViewSet) return;
+    if (!drawActive && !eraserActive) return;
     blankGridPanRef.current = null;
     blankGridPinchRef.current.pointers.clear();
     blankGridPinchRef.current.lastDistance = null;
-  }, [isBlankGridMode, mapPlotData.isViewSet]);
+  }, [drawActive, eraserActive]);
 
   const getNormalizedPoint = useCallback((clientX: number, clientY: number) => {
     const container = mapRef.current;
@@ -905,9 +913,62 @@ function StepMapPlot({
   }, [mapPlotData.outlines, latitude, mapPlotData.zoom, isBlankGridMode, canvasSize, updateMapPlotData]);
 
   const handleOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!mapPlotData.isViewSet) return;
-    if (!drawActive) return;
+    // If view isn't set yet, kick it off now and proceed — stamp/outline creation
+    // falls back gracefully when lat/lng anchoring isn't available yet.
+    if (!mapPlotData.isViewSet && canSetView) setView();
+    if (activeStampMenu) {
+      setActiveStampMenu(null);
+      return;
+    }
     if (Date.now() - lastDragAtRef.current < 180) return;
+
+    // Eraser mode: erase nearest stamp or outline
+    if (eraserActive) {
+      const pt = getNormalizedPoint(event.clientX, event.clientY);
+      if (!pt) return;
+      const canvasRect = mapRef.current?.getBoundingClientRect();
+      if (!canvasRect) return;
+      const hitStamp = mapPlotData.stamps.find(s => {
+        const dx = (s.x - pt.x) * canvasRect.width;
+        const dy = (s.y - pt.y) * canvasRect.height;
+        return Math.sqrt(dx * dx + dy * dy) < 28;
+      });
+      if (hitStamp) {
+        setErasedItems(prev => [...prev, { kind: 'stamp', item: hitStamp }]);
+        updateMapPlotData({ stamps: mapPlotData.stamps.filter(s => s.id !== hitStamp.id) });
+        return;
+      }
+      const hitOutline = mapPlotData.outlines.find(o => {
+        const centroid = getPolygonCentroidNormalized(o.points);
+        if (!centroid) return false;
+        const dx = (centroid.x - pt.x) * canvasRect.width;
+        const dy = (centroid.y - pt.y) * canvasRect.height;
+        return Math.sqrt(dx * dx + dy * dy) < 40;
+      });
+      if (hitOutline) {
+        setErasedItems(prev => [...prev, { kind: 'outline', item: hitOutline }]);
+        updateMapPlotData({
+          outlines: mapPlotData.outlines.filter(o => o.id !== hitOutline.id),
+          activeOutlineId: mapPlotData.activeOutlineId === hitOutline.id ? null : mapPlotData.activeOutlineId,
+        });
+      }
+      return;
+    }
+
+    if (!drawActive) {
+      // Idle mode: tap a closed outline to select it (show nodes + measurements), tap outside to deselect
+      const point = getNormalizedPoint(event.clientX, event.clientY);
+      if (!point) return;
+      const closedHit = [...mapPlotData.outlines]
+        .reverse()
+        .find(outline => outline.isClosed && isPointInPolygon(point, outline.points));
+      if (closedHit) {
+        updateMapPlotData({ activeOutlineId: closedHit.id });
+      } else if (mapPlotData.activeOutlineId) {
+        updateMapPlotData({ activeOutlineId: null });
+      }
+      return;
+    }
 
     const point = getNormalizedPoint(event.clientX, event.clientY);
     if (!point) return;
@@ -996,7 +1057,9 @@ function StepMapPlot({
   };
 
   const handleOverlayPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
-    if (!mapPlotData.isViewSet || !drawActive || mapPlotData.drawTool !== 'outline' || showDimensions) return;
+    if (showDimensions) return;
+    const idleSelectedClosed = !drawActive && !!mapPlotData.activeOutlineId && (mapPlotData.outlines.find(o => o.id === mapPlotData.activeOutlineId)?.isClosed ?? false);
+    if (!idleSelectedClosed && (!drawActive || mapPlotData.drawTool !== 'outline')) return;
 
     const point = getNormalizedPoint(event.clientX, event.clientY);
     const container = mapRef.current;
@@ -1041,11 +1104,14 @@ function StepMapPlot({
     if (hitOutlineId !== null && hitDistance <= NODE_HIT_PX) {
       const targetOutline = mapPlotData.outlines.find(o => o.id === hitOutlineId)!;
 
-      // Close-outline gesture: first node of an active open outline with enough points
+      // Close-outline gesture: for fence, tap last node; for others, tap first node
+      const isFenceOutline = targetOutline.type === 'fence';
+      const closeNodeIndex = isFenceOutline ? targetOutline.points.length - 1 : 0;
+      const minPointsForClose = isFenceOutline ? 2 : 3;
       if (
         !targetOutline.isClosed &&
-        hitNodeIndex === 0 &&
-        targetOutline.points.length >= 3 &&
+        hitNodeIndex === closeNodeIndex &&
+        targetOutline.points.length >= minPointsForClose &&
         targetOutline.id === mapPlotData.activeOutlineId
       ) {
         event.preventDefault();
@@ -1129,6 +1195,16 @@ function StepMapPlot({
 
   const handleStampPointerDown = (stampId: string, event: React.PointerEvent<HTMLButtonElement>) => {
     if (!mapPlotData.isViewSet || showDimensions) return;
+    if (eraserActive) {
+      const stamp = mapPlotData.stamps.find(s => s.id === stampId);
+      if (stamp) {
+        setErasedItems(prev => [...prev, { kind: 'stamp', item: stamp }]);
+        updateMapPlotData({ stamps: mapPlotData.stamps.filter(s => s.id !== stampId) });
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     event.preventDefault();
     event.stopPropagation();
     dragMovedRef.current = false;
@@ -1201,8 +1277,24 @@ function StepMapPlot({
     });
   };
 
+  // Keep a stable ref to setView so the auto-set effect below can call it without stale closures
+  const setViewRef = useRef(setView);
+  setViewRef.current = setView;
+
+  // Auto-set view as soon as the map is ready — eliminates the need for a manual lock button.
+  // Satellite: fires when the Google Maps instance becomes available.
+  // Blank-grid: fires when the canvas has been measured.
+  useEffect(() => {
+    if (mapPlotDataRef.current.isViewSet) return;
+    if (isSatelliteMode && googleMapInstance && hasCoordinates) {
+      setViewRef.current();
+    } else if (isBlankGridMode && canvasSize.width > 0) {
+      setViewRef.current();
+    }
+  }, [isSatelliteMode, isBlankGridMode, googleMapInstance, hasCoordinates, canvasSize.width]);
+
   const onCameraChanged = (event: any) => {
-    if (mapPlotData.isViewSet) return;
+    if (drawActiveRef.current) return;
 
     const detail = event?.detail;
     const mapFromEvent = (event?.map as google.maps.Map | undefined) ?? null;
@@ -1294,6 +1386,17 @@ function StepMapPlot({
   }, [updateMapPlotData]);
 
   const handleUndo = () => {
+    // If eraser was used, un-erase the last erased item first
+    if (erasedItems.length > 0) {
+      const last = erasedItems[erasedItems.length - 1];
+      setErasedItems(prev => prev.slice(0, -1));
+      if (last.kind === 'stamp') {
+        updateMapPlotData({ stamps: [...mapPlotData.stamps, last.item] });
+      } else {
+        updateMapPlotData({ outlines: [...mapPlotData.outlines, last.item] });
+      }
+      return;
+    }
     if (mapPlotData.drawTool === 'outline') {
       const workingOutline = activeOutline ?? mapPlotData.outlines[mapPlotData.outlines.length - 1] ?? null;
       if (!workingOutline) {
@@ -1408,9 +1511,12 @@ function StepMapPlot({
     const rect = container.getBoundingClientRect();
     const mx = (event.clientX - rect.left) / rect.width;
     const my = (event.clientY - rect.top) / rect.height;
-    const first = activeOutlinePoints[0];
-    const dx = (mx - first.x) * rect.width;
-    const dy = (my - first.y) * rect.height;
+    // Fence snaps to last node; all other outlines snap to first node
+    const snapTarget = activeOutline?.type === 'fence'
+      ? activeOutlinePoints[activeOutlinePoints.length - 1]
+      : activeOutlinePoints[0];
+    const dx = (mx - snapTarget.x) * rect.width;
+    const dy = (my - snapTarget.y) * rect.height;
     setSnapToFirst(Math.sqrt(dx * dx + dy * dy) < 18);
   };
 
@@ -1418,22 +1524,17 @@ function StepMapPlot({
     updateMapPlotData({ stamps: [], outlines: [], activeOutlineId: null });
   };
 
-  const hasUndo = mapPlotData.outlines.length > 0 || mapPlotData.stamps.length > 0;
+  const hasUndo = erasedItems.length > 0 || mapPlotData.outlines.length > 0 || mapPlotData.stamps.length > 0;
   const hasClear = mapPlotData.outlines.length > 0 || mapPlotData.stamps.length > 0;
+  const hasOutline = mapPlotData.outlines.some(o => o.isClosed);
   const canRenderDimensions =
     showDimensions &&
     canvasSize.width > 0 &&
     canvasSize.height > 0 &&
     latitude !== null;
 
-  const canRenderActiveStampMenu = mapPlotData.isViewSet && activeStampMenu !== null;
+  const canRenderActiveStampMenu = activeStampMenu !== null;
   const satelliteStampScale = isSatelliteMode ? getSatelliteStampScale(mapPlotData.zoom) : 1;
-
-  useEffect(() => {
-    if (activeStampMenu !== null && !mapPlotData.isViewSet) {
-      setActiveStampMenu(null);
-    }
-  }, [activeStampMenu, mapPlotData.isViewSet]);
 
   // Close stamp picker when clicking outside the toolbar dock
   useEffect(() => {
@@ -1533,13 +1634,13 @@ function StepMapPlot({
                 mapId={process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID ?? 'DEMO_MAP_ID'}
                 mapTypeId="satellite"
                 onCameraChanged={onCameraChanged}
-                gestureHandling={mapPlotData.isViewSet ? 'none' : 'greedy'}
+                gestureHandling={drawActive ? 'none' : 'greedy'}
                 zoomControl={false}
                 rotateControl={false}
                 mapTypeControl={false}
                 fullscreenControl={false}
                 streetViewControl={false}
-                keyboardShortcuts={!mapPlotData.isViewSet}
+                keyboardShortcuts={!drawActive}
                 disableDefaultUI={true}
                 className={styles.mapGoogleCanvas}
               >
@@ -1550,7 +1651,7 @@ function StepMapPlot({
           {isSatelliteMode && !mapsError && googleMapsApiKey && !hasCoordinates && (
             <div className={styles.mapEmptyState}>Missing coordinates. Go back and choose an address.</div>
 	          )}
-          {isBlankGridMode && !mapPlotData.isViewSet && (
+          {isBlankGridMode && !drawActive && !eraserActive && (
             <div
               className={styles.mapViewAdjustLayer}
               onWheel={handleBlankGridWheel}
@@ -1561,7 +1662,7 @@ function StepMapPlot({
               onPointerLeave={handleBlankGridPointerEnd}
             />
           )}
-          <div className={styles.mapDarkOverlay} />
+          {isSatelliteMode && <div className={styles.mapDarkOverlay} />}
 	          <div className={styles.mapGridOverlay} style={blankGridWorkspaceStyle} />
             {/* ── Left Panel: Drawing Tools ── */}
             {!satFocusTransform && (
@@ -1573,8 +1674,7 @@ function StepMapPlot({
                     {/* Outline */}
                     <button
                       type="button"
-                      className={`${styles.mapSideBtn} ${drawActive && mapPlotData.drawTool === 'outline' ? styles.mapSideBtnActive : ''}`}
-                      disabled={!mapPlotData.isViewSet}
+                      className={`${styles.mapSideBtn} ${drawActive && mapPlotData.drawTool === 'outline' && mapPlotData.selectedStampType !== 'fence' ? styles.mapSideBtnActive : ''}`}
                       onClick={() => {
                         activateElementTool(selectedElementType);
                         setActiveStampMenu(prev => prev === 'element' ? null : 'element');
@@ -1590,11 +1690,16 @@ function StepMapPlot({
                     {/* Features */}
                     <button
                       type="button"
-                      className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'object' || (mapPlotData.drawTool === 'stamp' && isMapObjectStampType(mapPlotData.selectedStampType)) || (mapPlotData.drawTool === 'outline' && mapPlotData.selectedStampType === 'fence')) ? styles.mapSideBtnActive : ''}`}
-                      disabled={!mapPlotData.isViewSet}
+                      className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'object' || (mapPlotData.drawTool === 'stamp' && isMapObjectStampType(mapPlotData.selectedStampType) && mapPlotData.selectedStampType !== 'sentricon-bait-station') || (mapPlotData.drawTool === 'outline' && mapPlotData.selectedStampType === 'fence')) ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet || !hasOutline}
                       onClick={() => {
-                        const safeObjectType = selectedObjectType === 'sentricon-bait-station' ? 'door' : selectedObjectType;
-                        activateObjectTool(safeObjectType);
+                        // Don't overwrite selectedStampType if fence is currently active —
+                        // we need it to stay 'fence' so the menu shows fence as selected.
+                        const fenceActive = drawActive && mapPlotData.selectedStampType === 'fence';
+                        if (!fenceActive) {
+                          const safeObjectType = selectedObjectType === 'sentricon-bait-station' ? 'door' : selectedObjectType;
+                          activateObjectTool(safeObjectType);
+                        }
                         setActiveStampMenu(prev => prev === 'object' ? null : 'object');
                       }}
                       title="Features"
@@ -1610,6 +1715,7 @@ function StepMapPlot({
                     <button
                       type="button"
                       className={styles.mapCancelToolBtn}
+                      style={{ top: mapPlotData.drawTool === 'outline' && mapPlotData.selectedStampType !== 'fence' ? 33 : 89 }}
                       onClick={() => setDrawActive(false)}
                     >
                       {mapPlotData.drawTool === 'outline' ? 'Cancel Outline' : 'Cancel Stamp'}
@@ -1624,7 +1730,7 @@ function StepMapPlot({
                     <button
                       type="button"
                       className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'pest' || (mapPlotData.drawTool === 'stamp' && isMapPestStampType(mapPlotData.selectedStampType))) ? styles.mapSideBtnActive : ''}`}
-                      disabled={!mapPlotData.isViewSet}
+                      disabled={!mapPlotData.isViewSet || !hasOutline}
                       onClick={() => {
                         if (selectedDynamicPestOption) {
                           activateDynamicPestTool(selectedDynamicPestOption);
@@ -1644,8 +1750,8 @@ function StepMapPlot({
                     {/* Stations */}
                     <button
                       type="button"
-                      className={`${styles.mapSideBtn} ${drawActive && (activeStampMenu === 'station' || (mapPlotData.drawTool === 'stamp' && (isMapStationStampType(mapPlotData.selectedStampType) || mapPlotData.selectedStampType === 'sentricon-bait-station'))) ? styles.mapSideBtnActive : ''}`}
-                      disabled={!mapPlotData.isViewSet}
+                      className={`${styles.mapSideBtn} ${styles.mapSideBtnNoStroke} ${drawActive && (activeStampMenu === 'station' || (mapPlotData.drawTool === 'stamp' && (isMapStationStampType(mapPlotData.selectedStampType) || mapPlotData.selectedStampType === 'sentricon-bait-station'))) ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet || !hasOutline}
                       onClick={() => {
                         activateStationTool(selectedStationStampType);
                         setActiveStampMenu(prev => prev === 'station' ? null : 'station');
@@ -1663,7 +1769,7 @@ function StepMapPlot({
                     <button
                       type="button"
                       className={`${styles.mapSideBtn} ${drawActive && isMapConditionStampType(mapPlotData.selectedStampType) && mapPlotData.drawTool === 'stamp' ? styles.mapSideBtnActive : ''}`}
-                      disabled={!mapPlotData.isViewSet}
+                      disabled={!mapPlotData.isViewSet || !hasOutline}
                       onClick={() => {
                         activateConditionTool('other-condition');
                         setActiveStampMenu(null);
@@ -1681,6 +1787,13 @@ function StepMapPlot({
                     <button
                       type="button"
                       className={styles.mapCancelToolBtn}
+                      style={{
+                        top: isMapPestStampType(mapPlotData.selectedStampType)
+                          ? 33
+                          : (isMapStationStampType(mapPlotData.selectedStampType) || mapPlotData.selectedStampType === 'sentricon-bait-station')
+                          ? 89
+                          : 145,
+                      }}
                       onClick={() => setDrawActive(false)}
                     >
                       Cancel Stamp
@@ -1688,7 +1801,7 @@ function StepMapPlot({
                   )}
                   </div>
 
-                  {/* Group 3: Undo + Trash */}
+                  {/* Group 3: Undo + Eraser + Trash */}
                   <div className={styles.mapSidePanelGroup}>
                     {/* Undo */}
                     <button
@@ -1704,12 +1817,27 @@ function StepMapPlot({
                       </svg>
                       <span className={styles.mapSideBtnLabel}>Undo</span>
                     </button>
+                    {/* Eraser */}
+                    <button
+                      type="button"
+                      className={`${styles.mapSideBtn} ${eraserActive ? styles.mapSideBtnActive : ''}`}
+                      disabled={!mapPlotData.isViewSet || !hasClear}
+                      onClick={() => setEraserActive(e => !e)}
+                      title="Eraser"
+                      aria-label="Eraser"
+                    >
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                        <path d="M20 20H7L3 16L13 6L21 14L18 17" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M6.5 17.5L9 15" strokeWidth="2" strokeLinecap="round"/>
+                      </svg>
+                      <span className={styles.mapSideBtnLabel}>Eraser</span>
+                    </button>
                     {/* Trash */}
                     <button
                       type="button"
                       className={`${styles.mapSideBtn} ${styles.mapSideBtnDanger}`}
                       disabled={!mapPlotData.isViewSet || !hasClear}
-                      onClick={handleClear}
+                      onClick={() => setShowTrashConfirm(true)}
                       title="Clear All"
                       aria-label="Clear All"
                     >
@@ -1723,8 +1851,18 @@ function StepMapPlot({
 
                 {/* Secondary picker menu — appears to the right of the tool group */}
                 {canRenderActiveStampMenu && activeStampMenu && (
-                  <div className={styles.mapSecondaryMenu} role="menu">
-                    {activeStampMenu === 'element' && MAP_ELEMENT_STAMP_OPTIONS.map(opt => (
+                  <div
+                    className={styles.mapSecondaryMenu}
+                    role="menu"
+                    style={{
+                      marginTop: activeStampMenu === 'element' ? 9
+                        : activeStampMenu === 'object' ? 65
+                        : activeStampMenu === 'pest' ? 148
+                        : activeStampMenu === 'station' ? 204
+                        : 0,
+                    }}
+                  >
+                    {activeStampMenu === 'element' && MAP_ELEMENT_STAMP_OPTIONS.filter(opt => opt.type !== 'fence').map(opt => (
                       <button
                         key={opt.type}
                         type="button"
@@ -1761,32 +1899,36 @@ function StepMapPlot({
                     )}
                     {activeStampMenu === 'pest' && (
                       companyPestOptions.length > 0
-                        ? companyPestOptions.map(opt => (
-                          <button
-                            key={opt.id}
-                            type="button"
-                            className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === 'dynamic-pest' && selectedDynamicPestOption?.id === opt.id ? styles.mapSecondaryBtnActive : ''}`}
-                            onClick={() => { activateDynamicPestTool(opt); setActiveStampMenu(null); }}
-                            title={opt.custom_label}
-                          >
-                            {opt.icon_svg
-                              ? <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: opt.icon_svg }} />
-                              : <MapStampGlyph type="dynamic-pest" size={28} />}
-                            <span className={styles.mapSecondaryBtnLabel}>{opt.custom_label}</span>
-                          </button>
-                        ))
-                        : MAP_PEST_STAMP_OPTIONS.map(opt => (
-                          <button
-                            key={opt.type}
-                            type="button"
-                            className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === opt.type ? styles.mapSecondaryBtnActive : ''}`}
-                            onClick={() => { activatePestTool(opt.type as MapPestStampType); setActiveStampMenu(null); }}
-                            title={opt.label}
-                          >
-                            <MapStampGlyph type={opt.type} size={28} />
-                            <span className={styles.mapSecondaryBtnLabel}>{opt.label}</span>
-                          </button>
-                        ))
+                        ? [...companyPestOptions]
+                            .sort((a, b) => a.custom_label.localeCompare(b.custom_label))
+                            .map(opt => (
+                              <button
+                                key={opt.id}
+                                type="button"
+                                className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === 'dynamic-pest' && selectedDynamicPestOption?.id === opt.id ? styles.mapSecondaryBtnActive : ''}`}
+                                onClick={() => { activateDynamicPestTool(opt); setActiveStampMenu(null); }}
+                                title={opt.custom_label}
+                              >
+                                {opt.icon_svg
+                                  ? <span className={styles.mapStampDynamicIcon} dangerouslySetInnerHTML={{ __html: opt.icon_svg }} />
+                                  : <MapStampGlyph type="dynamic-pest" size={28} />}
+                                <span className={styles.mapSecondaryBtnLabel}>{opt.custom_label}</span>
+                              </button>
+                            ))
+                        : [...MAP_PEST_STAMP_OPTIONS]
+                            .sort((a, b) => a.label.localeCompare(b.label))
+                            .map(opt => (
+                              <button
+                                key={opt.type}
+                                type="button"
+                                className={`${styles.mapSecondaryBtn} ${mapPlotData.selectedStampType === opt.type ? styles.mapSecondaryBtnActive : ''}`}
+                                onClick={() => { activatePestTool(opt.type as MapPestStampType); setActiveStampMenu(null); }}
+                                title={opt.label}
+                              >
+                                <MapStampGlyph type={opt.type} size={28} />
+                                <span className={styles.mapSecondaryBtnLabel}>{opt.label}</span>
+                              </button>
+                            ))
                     )}
                     {activeStampMenu === 'station' && (
                       <>
@@ -1902,8 +2044,8 @@ function StepMapPlot({
                   </button>
                 </div>
 
-                {/* Lock / Unlock button */}
-                <div className={styles.mapSidePanelGroup}>
+                {/* Lock / Unlock button — hidden */}
+                {/* <div className={styles.mapSidePanelGroup}>
                   <button
                     type="button"
                     className={`${styles.mapLockBtn} ${mapPlotData.isViewSet ? styles.mapLockBtnLocked : styles.mapLockBtnUnlocked}`}
@@ -1912,28 +2054,52 @@ function StepMapPlot({
                     title={mapPlotData.isViewSet ? 'Unlock View' : 'Lock View'}
                     aria-label={mapPlotData.isViewSet ? 'Unlock View' : 'Lock View'}
                   >
-                    {mapPlotData.isViewSet ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 20 22" fill="none" aria-hidden="true">
-                        <path d="M5 10V6C5 4.67392 5.52678 3.40215 6.46447 2.46447C7.40215 1.52678 8.67392 1 10 1C11.3261 1 12.5979 1.52678 13.5355 2.46447C14.4732 3.40215 15 4.67392 15 6V10M3 10H17C18.1046 10 19 10.8954 19 12V19C19 20.1046 18.1046 21 17 21H3C1.89543 21 1 20.1046 1 19V12C1 10.8954 1.89543 10 3 10Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="22" viewBox="0 0 20 22" fill="none" aria-hidden="true">
-                        <path d="M5 10.005V6.00504C4.99875 4.76508 5.45828 3.5689 6.28937 2.6487C7.12047 1.7285 8.26383 1.14994 9.4975 1.02533C10.7312 0.900712 11.9671 1.23894 12.9655 1.97435C13.9638 2.70976 14.6533 3.78988 14.9 5.00504M3 10.005H17C18.1046 10.005 19 10.9005 19 12.005V19.005C19 20.1096 18.1046 21.005 17 21.005H3C1.89543 21.005 1 20.1096 1 19.005V12.005C1 10.9005 1.89543 10.005 3 10.005Z" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    )}
-                    <span className={styles.mapLockBtnLabel}>
-                      {mapPlotData.isViewSet ? 'Locked' : 'Unlocked'}
-                    </span>
+                    ...
+                  </button>
+                </div> */}
+              </div>
+            )}
+
+          {/* Trash confirmation dialog */}
+          {showTrashConfirm && (
+            <div className={styles.trashConfirmOverlay}>
+              <div className={styles.trashConfirmDialog}>
+                <p className={styles.trashConfirmText}>Clear all outlines and stamps?</p>
+                <div className={styles.trashConfirmActions}>
+                  <button
+                    type="button"
+                    className={styles.trashConfirmCancel}
+                    onClick={() => setShowTrashConfirm(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.trashConfirmOk}
+                    onClick={() => { handleClear(); setShowTrashConfirm(false); setErasedItems([]); }}
+                  >
+                    Clear All
                   </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Onboarding hint: shown when view is set but no outlines drawn yet */}
+          {!hasOutline && !drawActive && !satFocusTransform && (
+            <div className={styles.onboardingHint} aria-hidden="true">
+              <svg className={styles.onboardingArrow} width="32" height="32" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+                <path d="M6 16 L2 12 M2 12 L6 8 M2 12 L14 12" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <span className={styles.onboardingHintText}>Start by creating a house outline</span>
+            </div>
+          )}
 
           {pestModalStampId && <div className={styles.mapStampModalDimmer} />}
 
 	          <div
-	            className={`${styles.mapPlotOverlay} ${mapPlotData.isViewSet ? styles.mapPlotOverlayActive : ''}`}
-            style={blankGridWorkspaceStyle}
+	            className={`${styles.mapPlotOverlay} ${(drawActive || eraserActive || (!!mapPlotData.activeOutlineId && (mapPlotData.outlines.find(o => o.id === mapPlotData.activeOutlineId)?.isClosed ?? false))) ? styles.mapPlotOverlayActive : ''}`}
+            style={{ ...blankGridWorkspaceStyle, cursor: eraserActive ? 'crosshair' : undefined }}
             onClick={handleOverlayClick}
             onPointerDown={handleOverlayPointerDown}
             onPointerMove={handleOverlayPointerMove}
@@ -1960,8 +2126,10 @@ function StepMapPlot({
               {mapPlotData.outlines.map(outline => {
                 const metrics = getOutlineMetrics(outline);
                 const isActive = outline.id === activeOutline?.id;
-                const showAreaLabel = canRenderDimensions && metrics.areaSqFt !== null;
-                const shouldShowOutlineText = outline.isClosed && metrics.centroid && (showLegendLabels || showAreaLabel);
+                // "idle selected" = user tapped a closed outline with no tool active
+                const showSelectedInfo = isActive && outline.isClosed && !drawActive;
+                const showAreaLabel = metrics.areaSqFt !== null && (canRenderDimensions || showSelectedInfo);
+                const shouldShowOutlineText = outline.isClosed && metrics.centroid && (showLegendLabels || showAreaLabel || showSelectedInfo);
                 const selectedSegment =
                   canRenderDimensions && selectedWallMeasurement?.outlineId === outline.id
                     ? getOutlineSegmentDimensions(outline)[selectedWallMeasurement.segmentIndex] ?? null
@@ -1981,7 +2149,9 @@ function StepMapPlot({
                   : (isActive ? 2 : 1.5);
                 const isFence = outline.type === 'fence';
                 // For fence: total length of open polyline; for closed outlines: perimeter
-                const perimeterFt = (isFence ? showDimensions && outline.points.length >= 2 : outline.isClosed && showDimensions)
+                const perimeterFt = (isFence
+                  ? (showDimensions || showSelectedInfo) && outline.points.length >= 2
+                  : outline.isClosed && (showDimensions || showSelectedInfo))
                   ? getOutlineSegmentDimensions(outline).reduce((sum, seg) => sum + seg.feet, 0)
                   : null;
                 // For fence label position: average of all points (midpoint of polyline)
@@ -1996,6 +2166,20 @@ function StepMapPlot({
                   : isBlankGridMode ? `${12 / blankGridScale} ${6 / blankGridScale}` : '12 6';
                 return (
                   <g key={outline.id}>
+                    {/* Invisible hit-area shape for idle-mode tap-to-select */}
+                    {!drawActive && !eraserActive && outline.isClosed && outline.points.length >= 3 && (
+                      <polygon
+                        points={outline.points.map(p => `${gx(p)},${gy(p)}`).join(' ')}
+                        fill="transparent"
+                        stroke="transparent"
+                        strokeWidth={isBlankGridMode ? 24 / blankGridScale : 24}
+                        style={{ pointerEvents: 'auto', cursor: 'pointer' }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          updateMapPlotData({ activeOutlineId: outline.id, selectedElementType: outline.type, selectedStampType: outline.type });
+                        }}
+                      />
+                    )}
                     {outline.points.length >= 2 && (
                       !isFence && outline.points.length >= 3 ? (
                         <polygon
@@ -2010,7 +2194,7 @@ function StepMapPlot({
                         <polyline
                           points={outline.points.map(p => `${gx(p)},${gy(p)}`).join(' ')}
                           fill="none"
-                          stroke={metrics.strokeColor}
+                          stroke={isFence ? (isBlankGridMode ? '#1a1a1a' : '#ffffff') : metrics.strokeColor}
                           strokeWidth={sw}
                           strokeDasharray={dash}
                           strokeLinejoin="round"
@@ -2018,6 +2202,43 @@ function StepMapPlot({
                         />
                       )
                     )}
+
+                    {/* Fence picket marks — perpendicular ticks along each segment */}
+                    {isFence && outline.points.length >= 2 && (() => {
+                      const spacing = isBlankGridMode ? 14 / blankGridScale : 14;
+                      const half   = isBlankGridMode ?  6 / blankGridScale :  6;
+                      const ticks: React.ReactNode[] = [];
+                      for (let si = 0; si < outline.points.length - 1; si++) {
+                        const ax = gx(outline.points[si]);
+                        const ay = gy(outline.points[si]);
+                        const bx = gx(outline.points[si + 1]);
+                        const by = gy(outline.points[si + 1]);
+                        const dx = bx - ax;
+                        const dy = by - ay;
+                        const len = Math.sqrt(dx * dx + dy * dy);
+                        if (len < 1) continue;
+                        const ux = dx / len;
+                        const uy = dy / len;
+                        const px = -uy; // perpendicular unit vector
+                        const py = ux;
+                        const n = Math.max(1, Math.round(len / spacing));
+                        for (let t = 0; t <= n; t++) {
+                          const cx = ax + ux * (len * t / n);
+                          const cy = ay + uy * (len * t / n);
+                          ticks.push(
+                            <line
+                              key={`f-${si}-${t}`}
+                              x1={cx - px * half} y1={cy - py * half}
+                              x2={cx + px * half} y2={cy + py * half}
+                              stroke={isBlankGridMode ? '#1a1a1a' : '#ffffff'}
+                              strokeWidth={sw}
+                              strokeLinecap="round"
+                            />
+                          );
+                        }
+                      }
+                      return <>{ticks}</>;
+                    })()}
 
                     {shouldShowOutlineText && metrics.centroid && (
                       <g transform={isBlankGridMode
@@ -2032,13 +2253,13 @@ function StepMapPlot({
                           className={styles.mapHomeFootprintText}
                           style={{ fill: metrics.strokeColor }}
                         >
-                          {showLegendLabels && (
+                          {(showLegendLabels || showSelectedInfo) && (
                             <tspan x={0} dy={showAreaLabel ? '-12' : '0'}>
                               {metrics.label}
                             </tspan>
                           )}
                           {showAreaLabel && (
-                            <tspan x={0} dy={showLegendLabels ? '16' : '0'}>
+                            <tspan x={0} dy={(showLegendLabels || showSelectedInfo) ? '16' : '0'}>
                               {`${Math.round(metrics.areaSqFt ?? 0).toLocaleString()} sq ft`}
                             </tspan>
                           )}
@@ -2070,7 +2291,44 @@ function StepMapPlot({
                       </g>
                     )}
 
-                    {canRenderDimensions && selectedSegment && (
+                    {/* House + Garage: show all wall labels at once when ruler is on */}
+                    {canRenderDimensions && outline.isClosed && (outline.type === 'house' || outline.type === 'garage') &&
+                      getOutlineSegmentDimensions(outline).map((seg, i) => {
+                        const label = `${Math.round(seg.feet)} ft`;
+                        const bubbleW = Math.max(46, label.length * 8 + 18);
+                        return (
+                          <g
+                            key={`dim-${outline.id}-${i}`}
+                            transform={isBlankGridMode
+                              ? `translate(${seg.x * W} ${seg.y * H}) scale(${1 / blankGridScale})`
+                              : `translate(${seg.x * W} ${seg.y * H})`}
+                          >
+                            <rect
+                              x={-bubbleW / 2}
+                              y={-11}
+                              width={bubbleW}
+                              height={22}
+                              rx="9"
+                              ry="9"
+                              className={styles.mapDimensionBubble}
+                            />
+                            <text
+                              x={0}
+                              y={0}
+                              textAnchor="middle"
+                              dominantBaseline="middle"
+                              className={styles.mapDimensionText}
+                              style={{ fill: metrics.strokeColor }}
+                            >
+                              {label}
+                            </text>
+                          </g>
+                        );
+                      })
+                    }
+
+                    {/* Other outline types: click a wall to see its measurement */}
+                    {canRenderDimensions && selectedSegment && outline.type !== 'house' && outline.type !== 'garage' && (
                       <>
                         <line
                           x1={selectedSegment.x1 * W}
@@ -2137,8 +2395,8 @@ function StepMapPlot({
                       <>
                         {isActive && !outline.isClosed && snapToFirst && (
                           <circle
-                            cx={gx(outline.points[0])}
-                            cy={gy(outline.points[0])}
+                            cx={isFence ? gx(outline.points[outline.points.length - 1]) : gx(outline.points[0])}
+                            cy={isFence ? gy(outline.points[outline.points.length - 1]) : gy(outline.points[0])}
                             r={isBlankGridMode ? 18 / blankGridScale : 18}
                             fill="none"
                             stroke={isFence ? '#22c55e' : '#f97316'}
@@ -2163,7 +2421,7 @@ function StepMapPlot({
                 );
               })}
             </svg>
-	            {mapPlotData.stamps.map(stamp => {
+            {mapPlotData.stamps.map(stamp => {
               const option = getMapStampOption(stamp.type);
               const isPestStamp = option.category === 'pest';
               const isObjectStamp = option.category === 'object';
@@ -2202,6 +2460,8 @@ function StepMapPlot({
                     left: `${stamp.x * 100}%`,
                     top: `${stamp.y * 100}%`,
                     transform: `translate(-50%, -50%) rotate(${stamp.rotation ?? 0}deg) scale(${stampScale})`,
+                    opacity: showDimensions ? 0.25 : 1,
+                    transition: 'opacity 0.2s ease',
                     ...(pestModalStampId && (isPestStamp || isBaitStation || isConditionStamp || isStationStamp) ? { opacity: 1 } : {}),
                     ...(!isActiveStamp && isConditionStamp
                       ? { color: 'var(--UI-Alert-500, #FD484F)' }
@@ -2210,7 +2470,7 @@ function StepMapPlot({
                       : !isActiveStamp && isStationStamp
                       ? { color: 'var(--blue-500, #0075de)' }
                       : !isActiveStamp && isObjectStamp
-                      ? { color: '#ffffff' }
+                      ? { color: isBlankGridMode ? '#1a1a1a' : '#ffffff' }
                       : !isActiveStamp
                       ? { backgroundColor: option.color, color: '#ffffff' }
                       : {}),
@@ -2232,7 +2492,7 @@ function StepMapPlot({
                             : s
                         ),
                       });
-                    } else if (isPestStamp || isConditionStamp || isBaitStation) {
+                    } else if (isPestStamp || isConditionStamp || isBaitStation || isStationStamp) {
                       if (mapRef.current) {
                         const canvasRect = mapRef.current.getBoundingClientRect();
                         const btnRect = event.currentTarget.getBoundingClientRect();
@@ -2887,7 +3147,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                           : isStationStamp
                           ? { color: stampColor ?? 'var(--blue-500, #0075de)' }
                           : isObjectStamp
-                          ? { color: '#ffffff' }
+                          ? { color: mapPlotData.backgroundMode === 'blank-grid' ? '#1a1a1a' : '#ffffff' }
                           : { backgroundColor: option.color, color: '#ffffff' }),
                       }}
                       title={hasDetails ? `${stamp.customConditionText || stamp.displayLabel || option.label} finding` : `${stamp.customConditionText || stamp.displayLabel || option.label} (no notes/photos)`}

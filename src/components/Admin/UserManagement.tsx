@@ -20,6 +20,11 @@ interface UserWithProfile {
     last_name: string;
     email: string;
     role?: string;
+    title?: string;
+    phone?: string;
+    contact_email?: string;
+    uploaded_avatar_url?: string;
+    avatar_url?: string;
   };
 }
 
@@ -309,9 +314,44 @@ function EditUserModal({
     last_name: user.profiles?.last_name || '',
     email: user.email,
     role: user.profiles?.role || 'user',
+    title: user.profiles?.title || '',
+    phone: user.profiles?.phone || '',
+    contact_email: user.profiles?.contact_email || '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const currentAvatarUrl = avatarPreview
+    || user.profiles?.uploaded_avatar_url
+    || user.profiles?.avatar_url
+    || null;
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user.profiles) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarPreview(URL.createObjectURL(file));
+    setAvatarUploading(true);
+    setProfileError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch(`/api/admin/users/${user.profiles.id}/avatar`, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setAvatarPreview(data.url);
+      onUserUpdated({ ...user, profiles: user.profiles ? { ...user.profiles, uploaded_avatar_url: data.url } : user.profiles });
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : 'Avatar upload failed');
+      setAvatarPreview(null);
+    } finally {
+      setAvatarUploading(false);
+      if (avatarInputRef.current) avatarInputRef.current.value = '';
+    }
+  };
 
   // Per-relationship pending changes
   const [pendingRoles, setPendingRoles] = useState<
@@ -439,6 +479,34 @@ function EditUserModal({
           {user.profiles && (
             <section className={styles.modalSection}>
               <h4 className={styles.sectionTitle}>Profile</h4>
+
+              {/* Avatar */}
+              <div className={styles.avatarEditRow}>
+                {currentAvatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentAvatarUrl} alt="Avatar" className={styles.avatarThumb} />
+                ) : (
+                  <div className={styles.avatarThumbPlaceholder}>
+                    {profileForm.first_name.charAt(0)}{profileForm.last_name.charAt(0)}
+                  </div>
+                )}
+                <button
+                  type="button"
+                  className={styles.uploadAvatarBtn}
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                >
+                  {avatarUploading ? 'Uploading…' : 'Upload Photo'}
+                </button>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarChange}
+                />
+              </div>
+
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label className={styles.label}>First Name</label>
@@ -479,6 +547,39 @@ function EditUserModal({
                     <option value="project_manager">Project Manager</option>
                     <option value="admin">Admin</option>
                   </select>
+                </div>
+              </div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Title</label>
+                  <input
+                    className={styles.input}
+                    placeholder="e.g. Lead Sales Inspector"
+                    value={profileForm.title}
+                    onChange={e => setProfileForm(p => ({ ...p, title: e.target.value }))}
+                  />
+                </div>
+              </div>
+              <div className={styles.formRow}>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Contact Phone</label>
+                  <input
+                    className={styles.input}
+                    type="tel"
+                    placeholder="e.g. (555) 867-5309"
+                    value={profileForm.phone}
+                    onChange={e => setProfileForm(p => ({ ...p, phone: e.target.value }))}
+                  />
+                </div>
+                <div className={styles.formGroup}>
+                  <label className={styles.label}>Contact Email</label>
+                  <input
+                    className={styles.input}
+                    type="email"
+                    placeholder="e.g. john@yourcompany.com"
+                    value={profileForm.contact_email}
+                    onChange={e => setProfileForm(p => ({ ...p, contact_email: e.target.value }))}
+                  />
                 </div>
               </div>
               {profileError && <p className={styles.fieldError}>{profileError}</p>}

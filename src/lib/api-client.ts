@@ -95,7 +95,7 @@ export const adminAPI = {
 
   async updateUser(
     userId: string,
-    userData: { email: string; first_name: string; last_name: string }
+    userData: { email: string; first_name: string; last_name: string; title?: string; phone?: string; contact_email?: string }
   ) {
     return authenticatedFetch(`/api/admin/users/${userId}`, {
       method: 'PUT',
