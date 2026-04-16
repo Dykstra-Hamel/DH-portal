@@ -243,7 +243,7 @@ export async function GET(request: NextRequest) {
     // Get profiles for these users
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email, avatar_url')
+      .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
       .in('id', Array.from(userIds));
 
     if (profilesError) {
@@ -611,7 +611,7 @@ export async function POST(request: NextRequest) {
 
     const { data: profiles, error: profilesError } = await supabase
       .from('profiles')
-      .select('id, first_name, last_name, email, avatar_url')
+      .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
       .in('id', userIds);
 
     if (profilesError) {

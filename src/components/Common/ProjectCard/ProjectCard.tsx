@@ -240,7 +240,7 @@ export function ProjectCard({
               firstName={project.assigned_to_profile.first_name}
               lastName={project.assigned_to_profile.last_name}
               email={project.assigned_to_profile.email}
-              avatarUrl={project.assigned_to_profile.avatar_url}
+              avatarUrl={project.assigned_to_profile.uploaded_avatar_url || project.assigned_to_profile.avatar_url}
               size="small"
               showTooltip={false}
             />

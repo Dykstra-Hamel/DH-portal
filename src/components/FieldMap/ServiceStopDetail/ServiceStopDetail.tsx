@@ -118,7 +118,7 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
     const params = new URLSearchParams();
     if (selectedCompany?.id) params.set('companyId', selectedCompany.id);
     if (stop.routeStopId) params.set('routeStopId', stop.routeStopId);
-    router.push(`/field-ops/field-map/service/${stopId}/wizard?${params.toString()}`);
+    router.push(`/field-sales/field-map/service/${stopId}/wizard?${params.toString()}`);
   }
 
   if (loading) {

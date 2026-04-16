@@ -19,7 +19,7 @@ export type PrimaryNavItem =
   | 'project-management'
   | 'tech-leads'
   | 'field-map'
-  | 'field-ops';
+  | 'field-sales';
 
 interface NavigationContextType {
   activePrimaryNav: PrimaryNavItem;
@@ -63,8 +63,8 @@ export function NavigationProvider({ children }: { children: ReactNode }) {
       setActivePrimaryNav('tech-leads');
     } else if (pathname.startsWith('/field-map')) {
       setActivePrimaryNav('field-map');
-    } else if (pathname.startsWith('/field-ops')) {
-      setActivePrimaryNav('field-ops');
+    } else if (pathname.startsWith('/field-sales')) {
+      setActivePrimaryNav('field-sales');
     } else if (pathname.startsWith('/dashboard')) {
       setActivePrimaryNav('dashboard');
     } else {

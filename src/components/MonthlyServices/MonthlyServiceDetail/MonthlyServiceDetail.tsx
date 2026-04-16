@@ -94,6 +94,7 @@ interface Profile {
   last_name?: string;
   email: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 interface TaskTemplate {
@@ -154,6 +155,7 @@ interface MonthlyServiceComment {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   attachments?: CommentAttachment[];
   reactions?: CommentReaction[];
@@ -1794,7 +1796,7 @@ export function MonthlyServiceDetail({
                             comment.user_profile?.last_name || undefined
                           }
                           email={comment.user_profile?.email || ''}
-                          avatarUrl={comment.user_profile?.avatar_url || null}
+                          avatarUrl={comment.user_profile?.uploaded_avatar_url || comment.user_profile?.avatar_url || null}
                           size="small"
                           showTooltip={true}
                           className={styles.commentAvatarMini}

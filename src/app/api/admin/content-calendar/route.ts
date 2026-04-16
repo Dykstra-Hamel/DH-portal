@@ -136,8 +136,8 @@ export async function GET(request: NextRequest) {
         topic,
         service_month,
         sort_order,
-        project_tasks!task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) ),
-        social_media_task:project_tasks!social_media_task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url ) )
+        project_tasks!task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url, uploaded_avatar_url ) ),
+        social_media_task:project_tasks!social_media_task_id ( is_completed, due_date, assigned_to, profiles:assigned_to ( first_name, last_name, email, avatar_url, uploaded_avatar_url ) )
       `)
       .in('monthly_service_id', serviceIds)
       .order('sort_order', { ascending: true, nullsFirst: false })
@@ -191,7 +191,7 @@ export async function GET(request: NextRequest) {
           ? `${(task.profiles as any).first_name ?? ''} ${(task.profiles as any).last_name ?? ''}`.trim() || null
           : null,
         task_assignee_email: task?.profiles ? (task.profiles as any).email ?? null : null,
-        task_assignee_avatar_url: task?.profiles ? (task.profiles as any).avatar_url ?? null : null,
+        task_assignee_avatar_url: task?.profiles ? ((task.profiles as any).uploaded_avatar_url || (task.profiles as any).avatar_url) ?? null : null,
         social_media_task_id: (piece as any).social_media_task_id ?? null,
         social_media_task_is_completed: socialTask?.is_completed ?? null,
         social_media_task_due_date: socialTask?.due_date ?? null,
@@ -199,7 +199,7 @@ export async function GET(request: NextRequest) {
           ? `${(socialTask.profiles as any).first_name ?? ''} ${(socialTask.profiles as any).last_name ?? ''}`.trim() || null
           : null,
         social_media_task_assignee_email: socialTask?.profiles ? (socialTask.profiles as any).email ?? null : null,
-        social_media_task_assignee_avatar_url: socialTask?.profiles ? (socialTask.profiles as any).avatar_url ?? null : null,
+        social_media_task_assignee_avatar_url: socialTask?.profiles ? ((socialTask.profiles as any).uploaded_avatar_url || (socialTask.profiles as any).avatar_url) ?? null : null,
       });
     }
 

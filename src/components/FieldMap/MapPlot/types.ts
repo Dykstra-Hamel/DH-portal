@@ -2,7 +2,7 @@
 
 export type MapPestStampType = 'ant' | 'termite' | 'cockroach' | 'spider' | 'mosquito' | 'rodent' | 'wasp' | 'bed-bug' | 'dynamic-pest';
 export type MapObjectStampType = 'door' | 'window' | 'sentricon-bait-station';
-export type MapElementStampType = 'house' | 'garage' | 'patio' | 'deck' | 'fence' | 'water';
+export type MapElementStampType = 'house' | 'garage' | 'patio' | 'deck' | 'fence' | 'water' | 'yard';
 export type MapConditionStampType = 'excessive-moisture' | 'faulty-grade' | 'earth-wood-contact' | 'inaccessible-areas' | 'other-condition';
 export type MapStationStampType = 'rodent-station' | 'bird-spikes' | 'bird-netting' | 'smart-defense';
 export type MapStampType = MapPestStampType | MapObjectStampType | MapElementStampType | MapConditionStampType | MapStationStampType;
@@ -115,6 +115,7 @@ export const MAP_ELEMENT_STAMP_OPTIONS: MapStampOption[] = [
   { type: 'house', label: 'Home', category: 'element', color: '#1d4ed8' },
   { type: 'garage', label: 'Garage', category: 'element', color: '#4338ca' },
   { type: 'deck', label: 'Deck/Patio', category: 'element', color: '#7c3aed' },
+  { type: 'yard', label: 'Yard', category: 'element', color: '#16a34a' },
   { type: 'water', label: 'Water', category: 'element', color: '#0284c7' },
   { type: 'fence', label: 'Fence', category: 'element', color: '#92400e' },
 ];

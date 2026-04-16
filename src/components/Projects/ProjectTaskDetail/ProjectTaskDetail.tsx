@@ -46,6 +46,7 @@ interface MentionUser {
   last_name?: string | null;
   email?: string | null;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 interface ProjectTaskDetailProps {
@@ -1900,7 +1901,7 @@ export default function ProjectTaskDetail({
                               comment.user_profile?.last_name || undefined
                             }
                             email={comment.user_profile?.email || ''}
-                            avatarUrl={comment.user_profile?.avatar_url || null}
+                            avatarUrl={comment.user_profile?.uploaded_avatar_url || comment.user_profile?.avatar_url || null}
                             size="small"
                             showTooltip={true}
                           />

@@ -134,7 +134,8 @@ export async function PUT(
           first_name,
           last_name,
           email,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         )
       `
       )

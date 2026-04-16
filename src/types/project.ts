@@ -90,6 +90,7 @@ export interface ProjectMember {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
 }
 
@@ -135,6 +136,7 @@ export interface Project {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   assigned_to_profile: {
     id: string;
@@ -142,6 +144,7 @@ export interface Project {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   } | null;
   company: {
     id: string;
@@ -197,6 +200,7 @@ export interface User {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
 }
 
@@ -340,6 +344,7 @@ export interface ProjectTask {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   } | null;
   created_by_profile?: {
     id: string;
@@ -347,6 +352,7 @@ export interface ProjectTask {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   subtasks?: ProjectTask[];
   comments?: ProjectTaskComment[];
@@ -411,6 +417,7 @@ export interface ProjectTaskComment {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   attachments?: ProjectCommentAttachment[];
   reactions?: CommentReaction[];
@@ -432,6 +439,7 @@ export interface ProjectTaskActivity {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
 }
 
@@ -497,7 +505,7 @@ export interface ProjectProof {
   updated_at: string;
   feedback_total?: number;
   feedback_resolved?: number;
-  uploaded_by_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+  uploaded_by_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null; uploaded_avatar_url?: string | null };
 }
 
 export interface ProofGroup {
@@ -523,7 +531,7 @@ export interface ProofFeedback {
   is_resolved: boolean;
   created_at: string;
   updated_at: string;
-  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null; uploaded_avatar_url?: string | null };
 }
 
 export interface ProofFeedbackActivity {
@@ -537,7 +545,7 @@ export interface ProofFeedbackActivity {
   page_number: number;
   is_resolved: boolean;
   created_at: string;
-  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null };
+  user_profile?: { id: string; first_name: string; last_name: string; avatar_url?: string | null; uploaded_avatar_url?: string | null };
   proof?: { id: string; file_name: string; version: number; is_current: boolean; mime_type: string };
 }
 
@@ -561,6 +569,7 @@ export interface ProjectComment {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   attachments?: ProjectCommentAttachment[];
   reactions?: CommentReaction[];
@@ -586,6 +595,7 @@ export interface ProjectActivity {
     last_name: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
 }
 

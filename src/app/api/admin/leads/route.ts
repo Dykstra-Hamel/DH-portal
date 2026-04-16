@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     if (userIds.size > 0) {
       const { data: profilesData, error: profilesError } = await supabase
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .in('id', Array.from(userIds));
 
       if (profilesError) {

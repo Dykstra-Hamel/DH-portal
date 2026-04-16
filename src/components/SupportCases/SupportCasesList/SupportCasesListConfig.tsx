@@ -163,6 +163,7 @@ export const getSupportCaseColumns = (): ColumnDefinition<SupportCase>[] => [
                 lastName={supportCase.assigned_user.last_name}
                 email={supportCase.assigned_user.email}
                 avatarUrl={supportCase.assigned_user.avatar_url}
+                uploadedAvatarUrl={supportCase.assigned_user.uploaded_avatar_url}
                 size="small"
               />
             )}

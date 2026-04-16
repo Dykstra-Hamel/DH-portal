@@ -717,7 +717,7 @@ export function TechLeadsOpportunities() {
                 className={styles.restoreDraftBtn}
                 onClick={() => {
                   closeModals();
-                  router.push('/field-ops/tech-leads/new');
+                  router.push('/field-sales/tech-leads/new');
                 }}
               >
                 Restore Draft

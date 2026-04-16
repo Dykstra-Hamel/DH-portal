@@ -37,7 +37,7 @@ export async function PATCH(
         .update({ is_approved: true, updated_at: new Date().toISOString() })
         .eq('id', proofId)
         .eq('project_id', projectId)
-        .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)`)
+        .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)`)
         .single();
 
       if (error || !proof) {
@@ -52,7 +52,7 @@ export async function PATCH(
         .update({ is_approved: false, updated_at: new Date().toISOString() })
         .eq('id', proofId)
         .eq('project_id', projectId)
-        .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)`)
+        .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)`)
         .single();
 
       if (error || !proof) {
@@ -90,7 +90,7 @@ export async function PATCH(
         .from('project_proofs')
         .update({ is_current: true, updated_at: new Date().toISOString() })
         .eq('id', proofId)
-        .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url)`)
+        .select(`*, uploaded_by_profile:profiles!project_proofs_uploaded_by_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)`)
         .single();
 
       if (restoreError || !proof) {

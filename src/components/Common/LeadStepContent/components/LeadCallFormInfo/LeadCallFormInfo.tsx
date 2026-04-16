@@ -156,7 +156,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             firstName={lead.submitted_user.first_name || undefined}
             lastName={lead.submitted_user.last_name || undefined}
             email={lead.submitted_user.email}
-            avatarUrl={lead.submitted_user.avatar_url || null}
+            avatarUrl={lead.submitted_user.uploaded_avatar_url || lead.submitted_user.avatar_url || null}
             size="small"
             showTooltip={true}
           />

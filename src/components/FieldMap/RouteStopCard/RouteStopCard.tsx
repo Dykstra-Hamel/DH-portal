@@ -85,8 +85,8 @@ export function RouteStopCard({
     : null;
 
   const href = isTechnicianOnly
-    ? `/field-ops/tech-leads/new?type=upsell${stop.routeStopId ? `&routeStopId=${stop.routeStopId}` : ''}`
-    : `/field-ops/field-map/service/${stop.stopId}${companyId ? `?companyId=${companyId}` : ''}`;
+    ? `/field-sales/tech-leads/new?type=upsell${stop.routeStopId ? `&routeStopId=${stop.routeStopId}` : ''}`
+    : `/field-sales/field-map/service/${stop.stopId}${companyId ? `?companyId=${companyId}` : ''}`;
 
   return (
     <Link href={href} className={styles.card}>

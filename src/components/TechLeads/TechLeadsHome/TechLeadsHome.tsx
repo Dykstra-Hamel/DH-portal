@@ -59,7 +59,7 @@ interface TechLeadsHomeProps {
 
 export function TechLeadsHome({
   showNav = true,
-  newPath = '/field-ops/tech-leads/new',
+  newPath = '/field-sales/tech-leads/new',
 }: TechLeadsHomeProps) {
   const router = useRouter();
   const { selectedCompany } = useCompany();

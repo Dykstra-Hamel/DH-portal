@@ -37,18 +37,18 @@ export async function GET(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         comments:project_task_comments(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url),
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
           attachments:comment_attachments!task_comment_id(id, file_path, file_name, file_size, mime_type, created_at)
         ),
         activity:project_task_activity(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         project:projects(
           id,
@@ -79,8 +79,8 @@ export async function GET(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url)
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
       `
       )
       .eq('parent_task_id', taskId)
@@ -294,8 +294,8 @@ export async function PUT(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date)
       `
@@ -414,8 +414,8 @@ export async function PUT(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         project_task_category_assignments(

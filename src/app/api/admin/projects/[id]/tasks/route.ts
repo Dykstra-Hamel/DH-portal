@@ -55,8 +55,8 @@ export async function GET(
       .select(
         `
         *,
-        assigned_to_profile:profiles!assigned_to(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!created_by(id, first_name, last_name, email, avatar_url),
+        assigned_to_profile:profiles!assigned_to(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!created_by(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         project_task_category_assignments(
@@ -215,8 +215,8 @@ export async function POST(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date)
       `
@@ -253,8 +253,8 @@ export async function POST(
       .select(
         `
         *,
-        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url),
-        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url),
+        assigned_to_profile:profiles!project_tasks_assigned_to_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+        created_by_profile:profiles!project_tasks_created_by_fkey(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         blocking_task:blocks_task_id(id, title, is_completed, assigned_to, due_date),
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         project_task_category_assignments(

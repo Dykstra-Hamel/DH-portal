@@ -32,7 +32,7 @@ export async function GET(
         page_number,
         is_resolved,
         created_at,
-        user_profile:profiles!proof_feedback_user_id_fkey(id, first_name, last_name, avatar_url),
+        user_profile:profiles!proof_feedback_user_id_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url),
         proof:project_proofs!proof_feedback_proof_id_fkey(id, file_name, version, is_current, mime_type)
       `)
       .eq('project_id', projectId)
