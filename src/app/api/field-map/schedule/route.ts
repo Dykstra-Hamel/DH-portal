@@ -79,6 +79,16 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', leadId);
 
+    // Mark any linked route stops as completed so reports reflect the inspector's work
+    await adminClient
+      .from('route_stops')
+      .update({
+        status: 'completed',
+        actual_departure: new Date().toISOString(),
+      })
+      .eq('lead_id', leadId)
+      .neq('status', 'completed');
+
     // Record signature on quote
     if (signatureData) {
       await adminClient

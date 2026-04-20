@@ -120,7 +120,7 @@
   border-radius: 20px;
   font-size: 12px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   white-space: nowrap;
   background: var(--gray-100);
   color: var(--gray-400);
@@ -214,7 +214,7 @@
   padding: 10px 12px;
   font-size: 14px;
   color: var(--gray-800);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   resize: vertical;
   box-sizing: border-box;
   background: var(--white);
@@ -234,7 +234,7 @@
   padding: 0 12px;
   font-size: 14px;
   color: var(--gray-800);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   box-sizing: border-box;
   background: var(--white);
 
@@ -255,14 +255,14 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--gray-700);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .fieldHint {
   margin: 2px 0 0;
   font-size: 12px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .errorState {
@@ -273,7 +273,7 @@
   background: var(--error-50);
   border-radius: 10px;
   margin: 0;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .mapAddressActions {
@@ -290,7 +290,7 @@
   color: var(--gray-700);
   font-size: 12px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -324,14 +324,14 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--blue-600);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .mapAddressSelectedValue {
   margin: 4px 0 0;
   font-size: 13px;
   color: var(--gray-800);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .planCard {
@@ -403,7 +403,7 @@
   padding: 0 10px;
   font-size: 14px;
   color: var(--gray-800);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   box-sizing: border-box;
   background: var(--white);
 
@@ -439,7 +439,7 @@
   color: var(--blue-500);
   font-size: 12px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   padding: 0;
 }
@@ -520,7 +520,7 @@
   background: transparent;
   color: var(--gray-600);
   font-size: 12px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   text-align: left;
   padding: 0;
@@ -530,7 +530,7 @@
   margin: 4px 0 0;
   font-size: 12px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .footer {
@@ -557,7 +557,7 @@
   border: 1px solid var(--error-200, #fecaca);
   border-radius: 8px;
   padding: 8px 12px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .nextBtn {
@@ -572,7 +572,7 @@
   font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   white-space: nowrap;
   transition:
     opacity 0.15s ease,
@@ -595,14 +595,14 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .mapAddressStepDesc {
   margin: 0;
   font-size: 14px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 // ── Customer info section (new inspections only) ─────────────────────────────
@@ -620,7 +620,7 @@
   font-size: 15px;
   font-weight: 700;
   color: var(--gray-800);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .customerSearchWrapper {
@@ -634,7 +634,7 @@
   border: 1.5px solid var(--gray-300);
   border-radius: 10px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
   background: var(--white);
   outline: none;
@@ -701,13 +701,13 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .customerResultMeta {
   font-size: 12px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .customerTextInput {
@@ -717,7 +717,7 @@
   border: 1.5px solid var(--gray-300);
   border-radius: 10px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
   background: var(--white);
   outline: none;
@@ -772,7 +772,7 @@
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   transition:
     opacity 0.15s ease,
     transform 0.1s ease;
@@ -797,7 +797,7 @@
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   transition:
     opacity 0.15s ease,
     transform 0.1s ease;
@@ -917,7 +917,7 @@
   color: var(--gray-700);
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   padding: 0 12px;
   cursor: pointer;
 
@@ -970,14 +970,14 @@
   font-size: 17px;
   font-weight: 700;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .modalBody {
   margin: 0 0 8px;
   font-size: 14px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   line-height: 1.5;
 }
 
@@ -997,7 +997,7 @@
   color: var(--white);
   font-size: 15px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: opacity 0.15s ease;
 
@@ -1015,7 +1015,7 @@
   color: var(--gray-700);
   font-size: 15px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: background 0.15s ease;
 

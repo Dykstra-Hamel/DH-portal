@@ -16,7 +16,7 @@
   font-weight: 700;
   color: var(--gray-900);
   margin: 0 0 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .tabs {
@@ -38,7 +38,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   white-space: nowrap;
   border-bottom: 2px solid transparent;
@@ -120,21 +120,21 @@
   font-weight: 600;
   color: var(--gray-800);
   margin: 0 0 4px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .leadAddress {
   font-size: 13px;
   color: var(--gray-600);
   margin: 0 0 4px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .leadDate {
   font-size: 12px;
   color: var(--gray-400);
   margin: 0;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .statusBadge {
@@ -143,7 +143,7 @@
   padding: 3px 8px;
   border-radius: 999px;
   text-transform: capitalize;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   white-space: nowrap;
 }
 
@@ -187,7 +187,7 @@
   border-radius: var(--border-radius-lg);
   font-size: 16px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: background 0.15s ease;
 
@@ -205,7 +205,7 @@
   padding: 48px 24px;
   color: var(--gray-400);
   font-size: 15px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .loadingState {
@@ -260,7 +260,7 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .modalClose {
@@ -304,14 +304,14 @@
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .detailValue {
   margin: 0;
   font-size: 14px;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .detailSection {
@@ -328,7 +328,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .multilineValue {
@@ -337,7 +337,7 @@
   color: var(--gray-900);
   white-space: pre-wrap;
   line-height: 1.45;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .noteList {
@@ -357,7 +357,7 @@
   margin: 0 0 4px;
   font-size: 11px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .noteText {
@@ -366,7 +366,7 @@
   color: var(--gray-900);
   white-space: pre-wrap;
   line-height: 1.4;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .emptyValue {
@@ -374,7 +374,7 @@
   font-size: 14px;
   color: var(--gray-500);
   font-style: italic;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .detailItemFull {
@@ -409,7 +409,7 @@
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 
   &:hover {
     color: var(--gray-700);

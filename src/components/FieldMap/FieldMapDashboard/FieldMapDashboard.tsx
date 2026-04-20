@@ -9,11 +9,13 @@ import {
 import styles from './FieldMapDashboard.module.scss';
 
 function formatDateHeader(date: Date): string {
-  return date.toLocaleDateString('en-US', {
-    weekday: 'long',
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const rest = date.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',
+    year: 'numeric',
   });
+  return `${weekday} - ${rest}`;
 }
 
 function useCountUp(target: number, duration = 700): number {
@@ -82,7 +84,7 @@ export function FieldMapDashboard({
   const selectedDateObj = new Date(selectedDate + 'T12:00:00');
   const isToday = selectedDate === todayStr;
 
-  type StopFilter = 'left' | 'total' | 'completed' | 'quoted' | 'won';
+  type StopFilter = 'left' | 'total' | 'completed';
   const [activeFilter, setActiveFilter] = useState<StopFilter>('left');
 
   const [stops, setStops] = useState<RouteStop[]>([]);
@@ -90,6 +92,17 @@ export function FieldMapDashboard({
   const [error, setError] = useState<string | null>(null);
   const [needsSetup, setNeedsSetup] = useState(false);
   const [inlineSrc, setInlineSrc] = useState<string | null>(null);
+  const dateInputRef = useRef<HTMLInputElement>(null);
+
+  const openDatePicker = () => {
+    const input = dateInputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === 'function') {
+      input.showPicker();
+    } else {
+      input.click();
+    }
+  };
 
   useEffect(() => {
     if (!companyId) return;
@@ -126,29 +139,22 @@ export function FieldMapDashboard({
   const completed = stops.filter(isCompleted).length;
   const remaining = stops.length - completed;
 
-  const quoted = stops.filter(s => s.leadStatus === 'quoted').length;
-  const won = stops.filter(
-    s => s.leadStatus === 'scheduling' || s.leadStatus === 'won'
-  ).length;
-
   const techReferred = stops.filter(s => s.referredToSales).length;
 
   const totalDisplay = useCountUp(stops.length);
   const completedDisplay = useCountUp(completed);
   const remainingDisplay = useCountUp(remaining);
-  const quotedDisplay = useCountUp(quoted);
-  const wonDisplay = useCountUp(won);
   const techReferredDisplay = useCountUp(techReferred);
 
-  const visibleStops = (() => {
-    switch (activeFilter) {
-      case 'total':     return stops;
-      case 'completed': return stops.filter(isCompleted);
-      case 'quoted':    return stops.filter(s => s.leadStatus === 'quoted');
-      case 'won':       return stops.filter(s => s.leadStatus === 'scheduling' || s.leadStatus === 'won');
-      default:          return stops.filter(s => !isCompleted(s)); // 'left'
-    }
-  })();
+  const visibleStops = embedded
+    ? stops.filter(s => !isCompleted(s))
+    : (() => {
+        switch (activeFilter) {
+          case 'total':     return stops;
+          case 'completed': return stops.filter(isCompleted);
+          default:          return stops.filter(s => !isCompleted(s)); // 'left'
+        }
+      })();
 
   // Find the next incomplete stop for inline street view (embedded mode)
   const nextIncompleteStop =
@@ -156,6 +162,11 @@ export function FieldMapDashboard({
     stops.find(s => s.lat != null && s.lng != null);
 
   useEffect(() => {
+    if (nextIncompleteStop?.housePhotoUrl) {
+      setInlineSrc(nextIncompleteStop.housePhotoUrl);
+      return;
+    }
+
     if (!nextIncompleteStop?.lat || !nextIncompleteStop?.lng) {
       setInlineSrc(null);
       return;
@@ -175,24 +186,50 @@ export function FieldMapDashboard({
       .then(r => r.json())
       .then(meta => setInlineSrc(meta.available ? streetSrc : satSrc))
       .catch(() => setInlineSrc(streetSrc));
-  }, [nextIncompleteStop?.lat, nextIncompleteStop?.lng]);
+  }, [nextIncompleteStop?.lat, nextIncompleteStop?.lng, nextIncompleteStop?.housePhotoUrl]);
 
   return (
     <div className={styles.page}>
       <div className={`${styles.body} ${embedded ? styles.bodyEmbedded : ''}`}>
         {/* Header */}
         <div className={styles.header}>
-          <div>
-            <h1 className={styles.title}>
-              {isToday ? 'Today\u2019s Route' : 'Route'}
-            </h1>
-            <p className={styles.date}>{formatDateHeader(selectedDateObj)}</p>
-          </div>
+          <h1 className={styles.title}>
+            {isToday ? 'Today\u2019s Route' : 'Route'}
+          </h1>
+          <button
+            type="button"
+            className={styles.dateTrigger}
+            onClick={openDatePicker}
+            aria-label="Change date"
+          >
+            <svg
+              className={styles.dateIcon}
+              width="19"
+              height="20"
+              viewBox="0 0 21 22"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M14 1V5M19 10.75V5C19 4.46957 18.7893 3.96086 18.4142 3.58579C18.0391 3.21071 17.5304 3 17 3H3C2.46957 3 1.96086 3.21071 1.58579 3.58579C1.21071 3.96086 1 4.46957 1 5V19C1 19.5304 1.21071 20.0391 1.58579 20.4142C1.96086 20.7893 2.46957 21 3 21H10.25M20 21L18.125 19.125M1 9H19M6 1V5M19 17C19 18.6569 17.6569 20 16 20C14.3431 20 13 18.6569 13 17C13 15.3431 14.3431 14 16 14C17.6569 14 19 15.3431 19 17Z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+            <span className={styles.dateLabel}>
+              {formatDateHeader(selectedDateObj)}
+            </span>
+          </button>
           <input
+            ref={dateInputRef}
             type="date"
-            className={styles.datePicker}
+            className={styles.hiddenDateInput}
             value={selectedDate}
             onChange={e => setSelectedDate(e.target.value)}
+            tabIndex={-1}
+            aria-hidden="true"
           />
         </div>
 
@@ -200,65 +237,88 @@ export function FieldMapDashboard({
         {!loading && !needsSetup && !error && stops.length > 0 && (
           isTechnicianOnly ? (
             <div className={styles.statsRowTech}>
-              <button
-                className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
-                onClick={() => setActiveFilter('total')}
-              >
-                <span className={styles.statNumber}>{totalDisplay}</span>
-                <span className={styles.statLabel}>Total</span>
-              </button>
-              <Link href="/tech-leads" className={styles.statCard}>
-                <span className={`${styles.statNumber} ${styles.statWon}`}>
-                  {techReferredDisplay}
-                </span>
-                <span className={styles.statLabel}>Leads Referred</span>
-              </Link>
+              {embedded ? (
+                <div className={styles.statCard}>
+                  <span className={styles.statNumber}>{totalDisplay}</span>
+                  <span className={styles.statLabel}>Total</span>
+                </div>
+              ) : (
+                <button
+                  className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
+                  onClick={() => setActiveFilter('total')}
+                >
+                  <span className={styles.statNumber}>{totalDisplay}</span>
+                  <span className={styles.statLabel}>Total</span>
+                </button>
+              )}
+              {embedded ? (
+                <div className={styles.statCard}>
+                  <span className={`${styles.statNumber} ${styles.statWon}`}>
+                    {techReferredDisplay}
+                  </span>
+                  <span className={styles.statLabel}>Leads Referred</span>
+                </div>
+              ) : (
+                <Link href="/tech-leads" className={styles.statCard}>
+                  <span className={`${styles.statNumber} ${styles.statWon}`}>
+                    {techReferredDisplay}
+                  </span>
+                  <span className={styles.statLabel}>Leads Referred</span>
+                </Link>
+              )}
             </div>
           ) : (
             <div className={styles.statsRow}>
-              <button
-                className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
-                onClick={() => setActiveFilter('total')}
-              >
-                <span className={styles.statNumber}>{totalDisplay}</span>
-                <span className={styles.statLabel}>Total</span>
-              </button>
-              <button
-                className={`${styles.statCard} ${activeFilter === 'completed' ? styles.statCardActive : ''}`}
-                onClick={() => setActiveFilter('completed')}
-              >
-                <span className={`${styles.statNumber} ${styles.statDone}`}>
-                  {completedDisplay}
-                </span>
-                <span className={styles.statLabel}>Completed</span>
-              </button>
-              <button
-                className={`${styles.statCard} ${activeFilter === 'left' ? styles.statCardActive : ''}`}
-                onClick={() => setActiveFilter('left')}
-              >
-                <span className={`${styles.statNumber} ${styles.statRemaining}`}>
-                  {remainingDisplay}
-                </span>
-                <span className={styles.statLabel}>Left</span>
-              </button>
-              <button
-                className={`${styles.statCard} ${activeFilter === 'quoted' ? styles.statCardActive : ''}`}
-                onClick={() => setActiveFilter('quoted')}
-              >
-                <span className={`${styles.statNumber} ${styles.statQuoted}`}>
-                  {quotedDisplay}
-                </span>
-                <span className={styles.statLabel}>Quoted</span>
-              </button>
-              <button
-                className={`${styles.statCard} ${activeFilter === 'won' ? styles.statCardActive : ''}`}
-                onClick={() => setActiveFilter('won')}
-              >
-                <span className={`${styles.statNumber} ${styles.statWon}`}>
-                  {wonDisplay}
-                </span>
-                <span className={styles.statLabel}>Won</span>
-              </button>
+              {embedded ? (
+                <div className={styles.statCard}>
+                  <span className={styles.statNumber}>{totalDisplay}</span>
+                  <span className={styles.statLabel}>Total</span>
+                </div>
+              ) : (
+                <button
+                  className={`${styles.statCard} ${activeFilter === 'total' ? styles.statCardActive : ''}`}
+                  onClick={() => setActiveFilter('total')}
+                >
+                  <span className={styles.statNumber}>{totalDisplay}</span>
+                  <span className={styles.statLabel}>Total</span>
+                </button>
+              )}
+              {embedded ? (
+                <div className={styles.statCard}>
+                  <span className={`${styles.statNumber} ${styles.statDone}`}>
+                    {completedDisplay}
+                  </span>
+                  <span className={styles.statLabel}>Completed</span>
+                </div>
+              ) : (
+                <button
+                  className={`${styles.statCard} ${activeFilter === 'completed' ? styles.statCardActive : ''}`}
+                  onClick={() => setActiveFilter('completed')}
+                >
+                  <span className={`${styles.statNumber} ${styles.statDone}`}>
+                    {completedDisplay}
+                  </span>
+                  <span className={styles.statLabel}>Completed</span>
+                </button>
+              )}
+              {embedded ? (
+                <div className={styles.statCard}>
+                  <span className={`${styles.statNumber} ${styles.statRemaining}`}>
+                    {remainingDisplay}
+                  </span>
+                  <span className={styles.statLabel}>Left</span>
+                </div>
+              ) : (
+                <button
+                  className={`${styles.statCard} ${activeFilter === 'left' ? styles.statCardActive : ''}`}
+                  onClick={() => setActiveFilter('left')}
+                >
+                  <span className={`${styles.statNumber} ${styles.statRemaining}`}>
+                    {remainingDisplay}
+                  </span>
+                  <span className={styles.statLabel}>Left</span>
+                </button>
+              )}
             </div>
           )
         )}
@@ -352,21 +412,26 @@ export function FieldMapDashboard({
 
         {/* Stop list */}
         {!loading && !needsSetup && !error && stops.length > 0 && (
-          <div className={styles.stopList}>
-            {visibleStops.map(stop => (
-              <RouteStopCard
-                key={stop.stopId}
-                stop={stop}
-                companyId={companyId}
-                isTechnicianOnly={isTechnicianOnly}
-                imageSrc={
-                  stop.stopId === nextIncompleteStop?.stopId
-                    ? (inlineSrc ?? undefined)
-                    : undefined
-                }
-              />
-            ))}
-          </div>
+          <>
+            <h2 className={styles.upNextHeading}>Up Next</h2>
+            <div className={styles.stopListContainer}>
+              <div className={styles.stopList}>
+                {visibleStops.map(stop => (
+                  <RouteStopCard
+                    key={stop.stopId}
+                    stop={stop}
+                    companyId={companyId}
+                    isTechnicianOnly={isTechnicianOnly}
+                    imageSrc={
+                      stop.stopId === nextIncompleteStop?.stopId
+                        ? (inlineSrc ?? undefined)
+                        : undefined
+                    }
+                  />
+                ))}
+              </div>
+            </div>
+          </>
         )}
       </div>
     </div>

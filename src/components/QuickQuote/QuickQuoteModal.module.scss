@@ -46,7 +46,7 @@
   border: none;
   color: var(--gray-500);
   font-size: 13px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   padding: 6px 8px;
   border-radius: 6px;
@@ -175,7 +175,7 @@
   border: 1px solid var(--gray-300);
   border-radius: 8px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-800);
   outline: none;
   box-sizing: border-box;
@@ -207,7 +207,7 @@
   color: var(--gray-600);
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: all 0.15s;
 
@@ -225,7 +225,7 @@
   color: var(--white);
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: background 0.15s;
 

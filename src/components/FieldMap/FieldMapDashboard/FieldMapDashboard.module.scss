@@ -106,10 +106,8 @@
 
 .body {
   flex: 1;
-  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
 }
 
 // ─── Inline Street View (embedded mode) ───────────────────────────────────────
@@ -140,46 +138,74 @@
 // ─── Header ───────────────────────────────────────────────────────────────────
 
 .header {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.date {
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--blue-400);
-  margin: 0 0 2px;
+  gap: 12px;
+  margin-bottom: 20px;
 }
 
 .title {
-  font-size: 24px;
+  font-size: 20px;
+  font-style: normal;
   font-weight: 700;
-  color: var(--gray-900);
+  line-height: 24px;
+  color: var(--gray-700);
   margin: 0;
 }
 
-.datePicker {
+.dateTrigger {
   appearance: none;
   background: transparent;
   border: none;
-  color: var(--gray-800);
+  padding: 4px 0;
+  margin: 0;
+  font-family: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--blue-400);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}
+
+.dateIcon {
+  color: var(--gray-500);
+  flex-shrink: 0;
+}
+
+.dateLabel {
+  color: var(--blue-600);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  cursor: pointer;
-  padding: 2px 0;
-  text-align: right;
+  white-space: nowrap;
+}
+
+.hiddenDateInput {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
 
 .statsRow {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px;
 }
 
@@ -225,7 +251,7 @@
 }
 
 .statDone {
-  color: var(--blue-500);
+  color: var(--blue-600);
 }
 
 .statRemaining {
@@ -247,6 +273,21 @@
 }
 
 // ─── Stop List ────────────────────────────────────────────────────────────────
+
+.upNextHeading {
+  margin: 27px 0 20px;
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 22px;
+  color: #252c37;
+}
+
+.stopListContainer {
+  border-radius: 8px;
+  background: #ebebeb;
+  padding: 15px;
+}
 
 .stopList {
   display: flex;

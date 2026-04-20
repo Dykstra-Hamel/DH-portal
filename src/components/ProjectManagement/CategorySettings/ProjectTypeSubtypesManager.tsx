@@ -106,7 +106,7 @@ export default function ProjectTypeSubtypesManager() {
         <div>
           <h2 className={styles.sectionTitle}>Project Type Subtypes</h2>
           <p style={{
-            fontFamily: 'var(--font-satoshi)',
+            fontFamily: 'var(--font-default)',
             fontSize: '14px',
             color: 'var(--gray-600)',
             margin: '4px 0 0 0',

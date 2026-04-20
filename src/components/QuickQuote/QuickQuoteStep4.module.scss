@@ -85,7 +85,7 @@
   border: 1px solid var(--gray-300);
   border-radius: 8px;
   font-size: 15px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-800);
   background: var(--white);
   outline: none;
@@ -124,7 +124,7 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: background 0.15s;
 

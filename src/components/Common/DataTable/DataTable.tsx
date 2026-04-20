@@ -11,8 +11,25 @@ import React, {
 import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
 import { Toast } from '@/components/Common/Toast';
 import DefaultItemRow from './DefaultItemRow';
+import CardItemRow from './CardItemRow';
 import { DataTableProps, SortConfig } from './DataTable.types';
 import styles from './DataTable.module.scss';
+
+// Watches a max-width media query and returns whether it currently matches.
+// Initialized to `false` so server-rendered markup (desktop) matches the
+// client's first paint, then flips on mount if the viewport is narrow.
+function useIsNarrow(breakpoint: number): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    setNarrow(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [breakpoint]);
+  return narrow;
+}
 
 export default function DataTable<T>({
   data,
@@ -35,6 +52,8 @@ export default function DataTable<T>({
   emptyStateMessage = 'No items found for this category.',
   tableType = 'tickets',
   customColumnWidths,
+  cardView,
+  cardBreakpoint = 1280,
   defaultSort,
   onShowToast,
   // Callbacks
@@ -42,6 +61,9 @@ export default function DataTable<T>({
   onSortChange,
   onSearchChange,
 }: DataTableProps<T>) {
+  const isNarrow = useIsNarrow(cardBreakpoint);
+  const useCardView = !!cardView && isNarrow;
+
   // Internal state - DataTable manages its own UI state
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort || null);
@@ -431,6 +453,68 @@ export default function DataTable<T>({
             </div>
           ) : sortedData.length === 0 ? (
             <div className={styles.emptyState}>{emptyStateMessage}</div>
+          ) : useCardView && cardView ? (
+            (() => {
+              const isSingleRow =
+                !cardView.summary && !cardView.avatar && !cardView.statusBar;
+              const actionCol =
+                isSingleRow && cardView.primaryAction ? '140px' : '0px';
+              const fieldWidths = cardView.topFields
+                .map(f => f.width ?? 'minmax(0, 1fr)')
+                .join(' ');
+              const gridTemplate = `${fieldWidths} ${actionCol}`;
+              return (
+            <div
+              className={styles.cardListContainer}
+              style={
+                {
+                  '--card-cols': cardView.topFields.length,
+                  '--card-action-col': actionCol,
+                  '--card-grid-template': gridTemplate,
+                } as React.CSSProperties
+              }
+            >
+              <div className={styles.cardListHeader}>
+                {cardView.topFields.map(field => (
+                  <div
+                    key={field.key}
+                    className={styles.cardListHeaderCell}
+                  >
+                    {field.label}
+                  </div>
+                ))}
+              </div>
+              <div className={styles.cardList} ref={dataRowsRef}>
+                {visibleSortedData.map((item, index) => {
+                  const rowKey = getRowKey(item, index);
+                  return (
+                    <CardItemRow
+                      key={rowKey}
+                      rowKey={rowKey}
+                      item={item}
+                      config={cardView}
+                      onAction={handleItemAction}
+                    />
+                  );
+                })}
+
+                {infiniteScrollEnabled && (
+                  <div ref={loadMoreRef} className={styles.loadMoreIndicator}>
+                    {loadingMore && (
+                      <div className={styles.loadMoreSpinner}>
+                        <div className={styles.spinner}></div>
+                        <span>Loading more...</span>
+                      </div>
+                    )}
+                    {hasMore && !loadingMore && (
+                      <div className={styles.loadMorePlaceholder} />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+              );
+            })()
           ) : (
             <div className={styles.dataContainer}>
               {/* Header Row */}

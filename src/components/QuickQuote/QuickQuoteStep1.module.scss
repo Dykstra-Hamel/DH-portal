@@ -60,7 +60,7 @@
   border-radius: 10px;
   cursor: pointer;
   transition: border-color 0.15s ease, background 0.15s ease, transform 0.1s ease;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 
   &:hover {
     border-color: var(--blue-300);

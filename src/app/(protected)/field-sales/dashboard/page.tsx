@@ -1,26 +1,21 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
 import { useUser } from '@/hooks/useUser';
 import { usePageActions } from '@/contexts/PageActionsContext';
+import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
 import { FieldMapDashboard } from '@/components/FieldMap/FieldMapDashboard/FieldMapDashboard';
 import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsDashboard/FieldSalesLeadsDashboard';
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
-import { Route, Ticket } from 'lucide-react';
+import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
+import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
+import AdditionalTasksPanel from '@/components/Tasks/AdditionalTasksPanel/AdditionalTasksPanel';
 import styles from './dashboard.module.scss';
 
-type FieldSalesView = 'leads' | 'route';
-
-interface Counts {
-  routeStops: number;
-  newLeads: number;
-  myLeads: number;
-  myActions: number;
-  myTasks: number;
-}
+type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions' | 'tasks';
 
 export default function FieldSalesDashboard() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -29,18 +24,16 @@ export default function FieldSalesDashboard() {
     userId ?? '',
     selectedCompany?.id ?? ''
   );
-  const { profile } = useUser();
-  const { setPageHeader } = usePageActions();
+  const { profile, user } = useUser();
+  const { setPageHeader, registerPageAction, unregisterPageAction } = usePageActions();
+  const { counts, newItemIndicators, clearNewItemIndicator } = useRealtimeCounts();
 
-  const [view, setView] = useState<FieldSalesView>('leads');
-  const [counts, setCounts] = useState<Counts>({
-    routeStops: 0,
-    newLeads: 0,
-    myLeads: 0,
-    myActions: 0,
-    myTasks: 0,
-  });
-  const [loadingCounts, setLoadingCounts] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('route');
+  const [routeStops, setRouteStops] = useState(0);
+  const [opportunitiesCount, setOpportunitiesCount] = useState(0);
+  const [createTrigger, setCreateTrigger] = useState(0);
+  const [sliderStyle, setSliderStyle] = useState<{ left: number; width: number } | null>(null);
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -55,7 +48,15 @@ export default function FieldSalesDashboard() {
     !departments.includes('inspector');
   const isInspector = isAdmin || departments.includes('inspector');
 
-  // Set page header title based on role
+  const TAB_ORDER = useMemo<DashboardTab[]>(
+    () =>
+      isTechnicianOnly
+        ? ['route', 'opportunities', 'tasks']
+        : ['route', 'leads', 'actions', 'tasks'],
+    [isTechnicianOnly]
+  );
+
+  // Set page header
   useEffect(() => {
     if (!profile) return;
     const firstName = profile.first_name || 'Your';
@@ -68,181 +69,205 @@ export default function FieldSalesDashboard() {
     };
   }, [profile, isTechnicianOnly, setPageHeader]);
 
-  // Fetch counts for inspector/admin cards
+  // Register add action when tasks tab is active
   useEffect(() => {
-    if (!isInspector || !selectedCompany?.id || !userId) return;
-    setLoadingCounts(true);
+    if (activeTab === 'tasks') {
+      registerPageAction('add', () => setCreateTrigger(prev => prev + 1));
+      return () => unregisterPageAction('add');
+    }
+  }, [activeTab, registerPageAction, unregisterPageAction]);
 
-    const companyId = selectedCompany.id;
+  // Fetch route stops count
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
     const today = new Date().toISOString().split('T')[0];
+    fetch(`/api/field-map/route?date=${today}&companyId=${selectedCompany.id}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => setRouteStops(d && Array.isArray(d.stops) ? d.stops.length : 0))
+      .catch(() => setRouteStops(0));
+  }, [selectedCompany?.id]);
 
-    Promise.all([
-      // Route stops count
-      fetch(`/api/field-map/route?date=${today}&companyId=${companyId}`)
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => (d && Array.isArray(d.stops) ? d.stops.length : 0))
-        .catch(() => 0),
-
-      // New leads count
-      fetch(
-        `/api/field-sales/leads?companyId=${companyId}&type=new&userId=${userId}`
+  // Fetch opportunities count (technician-only)
+  useEffect(() => {
+    if (!isTechnicianOnly || !selectedCompany?.id) {
+      setOpportunitiesCount(0);
+      return;
+    }
+    fetch(`/api/tech-leads/leads?companyId=${selectedCompany.id}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(d =>
+        setOpportunitiesCount(d && Array.isArray(d.leads) ? d.leads.length : 0)
       )
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => (d && Array.isArray(d.leads) ? d.leads.length : 0))
-        .catch(() => 0),
+      .catch(() => setOpportunitiesCount(0));
+  }, [isTechnicianOnly, selectedCompany?.id]);
 
-      // My leads count
-      fetch(
-        `/api/field-sales/leads?companyId=${companyId}&type=my&userId=${userId}`
-      )
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => (d && Array.isArray(d.leads) ? d.leads.length : 0))
-        .catch(() => 0),
+  // Update slider position whenever active tab changes or the tab resizes.
+  // useLayoutEffect so the slider is positioned before paint on first render.
+  // ResizeObserver catches the initial 0→actual-width flip in case the tab
+  // bar hasn't been laid out yet when the effect runs.
+  useLayoutEffect(() => {
+    const index = TAB_ORDER.indexOf(activeTab);
+    const tabEl = tabRefs.current[index];
+    if (!tabEl) return;
 
-      // Tasks (actions + regular)
-      fetch(
-        `/api/tasks?companyId=${companyId}&assignedTo=${userId}&includeArchived=false`
-      )
-        .then(r => (r.ok ? r.json() : null))
-        .then(d => {
-          const all = d && Array.isArray(d.tasks) ? d.tasks : [];
-          const actions = all.filter(
-            (t: any) => t.cadence_step_id && t.status !== 'completed'
-          );
-          const tasks = all.filter(
-            (t: any) => !t.cadence_step_id && t.status !== 'completed'
-          );
-          return { actions: actions.length, tasks: tasks.length };
-        })
-        .catch(() => ({ actions: 0, tasks: 0 })),
-    ])
-      .then(([routeStops, newLeads, myLeads, taskCounts]) => {
-        setCounts({
-          routeStops,
-          newLeads,
-          myLeads,
-          myActions: (taskCounts as { actions: number; tasks: number }).actions,
-          myTasks: (taskCounts as { actions: number; tasks: number }).tasks,
-        });
-      })
-      .finally(() => setLoadingCounts(false));
-  }, [isInspector, selectedCompany?.id, userId]);
+    const measure = () => {
+      if (!tabEl) return;
+      if (tabEl.offsetWidth === 0) return;
+      setSliderStyle({
+        left: tabEl.offsetLeft,
+        width: tabEl.offsetWidth,
+      });
+    };
 
-  // Technician-only: show route directly, no cards, no toggle
-  if (isTechnicianOnly) {
-    return (
-      <div className={styles.wrapper}>
-        <div className={styles.section}>
-          <FieldMapDashboard
-            companyId={selectedCompany?.id ?? ''}
-            isTechnicianOnly={true}
-          />
-        </div>
-        <FieldSalesNav />
-      </div>
-    );
-  }
+    measure();
+    const raf = requestAnimationFrame(measure);
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(tabEl);
 
-  // Inspector / Admin view
-  if (isInspector) {
+    return () => {
+      cancelAnimationFrame(raf);
+      resizeObserver.disconnect();
+    };
+  }, [activeTab, TAB_ORDER, isTechnicianOnly, isInspector]);
+
+  const handleTabClick = (tab: DashboardTab) => {
+    setActiveTab(tab);
+    if (tab === 'actions') clearNewItemIndicator('my_actions');
+    if (tab === 'tasks') clearNewItemIndicator('my_tasks');
+    if (tab === 'leads' || tab === 'opportunities')
+      clearNewItemIndicator('my_leads');
+  };
+
+  // Regular (non-action) tasks = total active - actions
+  const regularTasksCount = Math.max(0, counts.my_tasks - counts.my_actions);
+
+  // Inspector / Admin / Technician view (with tabs)
+  if (isTechnicianOnly || isInspector) {
     return (
       <div className={styles.wrapperInspector}>
-        {/* Top cards row */}
-        <div className={styles.cardsRow}>
-          {/* Card 1: toggle between route and leads */}
-          {view === 'leads' ? (
+        {/* Tab bar */}
+        <div className={styles.tabBarWrapper}>
+          <div className={styles.tabBar}>
+            {/* Sliding background */}
+            {sliderStyle && (
+              <div
+                className={styles.tabSlider}
+                style={{ left: sliderStyle.left, width: sliderStyle.width }}
+              />
+            )}
+
             <button
+              ref={el => { tabRefs.current[TAB_ORDER.indexOf('route')] = el; }}
               type="button"
-              className={`${styles.card} ${styles.toggleCard}`}
-              onClick={() => setView('route')}
+              className={`${styles.tab} ${activeTab === 'route' ? styles.tabActive : ''}`}
+              onClick={() => handleTabClick('route')}
             >
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>
-                  <Route size={18} />
-                  My Route
-                </span>
-                <span className={styles.badge}>
-                  {loadingCounts ? '…' : `${counts.routeStops} Stops`}
-                </span>
-              </div>
-              <p className={styles.cardDescription}>
-                See your schedule for today, where you will be going, and when.
-              </p>
+              <span className={styles.tabLabel}>My Route</span>
+              <span className={styles.tabCount}>{routeStops}</span>
             </button>
-          ) : (
-            <button
-              type="button"
-              className={`${styles.card} ${styles.toggleCard}`}
-              onClick={() => setView('leads')}
-            >
-              <div className={styles.cardHeader}>
-                <span className={styles.cardTitle}>
-                  <Ticket size={18} />
-                  New
-                </span>
+
+            {isTechnicianOnly && (
+              <button
+                ref={el => { tabRefs.current[TAB_ORDER.indexOf('opportunities')] = el; }}
+                type="button"
+                className={`${styles.tab} ${activeTab === 'opportunities' ? styles.tabActive : ''}`}
+                onClick={() => handleTabClick('opportunities')}
+              >
+                <span className={styles.tabLabel}>My Opportunities</span>
+                <span className={styles.tabCount}>{opportunitiesCount}</span>
+              </button>
+            )}
+
+            {!isTechnicianOnly && (
+              <button
+                ref={el => { tabRefs.current[TAB_ORDER.indexOf('leads')] = el; }}
+                type="button"
+                className={`${styles.tab} ${activeTab === 'leads' ? styles.tabActive : ''}`}
+                onClick={() => handleTabClick('leads')}
+              >
+                <span className={styles.tabLabel}>My Leads &amp; Sales</span>
                 <span
-                  className={`${styles.badge} ${counts.newLeads > 0 ? styles.badgeNew : ''}`}
+                  className={`${styles.tabCount} ${newItemIndicators.my_leads ? styles.tabCountNew : ''}`}
                 >
-                  {loadingCounts ? '…' : counts.newLeads}
+                  {counts.my_leads}
                 </span>
-                <span className={styles.cardTitle}>My Leads</span>
-                <span className={styles.badge}>
-                  {loadingCounts ? '…' : counts.myLeads}
+              </button>
+            )}
+
+            {!isTechnicianOnly && (
+              <button
+                ref={el => { tabRefs.current[TAB_ORDER.indexOf('actions')] = el; }}
+                type="button"
+                className={`${styles.tab} ${activeTab === 'actions' ? styles.tabActive : ''}`}
+                onClick={() => handleTabClick('actions')}
+              >
+                <span className={styles.tabLabel}>My Actions</span>
+                <span
+                  className={`${styles.tabCount} ${newItemIndicators.my_actions ? styles.tabCountNew : ''}`}
+                >
+                  {counts.my_actions}
                 </span>
-              </div>
-              <p className={styles.cardDescription}>
-                View new leads queue and assigned leads.
-              </p>
+              </button>
+            )}
+
+            <button
+              ref={el => { tabRefs.current[TAB_ORDER.indexOf('tasks')] = el; }}
+              type="button"
+              className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
+              onClick={() => handleTabClick('tasks')}
+            >
+              <span className={styles.tabLabel}>My Tasks</span>
+              <span
+                className={`${styles.tabCount} ${newItemIndicators.my_tasks ? styles.tabCountNew : ''}`}
+              >
+                {regularTasksCount}
+              </span>
             </button>
-          )}
-
-          {/* Card 2: My Actions */}
-          <button
-            type="button"
-            className={`${styles.card} ${styles.actionCard}`}
-            onClick={() => (window.location.href = '/field-sales/my-tasks')}
-          >
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>My Actions</span>
-              <span className={styles.badge}>
-                {loadingCounts ? '…' : counts.myActions}
-              </span>
-            </div>
-            <p className={styles.cardDescription}>
-              Actions for following up assigned leads.
-            </p>
-          </button>
-
-          {/* Card 3: My Tasks */}
-          <button
-            type="button"
-            className={`${styles.card} ${styles.taskCard}`}
-            onClick={() => (window.location.href = '/field-sales/my-tasks')}
-          >
-            <div className={styles.cardHeader}>
-              <span className={styles.cardTitle}>My Tasks</span>
-              <span className={styles.badge}>
-                {loadingCounts ? '…' : counts.myTasks}
-              </span>
-            </div>
-            <p className={styles.cardDescription}>
-              Personal tasks assigned to you.
-            </p>
-          </button>
+          </div>
         </div>
 
         {/* Main content area */}
         <div className={styles.contentArea}>
-          {view === 'leads' ? (
+          {activeTab === 'route' && (
+            <FieldMapDashboard
+              companyId={selectedCompany?.id ?? ''}
+              embedded
+              isTechnicianOnly={isTechnicianOnly}
+            />
+          )}
+
+          {activeTab === 'opportunities' && isTechnicianOnly && (
+            <div className={styles.opportunitiesSection}>
+              <TechLeadsOpportunities embedded />
+            </div>
+          )}
+
+          {activeTab === 'leads' && !isTechnicianOnly && (
             <div className={styles.leadsSection}>
-              <h2 className={styles.sectionTitle}>Leads</h2>
               <FieldSalesLeadsDashboard
                 companyId={selectedCompany?.id ?? ''}
                 userId={userId ?? ''}
               />
             </div>
-          ) : (
-            <FieldMapDashboard companyId={selectedCompany?.id ?? ''} embedded />
+          )}
+
+          {activeTab === 'actions' && !isTechnicianOnly && user && selectedCompany && (
+            <div className={styles.panelSection}>
+              <ActionsAutomationsPanel
+                companyId={selectedCompany.id}
+                userId={user.id}
+              />
+            </div>
+          )}
+
+          {activeTab === 'tasks' && user && selectedCompany && (
+            <div className={styles.panelSection}>
+              <AdditionalTasksPanel
+                companyId={selectedCompany.id}
+                userId={user.id}
+                externalCreateTrigger={createTrigger}
+              />
+            </div>
           )}
         </div>
 
@@ -251,7 +276,7 @@ export default function FieldSalesDashboard() {
     );
   }
 
-  // Fallback for no role yet determined
+  // Fallback
   return (
     <div className={styles.wrapper}>
       <FieldSalesNav />
