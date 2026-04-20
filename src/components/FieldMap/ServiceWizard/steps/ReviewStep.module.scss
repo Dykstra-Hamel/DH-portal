@@ -75,7 +75,7 @@
   font-size: 16px;
   font-weight: 800;
   color: var(--brand-primary, #111827);
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
   letter-spacing: -0.01em;
 }
 
@@ -161,7 +161,7 @@
   font-weight: 700;
   line-height: 22px;
   color: #111827;
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
 }
 
 .inspectorTitle {
@@ -170,7 +170,7 @@
   font-weight: 400;
   line-height: 22px;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .inspectorSeparator {
@@ -218,7 +218,7 @@
   font-weight: 400;
   line-height: 22px;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .addressLabelBreak {
@@ -233,7 +233,7 @@
   font-weight: 700;
   line-height: 22px;
   color: #111827;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 /* ── Hero extras ── */
@@ -244,7 +244,7 @@
   text-transform: uppercase;
   color: var(--brand-secondary, #6b7280);
   margin: 0 0 12px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .heroPests {
@@ -258,7 +258,7 @@
   letter-spacing: 0.07em;
   color: #9ca3af;
   margin: 0 0 10px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 /* Map layer — normal flow, drives container height, opacity animated via inline style */
@@ -299,7 +299,7 @@
   font-size: 14px;
   font-weight: 600;
   line-height: 16px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
 
   svg {
@@ -325,7 +325,7 @@
   -webkit-backdrop-filter: blur(6px);
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
   white-space: nowrap;
   transition:
@@ -400,7 +400,7 @@
   color: #374151;
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
   flex-shrink: 0;
   transition: background 0.15s ease;
@@ -431,7 +431,7 @@
   letter-spacing: 0.06em;
   color: #9ca3af;
   text-align: center;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .priceEditField {
@@ -464,7 +464,7 @@
   border: none;
   background: transparent;
   font-size: 13px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #111827;
   text-align: right;
 
@@ -500,7 +500,7 @@
   background: #fff;
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #6b7280;
   cursor: pointer;
   transition:
@@ -535,7 +535,7 @@
 .discountLabel {
   font-size: 14px;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   margin: 0;
 }
 
@@ -550,7 +550,7 @@
   border: 1px solid #d1d5db;
   border-radius: 8px;
   font-size: 13px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #374151;
   background: #fff;
   appearance: auto;
@@ -595,7 +595,7 @@
   border: none;
   background: transparent;
   font-size: 13px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #111827;
 
   &::placeholder {
@@ -627,7 +627,7 @@
   text-transform: uppercase;
   color: #9ca3af;
   margin: 0 0 8px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .notesText {
@@ -636,7 +636,7 @@
   line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 /* ── Spacer for sticky bar ── */
@@ -680,7 +680,7 @@
   border-radius: 30px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
   cursor: pointer;
   transition:
     opacity 0.15s ease,
@@ -708,7 +708,7 @@
   border-radius: 30px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
   cursor: pointer;
   transition:
     background 0.15s ease,
@@ -736,7 +736,7 @@
   border-radius: 10px;
   font-size: 13px;
   color: #dc2626;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .emailCapture {
@@ -751,7 +751,7 @@
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
   font-size: 14px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #111827;
   background: #fff;
 
@@ -774,7 +774,7 @@
   border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
   flex-shrink: 0;
 
@@ -794,7 +794,7 @@
   padding: 48px 24px;
   gap: 16px;
   text-align: center;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .successIcon {
@@ -814,7 +814,7 @@
   font-weight: 800;
   color: var(--brand-primary, #111827);
   letter-spacing: -0.5px;
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
 }
 
 .successSub {
@@ -834,7 +834,7 @@
   border-radius: 30px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
   cursor: pointer;
 }
 
@@ -868,14 +868,14 @@
   font-size: 18px;
   font-weight: 800;
   color: #111827;
-  font-family: var(--primary-font, var(--font-satoshi));
+  font-family: var(--primary-font, var(--font-default));
 }
 
 .sigSub {
   margin: -8px 0 0;
   font-size: 13px;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .sigLabel {
@@ -884,7 +884,7 @@
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   display: block;
   margin-bottom: 6px;
 }
@@ -895,7 +895,7 @@
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
   font-size: 15px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #111827;
   box-sizing: border-box;
 
@@ -922,14 +922,14 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   text-align: left;
 }
 
 .sigDate {
   font-size: 12px;
   color: #9ca3af;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   margin: 0;
 }
 
@@ -947,7 +947,7 @@
   color: #374151;
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
 }
 
@@ -959,7 +959,7 @@
   border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
 
   &:disabled {
@@ -972,7 +972,7 @@
   margin: 0;
   font-size: 13px;
   color: #dc2626;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 /* ── Unified schedule modal additions ── */
@@ -1016,7 +1016,7 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--gray-500, #6b7280);
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 }
 
 .sigDateRow {
@@ -1032,7 +1032,7 @@
   border: 1.5px solid #d1d5db;
   border-radius: 10px;
   font-size: 14px;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   color: #111827;
   background: #f9fafb;
   outline: none;
@@ -1056,7 +1056,7 @@
   color: #374151;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
 
   h1,
   h2,
@@ -1097,7 +1097,7 @@
   gap: 8px;
   font-size: 13px;
   color: #374151;
-  font-family: var(--secondary-font, var(--font-satoshi));
+  font-family: var(--secondary-font, var(--font-default));
   cursor: pointer;
 
   input[type='checkbox'] {

@@ -14,7 +14,7 @@ import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
 // Renders a read-only MapPlotCanvas from map_plot_data stored on the lead
-function FieldMapPlotSection({ mapPlotData }: { mapPlotData: MapPlotData | null }) {
+function FieldMapPlotSection({ mapPlotData, companyId }: { mapPlotData: MapPlotData | null; companyId?: string }) {
   if (!mapPlotData) return null;
 
   return (
@@ -26,6 +26,7 @@ function FieldMapPlotSection({ mapPlotData }: { mapPlotData: MapPlotData | null 
         mapPlotData={mapPlotData}
         onChange={() => {}}
         isReadOnly
+        companyId={companyId}
       />
     </div>
   );
@@ -286,7 +287,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
               </div>
             </div>
           )}
-          <FieldMapPlotSection mapPlotData={lead.map_plot_data ?? null} />
+          <FieldMapPlotSection mapPlotData={lead.map_plot_data ?? null} companyId={lead.company_id} />
         </div>
       ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>

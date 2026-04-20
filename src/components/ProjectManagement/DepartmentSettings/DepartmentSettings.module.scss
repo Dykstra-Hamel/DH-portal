@@ -20,7 +20,7 @@
 }
 
 .sectionTitle {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 20px;
   font-weight: 600;
   color: var(--gray-900);
@@ -36,7 +36,7 @@
   color: var(--white);
   border: none;
   border-radius: var(--border-radius);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
@@ -118,7 +118,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 15px;
   font-weight: 600;
   color: var(--gray-900);
@@ -135,7 +135,7 @@
   background: var(--gray-200);
   color: var(--gray-700);
   border-radius: 4px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -192,7 +192,7 @@
 }
 
 .emptyStateText {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 16px;
   font-weight: 500;
   color: var(--gray-600);
@@ -200,7 +200,7 @@
 }
 
 .emptyStateSubtext {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 400;
   color: var(--gray-500);
@@ -254,7 +254,7 @@
 }
 
 .modalTitle {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 20px;
   font-weight: 600;
   color: var(--gray-900);
@@ -279,7 +279,7 @@
 }
 
 .formLabel {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-800);
@@ -288,7 +288,7 @@
 
 .formInput {
   padding: 10px 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 500;
   color: var(--gray-900);
@@ -309,7 +309,7 @@
 }
 
 .formHint {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 12px;
   font-weight: 400;
   color: var(--gray-500);
@@ -323,7 +323,7 @@
   padding: 8px 16px;
   background: var(--gray-100);
   border-radius: var(--border-radius);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-900);
@@ -349,7 +349,7 @@
 
 .button {
   padding: 10px 20px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 600;
   border-radius: 8px;
@@ -402,7 +402,7 @@
 }
 
 .deleteWarningTitle {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 600;
   color: #991b1b;
@@ -410,7 +410,7 @@
 }
 
 .deleteWarningText {
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 13px;
   font-weight: 500;
   color: #7f1d1d;
@@ -431,7 +431,7 @@
   border: 1px solid var(--border-color);
   border-radius: 4px;
   margin-bottom: 8px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 13px;
   color: var(--gray-800);
 }
@@ -442,7 +442,7 @@
   border: 1px solid #fecaca;
   border-radius: var(--border-radius);
   color: #991b1b;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 13px;
   font-weight: 500;
   margin-top: 12px;

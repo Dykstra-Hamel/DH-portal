@@ -62,6 +62,16 @@ export async function POST(request: NextRequest) {
     // Update lead status to 'quoted'
     await adminClient.from('leads').update({ lead_status: 'quoted' }).eq('id', leadId);
 
+    // Mark any linked route stops as completed so reports reflect the inspector's work
+    await adminClient
+      .from('route_stops')
+      .update({
+        status: 'completed',
+        actual_departure: new Date().toISOString(),
+      })
+      .eq('lead_id', leadId)
+      .neq('status', 'completed');
+
     // Update quote status to 'sent' (or 'draft' if not emailing)
     const quoteStatus = sendEmail && clientEmail ? 'sent' : 'draft';
     await adminClient.from('quotes').update({ quote_status: quoteStatus }).eq('id', quoteId);

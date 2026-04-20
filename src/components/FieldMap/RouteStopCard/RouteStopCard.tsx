@@ -24,6 +24,7 @@ export interface RouteStop {
   leadStatus?: string | null;
   referredToSales?: boolean;
   routeStopId?: string | null;
+  housePhotoUrl?: string | null;
 }
 
 interface RouteStopCardProps {
@@ -79,14 +80,22 @@ export function RouteStopCard({
   isTechnicianOnly = false,
 }: RouteStopCardProps) {
   const status = stop.serviceStatus.toLowerCase();
-  const showStatus = !status.includes('scheduled');
+  const showActiveStatus =
+    status.includes('complete') ||
+    status.includes('progress') ||
+    status.includes('started');
   const inspectionBadge = stop.inspectionStatus
     ? getInspectionBadge(stop.inspectionStatus)
     : null;
 
+  const inspectorParams = new URLSearchParams();
+  if (companyId) inspectorParams.set('companyId', companyId);
+  if (stop.routeStopId) inspectorParams.set('routeStopId', stop.routeStopId);
+  const inspectorQuery = inspectorParams.toString();
+
   const href = isTechnicianOnly
     ? `/field-sales/tech-leads/new?type=upsell${stop.routeStopId ? `&routeStopId=${stop.routeStopId}` : ''}`
-    : `/field-sales/field-map/service/${stop.stopId}${companyId ? `?companyId=${companyId}` : ''}`;
+    : `/field-sales/field-map/service/${stop.stopId}${inspectorQuery ? `?${inspectorQuery}` : ''}`;
 
   return (
     <Link href={href} className={styles.card}>
@@ -99,26 +108,32 @@ export function RouteStopCard({
             <span className={styles.clientName}>
               {stop.clientName || 'Unknown Client'}
             </span>
+            {(inspectionBadge || showActiveStatus) && (
+              <div className={styles.badges}>
+                {inspectionBadge && (
+                  <span
+                    className={`${styles.status} ${inspectionBadge.className}`}
+                  >
+                    {inspectionBadge.label}
+                  </span>
+                )}
+                {showActiveStatus && (
+                  <span
+                    className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}
+                  >
+                    {stop.serviceStatus}
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           <p className={styles.address}>{stop.address}</p>
-          {/* {stop.serviceType && (
-            <span className={styles.serviceType}>{stop.serviceType}</span>
-          )} */}
         </div>
-        <div className={styles.badges}>
-          {inspectionBadge && (
-            <span className={`${styles.status} ${inspectionBadge.className}`}>
-              {inspectionBadge.label}
-            </span>
-          )}
-          {showStatus && (
-            <span
-              className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}
-            >
-              {stop.serviceStatus}
-            </span>
-          )}
-        </div>
+        {stop.serviceType && (
+          <div className={styles.serviceTypeMid}>
+            <span className={styles.serviceTypeChip}>{stop.serviceType}</span>
+          </div>
+        )}
         <div className={styles.chevronBtn}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -137,13 +152,25 @@ export function RouteStopCard({
           </svg>
         </div>
       </div>
-      {imageSrc && (
-        <img
-          src={imageSrc}
-          alt={`Street view of ${stop.address}`}
-          className={styles.stopImage}
-        />
-      )}
+      {imageSrc &&
+        (stop.housePhotoUrl && imageSrc === stop.housePhotoUrl ? (
+          <div
+            className={styles.houseImageWrap}
+            style={{ backgroundImage: `url(${imageSrc})` }}
+          >
+            <img
+              src={imageSrc}
+              alt={`Photo of ${stop.address}`}
+              className={styles.houseImageFg}
+            />
+          </div>
+        ) : (
+          <img
+            src={imageSrc}
+            alt={`Street view of ${stop.address}`}
+            className={styles.stopImage}
+          />
+        ))}
     </Link>
   );
 }

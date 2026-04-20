@@ -2,6 +2,64 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/api-utils';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 
+type LeadRow = {
+  assigned_to: string | null;
+  assigned_user?: unknown;
+};
+
+type LeadWithId = { id: string };
+
+// Attaches `is_viewed` onto each lead by querying lead_views for the given
+// user. Used by the New Leads tab to drive the "unread" highlight — other
+// tabs don't need it because those leads are always treated as engaged-with.
+async function hydrateViewedFlags<T extends LeadWithId>(
+  supabase: ReturnType<typeof createAdminClient>,
+  userId: string,
+  leads: T[]
+): Promise<(T & { is_viewed: boolean })[]> {
+  if (leads.length === 0) return [];
+
+  const leadIds = leads.map(l => l.id);
+  const { data: views } = await supabase
+    .from('lead_views')
+    .select('lead_id')
+    .eq('user_id', userId)
+    .in('lead_id', leadIds);
+
+  const viewed = new Set((views ?? []).map(v => v.lead_id));
+  return leads.map(l => ({ ...l, is_viewed: viewed.has(l.id) }));
+}
+
+// Attaches `assigned_user` (profile row) onto each lead using a single
+// profiles lookup. `leads.assigned_to` FKs to auth.users, not profiles, so the
+// embedded `profiles!leads_assigned_to_fkey(...)` join doesn't work — we join
+// manually via profiles.id.
+async function hydrateAssignedUsers<T extends LeadRow>(
+  supabase: ReturnType<typeof createAdminClient>,
+  leads: T[]
+): Promise<T[]> {
+  const userIds = Array.from(
+    new Set(
+      leads
+        .map(l => l.assigned_to)
+        .filter((id): id is string => !!id)
+    )
+  );
+
+  if (userIds.length === 0) return leads;
+
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
+    .in('id', userIds);
+
+  const byId = new Map((profiles ?? []).map(p => [p.id, p]));
+  return leads.map(l => ({
+    ...l,
+    assigned_user: l.assigned_to ? byId.get(l.assigned_to) ?? null : null,
+  }));
+}
+
 export async function GET(request: NextRequest) {
   const authResult = await getAuthenticatedUser();
   if (authResult instanceof NextResponse) {
@@ -25,7 +83,7 @@ export async function GET(request: NextRequest) {
         .from('leads')
         .select(`
           id, company_id, lead_status, lead_source, lead_type, service_type,
-          assigned_to, created_at, updated_at,
+          comments, assigned_to, created_at, updated_at,
           customer:customers(
             id, first_name, last_name, email, phone, city, state,
             customer_service_addresses(
@@ -33,7 +91,13 @@ export async function GET(request: NextRequest) {
               service_address:service_addresses(street_address, apartment_unit, city, state, zip_code)
             )
           ),
-          service_plan:service_plans(id, plan_name, requires_quote)
+          service_plan:service_plans(id, plan_name, requires_quote),
+          quotes(
+            id,
+            quote_line_items(
+              service_plan:service_plans(requires_quote)
+            )
+          )
         `)
         .eq('company_id', companyId)
         .eq('lead_status', 'new')
@@ -42,12 +106,27 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      // Filter to only leads where service_plan requires_quote = true
-      const filtered = (data ?? []).filter(
-        (lead: any) => lead.service_plan?.requires_quote === true
-      );
+      // Keep the lead if its directly-selected plan requires a quote, OR any
+      // plan on any of its quotes' line items requires a quote. The latter
+      // covers leads where a rep built the quote and chose the custom-quote
+      // plan there rather than on the lead itself.
+      const filtered = (data ?? []).filter((lead: any) => {
+        if (lead.service_plan?.requires_quote === true) return true;
+        const quotes = Array.isArray(lead.quotes) ? lead.quotes : [];
+        return quotes.some((q: any) =>
+          (q.quote_line_items ?? []).some(
+            (li: any) => li.service_plan?.requires_quote === true
+          )
+        );
+      });
 
-      return NextResponse.json({ leads: filtered });
+      const hydrated = await hydrateAssignedUsers(supabase, filtered as any[]);
+      const withViewed = await hydrateViewedFlags(
+        supabase,
+        authResult.user.id,
+        hydrated as any[]
+      );
+      return NextResponse.json({ leads: withViewed });
     }
 
     if (type === 'my') {
@@ -82,7 +161,7 @@ export async function GET(request: NextRequest) {
         .from('leads')
         .select(`
           id, company_id, lead_status, lead_source, lead_type, service_type,
-          assigned_to, created_at, updated_at,
+          comments, assigned_to, created_at, updated_at,
           customer:customers(
             id, first_name, last_name, email, phone, city, state,
             customer_service_addresses(
@@ -104,7 +183,8 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      return NextResponse.json({ leads: data ?? [] });
+      const hydrated = await hydrateAssignedUsers(supabase, (data ?? []) as any[]);
+      return NextResponse.json({ leads: hydrated });
     }
 
     if (type === 'closed') {
@@ -116,7 +196,7 @@ export async function GET(request: NextRequest) {
         .from('leads')
         .select(`
           id, company_id, lead_status, lead_source, lead_type, service_type,
-          assigned_to, created_at, updated_at,
+          comments, assigned_to, created_at, updated_at,
           customer:customers(
             id, first_name, last_name, email, phone, city, state,
             customer_service_addresses(
@@ -133,7 +213,8 @@ export async function GET(request: NextRequest) {
 
       if (error) throw error;
 
-      return NextResponse.json({ leads: data ?? [] });
+      const hydrated = await hydrateAssignedUsers(supabase, (data ?? []) as any[]);
+      return NextResponse.json({ leads: hydrated });
     }
 
     return NextResponse.json({ error: 'Invalid type. Must be new, my, or closed' }, { status: 400 });

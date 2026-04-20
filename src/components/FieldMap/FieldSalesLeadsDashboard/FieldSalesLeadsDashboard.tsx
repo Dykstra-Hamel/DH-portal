@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { getCustomerDisplayName } from '@/lib/display-utils';
-import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
+import { DataTable, ColumnDefinition, CardViewConfig } from '@/components/Common/DataTable';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 import styles from './FieldSalesLeadsDashboard.module.scss';
 
@@ -15,7 +16,18 @@ interface FieldSalesLead {
   company_id: string;
   lead_status: string;
   service_type?: string;
-  assigned_to?: string;
+  lead_source?: string | null;
+  lead_type?: string | null;
+  comments?: string | null;
+  assigned_to?: string | null;
+  assigned_user?: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string;
+    avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
+  } | null;
   created_at: string;
   updated_at: string;
   customer?: {
@@ -42,6 +54,7 @@ interface FieldSalesLead {
     plan_name: string;
     requires_quote?: boolean;
   };
+  is_viewed?: boolean;
 }
 
 function formatTimeInQueue(createdAt: string): string {
@@ -80,6 +93,54 @@ function getStatusLabel(status: string): string {
     closed: 'Closed',
   };
   return labels[status] ?? status;
+}
+
+function getReviewLeadHref(lead: FieldSalesLead, companyId: string): string {
+  const inProgress =
+    lead.lead_status === 'new' || lead.lead_status === 'in_process';
+  if (inProgress) {
+    const params = new URLSearchParams({ leadId: lead.id });
+    if (companyId) params.set('companyId', companyId);
+    return `/field-sales/field-map/new?${params.toString()}`;
+  }
+  return `/field-sales/leads/${lead.id}`;
+}
+
+type NextTaskInfo = {
+  action_type?: string | null;
+  due_date?: string | null;
+} | null;
+
+function formatNextAction(next: NextTaskInfo): string {
+  if (!next) return '—';
+  const verb = (() => {
+    switch (next.action_type) {
+      case 'live_call':
+      case 'outbound_call':
+      case 'ai_call':
+        return 'Call';
+      case 'text_message':
+        return 'Text';
+      case 'email':
+        return 'Email';
+      default:
+        return null;
+    }
+  })();
+  if (!verb) return '—';
+  if (!next.due_date) return verb;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(next.due_date + 'T00:00:00');
+  const diffDays = Math.round(
+    (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+  );
+
+  if (diffDays < 0) return `${verb} (Overdue)`;
+  if (diffDays === 0) return `${verb} Today`;
+  if (diffDays === 1) return `${verb} Tomorrow`;
+  return `${verb} in ${diffDays} Days`;
 }
 
 function getStatusProgress(status: string): number {
@@ -164,18 +225,226 @@ const BASE_COLUMNS: ColumnDefinition<FieldSalesLead>[] = [
       </div>
     ),
   },
-  {
-    key: 'action',
-    title: '',
-    sortable: false,
-    render: (lead) => (
-      <Link href={`/tickets/leads/${lead.id}`} className={styles.reviewBtn}>
+];
+
+function renderProgressCell(lead: FieldSalesLead) {
+  const unassigned = !lead.assigned_to;
+  const statusKey = unassigned ? 'unassigned' : lead.lead_status;
+  const progress = unassigned ? 100 : getStatusProgress(lead.lead_status);
+  const statusLabel = unassigned
+    ? 'Unassigned'
+    : getStatusLabel(lead.lead_status);
+  const inAutomation = !!(lead as FieldSalesLead & { in_automation?: boolean })
+    .in_automation;
+  const u = lead.assigned_user;
+
+  const avatarNode = u ? (
+    <MiniAvatar
+      firstName={u.first_name ?? undefined}
+      lastName={u.last_name ?? undefined}
+      email={u.email}
+      userId={u.id}
+      avatarUrl={u.avatar_url}
+      uploadedAvatarUrl={u.uploaded_avatar_url}
+      size="medium"
+      showTooltip={false}
+    />
+  ) : (
+    <div
+      className={styles.unassignedAvatar}
+      aria-label="Unassigned"
+      title="Unassigned"
+    >
+      ?
+    </div>
+  );
+
+  return (
+    <div
+      className={`${styles.progressCell} ${styles[`status_${statusKey}`]}`}
+    >
+      <div className={styles.progressAvatar}>{avatarNode}</div>
+      <div className={styles.progressColumn}>
+        <div className={styles.statusTrack}>
+          <div
+            className={styles.statusFill}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+        <span className={styles.statusLabel}>
+          {statusLabel}
+          {inAutomation && ' | Automation'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function buildSimpleCardViewConfig(
+  companyId: string,
+  nextTasks?: Record<string, NextTaskInfo>
+): CardViewConfig<FieldSalesLead> {
+  const topFields: CardViewConfig<FieldSalesLead>['topFields'] = [
+    {
+      key: 'age',
+      label: 'Age',
+      width: '64px',
+      render: lead => formatTimeInQueue(lead.created_at),
+    },
+    {
+      key: 'name',
+      label: 'Client Name',
+      width: 'minmax(140px, 1fr)',
+      render: lead => getCustomerDisplayName(lead.customer as any) ?? 'Unknown',
+    },
+  ];
+
+  if (nextTasks) {
+    topFields.push({
+      key: 'action',
+      label: 'Action',
+      width: 'minmax(140px, 1fr)',
+      render: lead => formatNextAction(nextTasks[lead.id] ?? null),
+    });
+  }
+
+  topFields.push({
+    key: 'progress',
+    label: 'Progress',
+    width: 'minmax(220px, 2fr)',
+    render: renderProgressCell,
+  });
+
+  return {
+    topFields,
+    primaryAction: lead => (
+      <Link href={getReviewLeadHref(lead, companyId)} className={styles.reviewBtn}>
+        Open Lead
+        <ChevronRight size={16} />
+      </Link>
+    ),
+  };
+}
+
+function buildSummaryCardViewConfig(
+  companyId: string,
+  viewedIds: Set<string>,
+  markViewed: (leadId: string) => void
+): CardViewConfig<FieldSalesLead> {
+  const renderSummaryAvatar = (lead: FieldSalesLead) => {
+    const u = lead.assigned_user;
+    return u ? (
+      <MiniAvatar
+        firstName={u.first_name ?? undefined}
+        lastName={u.last_name ?? undefined}
+        email={u.email}
+        userId={u.id}
+        avatarUrl={u.avatar_url}
+        uploadedAvatarUrl={u.uploaded_avatar_url}
+        size="medium"
+        showTooltip={false}
+      />
+    ) : (
+      <div
+        className={styles.unassignedAvatar}
+        aria-label="Unassigned"
+        title="Unassigned"
+      >
+        ?
+      </div>
+    );
+  };
+
+  const renderStatusBar = (lead: FieldSalesLead) => {
+    const progress = getStatusProgress(lead.lead_status);
+    return (
+      <div className={`${styles.statusPill} ${styles.status_unassigned}`}>
+        <div className={styles.statusTrack}>
+          <div className={styles.statusFill} style={{ width: `${progress}%` }} />
+        </div>
+        <span className={styles.statusLabel}>Unassigned</span>
+      </div>
+    );
+  };
+
+  return {
+    topFields: [
+      {
+        key: 'age',
+        label: 'Age',
+        width: '56px',
+        render: lead => formatTimeInQueue(lead.created_at),
+      },
+      {
+        key: 'name',
+        label: 'Client Name',
+        width: 'minmax(0, 2fr)',
+        render: lead => getCustomerDisplayName(lead.customer as any) ?? 'Unknown',
+      },
+      {
+        key: 'location',
+        label: 'Location',
+        width: 'minmax(0, 2fr)',
+        render: lead => {
+          const primary = lead.customer?.customer_service_addresses?.find(
+            a => a.is_primary_address
+          );
+          return (
+            primary?.service_address?.city ?? lead.customer?.city ?? 'Unknown'
+          );
+        },
+      },
+      {
+        key: 'format',
+        label: 'Format',
+        width: 'minmax(0, 1fr)',
+        render: lead => lead.lead_type ?? '—',
+      },
+      {
+        key: 'source',
+        label: 'Source',
+        width: 'minmax(0, 1fr)',
+        render: lead => lead.lead_source ?? '—',
+      },
+    ],
+    summary: {
+      label: 'Summary:',
+      render: lead => lead.comments?.trim() || 'No Details available.',
+    },
+    avatar: renderSummaryAvatar,
+    statusBar: renderStatusBar,
+    primaryAction: lead => (
+      <Link
+        href={`/field-sales/leads/${lead.id}`}
+        className={styles.reviewBtn}
+        onClick={() => markViewed(lead.id)}
+      >
         Review Lead
         <ChevronRight size={16} />
       </Link>
     ),
-  },
-];
+    unread: lead => !viewedIds.has(lead.id),
+  };
+}
+
+function buildActionColumn(
+  companyId: string
+): ColumnDefinition<FieldSalesLead> {
+  return {
+    key: 'action',
+    title: '',
+    sortable: false,
+    render: (lead) => (
+      <Link
+        href={getReviewLeadHref(lead, companyId)}
+        className={styles.reviewBtn}
+      >
+        Review Lead
+        <ChevronRight size={16} />
+      </Link>
+    ),
+  };
+}
 
 export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsDashboardProps) {
   const [activeTab, setActiveTab] = useState<LeadTab>('new');
@@ -183,6 +452,20 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [counts, setCounts] = useState<Record<LeadTab, number | null>>({ new: null, my: null, closed: null });
+  const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
+  const [nextTasks, setNextTasks] = useState<Record<string, NextTaskInfo>>({});
+
+  const markViewed = useCallback((leadId: string) => {
+    setViewedIds(prev => {
+      if (prev.has(leadId)) return prev;
+      const next = new Set(prev);
+      next.add(leadId);
+      return next;
+    });
+    fetch(`/api/field-sales/leads/${leadId}/viewed`, { method: 'POST' }).catch(
+      () => {}
+    );
+  }, []);
 
   useEffect(() => {
     if (!companyId || !userId) return;
@@ -213,24 +496,73 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
     fetch(`/api/field-sales/leads?${params}`)
       .then(r => r.json())
       .then(d => {
-        const loaded = Array.isArray(d.leads) ? d.leads : [];
+        const loaded: FieldSalesLead[] = Array.isArray(d.leads) ? d.leads : [];
         setLeads(loaded);
         setCounts(prev => ({ ...prev, [activeTab]: loaded.length }));
+        if (activeTab === 'new') {
+          setViewedIds(
+            new Set(loaded.filter(l => l.is_viewed).map(l => l.id))
+          );
+        }
       })
       .catch(() => setLeads([]))
       .finally(() => setLoading(false));
   }, [companyId, userId, activeTab]);
 
-  const columns = useMemo(() => {
-    if (activeTab === 'new') {
-      return BASE_COLUMNS.filter(c => c.key !== 'lead_status');
+  // Fetch each lead's next cadence action for the My Leads tab. Reuses the
+  // same endpoint the lead detail page uses, so the label stays consistent.
+  useEffect(() => {
+    if (activeTab !== 'my') {
+      setNextTasks({});
+      return;
     }
-    return BASE_COLUMNS;
-  }, [activeTab]);
+    if (leads.length === 0) {
+      setNextTasks({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const results = await Promise.all(
+        leads.map(async lead => {
+          try {
+            const r = await fetch(`/api/leads/${lead.id}/next-task`);
+            const d = await r.json();
+            return [lead.id, (d?.data ?? null) as NextTaskInfo] as const;
+          } catch {
+            return [lead.id, null as NextTaskInfo] as const;
+          }
+        })
+      );
+      if (cancelled) return;
+      setNextTasks(Object.fromEntries(results));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, leads]);
+
+  const columns = useMemo(() => {
+    const actionColumn = buildActionColumn(companyId);
+    const base =
+      activeTab === 'new'
+        ? BASE_COLUMNS.filter(c => c.key !== 'lead_status')
+        : BASE_COLUMNS;
+    return [...base, actionColumn];
+  }, [activeTab, companyId]);
 
   const columnWidths = activeTab === 'new'
     ? '80px 200px 1fr 180px 1fr'
     : '80px 200px 1fr 180px 140px 1fr';
+
+  const cardViewConfig = useMemo(() => {
+    if (activeTab === 'new') {
+      return buildSummaryCardViewConfig(companyId, viewedIds, markViewed);
+    }
+    return buildSimpleCardViewConfig(
+      companyId,
+      activeTab === 'my' ? nextTasks : undefined
+    );
+  }, [activeTab, companyId, viewedIds, markViewed, nextTasks]);
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery.trim()) return leads;
@@ -288,7 +620,13 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         title="Field Ops Leads"
         columns={columns}
         customColumnWidths={columnWidths}
+        cardView={cardViewConfig}
         searchEnabled={false}
+        onItemAction={
+          activeTab === 'new'
+            ? (_action, lead) => markViewed(lead.id)
+            : undefined
+        }
         emptyStateMessage={
           activeTab === 'new'
             ? 'No new leads in the queue.'

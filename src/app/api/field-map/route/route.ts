@@ -255,6 +255,7 @@ function mapDbStopToRouteStop(stop: any, routeMap: Record<string, any>) {
     leadStatus:          null as string | null,
     referredToSales:     !!(stop.referred_to_sales),
     routeStopId:         stop.id as string,
+    housePhotoUrl:       null as string | null,
   };
 }
 
@@ -274,22 +275,28 @@ async function attachInspectionStatus(
 
   const { data: matchedLeads } = await adminSupabase
     .from('leads')
-    .select('id, lead_status')
+    .select('id, lead_status, map_plot_data')
     .eq('company_id', companyId)
     .in('id', leadIds);
 
   const leadsById: Record<string, string> = {};
+  const photosByLeadId: Record<string, string | null> = {};
   (matchedLeads ?? []).forEach((lead: any) => {
     leadsById[lead.id] = lead.lead_status;
+    const photos = lead.map_plot_data?.housePhotos;
+    photosByLeadId[lead.id] =
+      Array.isArray(photos) && photos.length > 0 ? photos[0] : null;
   });
 
   for (const stop of stops) {
     if (!stop.leadId || !(stop.leadId in leadsById)) {
       stop.inspectionStatus = 'not_started';
       stop.leadId = null;
+      stop.housePhotoUrl = null;
     } else {
       const leadStatus = leadsById[stop.leadId];
       stop.leadStatus = leadStatus ?? null;
+      stop.housePhotoUrl = photosByLeadId[stop.leadId] ?? null;
       if (DONE_STATUSES.has(leadStatus)) {
         stop.inspectionStatus = 'done';
       } else {
@@ -329,6 +336,7 @@ interface EnrichedStop {
   leadStatus?: string | null;
   referredToSales?: boolean;
   routeStopId?: string | null;
+  housePhotoUrl?: string | null;
   lineItems?: any[] | null;
   pestpacRawData?: any;
 }
@@ -516,6 +524,7 @@ async function fetchAndSyncFromPestPac(
         inspectionStatus: 'not_started',
         leadId: null,
         leadStatus: null,
+        housePhotoUrl: null,
         lineItems: (stop.lineItems ?? stop.LineItems ?? stop.lineitem ?? stop.LineItem ?? null) as any[] | null,
         pestpacRawData: {
           ...stop,
@@ -666,12 +675,18 @@ export async function GET(request: NextRequest) {
         .map(d => d.leadId)
         .filter(Boolean) as string[];
       const leadsById: Record<string, string> = {};
+      const photosByLeadId: Record<string, string | null> = {};
       if (linkedLeadIds.length > 0) {
         const { data: leadsData } = await adminSupabase
           .from('leads')
-          .select('id, lead_status')
+          .select('id, lead_status, map_plot_data')
           .in('id', linkedLeadIds);
-        (leadsData ?? []).forEach((l: any) => { leadsById[l.id] = l.lead_status; });
+        (leadsData ?? []).forEach((l: any) => {
+          leadsById[l.id] = l.lead_status;
+          const photos = l.map_plot_data?.housePhotos;
+          photosByLeadId[l.id] =
+            Array.isArray(photos) && photos.length > 0 ? photos[0] : null;
+        });
       }
 
       const DONE_STATUSES = new Set(['quoted', 'scheduling', 'won']);
@@ -683,10 +698,12 @@ export async function GET(request: NextRequest) {
         if (!leadId) {
           stop.inspectionStatus = 'not_started';
           stop.leadId = null;
+          stop.housePhotoUrl = null;
         } else {
           const leadStatus = leadsById[leadId];
           stop.leadId = leadId;
           stop.leadStatus = leadStatus ?? null;
+          stop.housePhotoUrl = photosByLeadId[leadId] ?? null;
           stop.inspectionStatus = DONE_STATUSES.has(leadStatus) ? 'done' : 'in_progress';
         }
       }

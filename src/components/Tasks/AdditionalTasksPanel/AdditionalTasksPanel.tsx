@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Search } from 'lucide-react';
-import { DataTable } from '@/components/Common/DataTable';
+import { Search, ChevronRight } from 'lucide-react';
+import { DataTable, CardViewConfig } from '@/components/Common/DataTable';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { getTaskColumns } from '@/components/Tasks/TasksList/TasksListConfig';
-import { Task, TaskFormData, isTaskOverdue } from '@/types/task';
+import { Task, TaskFormData, isTaskOverdue, formatTaskDueDateTime } from '@/types/task';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import TaskForm from '@/components/Tasks/TaskForm/TaskForm';
 import {
@@ -203,6 +204,96 @@ export default function AdditionalTasksPanel({
     );
   }, [regularTasks, tasksTab, tasksSearchQuery]);
 
+  // ── Card view config (narrow viewports) ───────────────────────────────────
+
+  const tasksCardView = useMemo<CardViewConfig<Task>>(() => {
+    const statusLabels: Record<string, string> = {
+      new: 'New',
+      pending: 'Pending',
+      in_progress: 'In Progress',
+      completed: 'Completed',
+    };
+    const statusProgress: Record<string, number> = {
+      new: 25,
+      pending: 50,
+      in_progress: 75,
+      completed: 100,
+    };
+    return {
+      topFields: [
+        {
+          key: 'due',
+          label: 'Due',
+          render: task => formatTaskDueDateTime(task.due_date, task.due_time) || '—',
+        },
+        {
+          key: 'title',
+          label: 'Title',
+          render: task => task.title || '—',
+        },
+        {
+          key: 'priority',
+          label: 'Priority',
+          render: task => task.priority
+            ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1)
+            : '—',
+        },
+        {
+          key: 'status',
+          label: 'Status',
+          render: task => statusLabels[task.status] ?? task.status ?? '—',
+        },
+      ],
+      summary: {
+        label: 'Notes:',
+        render: task => task.description?.trim() || task.notes?.trim() || '—',
+      },
+      avatar: task => {
+        const u = task.assigned_user;
+        if (!u) return null;
+        return (
+          <MiniAvatar
+            firstName={u.first_name}
+            lastName={u.last_name}
+            email={u.email ?? ''}
+            userId={u.id}
+            size="medium"
+            showTooltip={false}
+          />
+        );
+      },
+      statusBar: task => {
+        const isOverdue = isTaskOverdue(task);
+        const pct = statusProgress[task.status] ?? 0;
+        return (
+          <div className={styles.progressCell}>
+            <span
+              className={`${styles.progressLabel} ${isOverdue ? styles.progressLabelOverdue : ''}`}
+            >
+              {statusLabels[task.status] ?? task.status}
+            </span>
+            <div className={styles.progressTrack}>
+              <div
+                className={`${styles.progressFill} ${isOverdue ? styles.progressFillOverdue : ''}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+          </div>
+        );
+      },
+      primaryAction: task => (
+        <button
+          type="button"
+          className={styles.viewBtn}
+          onClick={() => router.push(`/tickets/tasks/${task.id}`)}
+        >
+          View
+          <ChevronRight size={16} />
+        </button>
+      ),
+    };
+  }, [router]);
+
   const regularTaskColumns = useMemo(() => {
     const cols = getTaskColumns(false, true);
     const dueDateIdx = cols.findIndex(c => c.key === 'due_date');
@@ -372,6 +463,7 @@ export default function AdditionalTasksPanel({
           data={filteredRegularTasks}
           title=""
           columns={regularTaskColumns}
+          cardView={tasksCardView}
           loading={loading}
           emptyStateMessage="No additional tasks assigned to you."
           onItemAction={handleTaskAction}

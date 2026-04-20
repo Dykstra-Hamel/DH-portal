@@ -503,11 +503,15 @@ export async function POST(request: NextRequest) {
 
     // If no customerId provided, check for existing customer by email or phone
     if (!customerId && (email || phoneNumber)) {
+      const orClauses: string[] = [];
+      if (email) orClauses.push(`email.eq.${email}`);
+      if (phoneNumber) orClauses.push(`phone.eq.${phoneNumber}`);
       const { data: existingCustomer } = await supabase
         .from('customers')
         .select('id')
         .eq('company_id', companyId)
-        .or(email ? `email.eq.${email}` : `phone.eq.${phoneNumber}`)
+        .or(orClauses.join(','))
+        .limit(1)
         .maybeSingle();
 
       customerId = existingCustomer?.id || null;

@@ -2016,7 +2016,6 @@ function StepReview({
   selectedPestLabel,
   otherPest,
   selectedCustomer,
-  selectedPlan,
 }: {
   leadType: LeadType;
   photos: PhotoPreview[];
@@ -2027,7 +2026,6 @@ function StepReview({
   selectedPestLabel: string | null;
   otherPest: string;
   selectedCustomer: CustomerResult | null;
-  selectedPlan: ServicePlan | null;
 }) {
   const addr = selectedCustomer ? getPrimaryAddress(selectedCustomer) : null;
   const trimmedOtherPest = otherPest.trim();
@@ -2115,23 +2113,6 @@ function StepReview({
           </p>
         )}
       </div>
-
-      {selectedPlan && (
-        <div className={styles.reviewSection}>
-          <h3 className={styles.reviewSectionTitle}>Selected Plan</h3>
-          <p className={styles.reviewValue}>{selectedPlan.plan_name}</p>
-          {selectedPlan.recurring_price != null && (
-            <p className={styles.reviewPlanPrice}>
-              {formatPrice(selectedPlan.recurring_price)}
-              {formatFrequency(selectedPlan.billing_frequency)}
-              {selectedPlan.initial_price != null &&
-              selectedPlan.initial_price > 0
-                ? ` + ${formatPrice(selectedPlan.initial_price)} initial`
-                : ''}
-            </p>
-          )}
-        </div>
-      )}
 
       <div className={styles.reviewSection}>
         <h3 className={styles.reviewSectionTitle}>Notes & Flags</h3>
@@ -2274,10 +2255,9 @@ export function NewOpportunityWizard() {
     if (leadType === 'new-lead') {
       return [
         'type-select',
+        'new-customer',
         'photos',
         'ai-review',
-        'new-customer',
-        'service-plan-select',
         'review',
       ];
     }
@@ -2695,6 +2675,20 @@ export function NewOpportunityWizard() {
         if (selectedCustomer.zip_code) {
           body.zip = selectedCustomer.zip_code;
         }
+      } else if (newCustomerForm.firstName.trim()) {
+        // New customer entered in wizard — pass fields to /api/leads which
+        // handles dedup by email/phone and creates a customer if needed.
+        const ac = newCustomerForm.addressComponents;
+        const street =
+          `${ac?.street_number ? ac.street_number + ' ' : ''}${ac?.route ?? ''}`.trim();
+        body.firstName = newCustomerForm.firstName.trim();
+        body.lastName = newCustomerForm.lastName.trim();
+        body.email = newCustomerForm.email.trim() || undefined;
+        body.phoneNumber = newCustomerForm.phone.trim() || undefined;
+        body.streetAddress = street || undefined;
+        body.city = ac?.locality ?? undefined;
+        body.state = ac?.administrative_area_level_1 ?? undefined;
+        body.zip = ac?.postal_code ?? undefined;
       }
 
       // Upload photos to Supabase Storage
@@ -2906,46 +2900,6 @@ export function NewOpportunityWizard() {
   };
 
   const handleNext = async () => {
-    // New customer: create customer via API before advancing
-    if (currentStepId === 'new-customer') {
-      setIsCreatingCustomer(true);
-      setCreateCustomerError(null);
-      try {
-        const ac = newCustomerForm.addressComponents;
-        const street =
-          `${ac?.street_number ? ac.street_number + ' ' : ''}${ac?.route ?? ''}`.trim();
-        const res = await fetch('/api/customers', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            company_id: companyId,
-            first_name: newCustomerForm.firstName.trim(),
-            last_name: newCustomerForm.lastName.trim(),
-            phone: newCustomerForm.phone.trim() || null,
-            email: newCustomerForm.email.trim() || null,
-            address: street || null,
-            city: ac?.locality ?? null,
-            state: ac?.administrative_area_level_1 ?? null,
-            zip_code: ac?.postal_code ?? null,
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json();
-          throw new Error(err.error ?? 'Failed to create customer');
-        }
-        const data = await res.json();
-        setSelectedCustomer(data);
-        setStepIndex(i => i + 1);
-      } catch (err: any) {
-        setCreateCustomerError(
-          err.message ?? 'Failed to create customer. Please try again.'
-        );
-      } finally {
-        setIsCreatingCustomer(false);
-      }
-      return;
-    }
-
     // Upsell: PestPac sync when leaving site selection with a PestPac client selected
     if (
       currentStepId === 'select-site' &&
@@ -3205,7 +3159,6 @@ export function NewOpportunityWizard() {
               selectedPestValue === OTHER_PEST_OPTION_VALUE ? otherPest : ''
             }
             selectedCustomer={selectedCustomer}
-            selectedPlan={selectedServicePlan}
           />
         )}
 

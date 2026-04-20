@@ -236,6 +236,18 @@ export async function GET(
       stop.ScheduleID ?? stop.scheduleID ??
       routeId ?? serviceOrderId;
 
+    // If route_stops already has a row for this PestPac stop (e.g. created by a
+    // prior background sync), surface its id and lead_id so the wizard can link
+    // to the correct lead even on this fallback path.
+    const { data: fallbackRouteStop } = await adminSupabase
+      .from('route_stops')
+      .select('id, lead_id')
+      .eq('company_id', userCompany.company_id)
+      .eq('pestpac_stop_id', String(serviceOrderId))
+      .maybeSingle();
+    const fallbackRouteStopId = fallbackRouteStop?.id ?? null;
+    const fallbackLeadId = fallbackRouteStop?.lead_id ?? null;
+
     // PestPac ServiceOrders use BillToID for the bill-to client
     const clientId =
       stop.BillToID ?? stop.billToID ??
@@ -325,7 +337,8 @@ export async function GET(
         .join(', ');
 
     return NextResponse.json({
-      routeStopId: null,
+      routeStopId: fallbackRouteStopId,
+      leadId: fallbackLeadId,
       stopId: String(serviceOrderId),
       routeId: String(resolvedRouteId),
       clientId: clientId ? String(clientId) : null,

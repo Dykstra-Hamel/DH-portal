@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Phone, MessageSquare, Mail, Zap } from 'lucide-react';
-import { DataTable, ColumnDefinition } from '@/components/Common/DataTable';
+import { Phone, MessageSquare, Mail, Zap, ChevronRight } from 'lucide-react';
+import { DataTable, ColumnDefinition, CardViewConfig } from '@/components/Common/DataTable';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { Task } from '@/types/task';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -763,6 +764,187 @@ export default function ActionsAutomationsPanel({
     []
   );
 
+  // ── Card view configs (narrow viewports) ──────────────────────────────────
+
+  const actionsCardView = useMemo<CardViewConfig<Task>>(() => ({
+    topFields: [
+      {
+        key: 'due_date',
+        label: 'Due',
+        render: action => {
+          if (!action.due_date) return '—';
+          const today = getTodayStr();
+          if (action.due_date < today) {
+            const days = getOverdueDays(action.due_date);
+            return `Overdue ${days}d`;
+          }
+          return formatDueDate(action.due_date);
+        },
+      },
+      {
+        key: 'customer',
+        label: 'Client Name',
+        render: action => {
+          const leadData = action.related_entity_id
+            ? leadDataMap[action.related_entity_id]
+            : null;
+          const c = leadData?.customer;
+          const name = c ? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() : '';
+          return name || '—';
+        },
+      },
+      {
+        key: 'location',
+        label: 'Location',
+        render: action => {
+          const leadData = action.related_entity_id
+            ? leadDataMap[action.related_entity_id]
+            : null;
+          return leadData?.service_address?.city || '—';
+        },
+      },
+      {
+        key: 'action_type',
+        label: 'Action',
+        render: action => parseActionInfo(action.title).label,
+      },
+    ],
+    summary: {
+      label: 'Task:',
+      render: action => action.description?.trim() || action.title || '—',
+    },
+    avatar: action => {
+      const u = action.assigned_user;
+      if (!u) return null;
+      return (
+        <MiniAvatar
+          firstName={u.first_name}
+          lastName={u.last_name}
+          email={u.email ?? ''}
+          userId={u.id}
+          size="medium"
+          showTooltip={false}
+        />
+      );
+    },
+    statusBar: action => {
+      const leadData = action.related_entity_id
+        ? leadDataMap[action.related_entity_id]
+        : null;
+      const leadStatus = leadData?.lead_status ?? '';
+      if (!leadStatus) return null;
+      const today = getTodayStr();
+      const isOverdue = action.due_date ? action.due_date < today : false;
+      const progress = getLeadStatusProgress(leadStatus);
+      return (
+        <div className={styles.progressCell}>
+          <span
+            className={`${styles.progressLabel} ${isOverdue ? styles.progressLabelOverdue : ''}`}
+          >
+            {getLeadStatusLabel(leadStatus)}
+          </span>
+          <div className={styles.progressTrack}>
+            <div
+              className={`${styles.progressFill} ${isOverdue ? styles.progressFillOverdue : ''}`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+      );
+    },
+    primaryAction: action => (
+      <button
+        type="button"
+        className={styles.actionBtn}
+        onClick={() => handleActionRowClick(action)}
+      >
+        View
+        <ChevronRight size={16} />
+      </button>
+    ),
+  }), [leadDataMap, handleActionRowClick]);
+
+  const automationsCardView = useMemo<CardViewConfig<LeadWithCadence>>(() => ({
+    topFields: [
+      {
+        key: 'client',
+        label: 'Client Name',
+        render: lead => {
+          const c = lead.customer;
+          const name = c ? `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() : '';
+          return name || '—';
+        },
+      },
+      {
+        key: 'location',
+        label: 'Location',
+        render: lead => lead.service_address?.city || '—',
+      },
+      {
+        key: 'next_action',
+        label: 'Next Action',
+        render: lead => getNextAutomatedAction(lead)?.label ?? '—',
+      },
+      {
+        key: 'scheduled',
+        label: 'Scheduled',
+        render: lead => getNextAutomatedAction(lead)?.subtitle ?? '—',
+      },
+    ],
+    summary: {
+      label: 'Status:',
+      render: lead => getLeadStatusLabel(lead.lead_status),
+    },
+    statusBar: lead => {
+      const activeExec = getActiveExecution(lead);
+      let completed = 0;
+      let total = 0;
+      if (activeExec?.workflow?.workflow_steps?.length) {
+        const stepResults = activeExec.execution_data?.stepResults ?? [];
+        const timeline = buildWorkflowStepTimeline(
+          activeExec.workflow.workflow_steps,
+          stepResults,
+          activeExec.started_at
+        );
+        total = timeline.length;
+        completed = timeline.filter(t => t.isCompleted).length;
+      } else {
+        const assignments = toArray(lead.cadence_assignment);
+        const activeAssignment = assignments.find(ca => ca.completed_at === null);
+        const allSteps = activeAssignment?.cadence?.steps ?? [];
+        const completedIds = new Set(
+          toArray(lead.cadence_progress).map(p => p.cadence_step_id)
+        );
+        const automatedSteps = allSteps.filter(s =>
+          AUTOMATED_STEP_TYPES_ALL.includes(s.action_type)
+        );
+        total = automatedSteps.length;
+        completed = automatedSteps.filter(s => completedIds.has(s.id)).length;
+      }
+      const pct = total > 0 ? Math.round((completed / total) * 100) : 0;
+      return (
+        <div className={styles.progressCell}>
+          <span className={styles.progressLabel}>
+            {completed}/{total} Steps
+          </span>
+          <div className={styles.progressTrack}>
+            <div className={styles.progressFill} style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      );
+    },
+    primaryAction: lead => (
+      <button
+        type="button"
+        className={styles.actionBtn}
+        onClick={() => handleAutomationRowClick(lead)}
+      >
+        View
+        <ChevronRight size={16} />
+      </button>
+    ),
+  }), [handleAutomationRowClick]);
+
   const actionsEmptyMessage =
     actionsTab === 'due_today'
       ? 'No actions due today.'
@@ -814,6 +996,7 @@ export default function ActionsAutomationsPanel({
             data={filteredActions}
             title=""
             columns={actionsColumns}
+            cardView={actionsCardView}
             loading={loading}
             emptyStateMessage={actionsEmptyMessage}
             onItemAction={handleActionItemAction}
@@ -844,6 +1027,7 @@ export default function ActionsAutomationsPanel({
             data={filteredAutomations}
             title=""
             columns={automationColumns}
+            cardView={automationsCardView}
             loading={automationsLoading}
             emptyStateMessage="No leads with active automations assigned to you."
             onItemAction={handleAutomationItemAction}

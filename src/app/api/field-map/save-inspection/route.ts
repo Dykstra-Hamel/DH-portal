@@ -146,12 +146,44 @@ export async function POST(request: NextRequest) {
 
     // ── Resolve lead ID — check route_stops to avoid duplicates ──────────
     let resolvedLeadId: string | null = existingLeadId ?? null;
+    let resolvedRouteStopId: string | null = routeStopId ?? null;
 
-    if (!resolvedLeadId && routeStopId) {
+    if (!resolvedRouteStopId && stopId) {
+      const stopIdStr = String(stopId);
+      const { data: stopRow } = await adminClient
+        .from('route_stops')
+        .select('id, lead_id')
+        .eq('company_id', companyId)
+        .eq('pestpac_stop_id', stopIdStr)
+        .maybeSingle();
+      if (stopRow?.id) {
+        resolvedRouteStopId = stopRow.id;
+        if (!resolvedLeadId && stopRow.lead_id) resolvedLeadId = stopRow.lead_id;
+      } else {
+        // Fallback: the URL's stopId is dual-purpose (pestpac_stop_id ?? route_stops.id).
+        // If it looks like a UUID, try matching route_stops.id directly.
+        const looksLikeUuid =
+          /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+            stopIdStr
+          );
+        if (looksLikeUuid) {
+          const { data: byIdRow } = await adminClient
+            .from('route_stops')
+            .select('id, lead_id')
+            .eq('company_id', companyId)
+            .eq('id', stopIdStr)
+            .maybeSingle();
+          if (byIdRow?.id) {
+            resolvedRouteStopId = byIdRow.id;
+            if (!resolvedLeadId && byIdRow.lead_id) resolvedLeadId = byIdRow.lead_id;
+          }
+        }
+      }
+    } else if (!resolvedLeadId && resolvedRouteStopId) {
       const { data: stopRow } = await adminClient
         .from('route_stops')
         .select('lead_id')
-        .eq('id', routeStopId)
+        .eq('id', resolvedRouteStopId)
         .maybeSingle();
       if (stopRow?.lead_id) resolvedLeadId = stopRow.lead_id;
     }
@@ -217,11 +249,11 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Link lead back to route stop ──────────────────────────────────────
-    if (routeStopId && leadId) {
+    if (resolvedRouteStopId && leadId) {
       await adminClient
         .from('route_stops')
         .update({ lead_id: leadId })
-        .eq('id', routeStopId)
+        .eq('id', resolvedRouteStopId)
         .eq('company_id', companyId);
     }
 
