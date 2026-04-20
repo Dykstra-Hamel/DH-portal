@@ -53,6 +53,9 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
     pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/)
   );
+  const isFieldSalesLeadDetail = Boolean(
+    pathname.match(/^\/field-sales\/leads\/[^\/]+$/)
+  );
 
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
@@ -391,7 +394,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           };
         }
         // Show lower header for lead detail pages
-        if (pathname.match(/^\/tickets\/leads\/[^\/]+$/)) {
+        if (
+          pathname.match(/^\/tickets\/leads\/[^\/]+$/) ||
+          pathname.match(/^\/field-sales\/leads\/[^\/]+$/)
+        ) {
           // Use dynamic page header if set, otherwise hide header
           if (pageHeader) {
             return {
@@ -575,7 +581,7 @@ function LayoutContent({ children }: LayoutWrapperProps) {
         <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} hideSecondary={hideSecondarySidebar} />
         <div className={styles.rightContent}>
           <GlobalHeader onMenuToggle={toggleSidebar} />
-          {!isAppShellPage && pageConfig && (
+          {(!isAppShellPage || isFieldSalesLeadDetail) && pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
               titleLeading={

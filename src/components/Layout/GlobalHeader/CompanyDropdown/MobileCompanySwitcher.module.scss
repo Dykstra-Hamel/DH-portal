@@ -63,7 +63,7 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   margin: 0;
 }
 
@@ -144,7 +144,7 @@
   font-weight: 600;
   color: var(--gray-700);
   text-align: left;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 
   &:hover {
     background: var(--gray-50);
@@ -180,5 +180,5 @@
   text-align: center;
   color: var(--gray-400);
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }

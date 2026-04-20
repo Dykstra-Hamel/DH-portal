@@ -128,6 +128,8 @@ function StepMapPlot({
   drawActiveRef.current = drawActive;
   const dragMovedRef = useRef(false);
   const lastDragAtRef = useRef<number>(0);
+  const stampLongPressRef = useRef<{ timerId: ReturnType<typeof setTimeout>; stampId: string } | null>(null);
+  const stampDragArmedRef = useRef(false);
   const blankGridPanRef = useRef<{
     pointerId: number;
     startClientX: number;
@@ -1232,12 +1234,36 @@ function StepMapPlot({
     event.preventDefault();
     event.stopPropagation();
     dragMovedRef.current = false;
-    setDraggingStampId(stampId);
+    stampDragArmedRef.current = false;
     event.currentTarget.setPointerCapture(event.pointerId);
+
+    // Clear any previous long-press timer
+    if (stampLongPressRef.current) {
+      clearTimeout(stampLongPressRef.current.timerId);
+      stampLongPressRef.current = null;
+    }
+
+    // Arm drag only after a hold — short taps will trigger onClick instead
+    const timerId = setTimeout(() => {
+      stampDragArmedRef.current = true;
+      stampLongPressRef.current = null;
+      setDraggingStampId(stampId);
+    }, 100);
+    stampLongPressRef.current = { timerId, stampId };
   };
 
   const handleStampPointerMove = (stampId: string, event: React.PointerEvent<HTMLButtonElement>) => {
     if (showDimensions) return;
+
+    // If drag isn't armed yet (long press hasn't fired), any movement cancels the timer
+    if (!stampDragArmedRef.current) {
+      if (stampLongPressRef.current) {
+        clearTimeout(stampLongPressRef.current.timerId);
+        stampLongPressRef.current = null;
+      }
+      return;
+    }
+
     if (draggingStampId !== stampId) return;
     dragMovedRef.current = true;
     const point = getNormalizedPoint(event.clientX, event.clientY);
@@ -1246,6 +1272,11 @@ function StepMapPlot({
   };
 
   const stopDragging = () => {
+    if (stampLongPressRef.current) {
+      clearTimeout(stampLongPressRef.current.timerId);
+      stampLongPressRef.current = null;
+    }
+    stampDragArmedRef.current = false;
     if (dragMovedRef.current) {
       lastDragAtRef.current = Date.now();
     }
@@ -2504,6 +2535,7 @@ function StepMapPlot({
                   onPointerMove={event => handleStampPointerMove(stamp.id, event)}
                   onPointerUp={stopDragging}
                   onPointerCancel={stopDragging}
+                  onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
                   onClick={(event) => {
                     event.preventDefault();
                     event.stopPropagation();

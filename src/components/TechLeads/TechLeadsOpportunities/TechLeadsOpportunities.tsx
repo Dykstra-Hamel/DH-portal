@@ -183,16 +183,22 @@ function getDraftAddress(draft: DraftLead): string {
 
 function getStepLabel(stepIndex: number): string {
   const labels: Record<number, string> = {
-    1: 'Photos',
-    2: 'AI Review',
-    3: 'Select Site / Customer',
+    1: 'Customer',
+    2: 'Photos',
+    3: 'AI Review',
     4: 'Service Details',
     5: 'Review',
   };
   return labels[stepIndex] ?? `Step ${stepIndex}`;
 }
 
-export function TechLeadsOpportunities() {
+interface TechLeadsOpportunitiesProps {
+  embedded?: boolean;
+}
+
+export function TechLeadsOpportunities({
+  embedded = false,
+}: TechLeadsOpportunitiesProps = {}) {
   const router = useRouter();
   const { selectedCompany } = useCompany();
   const [leads, setLeads] = useState<TechLead[]>([]);
@@ -320,7 +326,9 @@ export function TechLeadsOpportunities() {
     <>
       <div className={styles.container}>
         <div className={styles.header}>
-          <h1 className={styles.headerTitle}>My Opportunities</h1>
+          {!embedded && (
+            <h1 className={styles.headerTitle}>My Opportunities</h1>
+          )}
           <div className={styles.tabs}>
             {tabs.map(tab => (
               <button
@@ -727,7 +735,7 @@ export function TechLeadsOpportunities() {
         </div>
       )}
 
-      <TechLeadsNav />
+      {!embedded && <TechLeadsNav />}
     </>
   );
 }

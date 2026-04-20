@@ -45,6 +45,10 @@ function mapStopStatus(pestpacStatus: string | null): string {
   return 'pending';
 }
 
+// Statuses that the app sets locally (e.g. via Send Quote / Schedule Service)
+// and that PestPac doesn't know about — the sync must not overwrite these.
+const TERMINAL_STOP_STATUSES = new Set(['completed', 'skipped']);
+
 async function resolveCustomer(
   adminSupabase: SupabaseClient,
   companyId: string,
@@ -306,6 +310,22 @@ export async function syncPestPacRoute({
           await linkCustomerAddress(adminSupabase, customerId, serviceAddressId);
         }
 
+        // Preserve locally-owned fields that the app writes but PestPac doesn't know about:
+        // terminal statuses (set by Send Quote / Schedule Service) and lead_id (set by save-inspection).
+        const { data: existingStop } = await adminSupabase
+          .from('route_stops')
+          .select('status, lead_id')
+          .eq('company_id', companyId)
+          .eq('pestpac_stop_id', stop.stopId)
+          .maybeSingle();
+
+        const nextStatus =
+          existingStop && TERMINAL_STOP_STATUSES.has(existingStop.status)
+            ? existingStop.status
+            : mapStopStatus(stop.serviceStatus);
+
+        const nextLeadId = existingStop?.lead_id ?? stop.leadId ?? null;
+
         const { error: stopErr } = await adminSupabase
           .from('route_stops')
           .upsert(
@@ -321,8 +341,8 @@ export async function syncPestPacRoute({
               service_type: stop.serviceType ?? null,
               notes: stop.serviceNotes ?? null,
               access_instructions: stop.accessInstructions ?? null,
-              status: mapStopStatus(stop.serviceStatus),
-              lead_id: stop.leadId ?? null,
+              status: nextStatus,
+              lead_id: nextLeadId,
               scheduled_arrival: stop.scheduledTime ?? null,
               customer_id: customerId,
               service_address_id: serviceAddressId,

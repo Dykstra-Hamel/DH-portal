@@ -663,22 +663,22 @@ export function SecondarySideNav({
           {
             items: [
               { text: 'Dashboard', href: '/field-sales/dashboard' },
+              { text: 'Reports', href: '/field-sales/reports' },
             ],
           },
-          ...(shouldShowTechLeads ? [{
-            title: 'Tech Leads',
-            items: [
-              { text: 'My Opportunities', href: '/field-sales/tech-leads/opportunities' },
-              { text: 'Reports', href: '/field-sales/tech-leads/reports' },
-            ],
-          }] : []),
-          {
-            title: 'Field Map',
-            items: [
-              { text: 'History', href: '/field-sales/field-map/history' },
-              { text: 'Reports', href: '/field-sales/field-map/reports' },
-            ],
-          },
+          // Tech Leads and Field Map sections hidden for now.
+          // ...(shouldShowTechLeads ? [{
+          //   title: 'Tech Leads',
+          //   items: [
+          //     { text: 'My Opportunities', href: '/field-sales/tech-leads/opportunities' },
+          //   ],
+          // }] : []),
+          // {
+          //   title: 'Field Map',
+          //   items: [
+          //     { text: 'History', href: '/field-sales/field-map/history' },
+          //   ],
+          // },
           ...(shouldShowRouting ? [{
             title: 'Routing',
             items: [
@@ -856,6 +856,8 @@ export function SecondarySideNav({
                     (item.href === '/field-map' &&
                       (pathname === '/field-map' ||
                         pathname.startsWith('/field-map/service/'))) ||
+                    (item.href === '/field-sales/dashboard' &&
+                      pathname.startsWith('/field-sales/leads/')) ||
                     (item.href.startsWith('/tickets/') &&
                       pathname.startsWith(item.href)) ||
                     (item.href.startsWith('/field-map/') &&

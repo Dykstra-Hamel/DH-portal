@@ -17,7 +17,7 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 /* Horizontal wrapping row of pest icons */
@@ -139,6 +139,7 @@
 .emptyHint {
   margin: 0;
   font-size: 13px;
+  font-family: var(--font-default);
 }
 
 /* ── Line items ── */
@@ -168,7 +169,7 @@
 .cardNum {
   font-size: 12px;
   font-weight: 700;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-500);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -177,7 +178,7 @@
 .removeBtn {
   font-size: 12px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--error-600);
   background: none;
   border: none;
@@ -199,7 +200,7 @@
   padding: 8px 12px;
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-500);
   background: var(--gray-50);
   border: none;
@@ -235,7 +236,7 @@
   color: var(--gray-600);
   font-size: 12px;
   font-weight: 500;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -275,7 +276,7 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .addonPickerChevron {
@@ -322,14 +323,14 @@
   flex: 1;
   font-size: 13px;
   font-weight: 500;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-800);
 }
 
 .addonPickerPrice {
   font-size: 12px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-500);
 }
 
@@ -344,7 +345,7 @@
   margin-left: 31px; // align with name (checkbox width + gap)
   padding: 5px 8px;
   font-size: 12px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-700);
   background: var(--gray-25);
   border: 1px solid var(--gray-300);
@@ -387,7 +388,7 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-800);
   cursor: pointer;
 }
@@ -404,7 +405,7 @@
   margin: 0;
   font-size: 13px;
   color: var(--gray-400);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-style: italic;
 }
 
@@ -412,7 +413,7 @@
   margin: 0;
   font-size: 12px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .fieldRequired {
@@ -430,7 +431,7 @@
   border: 1px solid var(--gray-200);
   border-radius: 8px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
   background: var(--gray-25);
   outline: none;
@@ -454,7 +455,7 @@
   font-size: 11px;
   color: var(--gray-400);
   pointer-events: none;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .textInput {
@@ -463,7 +464,7 @@
   border: 1px solid var(--gray-200);
   border-radius: 10px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
   background: var(--gray-25);
   box-sizing: border-box;
@@ -504,7 +505,7 @@
   font-size: 14px;
   font-weight: 600;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   flex-shrink: 0;
 }
 
@@ -515,7 +516,7 @@
   border: none;
   background: transparent;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
 
   &::placeholder {
@@ -539,7 +540,7 @@
   border: 1px solid var(--gray-200);
   border-radius: 10px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
   background: var(--gray-25);
   appearance: auto;
@@ -644,6 +645,7 @@
   color: var(--blue-600);
   font-size: 12px;
   font-weight: 600;
+  font-family: var(--font-default);
   cursor: pointer;
   align-self: flex-start;
   transition: all 0.15s ease;
@@ -663,7 +665,7 @@
   color: var(--blue-600);
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: all 0.15s ease;
 }
@@ -1369,7 +1371,7 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--gray-900);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

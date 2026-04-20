@@ -274,7 +274,7 @@
   font-weight: 600;
   color: var(--blue-600);
   cursor: pointer;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   transition: background 0.15s;
 
   &:hover {
@@ -336,7 +336,7 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: background 0.15s;
 
@@ -358,7 +358,7 @@
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   cursor: pointer;
   transition: all 0.15s;
 

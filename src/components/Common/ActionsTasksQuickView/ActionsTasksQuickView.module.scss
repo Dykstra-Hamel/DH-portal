@@ -41,7 +41,7 @@
   border: none;
   text-align: left;
   cursor: pointer;
-  font-family: var(--font-satoshi, inherit);
+  font-family: var(--font-default, inherit);
   font-size: 14px;
   line-height: 1;
   font-weight: 500;
@@ -64,7 +64,7 @@
   border: 1px solid var(--blue-500);
   border-radius: 6px;
   color: var(--gray-25);
-  font-family: var(--font-satoshi, inherit);
+  font-family: var(--font-default, inherit);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;

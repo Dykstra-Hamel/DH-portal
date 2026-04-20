@@ -22,7 +22,7 @@ export function FieldSalesNav() {
     });
   }, []);
 
-  const { departments, isLoading: departmentsLoading } = useUserDepartments(
+  const { departments } = useUserDepartments(
     userId ?? '',
     selectedCompany?.id ?? ''
   );
@@ -30,11 +30,6 @@ export function FieldSalesNav() {
   const isTechnician = departments.includes('technician');
   const isInspector = departments.includes('inspector');
   const showBothOptions = isAdmin || (isTechnician && isInspector);
-
-  // Default to "My Opps" while loading; only switch to "Tasks" once resolved
-  // and we know the user is not exclusively a technician.
-  const isResolved = userId !== null && !departmentsLoading;
-  const showTasks = isResolved && (isInspector || isAdmin || !isTechnician);
 
   const isActive = (href: string) => {
     if (href === '/field-sales/dashboard') {
@@ -53,11 +48,8 @@ export function FieldSalesNav() {
     }
   };
 
-  const thirdHref = showTasks
-    ? '/field-sales/my-tasks'
-    : '/field-sales/tech-leads/opportunities';
-
-  const thirdLabel = showTasks ? 'My Tasks' : 'My Opps';
+  const thirdHref = '/field-sales/reports';
+  const thirdLabel = 'Reports';
 
   return (
     <>
@@ -204,98 +196,52 @@ export function FieldSalesNav() {
             <span className={styles.newLabel}>New</span>
           </button>
 
-          {/* Third item: History (inspector) or My Opps (technician) */}
+          {/* Third item: Reports */}
           <Link
             href={thirdHref}
             className={`${styles.navItem} ${isActive(thirdHref) ? styles.active : ''}`}
           >
-            {isInspector ? (
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <rect
-                  x="9"
-                  y="3"
-                  width="6"
-                  height="4"
-                  rx="1"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <line
-                  x1="9"
-                  y1="12"
-                  x2="15"
-                  y2="12"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <line
-                  x1="9"
-                  y1="16"
-                  x2="13"
-                  y2="16"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            ) : (
-              <svg
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                aria-hidden="true"
-              >
-                <path
-                  d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <rect
-                  x="9"
-                  y="3"
-                  width="6"
-                  height="4"
-                  rx="1"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <line
-                  x1="9"
-                  y1="12"
-                  x2="15"
-                  y2="12"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-                <line
-                  x1="9"
-                  y1="16"
-                  x2="13"
-                  y2="16"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-            )}
+            <svg
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M3 20h18"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <rect
+                x="5"
+                y="11"
+                width="3"
+                height="6"
+                rx="1"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <rect
+                x="10.5"
+                y="7"
+                width="3"
+                height="10"
+                rx="1"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <rect
+                x="16"
+                y="4"
+                width="3"
+                height="13"
+                rx="1"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+            </svg>
             <span className={styles.label}>{thirdLabel}</span>
           </Link>
         </div>

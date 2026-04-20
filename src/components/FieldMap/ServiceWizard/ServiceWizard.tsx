@@ -37,7 +37,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const { selectedCompany } = useCompany();
 
   const companyIdParam = searchParams.get('companyId') ?? null;
-  const routeStopId = searchParams.get('routeStopId') ?? null;
+  const routeStopIdParam = searchParams.get('routeStopId') ?? null;
+  const [routeStopId, setRouteStopId] = useState<string | null>(
+    routeStopIdParam
+  );
+  const leadIdParam = searchParams.get('leadId') ?? null;
 
   const [clientInfo, setClientInfo] = useState({
     name: '',
@@ -53,14 +57,16 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const inspectorTitle = profile?.title ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
-  const initialStep = stopId ? 1 : 0;
+  const initialStep = stopId || leadIdParam ? 1 : 0;
   const [maxStepReached, setMaxStepReached] = useState(initialStep);
   const [currentStep, setCurrentStep] = useState(initialStep);
   const [mapPlotData, setMapPlotData] = useState<MapPlotData>(() => ({
     ...DEFAULT_MAP_PLOT_DATA,
   }));
   const [isGeocoding, setIsGeocoding] = useState(false);
-  const [isLoadingResume, setIsLoadingResume] = useState(Boolean(stopId));
+  const [isLoadingResume, setIsLoadingResume] = useState(
+    Boolean(stopId || leadIdParam)
+  );
   const [brandPrimaryColor, setBrandPrimaryColor] = useState<
     string | undefined
   >(undefined);
@@ -115,9 +121,126 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   // Mount effect: fetch stop data, populate clientInfo, auto-resume if lead exists
   useEffect(() => {
-    if (!stopId) return;
+    if (!stopId && !leadIdParam) return;
 
     const resolvedCompanyId = selectedCompany?.id ?? companyIdParam ?? '';
+
+    async function loadFromLeadId(directLeadId: string) {
+      try {
+        const [leadRes, quoteRes] = await Promise.all([
+          fetch(`/api/leads/${directLeadId}`),
+          fetch(`/api/leads/${directLeadId}/quote`),
+        ]);
+        if (!leadRes.ok) return;
+        const lead = await leadRes.json();
+        const quoteData = quoteRes.ok ? await quoteRes.json() : null;
+
+        const customer = lead.customer ?? {};
+        const fullName =
+          [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
+          '';
+        const addressFromCustomer = [
+          customer.address,
+          customer.city,
+          customer.state,
+          customer.zip_code,
+        ]
+          .filter(Boolean)
+          .join(', ');
+        const addressFromPlot =
+          typeof lead.map_plot_data?.addressInput === 'string'
+            ? lead.map_plot_data.addressInput
+            : '';
+        const resolvedAddress = addressFromCustomer || addressFromPlot;
+
+        setClientInfo({
+          name: fullName,
+          email: customer.email ?? '',
+          phone: customer.phone ?? '',
+          address: resolvedAddress,
+        });
+
+        if (lead.map_plot_data) {
+          setMapPlotData({
+            ...DEFAULT_MAP_PLOT_DATA,
+            ...lead.map_plot_data,
+            addressInput: resolvedAddress || lead.map_plot_data.addressInput || '',
+          });
+        } else if (resolvedAddress) {
+          setIsGeocoding(true);
+          try {
+            const geoRes = await fetch(
+              `/api/internal/geocode?address=${encodeURIComponent(resolvedAddress)}`
+            );
+            const geoData = await geoRes.json();
+            if (geoData.success && geoData.coordinates) {
+              setMapPlotData(prev => ({
+                ...prev,
+                addressInput: resolvedAddress,
+                centerLat: geoData.coordinates.latitude,
+                centerLng: geoData.coordinates.longitude,
+                zoom: 20,
+                heading: 0,
+                tilt: 0,
+                backgroundMode: 'satellite',
+              }));
+            }
+          } finally {
+            setIsGeocoding(false);
+          }
+        }
+
+        const lineItems: any[] = quoteData?.data?.line_items ?? [];
+        if (lineItems.length > 0) {
+          setQuoteLineItems(
+            lineItems.map((item: any): QuoteLineItem => {
+              const catalogItemId =
+                item.service_plan_id ??
+                item.addon_service_id ??
+                item.bundle_plan_id ??
+                undefined;
+              const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+                item.service_plan_id
+                  ? 'plan'
+                  : item.addon_service_id
+                    ? 'addon'
+                    : item.bundle_plan_id
+                      ? 'bundle'
+                      : undefined;
+              return {
+                id: item.id,
+                type: catalogItemId ? 'plan-addon' : 'custom',
+                catalogItemKind,
+                catalogItemId,
+                catalogItemName: item.plan_name,
+                coveredPestIds: [],
+                coveredPestLabels: [],
+                initialCost:
+                  item.final_initial_price ?? item.initial_price ?? null,
+                recurringCost:
+                  item.final_recurring_price ?? item.recurring_price ?? null,
+                frequency: item.billing_frequency ?? null,
+              };
+            })
+          );
+          setCurrentStep(4);
+          setMaxStepReached(4);
+        } else {
+          setCurrentStep(2);
+          setMaxStepReached(2);
+        }
+
+        setLeadId(directLeadId);
+        if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
+      } finally {
+        setIsLoadingResume(false);
+      }
+    }
+
+    if (!stopId && leadIdParam) {
+      loadFromLeadId(leadIdParam);
+      return;
+    }
 
     async function loadStopData() {
       try {
@@ -128,6 +251,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         );
         if (!res.ok) return;
         const stopData = await res.json();
+
+        if (!routeStopIdParam && stopData.routeStopId) {
+          setRouteStopId(stopData.routeStopId);
+        }
 
         setClientInfo({
           name: stopData.clientName ?? '',
@@ -564,7 +691,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       setReturnToReviewAfterMapEdit(false);
       return;
     }
-    const firstStep = stopId ? 1 : 0;
+    const firstStep = stopId || leadIdParam ? 1 : 0;
     if (currentStep > firstStep) {
       setCurrentStep(s => s - 1);
     } else {
