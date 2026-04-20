@@ -2,6 +2,7 @@
 
 import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
 import { MapPlotData, DEFAULT_MAP_PLOT_DATA, getMapStampOption, isMapPestStampType } from '@/components/FieldMap/MapPlot/types';
+import type { MapPestStampType } from '@/components/FieldMap/MapPlot/types';
 
 interface MapPlotStepProps {
   address: string;
@@ -12,9 +13,10 @@ interface MapPlotStepProps {
   canNext: boolean;
   companyId?: string;
   stampColor?: string;
+  onPestOptionsLoaded?: (iconMap: Record<string, string>) => void;
 }
 
-export function MapPlotStep({ address, initialData, onChange, onBack, onNext, canNext, companyId, stampColor }: MapPlotStepProps) {
+export function MapPlotStep({ address, initialData, onChange, onBack, onNext, canNext, companyId, stampColor, onPestOptionsLoaded }: MapPlotStepProps) {
   const data = initialData.addressInput ? initialData : {
     ...DEFAULT_MAP_PLOT_DATA,
     addressInput: address,
@@ -30,6 +32,7 @@ export function MapPlotStep({ address, initialData, onChange, onBack, onNext, ca
       canNext={canNext}
       companyId={companyId}
       stampColor={stampColor}
+      onPestOptionsLoaded={onPestOptionsLoaded}
     />
   );
 }
@@ -55,15 +58,15 @@ export function getPlottedPestIds(data: MapPlotData): string[] {
   return Array.from(ids);
 }
 
-export function getPlottedPests(data: MapPlotData): Array<{ id: string; label: string }> {
+export function getPlottedPests(data: MapPlotData): Array<{ id: string; label: string; stampType: MapPestStampType }> {
   const seen = new Set<string>();
-  const result: Array<{ id: string; label: string }> = [];
+  const result: Array<{ id: string; label: string; stampType: MapPestStampType }> = [];
   for (const stamp of data.stamps) {
     if (!isMapPestStampType(stamp.type)) continue;
     const id = stamp.pestId ?? stamp.type;
     if (seen.has(id)) continue;
     seen.add(id);
-    result.push({ id, label: stamp.displayLabel || getMapStampOption(stamp.type).label });
+    result.push({ id, label: stamp.displayLabel || getMapStampOption(stamp.type).label, stampType: stamp.type });
   }
   return result;
 }

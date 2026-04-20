@@ -57,6 +57,14 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${outfit.className} ${veganDays.variable}`}>
+      <head>
+        {/* Capture beforeinstallprompt before React hydrates so the install button works on first page load */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;window.dispatchEvent(new Event('pwa-prompt-ready'));});`,
+          }}
+        />
+      </head>
       <body>
         <ScrollToTop />
         <UserbackProvider>

@@ -5,6 +5,7 @@ import styles from './ServicePlansManager.module.scss';
 import ServicePlanModal from '../Widget/WidgetConfig/ServicePlanModal';
 import AddOnServicesManager from './AddOnServicesManager';
 import BundlePlansManager from './BundlePlansManager';
+import ProductsManager from './ProductsManager';
 
 interface ServicePlan {
   id: string;
@@ -69,7 +70,7 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'plans' | 'addons' | 'bundles'>('plans');
+  const [activeTab, setActiveTab] = useState<'plans' | 'addons' | 'bundles' | 'products'>('plans');
 
   useEffect(() => {
     if (companyId) {
@@ -233,6 +234,13 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
             >
               Bundle Plans
             </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === 'products' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('products')}
+            >
+              Products
+            </button>
           </div>
         </div>
         {activeTab === 'plans' && (
@@ -309,6 +317,10 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
 
       {activeTab === 'bundles' && (
         <BundlePlansManager companyId={companyId} />
+      )}
+
+      {activeTab === 'products' && (
+        <ProductsManager companyId={companyId} />
       )}
 
       {showPlanModal && (

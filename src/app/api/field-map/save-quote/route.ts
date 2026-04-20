@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { generateQuoteToken, generateQuoteUrl } from '@/lib/quote-utils';
+import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
 
 interface QuoteLineItem {
   id: string;
   type: 'plan-addon' | 'custom';
-  catalogItemKind?: 'plan' | 'addon' | 'bundle';
+  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product';
   catalogItemId?: string;
   catalogItemName?: string;
   customName?: string;
@@ -14,7 +15,10 @@ interface QuoteLineItem {
   initialCost: number | null;
   recurringCost: number | null;
   frequency: string | null;
-  isPrimary?: boolean;
+  parentLineItemId?: string | null;
+  quantity?: number | null;
+  // true = inspector highlighted, false = auto-added recommended, undefined = not a recommended slot
+  isRecommended?: boolean;
 }
 
 function getLineItemLabel(item: QuoteLineItem): string {
@@ -44,6 +48,8 @@ export async function POST(request: NextRequest) {
       discountTarget,
       discountAmount,
       discountType,
+      discountId,
+      quoteStatus,
     } = body;
 
     if (!leadId) {
@@ -86,7 +92,10 @@ export async function POST(request: NextRequest) {
     const lineItems: QuoteLineItem[] = Array.isArray(quoteLineItems) ? quoteLineItems : [];
 
     const totalInitial = lineItems.reduce((s, i) => s + (i.initialCost ?? 0), 0);
-    const totalRecurring = lineItems.reduce((s, i) => s + (i.recurringCost ?? 0), 0);
+    const totalRecurring = lineItems.reduce(
+      (s, i) => s + toMonthlyEquivalent(i.frequency, i.recurringCost ?? 0),
+      0
+    );
 
     const discountAmt = typeof discountAmount === 'number' ? discountAmount : null;
     const discountDollarInitial =
@@ -115,14 +124,22 @@ export async function POST(request: NextRequest) {
 
     if (existingQuote?.id) {
       // Update totals
-      await adminClient
+      const { error: updateError } = await adminClient
         .from('quotes')
         .update({
+          subtotal_initial_price: totalInitial,
+          subtotal_recurring_price: totalRecurring,
           total_initial_price: adjustedInitial,
           total_recurring_price: adjustedRecurring,
-          quote_status: 'draft',
+          applied_discount_id: discountId ?? null,
+          ...(quoteStatus != null ? { quote_status: quoteStatus } : {}),
         })
         .eq('id', existingQuote.id);
+
+      if (updateError) {
+        console.error('Failed to update quote:', updateError.message);
+        throw new Error(updateError.message);
+      }
 
       // Delete old line items and re-insert
       await adminClient.from('quote_line_items').delete().eq('quote_id', existingQuote.id);
@@ -139,9 +156,12 @@ export async function POST(request: NextRequest) {
           service_address_id: lead.service_address_id,
           primary_pest: lead.pest_type ?? '',
           additional_pests: [],
+          subtotal_initial_price: totalInitial,
+          subtotal_recurring_price: totalRecurring,
           total_initial_price: adjustedInitial,
           total_recurring_price: adjustedRecurring,
-          quote_status: 'draft',
+          applied_discount_id: discountId ?? null,
+          quote_status: quoteStatus ?? 'draft',
           quote_token: quoteToken,
         })
         .select('id')
@@ -182,6 +202,10 @@ export async function POST(request: NextRequest) {
             item.type === 'plan-addon' && item.catalogItemKind === 'bundle'
               ? (item.catalogItemId ?? null)
               : null;
+          const productId =
+            item.catalogItemKind === 'product'
+              ? (item.catalogItemId ?? null)
+              : null;
           const rawInitial = item.initialCost ?? 0;
           const rawRecurring = item.recurringCost ?? 0;
           const finalInitial =
@@ -201,10 +225,12 @@ export async function POST(request: NextRequest) {
               ? (rawRecurring / totalRecurring) * discountDollarRecurring
               : 0;
           return {
+            id: item.id,
             quote_id: quoteId,
             service_plan_id: servicePlanId,
             addon_service_id: addonServiceId,
             bundle_plan_id: bundlePlanId,
+            product_id: productId,
             plan_name: planName,
             plan_description: null,
             initial_price: rawInitial,
@@ -214,10 +240,13 @@ export async function POST(request: NextRequest) {
             final_recurring_price: finalRecurring,
             discount_percentage: discountType === '%' && discountAmt != null ? discountAmt : 0,
             discount_amount: discountType === '$' ? lineDiscountInitial + lineDiscountRecurring : 0,
-            is_optional: false,
-            is_selected: true,
+            // All recommended add-on slots (isRecommended true or false) are optional and start unselected
+            is_optional: item.isRecommended != null,
+            is_selected: item.isRecommended == null,
+            is_recommended: item.isRecommended ?? null,
             display_order: idx,
-            is_primary: item.isPrimary !== false,
+            parent_line_item_id: item.parentLineItemId ?? null,
+            quantity: item.quantity ?? null,
           };
         })
       );

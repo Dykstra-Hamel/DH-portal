@@ -32,7 +32,7 @@
   --color-text: #2b2b2b;
   --color-text-gray: #484848;
   --color-border-gray: #bfbfbf;
-  --color-white: #ffffff;
+  --gray-25: #ffffff;
   --color-bg-light: #f9fafb;
   --color-bg-blue-light: rgba(0, 82, 155, 0.05);
 
@@ -41,7 +41,7 @@
   --shadow-card: 0px 0px 24px rgba(0, 0, 0, 0.15);
 
   font-family: var(--secondary-font), sans-serif;
-  background: var(--color-white);
+  background: var(--gray-25);
   color: var(--color-text);
   width: 100%;
   // Ensure all child elements inherit the brand's primary font
@@ -105,15 +105,16 @@
 .contentArea {
   max-width: 1215px;
   width: 100%;
-  margin: 40px auto 0;
-  padding: 0 40px;
+  background: var(--gray-75);
+  margin: 0 auto;
+  padding: 40px 40px 0;
   display: flex;
   flex-direction: column;
   position: relative;
   padding-bottom: 80px;
 
   @media (width <= 480px) {
-    padding: 0 20px;
+    padding: 20px;
   }
 }
 
@@ -227,7 +228,7 @@
   gap: 32px;
   padding: 24px 0;
 
-  @media (max-width: 1024px) {
+  @media (max-width: 768px) {
     grid-template-columns: 1fr;
     gap: 24px;
   }
@@ -250,33 +251,25 @@
 }
 
 .planImageWrapper {
-  width: 522px;
-  min-height: 470px;
-  border-radius: 16px;
+  width: 100%;
+  min-height: 250px;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--gray-50);
   position: relative;
 
-  @media (width <= 1024px) {
+  @media (width <= 768px) {
     width: 100%;
   }
 
-  @media (max-width: 1024px) {
+  @media (max-width: 768px) {
     display: none;
-  }
-}
-
-.planImageWrapperMobile {
-  display: none;
-  width: 100%;
-  min-height: 440px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--gray-50);
-  position: relative;
-
-  @media (max-width: 1024px) {
-    display: block;
+    width: 100%;
+    min-height: 250px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--gray-50);
+    position: relative;
   }
 }
 
@@ -286,7 +279,6 @@
   object-fit: cover;
   display: block;
   position: relative;
-  border-radius: 16px;
 }
 
 .planImagePlaceholder {
@@ -296,7 +288,7 @@
   align-items: center;
   justify-content: center;
   background: var(--gray-300);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .planDisclaimerVideoRow {
@@ -396,7 +388,10 @@
 .plansContainer {
   margin-bottom: 40px;
   h2 {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
+    font-size: 24px;
+    color: var(--gray-800);
+    font-family: var(--primary-font);
   }
 }
 
@@ -408,18 +403,13 @@
   transition: all 0.3s ease;
 
   &.collapsible {
-    background: #ffffff;
+    background: #fff;
     border: 1px solid var(--gray-300);
-    border-radius: 16px;
+    border-radius: 8px;
     box-shadow: inset 0 0 0 0px var(--blue-500);
     transition:
       box-shadow 0.2s ease,
       border-color 0.2s ease;
-
-    &.selectedCard {
-      border-color: transparent;
-      box-shadow: inset 0 0 0 2px var(--blue-500);
-    }
 
     &.expanded {
       .planHeaderIcon {
@@ -481,7 +471,7 @@
 .planHeaderTitle {
   font-size: 24px;
   font-weight: 700;
-  color: var(--brand-primary) !important;
+  color: var(--brand-secondary) !important;
 
   @media (max-width: 490px) {
     font-size: 22px !important;
@@ -562,15 +552,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--primary-color, #3b82f6);
+  width: 32px;
+  height: 32px;
+  color: var(--brand-secondary);
   transition: transform 0.3s ease;
   flex-shrink: 0;
 
   @media (max-width: 490px) {
     position: absolute;
-    top: 20px;
+    top: 24px;
     right: 24px;
   }
 
@@ -578,7 +568,7 @@
     display: block;
 
     circle {
-      fill: var(--brand-primary);
+      fill: var(--brand-secondary);
     }
   }
 }
@@ -601,7 +591,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.9px;
-  color: var(--primary-color, #3b82f6);
+  color: var(--brand-secondary);
   text-transform: uppercase;
 }
 
@@ -625,11 +615,9 @@
 
 // Features section
 .planIncluded {
-  padding-top: 32px;
-  border-top: 1px solid var(--gray-300);
   h4 {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
     margin-bottom: 16px;
   }
 }
@@ -669,7 +657,7 @@
     height: 100%;
 
     path {
-      stroke: var(--accent-color);
+      stroke: var(--brand-secondary);
     }
   }
 }
@@ -1180,6 +1168,10 @@
   &:first-child {
     margin-top: 0;
   }
+}
+
+.totalItemGroup {
+  display: block;
 }
 
 .totalItem {
@@ -1784,7 +1776,7 @@
 
 .header {
   --header-bg-opacity: 0.05;
-  background: var(--color-white);
+  background: var(--gray-25);
   padding: 32px 0 0;
   top: 0;
   position: relative;
@@ -1923,9 +1915,8 @@
 // ========================================
 
 .heroSection {
-  background: var(--color-white);
+  background: var(--gray-25);
   padding: 80px 0;
-  border-radius: 0 0 16px 16px;
   position: relative;
   overflow-x: hidden;
 
@@ -2110,7 +2101,7 @@
 .primaryButton {
   position: relative;
   background: var(--brand-secondary);
-  color: var(--color-white);
+  color: var(--gray-25);
   border: none;
   padding: 14px 20px;
   border-radius: 30px;
@@ -2222,7 +2213,7 @@
 
 .footer {
   padding: 60px 0 40px 0;
-  background: var(--color-white);
+  background: var(--gray-25);
 }
 
 .footerContainer {
@@ -3039,8 +3030,8 @@
 }
 
 .addonCheckbox:has(input:checked) .addonCheckboxCustom {
-  border-color: var(--blue-500);
-  background-color: var(--blue-500);
+  border-color: var(--brand-primary, --blue-500);
+  background-color: var(--brand-primary, --blue-500);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='13' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
@@ -3059,7 +3050,7 @@
   width: 99px;
   height: 24px;
   border-radius: 30px;
-  background: var(--blue-500);
+  background: var(--brand-primary);
   color: #fff;
   font-size: 12px;
   font-weight: 600;

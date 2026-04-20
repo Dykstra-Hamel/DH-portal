@@ -4,6 +4,28 @@ import {
   SizeOption,
   PricingCalculation,
 } from '@/types/pricing';
+
+/**
+ * Convert a recurring-frequency amount to its monthly equivalent.
+ * e.g. $120/year → $10/mo, $45/quarter → $15/mo
+ */
+export function toMonthlyEquivalent(
+  frequency: string | null,
+  amount: number
+): number {
+  const factors: Record<string, number> = {
+    monthly: 1,
+    'bi-monthly': 6 / 12, // every 2 months = 6×/year
+    quarterly: 4 / 12,
+    'semi-annually': 2 / 12,
+    'semi-annual': 2 / 12,
+    'bi-annually': 2 / 12,
+    annually: 1 / 12,
+    annual: 1 / 12,
+  };
+  const key = (frequency ?? 'monthly').toLowerCase();
+  return amount * (factors[key] ?? 1);
+}
 import type { ServiceVariant } from '@/types/addon-service';
 
 /**

@@ -62,7 +62,7 @@
   padding: 8px 12px 8px 6px;
   align-items: center;
   gap: 13px;
-  background: white;
+  background: var(--gray-25);
   border: none;
   border-radius: var(--border-radius-sm);
   cursor: pointer;
@@ -242,4 +242,3 @@
   font-size: 14px;
   line-height: 20px;
 }
-
