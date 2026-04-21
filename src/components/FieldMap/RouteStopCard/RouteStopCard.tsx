@@ -99,6 +99,13 @@ export function RouteStopCard({
 
   return (
     <Link href={href} className={styles.card}>
+      {inspectionBadge && (
+        <span
+          className={`${styles.inspectionOverlay} ${inspectionBadge.className}`}
+        >
+          {inspectionBadge.label}
+        </span>
+      )}
       <div className={styles.infoRow}>
         <div className={styles.timeCol}>
           <span className={styles.time}>{formatTime(stop.scheduledTime)}</span>
@@ -108,22 +115,13 @@ export function RouteStopCard({
             <span className={styles.clientName}>
               {stop.clientName || 'Unknown Client'}
             </span>
-            {(inspectionBadge || showActiveStatus) && (
+            {showActiveStatus && (
               <div className={styles.badges}>
-                {inspectionBadge && (
-                  <span
-                    className={`${styles.status} ${inspectionBadge.className}`}
-                  >
-                    {inspectionBadge.label}
-                  </span>
-                )}
-                {showActiveStatus && (
-                  <span
-                    className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}
-                  >
-                    {stop.serviceStatus}
-                  </span>
-                )}
+                <span
+                  className={`${styles.status} ${getStatusStyle(stop.serviceStatus)}`}
+                >
+                  {stop.serviceStatus}
+                </span>
               </div>
             )}
           </div>
