@@ -311,7 +311,7 @@ function buildSimpleCardViewConfig(
   topFields.push({
     key: 'progress',
     label: 'Progress',
-    width: 'minmax(220px, 2fr)',
+    width: 'minmax(100px, 2fr)',
     render: renderProgressCell,
   });
 
