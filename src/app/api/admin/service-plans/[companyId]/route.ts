@@ -63,6 +63,13 @@ interface CreateServicePlanRequest {
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
   };
+  yard_sqft_pricing?: {
+    pricing_mode?: 'linear' | 'custom';
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+    custom_initial_prices?: number[];
+    custom_recurring_prices?: number[];
+  } | null;
   pest_coverage?: Array<{ pest_id: string; coverage_level: string }>;
   plan_products?: string[];
   recommended_addon_ids?: string[];
@@ -197,9 +204,9 @@ export async function POST(
     } else {
       // Subscription plan validation
       // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
-      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0 && !((planData.recurring_price ?? 0) > 0)) {
         return NextResponse.json(
-          { error: 'Initial price must be greater than 0 unless linear feet or per-unit pricing is configured' },
+          { error: 'Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured' },
           { status: 400 }
         );
       }
@@ -326,9 +333,9 @@ export async function PUT(
     } else if (planData.plan_category && planData.plan_category !== 'one-time') {
       // Validate subscription plans have required fields
       // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
-      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0 && !((planData.recurring_price ?? 0) > 0)) {
         return NextResponse.json(
-          { error: 'Initial price must be greater than 0 unless linear feet or per-unit pricing is configured' },
+          { error: 'Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured' },
           { status: 400 }
         );
       }

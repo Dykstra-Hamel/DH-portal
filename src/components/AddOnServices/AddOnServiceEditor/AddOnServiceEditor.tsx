@@ -300,6 +300,7 @@ export default function AddOnServiceEditor({
                   }
                   required
                 >
+                  <option value="one-time">One-Time</option>
                   <option value="monthly">Monthly</option>
                   <option value="bi-monthly">Bi-Monthly</option>
                   <option value="quarterly">Quarterly</option>
@@ -641,6 +642,7 @@ export default function AddOnServiceEditor({
                 <option value="monthly">Monthly</option>
                 <option value="bi-monthly">Bi-Monthly</option>
                 <option value="quarterly">Quarterly</option>
+                <option value="semi-annually">Semi-Annually</option>
                 <option value="on-demand">On-Demand</option>
               </select>
             </div>

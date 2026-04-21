@@ -346,7 +346,7 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
       )}
 
       {activeTab === 'addons' && (
-        <AddOnServicesManager companyId={companyId} />
+        <AddOnServicesManager companyId={companyId} servicePlans={servicePlans} />
       )}
 
       {activeTab === 'bundles' && (

@@ -13,6 +13,11 @@ export interface CompanyPricingSettings {
   yard_acres_interval: number;
   max_yard_acres: number;
 
+  // Yard sq ft intervals
+  base_yard_sq_ft: number;
+  yard_sq_ft_interval: number;
+  max_yard_sq_ft: number;
+
   // Linear feet intervals
   base_linear_feet: number;
   linear_feet_interval: number;
@@ -42,6 +47,13 @@ export interface ServicePlanPricing {
     custom_initial_prices?: number[];
     custom_recurring_prices?: number[];
   };
+  yard_sqft_pricing?: {
+    pricing_mode?: 'linear' | 'custom';
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+    custom_initial_prices?: number[];
+    custom_recurring_prices?: number[];
+  } | null;
   linear_feet_pricing: {
     pricing_mode?: 'tiered'; // Only tiered pricing supported for linear feet
     // Initial pricing: always per-foot rates
@@ -73,6 +85,8 @@ export interface PricingCalculation {
   homeSizeRecurringIncrease: number;
   yardSizeInitialIncrease: number;
   yardSizeRecurringIncrease: number;
+  yardSqftInitialIncrease: number;
+  yardSqftRecurringIncrease: number;
   linearFeetInitialIncrease: number;
   linearFeetRecurringIncrease: number;
   totalInitialPrice: number;

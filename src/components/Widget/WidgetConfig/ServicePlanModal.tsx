@@ -96,7 +96,7 @@ interface ServicePlanModalProps {
 
 // Custom Interval Pricing Input Component
 interface CustomIntervalPricingInputProps {
-  dimension: 'home' | 'yard' | 'linear_feet';
+  dimension: 'home' | 'yard' | 'yard_sqft' | 'linear_feet';
   formData: any;
   setFormData: (data: any) => void;
   companyId: string;
@@ -112,9 +112,12 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
     ? 'home_size_pricing'
     : dimension === 'yard'
     ? 'yard_size_pricing'
+    : dimension === 'yard_sqft'
+    ? 'yard_sqft_pricing'
     : 'linear_feet_pricing';
   const pricing = formData[pricingKey];
   const isLinearFeet = dimension === 'linear_feet';
+  const isYardSqft = dimension === 'yard_sqft';
 
   // Fetch company pricing settings to know how many intervals exist
   const { settings: pricingSettings, isLoading, error } = usePricingSettings(companyId);
@@ -141,6 +144,8 @@ const CustomIntervalPricingInput: React.FC<CustomIntervalPricingInputProps> = ({
             ? 'Home size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
             : dimension === 'yard'
             ? 'Yard size pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
+            : dimension === 'yard_sqft'
+            ? 'Yard sq ft pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'
             : 'Linear feet pricing intervals must be configured in Company Settings before you can set custom pricing for this plan.'}
         </p>
         <p style={{ color: '#6c757d', fontSize: '14px' }}>
@@ -392,6 +397,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       custom_initial_prices: [0],
       custom_recurring_prices: [0],
     },
+    yard_sqft_pricing: {
+      pricing_mode: 'linear' as 'linear' | 'custom',
+      initial_cost_per_interval: 25.00,
+      recurring_cost_per_interval: 15.00,
+      custom_initial_prices: [0],
+      custom_recurring_prices: [0],
+    },
+    yard_sqft_pricing_enabled: false,
     linear_feet_pricing: null,
   });
 
@@ -451,6 +464,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
           custom_initial_prices: (plan as any).yard_size_pricing?.custom_initial_prices || [0],
           custom_recurring_prices: (plan as any).yard_size_pricing?.custom_recurring_prices || [0],
         },
+        yard_sqft_pricing: {
+          pricing_mode: (plan as any).yard_sqft_pricing?.pricing_mode || 'linear',
+          initial_cost_per_interval: (plan as any).yard_sqft_pricing?.initial_cost_per_interval ?? 25.00,
+          recurring_cost_per_interval: (plan as any).yard_sqft_pricing?.recurring_cost_per_interval ?? 15.00,
+          custom_initial_prices: (plan as any).yard_sqft_pricing?.custom_initial_prices || [0],
+          custom_recurring_prices: (plan as any).yard_sqft_pricing?.custom_recurring_prices || [0],
+        },
+        yard_sqft_pricing_enabled: !!(plan as any).yard_sqft_pricing,
         linear_feet_pricing: (plan as any).linear_feet_pricing || null,
       });
     } else {
@@ -498,6 +519,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
           custom_initial_prices: [0],
           custom_recurring_prices: [0],
         },
+        yard_sqft_pricing: {
+          pricing_mode: 'linear' as 'linear' | 'custom',
+          initial_cost_per_interval: 25.00,
+          recurring_cost_per_interval: 15.00,
+          custom_initial_prices: [0],
+          custom_recurring_prices: [0],
+        },
+        yard_sqft_pricing_enabled: false,
         linear_feet_pricing: null,
       });
     }
@@ -732,8 +761,8 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       return;
     }
 
-    if (!hasLinearFeetPricing && !hasPerUnitPricing && formData.initial_price === 0) {
-      alert('Initial price must be greater than 0 unless linear feet or per-unit pricing is configured');
+    if (!hasLinearFeetPricing && !hasPerUnitPricing && formData.initial_price === 0 && !(formData.recurring_price > 0)) {
+      alert('Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured');
       return;
     }
 
@@ -774,12 +803,14 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       };
     });
 
+    const { yard_sqft_pricing_enabled, ...formDataWithoutFlag } = formData as any;
     const cleanedData = {
-      ...formData,
+      ...formDataWithoutFlag,
       plan_features: formData.plan_features.filter(f => f.trim() !== ''),
       plan_faqs: formData.plan_faqs.filter(faq => faq.question.trim() !== '' && faq.answer.trim() !== ''),
       pest_coverage: enrichedPestCoverage,
       recommended_addon_ids: formData.plan_recommended_addons,
+      yard_sqft_pricing: yard_sqft_pricing_enabled ? formData.yard_sqft_pricing : null,
     };
 
     onSave(cleanedData);
@@ -908,6 +939,11 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                           recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.yard_size_pricing.recurring_cost_per_interval,
                           custom_recurring_prices: newCategory === 'one-time' ? [] : formData.yard_size_pricing.custom_recurring_prices,
                         },
+                        yard_sqft_pricing: {
+                          ...formData.yard_sqft_pricing,
+                          recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.yard_sqft_pricing.recurring_cost_per_interval,
+                          custom_recurring_prices: newCategory === 'one-time' ? [] : formData.yard_sqft_pricing.custom_recurring_prices,
+                        },
                         linear_feet_pricing: updatedLinearFeetPricing,
                       });
                     }}
@@ -999,6 +1035,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                         <option value="monthly">Monthly</option>
                         <option value="bi-monthly">Bi-Monthly</option>
                         <option value="quarterly">Quarterly</option>
+                        <option value="semi-annually">Semi-Annually</option>
                       </select>
                     </div>
                   </div>
@@ -1483,6 +1520,135 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
               </div>
 
               <div className={styles.pricingSection}>
+                <h5>Yard Sq Ft Pricing</h5>
+
+                {/* Toggle to enable/disable yard sqft pricing */}
+                <div className={styles.checkboxGroup} style={{ marginBottom: '16px' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '8px' }}>
+                    <input
+                      type="checkbox"
+                      checked={(formData as any).yard_sqft_pricing_enabled === true}
+                      onChange={(e) => {
+                        setFormData({
+                          ...formData,
+                          yard_sqft_pricing_enabled: e.target.checked,
+                        } as any);
+                      }}
+                      style={{ marginTop: '3px' }}
+                    />
+                    <div>
+                      <div>Use yard sq ft pricing for this plan</div>
+                      <small style={{ color: '#666', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                        Enable this to charge based on yard square footage (as measured by the mapping tool).
+                      </small>
+                    </div>
+                  </label>
+                </div>
+
+                {(formData as any).yard_sqft_pricing_enabled && (
+                  <>
+                    {/* Pricing Mode Toggle */}
+                    <div className={styles.formGroup}>
+                      <label>Pricing Mode</label>
+                      <select
+                        value={formData.yard_sqft_pricing.pricing_mode || 'linear'}
+                        onChange={(e) => {
+                          const newMode = e.target.value as 'linear' | 'custom';
+                          if (newMode === 'custom' && formData.yard_sqft_pricing.pricing_mode !== 'custom') {
+                            const intervalCount = 5;
+                            const customInitialPrices = Array.from({ length: intervalCount }, (_, i) =>
+                              i * formData.yard_sqft_pricing.initial_cost_per_interval
+                            );
+                            const customRecurringPrices = Array.from({ length: intervalCount }, (_, i) =>
+                              i * formData.yard_sqft_pricing.recurring_cost_per_interval
+                            );
+                            setFormData({
+                              ...formData,
+                              yard_sqft_pricing: {
+                                ...formData.yard_sqft_pricing,
+                                pricing_mode: newMode,
+                                custom_initial_prices: customInitialPrices,
+                                custom_recurring_prices: customRecurringPrices,
+                              },
+                            } as any);
+                          } else {
+                            setFormData({
+                              ...formData,
+                              yard_sqft_pricing: {
+                                ...formData.yard_sqft_pricing,
+                                pricing_mode: newMode,
+                              },
+                            } as any);
+                          }
+                        }}
+                      >
+                        <option value="linear">Linear (Same increase per interval)</option>
+                        <option value="custom">Custom (Set price for each interval)</option>
+                      </select>
+                      <small>
+                        Linear: Each interval adds the same amount (e.g., +$25, +$50, +$75)
+                        <br />
+                        Custom: Set exact prices for each interval (e.g., +$20, +$45, +$85)
+                        <br />
+                        <em>Switching to Custom will pre-fill values based on your linear pricing</em>
+                      </small>
+                    </div>
+
+                    {(formData.yard_sqft_pricing.pricing_mode || 'linear') === 'linear' ? (
+                      <div className={styles.formRow}>
+                        <div className={styles.formGroup}>
+                          <label>Initial Cost Per Interval ($)</label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={formData.yard_sqft_pricing.initial_cost_per_interval}
+                            onChange={(e) => setFormData({
+                              ...formData,
+                              yard_sqft_pricing: {
+                                ...formData.yard_sqft_pricing,
+                                initial_cost_per_interval: parseFloat(e.target.value) || 0,
+                              },
+                            } as any)}
+                            placeholder="25.00"
+                          />
+                          <small>Added to initial price for each interval above base</small>
+                        </div>
+
+                        {formData.plan_category !== 'one-time' && (
+                          <div className={styles.formGroup}>
+                            <label>Recurring Cost Per Interval ($)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={formData.yard_sqft_pricing.recurring_cost_per_interval}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                yard_sqft_pricing: {
+                                  ...formData.yard_sqft_pricing,
+                                  recurring_cost_per_interval: parseFloat(e.target.value) || 0,
+                                },
+                              } as any)}
+                              placeholder="15.00"
+                            />
+                            <small>Added to recurring price for each interval above base</small>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <CustomIntervalPricingInput
+                        dimension="yard_sqft"
+                        formData={formData}
+                        setFormData={setFormData}
+                        companyId={companyId}
+                      />
+                    )}
+                  </>
+                )}
+              </div>
+
+              <div className={styles.pricingSection}>
                 <h5>Linear Feet Pricing</h5>
 
                 {/* Toggle to enable/disable linear feet pricing */}
@@ -1789,6 +1955,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                             <option value="monthly">Monthly</option>
                             <option value="bi-monthly">Bi-Monthly</option>
                             <option value="quarterly">Quarterly</option>
+                            <option value="semi-annually">Semi-Annually</option>
                           </select>
                         </div>
                       </div>

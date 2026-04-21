@@ -91,6 +91,9 @@ export async function PUT(
       base_yard_acres,
       yard_acres_interval,
       max_yard_acres,
+      base_yard_sq_ft,
+      yard_sq_ft_interval,
+      max_yard_sq_ft,
       base_linear_feet,
       linear_feet_interval,
       max_linear_feet,
@@ -116,22 +119,29 @@ export async function PUT(
 
     const supabase = createAdminClient();
 
+    // Build upsert payload — yard_sq_ft fields are optional (may not exist on older rows)
+    const upsertPayload: Record<string, unknown> = {
+      company_id: id,
+      base_home_sq_ft,
+      home_sq_ft_interval,
+      max_home_sq_ft,
+      base_yard_acres,
+      yard_acres_interval,
+      max_yard_acres,
+      base_linear_feet,
+      linear_feet_interval,
+      max_linear_feet,
+    };
+
+    if (base_yard_sq_ft !== undefined) upsertPayload.base_yard_sq_ft = base_yard_sq_ft;
+    if (yard_sq_ft_interval !== undefined) upsertPayload.yard_sq_ft_interval = yard_sq_ft_interval;
+    if (max_yard_sq_ft !== undefined) upsertPayload.max_yard_sq_ft = max_yard_sq_ft;
+
     // Update or insert pricing settings
     const { data: settings, error } = await supabase
       .from('company_pricing_settings')
       .upsert(
-        {
-          company_id: id,
-          base_home_sq_ft,
-          home_sq_ft_interval,
-          max_home_sq_ft,
-          base_yard_acres,
-          yard_acres_interval,
-          max_yard_acres,
-          base_linear_feet,
-          linear_feet_interval,
-          max_linear_feet,
-        },
+        upsertPayload,
         { onConflict: 'company_id' }
       )
       .select()

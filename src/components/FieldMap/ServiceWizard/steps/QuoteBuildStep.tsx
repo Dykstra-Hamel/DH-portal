@@ -18,6 +18,7 @@ import type {
 } from '@/types/pricing';
 import {
   generateHomeSizeOptions,
+  generateYardSqftOptions,
   findSizeOptionByValue,
   toMonthlyEquivalent,
 } from '@/lib/pricing-calculations';
@@ -107,6 +108,7 @@ interface CatalogItem {
   variants: CatalogVariant[];
   percentagePricing: CatalogPercentagePricing | null;
   homeSizePricing: ServicePlanPricing['home_size_pricing'] | null;
+  yardSqftPricing: ServicePlanPricing['yard_sqft_pricing'] | null;
   eligibilityMode: 'all' | 'specific';
   eligiblePlanIds: string[];
   recommendedAddonIds: string[];
@@ -1209,6 +1211,7 @@ export function QuoteBuildStep({
           variants: Array.isArray(p.variants) ? p.variants : [],
           percentagePricing: null,
           homeSizePricing: p.home_size_pricing ?? null,
+          yardSqftPricing: p.yard_sqft_pricing ?? null,
           eligibilityMode: 'all' as const,
           eligiblePlanIds: [],
           recommendedAddonIds: p.recommended_addon_ids ?? [],
@@ -1240,6 +1243,7 @@ export function QuoteBuildStep({
           variants: Array.isArray(a.variants) ? a.variants : [],
           percentagePricing: a.percentage_pricing ?? null,
           homeSizePricing: null,
+          yardSqftPricing: null,
           eligibilityMode: (a.eligibility_mode ?? 'all') as 'all' | 'specific',
           eligiblePlanIds: a.eligible_plan_ids ?? [],
           recommendedAddonIds: [],
@@ -1282,6 +1286,7 @@ export function QuoteBuildStep({
             variants: [],
             percentagePricing: null,
             homeSizePricing: null,
+            yardSqftPricing: null,
             eligibilityMode: 'all' as const,
             eligiblePlanIds: [],
             recommendedAddonIds: [],
@@ -1685,12 +1690,16 @@ export function QuoteBuildStep({
     modalSelectedService?.pricingType === 'per_linear_foot' ||
     modalSelectedService?.pricingUnit === 'linear_feet';
 
+  const modalUsesYardSqft =
+    modalSelectedService?.kind === 'plan' &&
+    !!modalSelectedService?.yardSqftPricing;
+
   const sqftSuggestions = useMemo(
     () =>
       (mapMeasurements?.byOutline ?? []).filter(
-        o => o.type === 'house' && o.sqft > 0
+        o => o.type === (modalUsesYardSqft ? 'yard' : 'house') && o.sqft > 0
       ),
-    [mapMeasurements]
+    [mapMeasurements, modalUsesYardSqft]
   );
   const linFtSuggestions = useMemo(
     () =>
@@ -1751,14 +1760,22 @@ export function QuoteBuildStep({
     setModalQuantity(sqft);
     if (!modalSelectedService || !pricingSettings) return;
 
-    const planPricing: ServicePlanPricing | undefined =
-      modalSelectedService.homeSizePricing
-        ? ({
-            home_size_pricing: modalSelectedService.homeSizePricing,
-          } as ServicePlanPricing)
-        : undefined;
+    let options;
+    if (modalUsesYardSqft && modalSelectedService.yardSqftPricing) {
+      const planPricing = {
+        yard_sqft_pricing: modalSelectedService.yardSqftPricing,
+      } as ServicePlanPricing;
+      options = generateYardSqftOptions(pricingSettings, planPricing);
+    } else {
+      const planPricing: ServicePlanPricing | undefined =
+        modalSelectedService.homeSizePricing
+          ? ({
+              home_size_pricing: modalSelectedService.homeSizePricing,
+            } as ServicePlanPricing)
+          : undefined;
+      options = generateHomeSizeOptions(pricingSettings, planPricing);
+    }
 
-    const options = generateHomeSizeOptions(pricingSettings, planPricing);
     const match = findSizeOptionByValue(sqft, options);
     if (!match) return;
 
@@ -1783,6 +1800,7 @@ export function QuoteBuildStep({
       const total = linFtSuggestions.reduce((s, o) => s + o.linearFt, 0);
       if (total > 0) handleModalQuantityChange(total);
     } else if (modalWantsSqFt && sqftSuggestions.length > 0) {
+      // sqftSuggestions already filters by 'yard' when modalUsesYardSqft
       const total = sqftSuggestions.reduce((s, o) => s + o.sqft, 0);
       if (total > 0) {
         if (modalIsPerUnit) handleModalQuantityChange(total);
@@ -2717,7 +2735,7 @@ export function QuoteBuildStep({
                           className={`${styles.measurementField} ${!modalWantsSqFt ? styles.measurementFieldDisabled : ''}`}
                         >
                           <span className={styles.fieldLabel}>
-                            Home Size —{' '}
+                            {modalUsesYardSqft ? 'Yard Size' : 'Home Size'} —{' '}
                             <span className={styles.fieldLabelLowercase}>
                               Square Feet
                             </span>

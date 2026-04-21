@@ -1,0 +1,2 @@
+ALTER TABLE service_plans
+ADD COLUMN IF NOT EXISTS yard_sqft_pricing JSONB DEFAULT NULL;

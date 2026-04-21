@@ -298,6 +298,78 @@ export function generateYardSizeOptions(
 }
 
 /**
+ * Generate yard sq ft dropdown options based on company intervals
+ * Example output: "0-5,000 Sq Ft", "5,001-6,000 Sq Ft (+$25 initial, +$15/month)", "20,000+ Sq Ft"
+ */
+export function generateYardSqftOptions(
+  companySettings: CompanyPricingSettings,
+  servicePlanPricing?: ServicePlanPricing
+): SizeOption[] {
+  const options: SizeOption[] = [];
+  const { base_yard_sq_ft, yard_sq_ft_interval, max_yard_sq_ft } =
+    companySettings;
+
+  let currentSize = 0;
+  let intervalIndex = 0;
+
+  while (currentSize <= max_yard_sq_ft) {
+    const rangeStart = currentSize;
+    const rangeEnd =
+      currentSize === 0
+        ? base_yard_sq_ft
+        : Math.min(currentSize + yard_sq_ft_interval, max_yard_sq_ft);
+
+    const isLastInterval = rangeEnd >= max_yard_sq_ft;
+
+    let initialIncrease = 0;
+    let recurringIncrease = 0;
+
+    if (servicePlanPricing?.yard_sqft_pricing) {
+      const pricing = servicePlanPricing.yard_sqft_pricing;
+      const mode = pricing.pricing_mode || 'linear';
+
+      if (mode === 'custom') {
+        initialIncrease = pricing.custom_initial_prices?.[intervalIndex] ?? 0;
+        recurringIncrease = pricing.custom_recurring_prices?.[intervalIndex] ?? 0;
+      } else {
+        initialIncrease = intervalIndex * (pricing.initial_cost_per_interval ?? 0);
+        recurringIncrease = intervalIndex * (pricing.recurring_cost_per_interval ?? 0);
+      }
+    }
+
+    let label = '';
+    if (currentSize === 0) {
+      label = `0-${rangeEnd.toLocaleString()} Sq Ft`;
+    } else if (isLastInterval) {
+      label = `${rangeStart.toLocaleString()}+ Sq Ft`;
+    } else {
+      label = `${rangeStart.toLocaleString()}-${rangeEnd.toLocaleString()} Sq Ft`;
+    }
+
+    options.push({
+      value: isLastInterval ? `${rangeStart}+` : `${rangeStart}-${rangeEnd}`,
+      label,
+      intervalIndex,
+      initialIncrease,
+      recurringIncrease,
+      rangeStart,
+      rangeEnd: isLastInterval ? null : rangeEnd,
+    });
+
+    if (isLastInterval) break;
+
+    if (currentSize === 0) {
+      currentSize = base_yard_sq_ft + 1;
+    } else {
+      currentSize = rangeEnd + 1;
+    }
+    intervalIndex++;
+  }
+
+  return options;
+}
+
+/**
  * Generate linear feet dropdown options based on company intervals
  * Example output: "0-100 Linear Ft", "101-150 Linear Ft (+$15 initial, +$8/month)", "500+ Linear Ft"
  */
@@ -477,12 +549,15 @@ export function calculateTotalPricing(
   homeSizeOption?: SizeOption,
   yardSizeOption?: SizeOption,
   linearFeetOption?: SizeOption,
-  minimumPrice?: number | null
+  minimumPrice?: number | null,
+  yardSqftOption?: SizeOption
 ): PricingCalculation {
   const homeSizeInitialIncrease = homeSizeOption?.initialIncrease || 0;
   const homeSizeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
   const yardSizeInitialIncrease = yardSizeOption?.initialIncrease || 0;
   const yardSizeRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+  const yardSqftInitialIncrease = yardSqftOption?.initialIncrease || 0;
+  const yardSqftRecurringIncrease = yardSqftOption?.recurringIncrease || 0;
   const linearFeetInitialIncrease = linearFeetOption?.initialIncrease || 0;
   const linearFeetRecurringIncrease = linearFeetOption?.recurringIncrease || 0;
 
@@ -490,11 +565,16 @@ export function calculateTotalPricing(
   const safeBaseRecurringPrice = baseRecurringPrice || 0;
 
   const rawInitial =
-    baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease + linearFeetInitialIncrease;
+    baseInitialPrice +
+    homeSizeInitialIncrease +
+    yardSizeInitialIncrease +
+    yardSqftInitialIncrease +
+    linearFeetInitialIncrease;
   const rawRecurring =
     safeBaseRecurringPrice +
     homeSizeRecurringIncrease +
     yardSizeRecurringIncrease +
+    yardSqftRecurringIncrease +
     linearFeetRecurringIncrease;
 
   // Apply minimum price floor to the initial (one-time or setup) cost
@@ -508,6 +588,8 @@ export function calculateTotalPricing(
     homeSizeRecurringIncrease,
     yardSizeInitialIncrease,
     yardSizeRecurringIncrease,
+    yardSqftInitialIncrease,
+    yardSqftRecurringIncrease,
     linearFeetInitialIncrease,
     linearFeetRecurringIncrease,
     totalInitialPrice,
@@ -560,14 +642,14 @@ export function findSizeOptionByValue(
  */
 export function calculateIntervalCount(
   settings: CompanyPricingSettings,
-  dimension: 'home' | 'yard' | 'linear_feet'
+  dimension: 'home' | 'yard' | 'yard_sqft' | 'linear_feet'
 ): number {
-  // Generate the actual options and return the length
-  // This ensures the count always matches what generateHomeSizeOptions/generateYardSizeOptions/generateLinearFeetOptions creates
   const options = dimension === 'home'
     ? generateHomeSizeOptions(settings)
     : dimension === 'yard'
     ? generateYardSizeOptions(settings)
+    : dimension === 'yard_sqft'
+    ? generateYardSqftOptions(settings)
     : generateLinearFeetOptions(settings);
 
   return options.length;
@@ -592,18 +674,19 @@ export function calculatePerUnitPrice(
  */
 export function getIntervalLabel(
   settings: CompanyPricingSettings | null | undefined,
-  dimension: 'home' | 'yard' | 'linear_feet',
+  dimension: 'home' | 'yard' | 'yard_sqft' | 'linear_feet',
   intervalIndex: number
 ): string {
   if (!settings) {
     return `Interval ${intervalIndex}`;
   }
 
-  // Generate all options and find the matching one
   const options = dimension === 'home'
     ? generateHomeSizeOptions(settings)
     : dimension === 'yard'
     ? generateYardSizeOptions(settings)
+    : dimension === 'yard_sqft'
+    ? generateYardSqftOptions(settings)
     : generateLinearFeetOptions(settings);
 
   return options[intervalIndex]?.label || `Interval ${intervalIndex}`;
