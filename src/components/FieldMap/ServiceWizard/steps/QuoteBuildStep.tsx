@@ -409,7 +409,7 @@ function LineItemCard({
         activeVariant?.price_per_unit ?? selectedCatalogItem.pricePerUnit ?? 0;
       computed = qty * effectiveRate;
     } else if (isPerHour) {
-      const rate = selectedCatalogItem.initialPrice ?? 0;
+      const rate = activeVariant?.price_per_unit ?? selectedCatalogItem.pricePerUnit ?? selectedCatalogItem.initialPrice ?? 0;
       computed = qty * rate;
     } else if (isPerRoom) {
       const rate = selectedCatalogItem.initialPrice ?? 0;
@@ -1054,6 +1054,7 @@ export function QuoteBuildStep({
   const [pestModal, setPestModal] = useState<PlottedPest | null>(null);
   const [modalServiceId, setModalServiceId] = useState<string | null>(null);
   const [modalAddonIds, setModalAddonIds] = useState<Set<string>>(new Set());
+  const [modalAddonQuantities, setModalAddonQuantities] = useState<Record<string, number>>({});
   const [modalProductQtys, setModalProductQtys] = useState<
     Record<string, number>
   >({});
@@ -1065,6 +1066,7 @@ export function QuoteBuildStep({
   );
   const [modalFrequency, setModalFrequency] = useState<string | null>(null);
   const [modalQuantity, setModalQuantity] = useState<number | null>(null);
+  const [modalVariantLabel, setModalVariantLabel] = useState<string | null>(null);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const modalBodyRef = useRef<HTMLDivElement>(null);
@@ -1084,11 +1086,13 @@ export function QuoteBuildStep({
     if (editingItemId) return;
     setModalServiceId(null);
     setModalAddonIds(new Set());
+    setModalAddonQuantities({});
     setModalProductQtys({});
     setModalInitialPrice(null);
     setModalRecurringPrice(null);
     setModalFrequency(null);
     setModalQuantity(null);
+    setModalVariantLabel(null);
     setServiceSearch('');
     setServiceDropdownOpen(false);
   }, [pestModal, editingItemId]);
@@ -1160,6 +1164,7 @@ export function QuoteBuildStep({
     );
     setModalQuantity(null);
     setModalProductQtys({});
+    setModalVariantLabel(null);
   }, [modalServiceId, catalog, editingItemId]);
 
   useEffect(() => {
@@ -1779,11 +1784,15 @@ export function QuoteBuildStep({
     const match = findSizeOptionByValue(sqft, options);
     if (!match) return;
 
-    const rawInitial =
-      (modalSelectedService.initialPrice ?? 0) + match.initialIncrease;
-    const rawRecurring =
-      (modalSelectedService.recurringPrice ?? 0) + match.recurringIncrease;
-    const min = modalSelectedService.minimumPrice;
+    const activeVariant = modalVariantLabel
+      ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
+      : null;
+    const baseInitial = activeVariant?.initial_price ?? modalSelectedService.initialPrice ?? 0;
+    const baseRecurring = activeVariant?.recurring_price ?? modalSelectedService.recurringPrice ?? 0;
+    const min = activeVariant?.minimum_price ?? modalSelectedService.minimumPrice;
+
+    const rawInitial = baseInitial + match.initialIncrease;
+    const rawRecurring = baseRecurring + match.recurringIncrease;
     const finalInitial = min != null ? Math.max(rawInitial, min) : rawInitial;
 
     setModalInitialPrice(finalInitial);
@@ -1851,14 +1860,23 @@ export function QuoteBuildStep({
       }
     }
 
+    const addonQtys: Record<string, number> = {};
+    for (const a of childAddons) {
+      if (a.catalogItemId && a.quantity != null) {
+        addonQtys[a.catalogItemId] = a.quantity;
+      }
+    }
+
     setEditingItemId(primaryItemId);
     setModalServiceId(primary.catalogItemId ?? null);
     setModalAddonIds(addonIds);
+    setModalAddonQuantities(addonQtys);
     setModalProductQtys(productQtys);
     setModalInitialPrice(primary.initialCost);
     setModalRecurringPrice(primary.recurringCost);
     setModalFrequency(primary.frequency);
     setModalQuantity(primary.quantity ?? null);
+    setModalVariantLabel(primary.selectedVariantLabel ?? null);
     setPestModal({ id: '__all__', label: 'Edit Service' });
   }
 
@@ -1902,7 +1920,7 @@ export function QuoteBuildStep({
           ? 'one-time'
           : (service.treatmentFrequency ?? service.billingFrequency ?? null)),
       quantity: modalQuantity,
-      selectedVariantLabel: null,
+      selectedVariantLabel: modalVariantLabel,
       percentageJobCost: null,
       percentagePricingNote: null,
       is_custom_priced: false,
@@ -1936,6 +1954,22 @@ export function QuoteBuildStep({
         addonCustomInitialPrice = computed;
       }
 
+      // Override cost for per-unit types when a quantity was entered in the modal
+      const addonQty = modalAddonQuantities[addonId] ?? null;
+      if (addonQty != null && addon.pricingType !== 'flat' && !addon.percentagePricing) {
+        const pt = addon.pricingType;
+        if (pt === 'per_room') {
+          const first = addon.initialPrice ?? 0;
+          const additional = addon.additionalUnitPrice ?? 0;
+          const raw = addonQty <= 0 ? 0 : first + Math.max(0, addonQty - 1) * additional;
+          resolvedInitial = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        } else {
+          const rate = addon.pricePerUnit ?? 0;
+          const raw = addonQty * rate;
+          resolvedInitial = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        }
+      }
+
       newItems.push({
         id: crypto.randomUUID(),
         type: 'plan-addon',
@@ -1949,7 +1983,7 @@ export function QuoteBuildStep({
         recurringCost: addon.recurringPrice,
         frequency: isAddonOneTime ? 'one-time' : resolvedFrequency,
         selectedVariantLabel: null,
-        quantity: null,
+        quantity: addonQty,
         percentageJobCost: addonPercentageJobCost,
         percentagePricingNote: addonPercentagePricingNote,
         is_custom_priced: addonIsCustomPriced,
@@ -1986,6 +2020,22 @@ export function QuoteBuildStep({
         addonCustomInitialPrice = computed;
       }
 
+      // Override cost for per-unit types when a quantity was entered in the modal
+      const addonQty = modalAddonQuantities[addonId] ?? null;
+      if (addonQty != null && addon.pricingType !== 'flat' && !addon.percentagePricing) {
+        const pt = addon.pricingType;
+        if (pt === 'per_room') {
+          const first = addon.initialPrice ?? 0;
+          const additional = addon.additionalUnitPrice ?? 0;
+          const raw = addonQty <= 0 ? 0 : first + Math.max(0, addonQty - 1) * additional;
+          resolvedInitial = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        } else {
+          const rate = addon.pricePerUnit ?? 0;
+          const raw = addonQty * rate;
+          resolvedInitial = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        }
+      }
+
       newItems.push({
         id: crypto.randomUUID(),
         type: 'plan-addon',
@@ -1999,7 +2049,7 @@ export function QuoteBuildStep({
         recurringCost: addon.recurringPrice,
         frequency: isAddonOneTime ? 'one-time' : resolvedFrequency,
         selectedVariantLabel: null,
-        quantity: null,
+        quantity: addonQty,
         percentageJobCost: addonPercentageJobCost,
         percentagePricingNote: addonPercentagePricingNote,
         is_custom_priced: addonIsCustomPriced,
@@ -2050,11 +2100,13 @@ export function QuoteBuildStep({
     setPestModal(null);
     setModalServiceId(null);
     setModalAddonIds(new Set());
+    setModalAddonQuantities({});
     setModalProductQtys({});
     setModalInitialPrice(null);
     setModalRecurringPrice(null);
     setModalFrequency(null);
     setModalQuantity(null);
+    setModalVariantLabel(null);
   }
 
   // Only render plan/bundle/custom items as compact summary cards; addons and products
@@ -2727,6 +2779,43 @@ export function QuoteBuildStep({
                       </p>
                     )}
 
+                    {/* Variant selector — shown when plan has variants */}
+                    {modalSelectedService.variants.length > 0 && (
+                      <div className={styles.fieldGroup} style={{ marginBottom: '12px' }}>
+                        <label className={styles.fieldLabel}>Variant</label>
+                        <select
+                          className={styles.selectInput}
+                          value={modalVariantLabel ?? ''}
+                          onChange={e => {
+                            const label = e.target.value || null;
+                            setModalVariantLabel(label);
+                            const variant = modalSelectedService.variants.find(v => v.label === label);
+                            if (variant) {
+                              if (variant.initial_price !== undefined) setModalInitialPrice(variant.initial_price);
+                              if (variant.recurring_price !== undefined) setModalRecurringPrice(variant.recurring_price);
+                              const freq = variant.treatment_frequency ?? variant.billing_frequency;
+                              if (freq) setModalFrequency(freq);
+                            } else {
+                              // Cleared — reset to plan defaults
+                              setModalInitialPrice(modalSelectedService.initialPrice);
+                              setModalRecurringPrice(modalSelectedService.recurringPrice);
+                              const isOneTime = modalSelectedService.planCategory === 'one-time' || modalSelectedService.billingFrequency === 'one-time';
+                              setModalFrequency(
+                                isOneTime
+                                  ? 'one-time'
+                                  : (modalSelectedService.treatmentFrequency ?? modalSelectedService.billingFrequency ?? null)
+                              );
+                            }
+                          }}
+                        >
+                          <option value="">— Plan Default —</option>
+                          {modalSelectedService.variants.map(v => (
+                            <option key={v.label} value={v.label}>{v.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     {/* Two-column measurement row — shown for all non-per-hour, non-per-room plans */}
                     {!modalIsPerHour && !modalIsPerRoom && (
                       <div className={styles.measurementRow}>
@@ -2980,17 +3069,89 @@ export function QuoteBuildStep({
                                 </span>
                               )}
                               {addon.name}
-                              {addon.initialPrice != null &&
-                                addon.initialPrice > 0 && (
-                                  <span className={styles.modalChipPrice}>
-                                    {' '}
-                                    +{formatCurrency(addon.initialPrice)}
-                                  </span>
-                                )}
+                              {(() => {
+                                const pt = addon.pricingType;
+                                if (pt === 'per_hour') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/hr</span> : null;
+                                }
+                                if (pt === 'per_room') {
+                                  const rate = addon.initialPrice;
+                                  return rate != null ? <span className={styles.modalChipPrice}> from {formatCurrency(rate)}</span> : null;
+                                }
+                                if (pt === 'per_sqft') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/sq ft</span> : null;
+                                }
+                                if (pt === 'per_acre') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/acre</span> : null;
+                                }
+                                if (pt === 'per_linear_foot') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/linear ft</span> : null;
+                                }
+                                return addon.initialPrice != null && addon.initialPrice > 0
+                                  ? <span className={styles.modalChipPrice}> +{formatCurrency(addon.initialPrice)}</span>
+                                  : null;
+                              })()}
                             </button>
                           );
                         })}
                       </div>
+                      {/* Quantity inputs for selected per-unit recommended add-ons */}
+                      {modalRecommendedAddons
+                        .filter(a => modalAddonIds.has(a.id) && a.pricingType !== 'flat')
+                        .map(addon => {
+                          const pt = addon.pricingType;
+                          const label =
+                            pt === 'per_hour' ? 'Hours' :
+                            pt === 'per_room' ? 'Rooms' :
+                            pt === 'per_sqft' ? 'Square Feet' :
+                            pt === 'per_acre' ? 'Acres' :
+                            pt === 'per_linear_foot' ? 'Linear Feet' : 'Units';
+                          return (
+                            <div key={addon.id} className={styles.addonQuantityRow}>
+                              <label className={styles.addonQuantityLabel}>
+                                {addon.name} — {label}:
+                              </label>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step={pt === 'per_hour' ? '0.5' : '1'}
+                                className={styles.textInput}
+                                value={modalAddonQuantities[addon.id] ?? ''}
+                                onChange={e => {
+                                  const v = parseFloat(e.target.value);
+                                  setModalAddonQuantities(prev => ({
+                                    ...prev,
+                                    [addon.id]: Number.isFinite(v) && v >= 0 ? v : 0,
+                                  }));
+                                }}
+                                placeholder={pt === 'per_hour' ? '0.0' : '1'}
+                              />
+                              {(() => {
+                                const qty = modalAddonQuantities[addon.id] ?? 0;
+                                if (!qty) return null;
+                                if (pt === 'per_room') {
+                                  const first = addon.initialPrice ?? 0;
+                                  const additional = addon.additionalUnitPrice ?? 0;
+                                  const total = qty <= 0 ? 0 : first + Math.max(0, qty - 1) * additional;
+                                  const min = addon.minimumPrice;
+                                  const final = min != null ? Math.max(total, min) : total;
+                                  return <span className={styles.pricingHint}>= {formatCurrency(final)}</span>;
+                                }
+                                const rate = addon.pricePerUnit ?? 0;
+                                const raw = qty * rate;
+                                const min = addon.minimumPrice;
+                                const final = min != null ? Math.max(raw, min) : raw;
+                                return <span className={styles.pricingHint}>{qty} × {formatCurrency(rate)} = {formatCurrency(final)}</span>;
+                              })()}
+                            </div>
+                          );
+                        })
+                      }
                     </div>
                   )}
 
@@ -3035,17 +3196,89 @@ export function QuoteBuildStep({
                                 </span>
                               )}
                               {addon.name}
-                              {addon.initialPrice != null &&
-                                addon.initialPrice > 0 && (
-                                  <span className={styles.modalChipPrice}>
-                                    {' '}
-                                    +{formatCurrency(addon.initialPrice)}
-                                  </span>
-                                )}
+                              {(() => {
+                                const pt = addon.pricingType;
+                                if (pt === 'per_hour') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/hr</span> : null;
+                                }
+                                if (pt === 'per_room') {
+                                  const rate = addon.initialPrice;
+                                  return rate != null ? <span className={styles.modalChipPrice}> from {formatCurrency(rate)}</span> : null;
+                                }
+                                if (pt === 'per_sqft') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/sq ft</span> : null;
+                                }
+                                if (pt === 'per_acre') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/acre</span> : null;
+                                }
+                                if (pt === 'per_linear_foot') {
+                                  const rate = addon.pricePerUnit;
+                                  return rate != null ? <span className={styles.modalChipPrice}> {formatCurrency(rate)}/linear ft</span> : null;
+                                }
+                                return addon.initialPrice != null && addon.initialPrice > 0
+                                  ? <span className={styles.modalChipPrice}> +{formatCurrency(addon.initialPrice)}</span>
+                                  : null;
+                              })()}
                             </button>
                           );
                         })}
                       </div>
+                      {/* Quantity inputs for selected per-unit additional add-ons */}
+                      {modalAdditionalAddons
+                        .filter(a => modalAddonIds.has(a.id) && a.pricingType !== 'flat')
+                        .map(addon => {
+                          const pt = addon.pricingType;
+                          const label =
+                            pt === 'per_hour' ? 'Hours' :
+                            pt === 'per_room' ? 'Rooms' :
+                            pt === 'per_sqft' ? 'Square Feet' :
+                            pt === 'per_acre' ? 'Acres' :
+                            pt === 'per_linear_foot' ? 'Linear Feet' : 'Units';
+                          return (
+                            <div key={addon.id} className={styles.addonQuantityRow}>
+                              <label className={styles.addonQuantityLabel}>
+                                {addon.name} — {label}:
+                              </label>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step={pt === 'per_hour' ? '0.5' : '1'}
+                                className={styles.textInput}
+                                value={modalAddonQuantities[addon.id] ?? ''}
+                                onChange={e => {
+                                  const v = parseFloat(e.target.value);
+                                  setModalAddonQuantities(prev => ({
+                                    ...prev,
+                                    [addon.id]: Number.isFinite(v) && v >= 0 ? v : 0,
+                                  }));
+                                }}
+                                placeholder={pt === 'per_hour' ? '0.0' : '1'}
+                              />
+                              {(() => {
+                                const qty = modalAddonQuantities[addon.id] ?? 0;
+                                if (!qty) return null;
+                                if (pt === 'per_room') {
+                                  const first = addon.initialPrice ?? 0;
+                                  const additional = addon.additionalUnitPrice ?? 0;
+                                  const total = qty <= 0 ? 0 : first + Math.max(0, qty - 1) * additional;
+                                  const min = addon.minimumPrice;
+                                  const final = min != null ? Math.max(total, min) : total;
+                                  return <span className={styles.pricingHint}>= {formatCurrency(final)}</span>;
+                                }
+                                const rate = addon.pricePerUnit ?? 0;
+                                const raw = qty * rate;
+                                const min = addon.minimumPrice;
+                                const final = min != null ? Math.max(raw, min) : raw;
+                                return <span className={styles.pricingHint}>{qty} × {formatCurrency(rate)} = {formatCurrency(final)}</span>;
+                              })()}
+                            </div>
+                          );
+                        })
+                      }
                     </div>
                   )}
 
