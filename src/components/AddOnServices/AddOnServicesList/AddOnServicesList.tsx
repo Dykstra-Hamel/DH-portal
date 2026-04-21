@@ -6,8 +6,14 @@ import styles from './AddOnServicesList.module.scss';
 import { AddOnService } from '@/types/addon-service';
 import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 
+interface ServicePlanBasic {
+  id: string;
+  plan_name: string;
+}
+
 interface AddOnServicesListProps {
   companyId: string;
+  servicePlans?: ServicePlanBasic[];
   onEdit: (addon: AddOnService) => void;
   onDelete: (addonId: string) => void;
   onAdd: () => void;
@@ -15,6 +21,7 @@ interface AddOnServicesListProps {
 
 export default function AddOnServicesList({
   companyId,
+  servicePlans = [],
   onEdit,
   onDelete,
   onAdd,
@@ -106,9 +113,25 @@ export default function AddOnServicesList({
                   <div>${addon.recurring_price} / {addon.billing_frequency}</div>
                 </div>
                 <div>
-                  <span className={`${styles.eligibility} ${addon.eligibility_mode === 'all' ? styles.eligibilityAll : styles.eligibilitySpecific}`}>
-                    {addon.eligibility_mode === 'all' ? 'All plans' : 'Limited'}
-                  </span>
+                  {addon.eligibility_mode === 'all' ? (
+                    <span className={`${styles.eligibility} ${styles.eligibilityAll}`}>All plans</span>
+                  ) : (
+                    <span className={styles.tooltipWrapper}>
+                      <span className={`${styles.eligibility} ${styles.eligibilitySpecific}`}>Limited</span>
+                      <span className={styles.tooltip}>
+                        {(addon.eligible_plan_ids ?? []).length === 0 ? (
+                          <span className={styles.tooltipEmpty}>No plans assigned</span>
+                        ) : (
+                          (addon.eligible_plan_ids ?? []).map(id => {
+                            const plan = servicePlans.find(p => p.id === id);
+                            return plan ? (
+                              <span key={id} className={styles.tooltipItem}>{plan.plan_name}</span>
+                            ) : null;
+                          })
+                        )}
+                      </span>
+                    </span>
+                  )}
                 </div>
                 <div>
                   <span className={`${styles.statusIndicator} ${addon.is_active ? styles.active : styles.inactive}`}>
