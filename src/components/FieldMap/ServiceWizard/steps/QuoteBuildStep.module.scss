@@ -416,6 +416,20 @@
   font-family: var(--font-default);
 }
 
+.addonQuantityRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.addonQuantityLabel {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 .fieldRequired {
   color: var(--red-500, #ef4444);
   margin-left: 2px;
@@ -1260,7 +1274,7 @@
 }
 
 .modalProductTrashPlaceholder {
-  // grid column holds the width — no extra styles needed
+  width: 28px; // grid column holds the width — no extra styles needed
 }
 
 .modalSelectPrompt {

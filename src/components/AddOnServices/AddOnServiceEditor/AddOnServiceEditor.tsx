@@ -349,11 +349,11 @@ export default function AddOnServiceEditor({
               </select>
             </div>
 
-            {['per_sqft', 'per_linear_foot', 'per_acre'].includes(formData.pricing_type) && (
+            {['per_sqft', 'per_linear_foot', 'per_acre', 'per_hour'].includes(formData.pricing_type) && (
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label htmlFor="price_per_unit">
-                    Price Per {formData.pricing_type === 'per_sqft' ? 'Sq Ft' : formData.pricing_type === 'per_linear_foot' ? 'Linear Ft' : 'Acre'} ($)
+                    Price Per {formData.pricing_type === 'per_sqft' ? 'Sq Ft' : formData.pricing_type === 'per_linear_foot' ? 'Linear Ft' : formData.pricing_type === 'per_acre' ? 'Acre' : 'Hour'} ($)
                   </label>
                   <input
                     id="price_per_unit"
