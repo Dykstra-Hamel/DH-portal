@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, ChevronRight } from 'lucide-react';
 import { DataTable, CardViewConfig } from '@/components/Common/DataTable';
-import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import { getTaskColumns } from '@/components/Tasks/TasksList/TasksListConfig';
 import { Task, TaskFormData, isTaskOverdue, formatTaskDueDateTime } from '@/types/task';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
@@ -224,63 +223,40 @@ export default function AdditionalTasksPanel({
         {
           key: 'due',
           label: 'Due',
+          width: '110px',
           render: task => formatTaskDueDateTime(task.due_date, task.due_time) || '—',
         },
         {
           key: 'title',
           label: 'Title',
+          width: 'minmax(140px, 1fr)',
           render: task => task.title || '—',
         },
         {
-          key: 'priority',
-          label: 'Priority',
-          render: task => task.priority
-            ? task.priority.charAt(0).toUpperCase() + task.priority.slice(1)
-            : '—',
-        },
-        {
-          key: 'status',
-          label: 'Status',
-          render: task => statusLabels[task.status] ?? task.status ?? '—',
+          key: 'progress',
+          label: 'Progress',
+          width: 'minmax(100px, 2fr)',
+          render: task => {
+            const isOverdue = isTaskOverdue(task);
+            const pct = statusProgress[task.status] ?? 0;
+            return (
+              <div className={styles.progressCell}>
+                <span
+                  className={`${styles.progressLabel} ${isOverdue ? styles.progressLabelOverdue : ''}`}
+                >
+                  {statusLabels[task.status] ?? task.status}
+                </span>
+                <div className={styles.progressTrack}>
+                  <div
+                    className={`${styles.progressFill} ${isOverdue ? styles.progressFillOverdue : ''}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            );
+          },
         },
       ],
-      summary: {
-        label: 'Notes:',
-        render: task => task.description?.trim() || task.notes?.trim() || '—',
-      },
-      avatar: task => {
-        const u = task.assigned_user;
-        if (!u) return null;
-        return (
-          <MiniAvatar
-            firstName={u.first_name}
-            lastName={u.last_name}
-            email={u.email ?? ''}
-            userId={u.id}
-            size="medium"
-            showTooltip={false}
-          />
-        );
-      },
-      statusBar: task => {
-        const isOverdue = isTaskOverdue(task);
-        const pct = statusProgress[task.status] ?? 0;
-        return (
-          <div className={styles.progressCell}>
-            <span
-              className={`${styles.progressLabel} ${isOverdue ? styles.progressLabelOverdue : ''}`}
-            >
-              {statusLabels[task.status] ?? task.status}
-            </span>
-            <div className={styles.progressTrack}>
-              <div
-                className={`${styles.progressFill} ${isOverdue ? styles.progressFillOverdue : ''}`}
-                style={{ width: `${pct}%` }}
-              />
-            </div>
-          </div>
-        );
-      },
       primaryAction: task => (
         <button
           type="button"

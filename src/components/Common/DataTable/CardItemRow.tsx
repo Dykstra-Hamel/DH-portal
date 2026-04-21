@@ -50,7 +50,11 @@ export default function CardItemRow<T>({
               rendered
             );
           return (
-            <div key={field.key} className={styles.cardTopCell}>
+            <div
+              key={field.key}
+              className={styles.cardTopCell}
+              data-field-key={field.key}
+            >
               {content}
             </div>
           );
