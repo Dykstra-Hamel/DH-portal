@@ -984,6 +984,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                         onChange={(e) => handleInputChange('billing_frequency', e.target.value)}
                       >
                         <option value="monthly">Monthly</option>
+                        <option value="bi-monthly">Bi-Monthly</option>
                         <option value="quarterly">Quarterly</option>
                         <option value="semi-annually">Semi-Annually</option>
                         <option value="annually">Annually</option>
@@ -1767,6 +1768,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                           >
                             <option value="">Plan default</option>
                             <option value="monthly">Monthly</option>
+                            <option value="bi-monthly">Bi-Monthly</option>
                             <option value="quarterly">Quarterly</option>
                             <option value="semi-annually">Semi-Annually</option>
                             <option value="annually">Annually</option>

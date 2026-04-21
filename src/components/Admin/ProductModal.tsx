@@ -50,6 +50,7 @@ export default function ProductModal({ product, isOpen, onClose, onSave }: Produ
   });
 
   useEffect(() => {
+    if (!isOpen) return;
     if (product) {
       setFormData({
         product_name: product.product_name,
@@ -81,7 +82,7 @@ export default function ProductModal({ product, isOpen, onClose, onSave }: Produ
         display_order: 0,
       });
     }
-  }, [product]);
+  }, [product, isOpen]);
 
   const handleChange = (field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
