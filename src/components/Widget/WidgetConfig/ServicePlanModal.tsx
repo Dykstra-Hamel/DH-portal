@@ -6,6 +6,7 @@ import FullRichTextEditor from '@/components/Common/RichTextEditor/RichTextEdito
 import styles from './WidgetConfig.module.scss';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { calculateIntervalCount, getIntervalLabel } from '@/lib/pricing-calculations';
+import ProductModal from '@/components/Admin/ProductModal';
 
 interface ServicePlan {
   id: string;
@@ -49,8 +50,25 @@ interface ServicePlan {
     pest_icon: string;
     pest_category: string;
   }>;
+  plan_products?: string[];
   created_at: string;
   updated_at: string;
+}
+
+interface Product {
+  id: string;
+  product_name: string;
+  unit_price: number;
+  is_active: boolean;
+}
+
+interface AddOnService {
+  id: string;
+  addon_name: string;
+  recurring_price: number | null;
+  eligibility_mode: 'all' | 'specific';
+  eligible_plan_ids: string[];
+  is_active: boolean;
 }
 
 interface PestType {
@@ -343,6 +361,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_terms: '',
     plan_video_url: null as string | null,
     is_active: true,
+    is_featured: false,
     allow_custom_pricing: false,
     pricing_unit: null as 'sqft' | 'linear_feet' | 'acres' | null,
     price_per_unit: null as number | null,
@@ -357,6 +376,8 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       treatment_frequency?: string;
     }>,
     pest_coverage: [] as Array<{ pest_id: string; coverage_level: string }>,
+    plan_products: [] as string[],
+    plan_recommended_addons: [] as string[],
     home_size_pricing: {
       pricing_mode: 'linear' as 'linear' | 'custom',
       initial_cost_per_interval: 20.00,
@@ -378,6 +399,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isUploadingVideo, setIsUploadingVideo] = useState(false);
   const [videoSizeWarning, setVideoSizeWarning] = useState(false);
+  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
+  const [availableAddons, setAvailableAddons] = useState<AddOnService[]>([]);
+  const [showProductModal, setShowProductModal] = useState(false);
 
   useEffect(() => {
     if (plan) {
@@ -401,6 +425,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_terms: plan.plan_terms || '',
         plan_video_url: (plan as any).plan_video_url || null,
         is_active: plan.is_active,
+        is_featured: (plan as any).is_featured ?? false,
         allow_custom_pricing: (plan as any).allow_custom_pricing || false,
         pricing_unit: (plan as any).pricing_unit ?? null,
         price_per_unit: (plan as any).price_per_unit ?? null,
@@ -410,6 +435,8 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
           pest_id: pc.pest_id,
           coverage_level: pc.coverage_level,
         })) || [],
+        plan_products: (plan as any).plan_products ?? [],
+        plan_recommended_addons: (plan as any).recommended_addon_ids ?? [],
         home_size_pricing: {
           pricing_mode: (plan as any).home_size_pricing?.pricing_mode || 'linear',
           initial_cost_per_interval: (plan as any).home_size_pricing?.initial_cost_per_interval ?? 20.00,
@@ -448,12 +475,15 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_terms: '',
         plan_video_url: null,
         is_active: true,
+        is_featured: false,
         allow_custom_pricing: false,
         pricing_unit: null,
         price_per_unit: null,
         minimum_price: null,
         variants: [],
         pest_coverage: [],
+        plan_products: [],
+        plan_recommended_addons: [],
         home_size_pricing: {
           pricing_mode: 'linear' as 'linear' | 'custom',
           initial_cost_per_interval: 20.00,
@@ -472,6 +502,22 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       });
     }
   }, [plan]);
+
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/admin/products/${companyId}`)
+      .then(r => r.ok ? r.json() : { data: [] })
+      .then(data => setAvailableProducts(
+        (data.data ?? []).filter((p: Product) => p.is_active)
+      ))
+      .catch(() => {});
+    fetch(`/api/add-on-services/${companyId}`)
+      .then(r => r.ok ? r.json() : { addons: [] })
+      .then(data => setAvailableAddons(
+        (data.addons ?? []).filter((a: AddOnService) => a.is_active)
+      ))
+      .catch(() => {});
+  }, [companyId]);
 
   const handleInputChange = (field: string, value: any) => {
     setFormData(prev => ({
@@ -650,6 +696,24 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     }
   };
 
+  const handleCreateProduct = async (data: Partial<import('@/components/Admin/ProductModal').Product>) => {
+    try {
+      const res = await fetch(`/api/admin/products/${companyId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) throw new Error('Failed to create product');
+      const json = await res.json();
+      const newProduct: Product = json.data;
+      setAvailableProducts(prev => [...prev, newProduct]);
+      handleInputChange('plan_products', [...formData.plan_products, newProduct.id]);
+      setShowProductModal(false);
+    } catch {
+      alert('Failed to create product. Please try again.');
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -715,6 +779,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       plan_features: formData.plan_features.filter(f => f.trim() !== ''),
       plan_faqs: formData.plan_faqs.filter(faq => faq.question.trim() !== '' && faq.answer.trim() !== ''),
       pest_coverage: enrichedPestCoverage,
+      recommended_addon_ids: formData.plan_recommended_addons,
     };
 
     onSave(cleanedData);
@@ -767,6 +832,20 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
             onClick={() => setActiveTab('variants')}
           >
             Variants
+          </button>
+          <button
+            type="button"
+            className={`${styles.tabButton} ${activeTab === 'options' ? styles.active : ''}`}
+            onClick={() => setActiveTab('options')}
+          >
+            Options
+          </button>
+          <button
+            type="button"
+            className={`${styles.tabButton} ${activeTab === 'products' ? styles.active : ''}`}
+            onClick={() => setActiveTab('products')}
+          >
+            Products
           </button>
         </div>
 
@@ -1080,6 +1159,17 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     onChange={(e) => handleInputChange('is_active', e.target.checked)}
                   />
                   Plan is active
+                </label>
+              </div>
+
+              <div className={styles.checkboxGroup}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.is_featured}
+                    onChange={(e) => handleInputChange('is_featured', e.target.checked)}
+                  />
+                  Featured plan
                 </label>
               </div>
             </div>
@@ -1715,6 +1805,98 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
             </div>
           )}
 
+          {activeTab === 'options' && (
+            <div className={styles.tabContent}>
+              <h4>Recommended Options</h4>
+              <p>Select add-ons to highlight as recommended when this plan appears on a quote.</p>
+
+              {(() => {
+                const eligibleAddons = availableAddons.filter(a =>
+                  a.eligibility_mode === 'all' ||
+                  (plan?.id && a.eligible_plan_ids.includes(plan.id))
+                );
+                if (eligibleAddons.length === 0) {
+                  return (
+                    <p style={{ color: '#6b7280', fontSize: 14 }}>
+                      No eligible add-ons available. Configure add-on eligibility in the Add-On Services manager.
+                    </p>
+                  );
+                }
+                return (
+                  <div className={styles.pestCoverageGrid}>
+                    {eligibleAddons.map(addon => (
+                      <div key={addon.id} className={styles.pestCoverageItem}>
+                        <div className={styles.pestInfo}>
+                          <span className={styles.pestName}>{addon.addon_name}</span>
+                          {addon.recurring_price != null && (
+                            <span style={{ color: '#6b7280', fontSize: 12 }}>
+                              ${Number(addon.recurring_price).toFixed(2)}/mo
+                            </span>
+                          )}
+                        </div>
+                        <input
+                          type="checkbox"
+                          checked={formData.plan_recommended_addons.includes(addon.id)}
+                          onChange={e => {
+                            const ids = e.target.checked
+                              ? [...formData.plan_recommended_addons, addon.id]
+                              : formData.plan_recommended_addons.filter(id => id !== addon.id);
+                            handleInputChange('plan_recommended_addons', ids);
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {activeTab === 'products' && (
+            <div className={styles.tabContent}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                <h4 style={{ margin: 0 }}>Available Products</h4>
+                <button
+                  type="button"
+                  className={styles.addButton}
+                  onClick={() => setShowProductModal(true)}
+                >
+                  + New Product
+                </button>
+              </div>
+              <p>Select which products can be added as line items when this plan is on a quote.</p>
+
+              {availableProducts.length === 0 ? (
+                <p style={{ color: '#6b7280', fontSize: 14 }}>
+                  No active products configured for this company yet.
+                </p>
+              ) : (
+                <div className={styles.pestCoverageGrid}>
+                  {availableProducts.map(product => (
+                    <div key={product.id} className={styles.pestCoverageItem}>
+                      <div className={styles.pestInfo}>
+                        <span className={styles.pestName}>{product.product_name}</span>
+                        <span style={{ color: '#6b7280', fontSize: 12 }}>
+                          ${Number(product.unit_price).toFixed(2)}
+                        </span>
+                      </div>
+                      <input
+                        type="checkbox"
+                        checked={formData.plan_products.includes(product.id)}
+                        onChange={e => {
+                          const ids = e.target.checked
+                            ? [...formData.plan_products, product.id]
+                            : formData.plan_products.filter(id => id !== product.id);
+                          handleInputChange('plan_products', ids);
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className={styles.modalActions}>
             <button type="button" onClick={onClose} className={styles.cancelButton}>
               Cancel
@@ -1725,6 +1907,13 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
           </div>
         </form>
       </div>
+
+      <ProductModal
+        product={null}
+        isOpen={showProductModal}
+        onClose={() => setShowProductModal(false)}
+        onSave={handleCreateProduct}
+      />
     </div>
   );
 };

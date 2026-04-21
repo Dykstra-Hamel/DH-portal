@@ -291,7 +291,7 @@ export default function AddOnServiceEditor({
                 </label>
                 <select
                   id="billing_frequency"
-                  value={formData.billing_frequency}
+                  value={formData.billing_frequency ?? ''}
                   onChange={e =>
                     setFormData({
                       ...formData,

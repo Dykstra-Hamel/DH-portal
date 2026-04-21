@@ -84,6 +84,7 @@ function StepMapPlot({
   onNext,
   canNext,
   stampColor,
+  onPestOptionsLoaded,
 }: {
   companyId: string;
   mapPlotData: MapPlotData;
@@ -92,6 +93,7 @@ function StepMapPlot({
   onNext: () => void;
   canNext: boolean;
   stampColor?: string;
+  onPestOptionsLoaded?: (iconMap: Record<string, string>) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const toolbarDockRef = useRef<HTMLDivElement>(null);
@@ -237,6 +239,14 @@ function StepMapPlot({
               selectedPestType: 'dynamic-pest',
               selectedStampType: 'dynamic-pest',
             });
+          }
+          // Bubble icon map up so parent can pass it to subsequent steps
+          if (onPestOptionsLoaded) {
+            const iconMap: Record<string, string> = {};
+            for (const opt of data.data) {
+              if (opt.id && opt.icon_svg) iconMap[opt.id] = opt.icon_svg;
+            }
+            onPestOptionsLoaded(iconMap);
           }
         }
       })
@@ -2628,6 +2638,7 @@ export interface MapPlotCanvasProps {
   onNext?: () => void;
   canNext?: boolean;
   stampColor?: string;
+  onPestOptionsLoaded?: (iconMap: Record<string, string>) => void;
 }
 
 interface StaticMapProjectionContext {
@@ -3281,6 +3292,7 @@ export function MapPlotCanvas({
   onNext,
   canNext = true,
   stampColor,
+  onPestOptionsLoaded,
 }: MapPlotCanvasProps) {
   if (isReadOnly) {
     return <ReadOnlySummary mapPlotData={mapPlotData} companyId={companyId} stampColor={stampColor} />;
@@ -3295,6 +3307,7 @@ export function MapPlotCanvas({
       onNext={onNext ?? (() => undefined)}
       canNext={canNext}
       stampColor={stampColor}
+      onPestOptionsLoaded={onPestOptionsLoaded}
     />
   );
 }

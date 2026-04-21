@@ -5,7 +5,7 @@
   inset: 0;
   z-index: 9999;
   overflow-y: auto;
-  background: #ffffff;
+  background: var(--gray-25);
 }
 
 /* ── Loading spinner ── */
@@ -13,7 +13,7 @@
   width: 44px;
   height: 44px;
   border: 4px solid #e5e7eb;
-  border-top-color: var(--brand-primary, #0052cc);
+  border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
 }
@@ -28,21 +28,16 @@
 .reviewHeader {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 20px;
-  background: #fff;
-  position: sticky;
-  top: 0;
+  justify-content: center;
+  padding: 24px;
+  background: var(--gray-25);
+  position: relative;
   z-index: 10;
-  border-bottom: 1px solid transparent;
-  transition:
-    border-color 0.2s ease,
-    box-shadow 0.2s ease;
+  border-bottom: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
 }
 
 .reviewHeaderScrolled {
-  border-bottom-color: #e5e5e5;
   box-shadow: 0 4px 6px color-mix(in srgb, #d1d5db 60%, transparent);
 }
 
@@ -50,19 +45,29 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  position: absolute;
   width: 36px;
   height: 36px;
   border: none;
   border-radius: 50%;
-  background: #f3f4f6;
-  color: #374151;
+  background: var(--gray-50);
+  color: var(--gray-700);
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s;
+  left: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.15s;
+}
 
-  &:hover {
-    background: #e5e7eb;
-  }
+.heroLogoWrapper {
+  width: 175px;
+  height: auto;
+  min-height: 75px;
+  display: flex;
+  position: relative;
+  justify-content: center;
+  align-items: center;
 }
 
 .reviewHeaderLogo {
@@ -74,16 +79,14 @@
 .reviewHeaderName {
   font-size: 16px;
   font-weight: 800;
-  color: var(--brand-primary, #111827);
-  font-family: var(--primary-font, var(--font-default));
+  color: var(--brand-primary);
+  font-family: var(--primary-font);
   letter-spacing: -0.01em;
 }
 
-/* .reviewHeaderDate removed — date no longer shown in header */
-
 /* ── Hero section compact padding override ── */
 .heroSectionCompact {
-  padding: 20px 0;
+  padding: 0;
 }
 
 /* ── Hero content centering (until image stacks at 992px) ── */
@@ -107,15 +110,15 @@
   gap: 20px;
   border-radius: 8px;
   background: #f4f5f8;
-  padding: 20px 32px;
+  padding: 20px 34px;
   margin-top: 8px;
 
-  @media (max-width: 992px) {
-    justify-content: flex-start;
+  @media (max-width: 768px) {
+    justify-content: center;
     flex-wrap: wrap;
     gap: 16px;
     padding: 16px 20px;
-    text-align: left;
+    text-align: center;
   }
 }
 
@@ -139,8 +142,8 @@
   width: 57px;
   height: 57px;
   border-radius: 50%;
-  background: var(--brand-primary, #3b82f6);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--gray-25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,23 +163,23 @@
   font-size: 18px;
   font-weight: 700;
   line-height: 22px;
-  color: #111827;
-  font-family: var(--primary-font, var(--font-default));
+  color: var(--gray-700);
+  font-family: var(--primary-font);
 }
 
 .inspectorTitle {
   margin: 0;
   font-size: 12px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 22px;
-  color: #6b7280;
-  font-family: var(--secondary-font, var(--font-default));
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .inspectorSeparator {
   width: 1px;
   align-self: stretch;
-  background: #b8b8b8;
+  background: var(--gray-300);
   flex-shrink: 0;
 
   @media (max-width: 992px) {
@@ -215,10 +218,10 @@
 .inspectorAddressLabel {
   margin: 0;
   font-size: 14px;
-  font-weight: 400;
-  line-height: 22px;
-  color: #6b7280;
-  font-family: var(--secondary-font, var(--font-default));
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .addressLabelBreak {
@@ -231,9 +234,9 @@
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  line-height: 22px;
-  color: #111827;
-  font-family: var(--secondary-font, var(--font-default));
+  line-height: 20px;
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 /* ── Hero extras ── */
@@ -242,23 +245,66 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--brand-secondary, #6b7280);
+  color: var(--brand-secondary);
   margin: 0 0 12px;
-  font-family: var(--secondary-font, var(--font-default));
-}
-
-.heroPests {
-  margin-top: 24px;
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .heroPestsLabel {
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 700;
+  text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.07em;
-  color: #9ca3af;
+  color: var(--gray-700);
   margin: 0 0 10px;
-  font-family: var(--secondary-font, var(--font-default));
+}
+
+/* Pest icon row — mirrors QuoteBuildStep layout */
+.heroPestIconRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+
+.heroPestIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand-secondary);
+}
+
+.heroPestIconCircle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gray-25);
+  border: 2px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroPestIconSvg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+
+  svg path {
+    fill: currentColor;
+  }
+}
+
+.heroPestIconLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: currentColor;
+  text-align: center;
+  line-height: 1.3;
 }
 
 /* Map layer — normal flow, drives container height, opacity animated via inline style */
@@ -299,7 +345,7 @@
   font-size: 14px;
   font-weight: 600;
   line-height: 16px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
 
   svg {
@@ -325,12 +371,11 @@
   -webkit-backdrop-filter: blur(6px);
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
+  color: var(--brand-secondary);
   cursor: pointer;
   white-space: nowrap;
-  transition:
-    background 0.15s ease,
-    transform 0.15s ease;
+  transition: all 0.15s ease;
 
   &:hover {
     background: rgba(239, 239, 239, 0.96);
@@ -388,6 +433,7 @@
 
   h3 {
     margin: 0;
+    color: var(--brand-secondary);
   }
 }
 
@@ -396,14 +442,14 @@
   padding: 0 14px;
   border-radius: 8px;
   border: 1px solid #d1d5db;
-  background: #fff;
+  background: var(--gray-25);
   color: #374151;
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
   flex-shrink: 0;
-  transition: background 0.15s ease;
+  transition: all 0.15s ease;
 
   &:hover {
     background: #f3f4f6;
@@ -431,7 +477,7 @@
   letter-spacing: 0.06em;
   color: #9ca3af;
   text-align: center;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .priceEditField {
@@ -441,12 +487,12 @@
   border: 1px solid #d1d5db;
   border-radius: 6px;
   overflow: hidden;
-  background: #fff;
+  background: var(--gray-25);
 
   &:focus-within {
-    border-color: var(--brand-primary, #3b82f6);
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
+      color-mix(in srgb, var(--brand-primary) 15%, transparent);
   }
 }
 
@@ -464,7 +510,7 @@
   border: none;
   background: transparent;
   font-size: 13px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #111827;
   text-align: right;
 
@@ -497,15 +543,13 @@
   width: 34px;
   height: 34px;
   border: none;
-  background: #fff;
+  background: var(--gray-25);
   font-size: 13px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #6b7280;
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
+  transition: all 0.15s ease;
 
   &:first-child {
     border-right: 1px solid #d1d5db;
@@ -513,8 +557,8 @@
 }
 
 .discountTypeBtnActive {
-  background: var(--brand-primary, #3b82f6);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--gray-25);
 }
 
 /* ── Discount item in the list ── */
@@ -535,7 +579,7 @@
 .discountLabel {
   font-size: 14px;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   margin: 0;
 }
 
@@ -547,36 +591,36 @@
 
 .discountSelect {
   padding: 7px 10px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
   font-size: 13px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #374151;
-  background: #fff;
+  background: var(--gray-25);
   appearance: auto;
 
   &:focus {
     outline: none;
-    border-color: var(--brand-primary, #3b82f6);
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
+      color-mix(in srgb, var(--brand-primary) 15%, transparent);
   }
 }
 
 .discountInputWrap {
   display: flex;
   align-items: center;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
   overflow: hidden;
-  background: #fff;
+  background: var(--gray-25);
   padding: 0 4px 0 8px;
   width: 110px;
 
   &:focus-within {
-    border-color: var(--brand-primary, #3b82f6);
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 2px
-      color-mix(in srgb, var(--brand-primary, #3b82f6) 15%, transparent);
+      color-mix(in srgb, var(--brand-primary) 15%, transparent);
   }
 }
 
@@ -595,7 +639,7 @@
   border: none;
   background: transparent;
   font-size: 13px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #111827;
 
   &::placeholder {
@@ -616,7 +660,7 @@
   margin-top: 24px;
   padding: 16px 20px;
   background: #f9fafb;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--gray-300);
   border-radius: 12px;
 }
 
@@ -627,7 +671,7 @@
   text-transform: uppercase;
   color: #9ca3af;
   margin: 0 0 8px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .notesText {
@@ -636,7 +680,7 @@
   line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 /* ── Spacer for sticky bar ── */
@@ -659,13 +703,13 @@
   right: 0;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-top: 1px solid #e5e7eb;
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--gray-300);
+  padding: 12px 34px calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 10;
 }
 
 .stickyActionsInner {
-  max-width: 1215px;
+  max-width: 750px;
   margin: 0 auto;
   display: flex;
   gap: 12px;
@@ -674,13 +718,13 @@
 .sendBtn {
   flex: 1;
   padding: 15px 20px;
-  background: var(--brand-primary, #0052cc);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--gray-25);
   border: none;
-  border-radius: 30px;
+  border-radius: 4px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--primary-font, var(--font-default));
+  font-family: var(--primary-font);
   cursor: pointer;
   transition:
     opacity 0.15s ease,
@@ -702,21 +746,19 @@
 .scheduleBtn {
   flex: 1;
   padding: 15px 20px;
-  background: #fff;
-  color: var(--brand-primary, #0052cc);
-  border: 2px solid var(--brand-primary, #0052cc);
-  border-radius: 30px;
+  background: var(--gray-25);
+  color: var(--brand-secondary);
+  border: 2px solid var(--brand-secondary);
+  border-radius: 4px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--primary-font, var(--font-default));
+  font-family: var(--primary-font);
   cursor: pointer;
-  transition:
-    background 0.15s ease,
-    transform 0.1s ease;
+  transition: all 0.1s ease;
   letter-spacing: -0.2px;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand-primary, #0052cc) 8%, white);
+    background: color-mix(in srgb, var(--brand-secondary) 8%, white);
   }
   &:active:not(:disabled) {
     transform: scale(0.98);
@@ -736,7 +778,7 @@
   border-radius: 10px;
   font-size: 13px;
   color: #dc2626;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .emailCapture {
@@ -751,15 +793,15 @@
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
   font-size: 14px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #111827;
-  background: #fff;
+  background: var(--gray-25);
 
   &:focus {
     outline: none;
-    border-color: var(--brand-primary, #0052cc);
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
+      color-mix(in srgb, var(--brand-primary) 12%, transparent);
   }
   &::placeholder {
     color: #9ca3af;
@@ -768,13 +810,13 @@
 
 .emailSendBtn {
   padding: 0 18px;
-  background: var(--brand-primary, #0052cc);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--gray-25);
   border: none;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
   flex-shrink: 0;
 
@@ -794,7 +836,7 @@
   padding: 48px 24px;
   gap: 16px;
   text-align: center;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .successIcon {
@@ -812,9 +854,9 @@
   margin: 0;
   font-size: 28px;
   font-weight: 800;
-  color: var(--brand-primary, #111827);
+  color: var(--brand-primary);
   letter-spacing: -0.5px;
-  font-family: var(--primary-font, var(--font-default));
+  font-family: var(--primary-font);
 }
 
 .successSub {
@@ -828,13 +870,13 @@
 .successBtn {
   margin-top: 8px;
   padding: 14px 36px;
-  background: var(--brand-primary, #0052cc);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--gray-25);
   border: none;
   border-radius: 30px;
   font-size: 16px;
   font-weight: 700;
-  font-family: var(--primary-font, var(--font-default));
+  font-family: var(--primary-font);
   cursor: pointer;
 }
 
@@ -855,7 +897,7 @@
   max-width: 680px;
   max-height: 90vh;
   overflow-y: auto;
-  background: #fff;
+  background: var(--gray-25);
   border-radius: 20px 20px 0 0;
   padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   display: flex;
@@ -868,14 +910,14 @@
   font-size: 18px;
   font-weight: 800;
   color: #111827;
-  font-family: var(--primary-font, var(--font-default));
+  font-family: var(--primary-font);
 }
 
 .sigSub {
   margin: -8px 0 0;
   font-size: 13px;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .sigLabel {
@@ -884,7 +926,7 @@
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #6b7280;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   display: block;
   margin-bottom: 6px;
 }
@@ -895,15 +937,15 @@
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
   font-size: 15px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #111827;
   box-sizing: border-box;
 
   &:focus {
     outline: none;
-    border-color: var(--brand-primary, #0052cc);
+    border-color: var(--brand-primary);
     box-shadow: 0 0 0 3px
-      color-mix(in srgb, var(--brand-primary, #0052cc) 12%, transparent);
+      color-mix(in srgb, var(--brand-primary) 12%, transparent);
   }
 }
 
@@ -911,7 +953,7 @@
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
   overflow: hidden;
-  background: #fff;
+  background: var(--gray-25);
 }
 
 .sigClear {
@@ -922,14 +964,14 @@
   border: none;
   cursor: pointer;
   padding: 0;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   text-align: left;
 }
 
 .sigDate {
   font-size: 12px;
   color: #9ca3af;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   margin: 0;
 }
 
@@ -943,23 +985,23 @@
   padding: 11px 20px;
   border: 1.5px solid #d1d5db;
   border-radius: 12px;
-  background: #fff;
+  background: var(--gray-25);
   color: #374151;
   font-size: 14px;
   font-weight: 600;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
 }
 
 .sigConfirmBtn {
   padding: 11px 24px;
-  background: var(--brand-primary, #0052cc);
-  color: #fff;
+  background: var(--brand-primary);
+  color: var(--gray-25);
   border: none;
   border-radius: 12px;
   font-size: 14px;
   font-weight: 700;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
 
   &:disabled {
@@ -972,7 +1014,7 @@
   margin: 0;
   font-size: 13px;
   color: #dc2626;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 /* ── Unified schedule modal additions ── */
@@ -988,18 +1030,18 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: var(--gray-100, #f3f4f6);
+  background: var(--gray-100);
   border: none;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 16px;
-  color: var(--gray-500, #6b7280);
+  color: var(--gray-500);
   cursor: pointer;
   flex-shrink: 0;
 
   &:hover {
-    background: var(--gray-200, #e5e7eb);
+    background: var(--gray-200);
   }
 }
 
@@ -1015,8 +1057,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--gray-500, #6b7280);
-  font-family: var(--secondary-font, var(--font-default));
+  color: var(--gray-500);
+  font-family: var(--secondary-font, var(--primary-font));
 }
 
 .sigDateRow {
@@ -1032,15 +1074,15 @@
   border: 1.5px solid #d1d5db;
   border-radius: 10px;
   font-size: 14px;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   color: #111827;
   background: #f9fafb;
   outline: none;
   box-sizing: border-box;
 
   &:focus {
-    border-color: var(--brand-primary, #0052cc);
-    background: #fff;
+    border-color: var(--brand-primary);
+    background: var(--gray-25);
   }
 }
 
@@ -1056,7 +1098,7 @@
   color: #374151;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
 
   h1,
   h2,
@@ -1097,7 +1139,7 @@
   gap: 8px;
   font-size: 13px;
   color: #374151;
-  font-family: var(--secondary-font, var(--font-default));
+  font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
 
   input[type='checkbox'] {
@@ -1143,4 +1185,296 @@
   font-weight: 600;
   color: #6b7280;
   letter-spacing: 0.02em;
+}
+
+/* ── Addon rows inside the totals list ── */
+.totalAddonItem {
+  font-size: 12px !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+  margin-left: 30px;
+  color: var(--gray-700);
+
+  @media (max-width: 768px) {
+    margin-left: 24px;
+  }
+}
+
+/* Shrinks the checkbox for total addon rows */
+.totalAddonCheckbox span {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 2px !important;
+  background-size: 12px 10px !important;
+}
+
+/* ── Inline add-ons inside plan card ── */
+.planCardAddons {
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 24px;
+}
+
+.planCardAddonRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Shrinks the custom checkbox box for compact addon rows */
+.planCardAddonCheckbox span {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 3px !important;
+  background-size: 12px 10px !important;
+}
+
+.planCardAddonName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.planCardAddonPrice {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+}
+
+.planCardAddonRecommended {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb; // blue-600
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Plan card header: pest icon ── */
+.planHeaderPestIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--brand-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fff;
+  svg {
+    path {
+      fill: var(--brand-secondary);
+    }
+  }
+}
+
+.planHeaderPestIconSvg {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg,
+  img {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+.planHeaderShieldIcon {
+  display: block;
+}
+
+/* ── Video callout button ── */
+.planVideoCallout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 10px;
+  background: #e8edf7;
+  border: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  gap: 16px;
+  text-align: left;
+
+  &:hover {
+    background: #dce4f3;
+  }
+}
+
+.planVideoCalloutText {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  font-family: var(--secondary-font, var(--primary-font));
+  line-height: 27px;
+  text-align: center;
+}
+
+.planVideoCalloutPlay {
+  flex-shrink: 0;
+  width: 131px;
+  height: 79px;
+  background: var(--brand-secondary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Recommended add-on button row ── */
+.planCardAddonBtnGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  padding: 16px 0 8px;
+}
+
+.planCardAddonBtnWrap {
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.planCardAddonRecommendedLabel {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  font-family: var(--secondary-font, var(--primary-font));
+  background: #fff;
+  padding: 4px 8px;
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: -45px;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.planCardAddonBtnLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-500);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.planCardAddonBtn {
+  position: relative;
+  padding: 10px 20px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: #fff;
+  font-family: var(--secondary-font, var(--primary-font));
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 120px;
+  text-align: center;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.planCardAddonBtnSelected {
+  border-color: var(--brand-secondary);
+  box-shadow: 0 0 0 1px var(--brand-secondary);
+
+  .planCardAddonBtnLabel {
+    color: var(--brand-secondary);
+  }
+}
+
+.planCardAddonBtnCheck {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gray-25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    circle {
+      fill: var(--gray-25);
+    }
+
+    path {
+      fill: var(--brand-secondary);
+    }
+  }
+}
+
+.planCardAddonBtnPrice {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gray-500);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.discountAppliedRow {
+  color: var(--gray-700);
+  font-size: 16px;
+
+  div {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+
+  strong {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+}
+
+/* ── Additional Services We Offer section ── */
+.additionalServicesSection {
+  margin-bottom: 32px;
+}
+
+.additionalServicePrice {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-800);
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  sup {
+    font-size: 12px;
+  }
+}
+
+.additionalServicePriceNumber {
+  font-size: 20px;
+}
+
+.additionalServicesHeading {
+  font-size: 24px !important;
+  font-weight: 700;
+  font-family: var(--primary-font);
+  color: var(--gray-800) !important;
+  margin: 0 0 16px;
 }

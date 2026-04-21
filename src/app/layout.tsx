@@ -48,8 +48,16 @@ export const metadata: Metadata = {
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-      { url: '/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
-      { url: '/apple-touch-icon-167x167.png', sizes: '167x167', type: 'image/png' },
+      {
+        url: '/apple-touch-icon-152x152.png',
+        sizes: '152x152',
+        type: 'image/png',
+      },
+      {
+        url: '/apple-touch-icon-167x167.png',
+        sizes: '167x167',
+        type: 'image/png',
+      },
     ],
   },
 };
@@ -64,7 +72,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${figtree.variable} ${outfit.variable} ${veganDays.variable}`}>
+    <html
+      lang="en"
+      className={`${figtree.variable} ${outfit.variable} ${veganDays.variable}`}
+    >
+      <head>
+        {/* Capture beforeinstallprompt before React hydrates so the install button works on first page load */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;window.dispatchEvent(new Event('pwa-prompt-ready'));});`,
+          }}
+        />
+      </head>
       <body>
         <ScrollToTop />
         <UserbackProvider>
