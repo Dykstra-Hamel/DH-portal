@@ -1,5 +1,112 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
+
+/**
+ * PATCH: Update is_selected on a quote line item and recalculate quote totals
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string; lineItemId: string }> }
+) {
+  try {
+    const { id: quoteId, lineItemId } = await params;
+    const body = await request.json();
+
+    if (typeof body.is_selected !== 'boolean') {
+      return NextResponse.json(
+        { error: 'is_selected (boolean) is required' },
+        { status: 400 }
+      );
+    }
+
+    const supabase = createAdminClient();
+
+    const { data: lineItem } = await supabase
+      .from('quote_line_items')
+      .select('id')
+      .eq('id', lineItemId)
+      .eq('quote_id', quoteId)
+      .single();
+
+    if (!lineItem) {
+      return NextResponse.json({ error: 'Line item not found' }, { status: 404 });
+    }
+
+    await supabase
+      .from('quote_line_items')
+      .update({ is_selected: body.is_selected })
+      .eq('id', lineItemId);
+
+    // Recalculate totals from selected items only
+    const { data: selectedItems } = await supabase
+      .from('quote_line_items')
+      .select('initial_price, recurring_price, billing_frequency')
+      .eq('quote_id', quoteId)
+      .eq('is_selected', true);
+
+    const subtotalInitialPrice = (selectedItems ?? []).reduce(
+      (s, i) => s + (i.initial_price || 0),
+      0
+    );
+    const subtotalRecurringPrice = (selectedItems ?? []).reduce(
+      (s, i) => s + toMonthlyEquivalent(i.billing_frequency, i.recurring_price || 0),
+      0
+    );
+
+    // Fetch the quote's applied discount to compute exact totals
+    const { data: quote } = await supabase
+      .from('quotes')
+      .select('applied_discount_id')
+      .eq('id', quoteId)
+      .single();
+
+    let totalInitialPrice = subtotalInitialPrice;
+    let totalRecurringPrice = subtotalRecurringPrice;
+
+    if (quote?.applied_discount_id) {
+      const { data: discount } = await supabase
+        .from('discounts')
+        .select('discount_type, discount_value, applies_to_price, recurring_discount_type, recurring_discount_value')
+        .eq('id', quote.applied_discount_id)
+        .single();
+
+      if (discount) {
+        if (discount.applies_to_price === 'initial' || discount.applies_to_price === 'both') {
+          const dollarOff = discount.discount_type === 'percentage'
+            ? (subtotalInitialPrice * discount.discount_value) / 100
+            : discount.discount_value;
+          totalInitialPrice = Math.max(0, subtotalInitialPrice - dollarOff);
+        }
+        if (discount.applies_to_price === 'recurring' || discount.applies_to_price === 'both') {
+          const recurringType = discount.recurring_discount_type ?? discount.discount_type;
+          const recurringValue = discount.recurring_discount_value ?? discount.discount_value;
+          const dollarOff = recurringType === 'percentage'
+            ? (subtotalRecurringPrice * recurringValue) / 100
+            : recurringValue;
+          totalRecurringPrice = Math.max(0, subtotalRecurringPrice - dollarOff);
+        }
+      }
+    }
+
+    await supabase
+      .from('quotes')
+      .update({
+        subtotal_initial_price: subtotalInitialPrice,
+        subtotal_recurring_price: subtotalRecurringPrice,
+        total_initial_price: totalInitialPrice,
+        total_recurring_price: totalRecurringPrice,
+      })
+      .eq('id', quoteId);
+
+    return NextResponse.json({
+      success: true,
+      data: { line_item_id: lineItemId, is_selected: body.is_selected },
+    });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 
 /**
  * DELETE: Delete a quote line item
@@ -52,28 +159,64 @@ export async function DELETE(
     // Recalculate quote totals after deletion
     const { data: remainingItems } = await supabase
       .from('quote_line_items')
-      .select('final_initial_price, final_recurring_price')
-      .eq('quote_id', quoteId);
+      .select('initial_price, recurring_price, billing_frequency')
+      .eq('quote_id', quoteId)
+      .eq('is_selected', true);
 
-    if (remainingItems) {
-      const totalInitialPrice = remainingItems.reduce(
-        (sum, item) => sum + (item.final_initial_price || 0),
-        0
-      );
-      const totalRecurringPrice = remainingItems.reduce(
-        (sum, item) => sum + (item.final_recurring_price || 0),
-        0
-      );
+    const subtotalInitialPrice = (remainingItems ?? []).reduce(
+      (sum, item) => sum + (item.initial_price || 0),
+      0
+    );
+    const subtotalRecurringPrice = (remainingItems ?? []).reduce(
+      (sum, item) => sum + toMonthlyEquivalent(item.billing_frequency, item.recurring_price || 0),
+      0
+    );
 
-      // Update quote totals
-      await supabase
-        .from('quotes')
-        .update({
-          total_initial_price: totalInitialPrice,
-          total_recurring_price: totalRecurringPrice,
-        })
-        .eq('id', quoteId);
+    // Fetch the quote's applied discount to compute exact totals
+    const { data: quoteForDiscount } = await supabase
+      .from('quotes')
+      .select('applied_discount_id')
+      .eq('id', quoteId)
+      .single();
+
+    let totalInitialPrice = subtotalInitialPrice;
+    let totalRecurringPrice = subtotalRecurringPrice;
+
+    if (quoteForDiscount?.applied_discount_id) {
+      const { data: discount } = await supabase
+        .from('discounts')
+        .select('discount_type, discount_value, applies_to_price, recurring_discount_type, recurring_discount_value')
+        .eq('id', quoteForDiscount.applied_discount_id)
+        .single();
+
+      if (discount) {
+        if (discount.applies_to_price === 'initial' || discount.applies_to_price === 'both') {
+          const dollarOff = discount.discount_type === 'percentage'
+            ? (subtotalInitialPrice * discount.discount_value) / 100
+            : discount.discount_value;
+          totalInitialPrice = Math.max(0, subtotalInitialPrice - dollarOff);
+        }
+        if (discount.applies_to_price === 'recurring' || discount.applies_to_price === 'both') {
+          const recurringType = discount.recurring_discount_type ?? discount.discount_type;
+          const recurringValue = discount.recurring_discount_value ?? discount.discount_value;
+          const dollarOff = recurringType === 'percentage'
+            ? (subtotalRecurringPrice * recurringValue) / 100
+            : recurringValue;
+          totalRecurringPrice = Math.max(0, subtotalRecurringPrice - dollarOff);
+        }
+      }
     }
+
+    // Update quote totals
+    await supabase
+      .from('quotes')
+      .update({
+        subtotal_initial_price: subtotalInitialPrice,
+        subtotal_recurring_price: subtotalRecurringPrice,
+        total_initial_price: totalInitialPrice,
+        total_recurring_price: totalRecurringPrice,
+      })
+      .eq('id', quoteId);
 
     return NextResponse.json({
       success: true,

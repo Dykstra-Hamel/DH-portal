@@ -1,21 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { MapPlotData } from '@/components/FieldMap/MapPlot/types';
+import type { MapPestStampType } from '@/components/FieldMap/MapPlot/types';
 import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
+import { MapStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import VideoLightbox from '@/components/Quote/QuoteContent/VideoLightbox';
-import type { QuoteLineItem } from './QuoteBuildStep';
+import type { QuoteLineItem, AvailableDiscount } from './QuoteBuildStep';
 import {
   formatCurrency,
   formatLineItemLabel,
   getQuoteTotals,
+  getPestStampType,
 } from './QuoteBuildStep';
 import qcStyles from '@/components/Quote/QuoteContent/quotecontent.module.scss';
 import styles from './ReviewStep.module.scss';
-import { TimeOption, DEFAULT_TIME_OPTIONS, getEnabledTimeOptions } from '@/lib/time-options';
+import {
+  TimeOption,
+  DEFAULT_TIME_OPTIONS,
+  getEnabledTimeOptions,
+} from '@/lib/time-options';
+import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
 
 // ── FAQ item (same as PlanDetails) ────────────────────────────────────────
 
@@ -99,20 +107,20 @@ function abbreviateFrequency(frequency: string | null): string {
   return frequency ? (abbr[frequency.toLowerCase()] ?? frequency) : 'mo';
 }
 
-// Convert any recurring frequency amount to a monthly equivalent
-function toMonthlyEquivalent(frequency: string | null, amount: number): number {
-  const factors: Record<string, number> = {
-    monthly: 1,
-    'bi-monthly': 6 / 12, // every 2 months = 6×/year
-    quarterly: 4 / 12, // every 3 months = 4×/year
-    'semi-annually': 2 / 12, // every 6 months = 2×/year
-    'semi-annual': 2 / 12,
-    'bi-annually': 2 / 12, // every 6 months = 2×/year
-    annually: 1 / 12, // once/year
-    annual: 1 / 12,
-  };
-  const key = (frequency ?? 'monthly').toLowerCase();
-  return amount * (factors[key] ?? 1);
+// ── Featured plan (for "Additional Services We Offer" section) ─────────────
+
+interface FeaturedPlan {
+  id: string;
+  plan_name: string;
+  initial_price: number | null;
+  recurring_price: number | null;
+  billing_frequency: string | null;
+  description: string | null;
+  plan_description?: string | null;
+  plan_features?: string[] | null;
+  plan_image_url?: string | null;
+  plan_video_url?: string | null;
+  plan_terms?: string | null;
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -133,6 +141,15 @@ interface ReviewStepProps {
   companyId: string;
   leadId: string | null;
   quoteId: string | null;
+  pestIconMap: Record<string, string>;
+  plottedPests: Array<{
+    id: string;
+    label: string;
+    stampType: MapPestStampType;
+  }>;
+  appliedDiscount?: AvailableDiscount | null;
+  quoteSubtotalInitial?: number | null;
+  quoteTotalInitial?: number | null;
   onBack: () => void;
 }
 
@@ -160,12 +177,16 @@ export function ReviewStep({
   companyId,
   leadId,
   quoteId,
+  pestIconMap,
+  plottedPests,
+  appliedDiscount,
+  quoteSubtotalInitial,
+  quoteTotalInitial,
   onBack,
 }: ReviewStepProps) {
   const router = useRouter();
   const signatureRef = useRef<SignatureCanvas | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const [hasShadow, setHasShadow] = useState(false);
   const [sigHasContent, setSigHasContent] = useState(false);
 
   const [branding, setBranding] = useState<BrandingData | null>(null);
@@ -173,10 +194,12 @@ export function ReviewStep({
   // catalogDetails maps catalogItemId → full plan/addon data from the API
   const [catalogDetails, setCatalogDetails] = useState<Record<string, any>>({});
   const [catalogLoaded, setCatalogLoaded] = useState(false);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [expandedAddonItems, setExpandedAddonItems] = useState<Set<string>>(
-    new Set()
-  );
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(() => {
+    const first = quoteLineItems.find(
+      i => i.catalogItemKind !== 'addon' && i.catalogItemKind !== 'product'
+    );
+    return first?.id ?? null;
+  });
   const [activeFaqTab, setActiveFaqTab] = useState(0);
   const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
 
@@ -201,10 +224,28 @@ export function ReviewStep({
   const [termsNudge, setTermsNudge] = useState(false);
   const termsBodyRef = useRef<HTMLDivElement | null>(null);
   const [discountAmount, setDiscountAmount] = useState<number | null>(null);
+  // Initialise from DB-persisted isSelected when available; fall back to isRecommended heuristic for new in-memory items.
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
-    () => new Set(quoteLineItems.map(i => i.id))
+    () =>
+      new Set(
+        quoteLineItems
+          .filter(i => {
+            if (i.catalogItemKind === 'product') return false;
+            // For DB-loaded items isSelected is set; for fresh in-memory items fall back to isRecommended heuristic
+            return i.isSelected ?? i.isRecommended === undefined;
+          })
+          .map(i => i.id)
+      )
   );
+  const [addonCatalog, setAddonCatalog] = useState<Record<string, any>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [featuredPlans, setFeaturedPlans] = useState<FeaturedPlan[]>([]);
+  const [additionalLineItems, setAdditionalLineItems] = useState<
+    QuoteLineItem[]
+  >([]);
+  const [expandedFeaturedId, setExpandedFeaturedId] = useState<string | null>(
+    null
+  );
 
   // ── Fetch branding ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -225,6 +266,32 @@ export function ReviewStep({
       .finally(() => setBrandingLoaded(true));
   }, [companyId]);
 
+  // ── Fetch featured plans for "Additional Services We Offer" section ────
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/service-plans/${companyId}`)
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (!data?.plans) return;
+        const quotedPlanIds = new Set(
+          quoteLineItems
+            .filter(i => i.catalogItemKind === 'plan' && i.catalogItemId)
+            .map(i => i.catalogItemId as string)
+        );
+        const featured = (data.plans as FeaturedPlan[]).filter(
+          (p: any) => p.is_featured && !quotedPlanIds.has(p.id)
+        );
+        // Pre-populate catalogDetails so plan cards can expand after being added
+        const newDetails: Record<string, any> = {};
+        featured.forEach((p: any) => {
+          newDetails[p.id] = p;
+        });
+        setCatalogDetails(prev => ({ ...prev, ...newDetails }));
+        setFeaturedPlans(featured);
+      })
+      .catch(() => {});
+  }, [companyId]); // intentionally omits quoteLineItems — runs once on mount
+
   // ── Fetch full catalog details for expandable plan cards ───────────────
   useEffect(() => {
     if (!companyId) return;
@@ -234,7 +301,6 @@ export function ReviewStep({
     if (planAddonItems.length === 0) return;
 
     const hasPlan = planAddonItems.some(i => i.catalogItemKind === 'plan');
-    const hasAddon = planAddonItems.some(i => i.catalogItemKind === 'addon');
     const hasBundle = planAddonItems.some(i => i.catalogItemKind === 'bundle');
 
     const fetches: Promise<any>[] = [];
@@ -245,13 +311,13 @@ export function ReviewStep({
         )
       );
     else fetches.push(Promise.resolve(null));
-    if (hasAddon)
-      fetches.push(
-        fetch(`/api/add-on-services/${companyId}`).then(r =>
-          r.ok ? r.json() : null
-        )
-      );
-    else fetches.push(Promise.resolve(null));
+    // Always fetch add-ons so we can show catalog-recommended ones even if
+    // the inspector didn't select any
+    fetches.push(
+      fetch(`/api/add-on-services/${companyId}`).then(r =>
+        r.ok ? r.json() : null
+      )
+    );
     if (hasBundle)
       fetches.push(
         fetch(`/api/admin/bundle-plans?companyId=${companyId}`).then(r =>
@@ -266,9 +332,17 @@ export function ReviewStep({
         (plansRes?.plans ?? []).forEach((p: any) => {
           details[p.id] = p;
         });
-        (addonsRes?.addons ?? addonsRes?.data ?? []).forEach((a: any) => {
+        const addonList: any[] = addonsRes?.addons ?? addonsRes?.data ?? [];
+        addonList.forEach((a: any) => {
           details[a.id] = a;
         });
+        // Build a lookup map for all add-ons so recommended ones can be shown
+        // even when not present in the quote line items
+        const catalogMap: Record<string, any> = {};
+        addonList.forEach((a: any) => {
+          catalogMap[a.id] = a;
+        });
+        setAddonCatalog(catalogMap);
         (bundlesRes?.data ?? bundlesRes?.bundles ?? []).forEach((b: any) => {
           details[b.id] = b;
         });
@@ -285,17 +359,6 @@ export function ReviewStep({
     );
     if (!hasPlanAddon) setCatalogLoaded(true);
   }, [quoteLineItems]);
-
-  // ── Scroll-based header shadow ─────────────────────────────────────────
-  // Depends on brandingLoaded+catalogLoaded so the effect re-runs once the
-  // fullscreen div mounts (it doesn't exist while the spinner is showing)
-  useEffect(() => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const handleScroll = () => setHasShadow(el.scrollTop > 10);
-    el.addEventListener('scroll', handleScroll, { passive: true });
-    return () => el.removeEventListener('scroll', handleScroll);
-  }, [brandingLoaded, catalogLoaded]);
 
   // ── Terms scroll-to-view ───────────────────────────────────────────────
   useEffect(() => {
@@ -316,23 +379,41 @@ export function ReviewStep({
 
   const isLoading = !brandingLoaded || !catalogLoaded;
 
-  const selectedItems = quoteLineItems.filter(i => selectedItemIds.has(i.id));
+  const effectiveLineItems = [...quoteLineItems, ...additionalLineItems];
 
-  const { totalInitial, totalRecurring, recurringByFrequency } =
-    getQuoteTotals(selectedItems);
+  const selectedItems = effectiveLineItems.filter(i =>
+    selectedItemIds.has(i.id)
+  );
+
+  const { totalInitial, totalRecurring, recurringByFrequency } = getQuoteTotals(
+    selectedItems.map(i => ({ ...i, isSelected: true }))
+  );
   const todayLabel = new Date().toLocaleDateString(undefined, {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
   });
   const firstName = clientName.trim().split(' ')[0] || 'Customer';
-  const multipleItems = quoteLineItems.length > 1;
+  const multipleItems = effectiveLineItems.length > 1;
+
+  function persistLineItemSelection(lineItemId: string, isSelected: boolean) {
+    if (!quoteId) return;
+    fetch(`/api/quotes/${quoteId}/line-items/${lineItemId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_selected: isSelected }),
+    }).catch(() => {}); // fire-and-forget; UI already updated optimistically
+  }
 
   function toggleItemSelected(id: string) {
     setSelectedItemIds(prev => {
-      if (!prev.has(id)) return new Set([...prev, id]);
+      if (!prev.has(id)) {
+        persistLineItemSelection(id, true);
+        return new Set([...prev, id]);
+      }
       // Prevent unchecking the last selected item
       if (prev.size <= 1) return prev;
+      persistLineItemSelection(id, false);
       const next = new Set(prev);
       next.delete(id);
       return next;
@@ -353,6 +434,32 @@ export function ReviewStep({
     0,
     totalRecurring - discountDollarRecurring
   );
+
+  // Show discount row whenever the DB recorded a discount — regardless of local additions
+  const showDiscount =
+    quoteSubtotalInitial != null &&
+    quoteTotalInitial != null &&
+    quoteSubtotalInitial > quoteTotalInitial;
+
+  // When additional items exist, compute the total from the local subtotal + the actual
+  // applied discount object — no ratios, handles both % and fixed-dollar correctly.
+  const localDiscountDollar = (() => {
+    if (!showDiscount || !appliedDiscount) return 0;
+    const { discount_type, discount_value, applies_to_price } = appliedDiscount;
+    if (applies_to_price === 'recurring') return 0;
+    if (discount_type === 'percentage')
+      return (totalInitial * discount_value) / 100;
+    return discount_value; // fixed_amount
+  })();
+
+  const displaySubtotal =
+    additionalLineItems.length > 0
+      ? totalInitial
+      : (quoteSubtotalInitial ?? totalInitial);
+  const displayTotal =
+    additionalLineItems.length > 0
+      ? Math.max(0, totalInitial - localDiscountDollar)
+      : (quoteTotalInitial ?? adjustedInitial);
 
   // Brand CSS vars
   const isReversed = branding?.quote_accent_color_preference === 'secondary';
@@ -516,13 +623,13 @@ export function ReviewStep({
 
   // ── Terms content for unified schedule modal ───────────────────────────
   const companyTerms = branding?.quote_terms ?? null;
-  const planTermsBlocks = quoteLineItems
+  const planTermsBlocks = effectiveLineItems
     .filter(i => i.catalogItemId && catalogDetails[i.catalogItemId]?.plan_terms)
     .map(i => ({
       name: i.catalogItemName ?? 'Plan',
       terms: catalogDetails[i.catalogItemId!].plan_terms as string,
     }));
-  const addonTermsBlocks = quoteLineItems
+  const addonTermsBlocks = effectiveLineItems
     .filter(
       i => i.catalogItemId && catalogDetails[i.catalogItemId]?.addon_terms
     )
@@ -559,21 +666,7 @@ export function ReviewStep({
   }
 
   function toggleExpanded(id: string) {
-    setExpandedItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function toggleAddonExpanded(id: string) {
-    setExpandedAddonItems(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+    setExpandedItemId(prev => (prev === id ? null : id));
   }
 
   // ── FAQ helpers ────────────────────────────────────────────────────────
@@ -601,7 +694,7 @@ export function ReviewStep({
   }
 
   // Collect all FAQ sources (plans + addons that have faqs)
-  const faqSources = quoteLineItems.filter(
+  const faqSources = effectiveLineItems.filter(
     i => i.type === 'plan-addon' && getFaqsForItem(i).length > 0
   );
   const clampedFaqTab = Math.min(
@@ -714,11 +807,64 @@ export function ReviewStep({
     );
   }
 
+  async function handleAddFeaturedPlan(plan: FeaturedPlan) {
+    if (!quoteId) return;
+
+    const newId = crypto.randomUUID();
+    const newItem: QuoteLineItem = {
+      id: newId,
+      type: 'plan-addon',
+      catalogItemKind: 'plan',
+      catalogItemId: plan.id,
+      catalogItemName: plan.plan_name,
+      coveredPestIds: [],
+      coveredPestLabels: [],
+      initialCost: plan.initial_price,
+      recurringCost: plan.recurring_price,
+      frequency: plan.billing_frequency,
+      isPrimary: true,
+      isSelected: true,
+    };
+
+    // Optimistic UI: add immediately
+    setAdditionalLineItems(prev => [...prev, newItem]);
+    setSelectedItemIds(prev => new Set([...prev, newId]));
+    setFeaturedPlans(prev => prev.filter(p => p.id !== plan.id));
+
+    // DB write
+    const displayOrder = quoteLineItems.length + additionalLineItems.length;
+    await fetch(`/api/quotes/${quoteId}/line-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_plan_id: plan.id,
+        plan_name: plan.plan_name,
+        initial_price: plan.initial_price ?? 0,
+        recurring_price: plan.recurring_price ?? 0,
+        billing_frequency: plan.billing_frequency ?? 'monthly',
+        display_order: displayOrder,
+      }),
+    }).catch(() => {
+      // Rollback on failure
+      setAdditionalLineItems(prev => prev.filter(i => i.id !== newId));
+      setSelectedItemIds(prev => {
+        const next = new Set(prev);
+        next.delete(newId);
+        return next;
+      });
+      setFeaturedPlans(prev => [...prev, plan]);
+    });
+  }
+
   // ── Totals helpers ─────────────────────────────────────────────────────
   const billingFrequency = recurringByFrequency[0]?.frequency ?? 'monthly';
-  const planItems = quoteLineItems.filter(i => i.isPrimary !== false && i.catalogItemKind !== 'addon');
-  const addonItems = quoteLineItems.filter(i => i.isPrimary === false || i.catalogItemKind === 'addon');
-  const customItems = quoteLineItems.filter(i => i.type === 'custom');
+  const planItems = effectiveLineItems.filter(
+    i => i.catalogItemKind !== 'addon' && i.catalogItemKind !== 'product'
+  );
+  const addonItems = effectiveLineItems.filter(
+    i => i.catalogItemKind === 'addon'
+  );
+  const customItems = effectiveLineItems.filter(i => i.type === 'custom');
 
   // ── Main review page ───────────────────────────────────────────────────
   return (
@@ -729,9 +875,7 @@ export function ReviewStep({
         style={brandingStyle}
       >
         {/* ── Header with back button ── */}
-        <div
-          className={`${styles.reviewHeader} ${hasShadow ? styles.reviewHeaderScrolled : ''}`}
-        >
+        <div className={`${styles.reviewHeader}`}>
           <button
             type="button"
             className={styles.backBtn}
@@ -756,21 +900,20 @@ export function ReviewStep({
           </button>
           <div className={styles.reviewHeaderLogo}>
             {branding?.logo_url ? (
-              <Image
-                src={branding.logo_url}
-                alt={branding.company_name || companyName}
-                width={200}
-                height={64}
-                style={{ objectFit: 'contain', maxHeight: 64 }}
-              />
+              <div className={styles.heroLogoWrapper}>
+                <Image
+                  src={branding.logo_url}
+                  alt={branding.company_name || companyName}
+                  fill={true}
+                  objectFit="contain"
+                />
+              </div>
             ) : (
               <span className={styles.reviewHeaderName}>
                 {branding?.company_name || companyName}
               </span>
             )}
           </div>
-          {/* spacer to keep logo centered */}
-          <div style={{ width: 36, flexShrink: 0 }} />
         </div>
 
         {/* ── Hero ── */}
@@ -781,18 +924,32 @@ export function ReviewStep({
             <div
               className={`${qcStyles.heroContent} ${qcStyles.heroContentCompact} ${styles.heroContentCentered}`}
             >
-              <h1 className={qcStyles.heroTitle}>
-                Your Quote Is Ready, {firstName}
-              </h1>
-              {pestTypes.length > 0 && (
+              {plottedPests.length > 0 && (
                 <div className={styles.heroPests}>
                   <p className={styles.heroPestsLabel}>Pests identified</p>
-                  <div className={qcStyles.pestTags}>
-                    {pestTypes.map(t => (
-                      <span key={t} className={qcStyles.pestTag}>
-                        {t.charAt(0).toUpperCase() + t.slice(1)}
-                      </span>
-                    ))}
+                  <div className={styles.heroPestIconRow}>
+                    {plottedPests.map(pest => {
+                      const iconSvg = pestIconMap[pest.id] ?? null;
+                      const stampType =
+                        pest.stampType ?? getPestStampType(pest.id);
+                      return (
+                        <div key={pest.id} className={styles.heroPestIcon}>
+                          <div className={styles.heroPestIconCircle}>
+                            {iconSvg ? (
+                              <span
+                                className={styles.heroPestIconSvg}
+                                dangerouslySetInnerHTML={{ __html: iconSvg }}
+                              />
+                            ) : (
+                              <MapStampGlyph type={stampType} size={24} />
+                            )}
+                          </div>
+                          <span className={styles.heroPestIconLabel}>
+                            {pest.label}
+                          </span>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -872,8 +1029,7 @@ export function ReviewStep({
                     src={housePhoto}
                     alt="House photo"
                     fill
-                    style={{ objectFit: 'cover' }}
-                    sizes="(max-width: 768px) 100vw, 50vw"
+                    objectFit="cover"
                   />
                 </div>
               )}
@@ -882,7 +1038,6 @@ export function ReviewStep({
                 <button
                   type="button"
                   className={styles.heroViewToggleBtn}
-                  style={{ color: brandPrimary ?? '#1D3D7C' }}
                   onClick={() => setShowMapView(true)}
                 >
                   <svg
@@ -934,234 +1089,363 @@ export function ReviewStep({
 
         {/* ── Content area ── */}
         <div className={qcStyles.contentArea}>
-          {/* ── Plan cards (Plans / Bundles / Custom) ── */}
-          {planItems.length > 0 && (
-            <div className={qcStyles.plansContainer} id="pestProtectionPlans">
-              <h2>Service Quote</h2>
-              {planItems.map(item => {
-                const detail = getPlanContent(item);
-                const hasContent =
-                  item.type === 'plan-addon' && planHasContent(item);
-                const isExpanded = expandedItems.has(item.id);
-                const isSelected = selectedItemIds.has(item.id);
-                const isOnly =
-                  multipleItems && selectedItemIds.size === 1 && isSelected;
+          <div className={qcStyles.contentAreaInner}>
+            {/* ── Plan cards (Plans / Bundles / Custom) ── */}
+            {planItems.length > 0 && (
+              <div className={qcStyles.plansContainer} id="pestProtectionPlans">
+                <h2>Quoted Services</h2>
+                {planItems.map(item => {
+                  const detail = getPlanContent(item);
+                  const hasContent =
+                    item.type === 'plan-addon' && planHasContent(item);
+                  const hasRecommended = addonItems.some(
+                    a =>
+                      a.parentLineItemId === item.id &&
+                      a.isRecommended !== undefined
+                  );
+                  const isExpandable = hasContent || hasRecommended;
+                  const isExpanded = expandedItemId === item.id;
+                  const isSelected = selectedItemIds.has(item.id);
+                  const isOnly =
+                    multipleItems && selectedItemIds.size === 1 && isSelected;
 
-                const imageUrl =
-                  detail?.plan_image_url ?? detail?.bundle_image_url ?? null;
-                const description =
-                  detail?.plan_description ??
-                  detail?.bundle_description ??
-                  null;
-                const features: string[] =
-                  detail?.plan_features ?? detail?.bundle_features ?? [];
-                const disclaimer: string | null =
-                  detail?.plan_disclaimer ?? null;
-                const videoUrl: string | null = detail?.plan_video_url ?? null;
+                  const imageUrl =
+                    detail?.plan_image_url ?? detail?.bundle_image_url ?? null;
+                  const description =
+                    detail?.plan_description ??
+                    detail?.bundle_description ??
+                    null;
+                  const features: string[] =
+                    detail?.plan_features ?? detail?.bundle_features ?? [];
+                  const disclaimer: string | null =
+                    detail?.plan_disclaimer ?? null;
+                  const videoUrl: string | null =
+                    detail?.plan_video_url ?? null;
 
-                return (
-                  <div
-                    key={item.id}
-                    className={`${qcStyles.planCard} ${qcStyles.collapsible} ${isSelected ? qcStyles.selectedCard : ''} ${isExpanded ? qcStyles.expanded : ''}`}
-                  >
+                  // Aggregate product children into this item's displayed price
+                  const productChildren = quoteLineItems.filter(
+                    c =>
+                      c.catalogItemKind === 'product' &&
+                      c.parentLineItemId === item.id
+                  );
+                  const selectedAddonChildren = addonItems.filter(
+                    a =>
+                      a.parentLineItemId === item.id &&
+                      selectedItemIds.has(a.id)
+                  );
+                  const aggInitial =
+                    (item.initialCost ?? 0) +
+                    productChildren.reduce(
+                      (s, c) => s + (c.initialCost ?? 0),
+                      0
+                    ) +
+                    selectedAddonChildren.reduce(
+                      (s, a) => s + (a.initialCost ?? 0),
+                      0
+                    );
+                  const aggRecurring =
+                    (item.recurringCost ?? 0) +
+                    productChildren.reduce(
+                      (s, c) => s + (c.recurringCost ?? 0),
+                      0
+                    ) +
+                    selectedAddonChildren.reduce(
+                      (s, a) => s + (a.recurringCost ?? 0),
+                      0
+                    );
+
+                  return (
                     <div
-                      className={qcStyles.planHeader}
-                      onClick={
-                        hasContent ? () => toggleExpanded(item.id) : undefined
-                      }
-                      style={{ cursor: hasContent ? 'pointer' : 'default' }}
+                      key={item.id}
+                      className={`${qcStyles.planCard} ${qcStyles.collapsible} ${isExpanded ? qcStyles.expanded : ''}`}
                     >
-                      {multipleItems && (
-                        <label
-                          className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
-                          onClick={e => e.stopPropagation()}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => toggleItemSelected(item.id)}
-                            disabled={isOnly}
-                          />
-                          <span
-                            className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
-                          />
-                        </label>
-                      )}
-                      <div>
-                        <h3 className={qcStyles.planHeaderTitle}>
-                          {formatLineItemLabel(item)}
-                        </h3>
-                        {item.selectedVariantLabel && (
-                          <span className={styles.variantBadge}>
-                            {item.selectedVariantLabel}
-                          </span>
+                      <div
+                        className={qcStyles.planHeader}
+                        onClick={
+                          isExpandable
+                            ? () => toggleExpanded(item.id)
+                            : undefined
+                        }
+                        style={{ cursor: isExpandable ? 'pointer' : 'default' }}
+                      >
+                        {multipleItems && (
+                          <label
+                            className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => toggleItemSelected(item.id)}
+                              disabled={isOnly}
+                            />
+                            <span
+                              className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
+                            />
+                          </label>
                         )}
-                      </div>
-                      <div className={qcStyles.addonHeaderRight}>
-                        <div className={qcStyles.planHeaderPricing}>
-                          {(item.recurringCost ?? 0) > 0 && (
-                            <span className={qcStyles.planHeaderRecurring}>
-                              <sup>$</sup>
-                              {(item.recurringCost ?? 0).toFixed(0)}
-                              <span className={qcStyles.planRecurringFrequency}>
-                                /{abbreviateFrequency(item.frequency)}
-                              </span>
+                        {(() => {
+                          // coveredPestIds is [] when loaded from DB — derive from catalog
+                          const catalogCoveredIds: string[] =
+                            item.coveredPestIds.length > 0
+                              ? item.coveredPestIds
+                              : (
+                                  catalogDetails[item.catalogItemId ?? '']
+                                    ?.pest_coverage ?? []
+                                ).map((c: any) => c.pest_id as string);
+
+                          // Find which plotted pests this plan covers
+                          const coveredPlotted = plottedPests.filter(p =>
+                            catalogCoveredIds.includes(p.id)
+                          );
+                          const singlePest =
+                            coveredPlotted.length === 1
+                              ? coveredPlotted[0]
+                              : null;
+
+                          // Multiple plotted pests covered → shield icon
+                          if (!singlePest && coveredPlotted.length > 1) {
+                            return (
+                              <div className={styles.planHeaderPestIcon}>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="24"
+                                  height="26"
+                                  viewBox="0 0 34 36"
+                                  fill="none"
+                                  className={styles.planHeaderShieldIcon}
+                                >
+                                  <path
+                                    d="M31.1667 0H2.83333C2.08189 0 1.36122 0.303427 0.829864 0.84353C0.298511 1.38363 0 2.11617 0 2.87999V12.96C0 22.4495 4.51917 28.2005 8.31052 31.3541C12.3941 34.7489 16.4564 35.9009 16.6334 35.9495C16.8769 36.0168 17.1337 36.0168 17.3772 35.9495C17.5543 35.9009 21.6112 34.7489 25.7001 31.3541C29.4808 28.2005 34 22.4495 34 12.96V2.87999C34 2.11617 33.7015 1.38363 33.1701 0.84353C32.6388 0.303427 31.9181 0 31.1667 0ZM25.0892 12.5388L15.1725 22.6187C15.0409 22.7526 14.8847 22.8588 14.7127 22.9313C14.5407 23.0038 14.3564 23.0411 14.1702 23.0411C13.984 23.0411 13.7997 23.0038 13.6277 22.9313C13.4557 22.8588 13.2995 22.7526 13.1679 22.6187L8.91792 18.2987C8.65209 18.0285 8.50275 17.6621 8.50275 17.28C8.50275 16.8978 8.65209 16.5314 8.91792 16.2612C9.18374 15.991 9.54428 15.8392 9.92021 15.8392C10.2961 15.8392 10.6567 15.991 10.9225 16.2612L14.1667 19.5641L23.081 10.5012C23.2127 10.3674 23.3689 10.2613 23.5409 10.1888C23.7129 10.1164 23.8972 10.0792 24.0833 10.0792C24.2695 10.0792 24.4538 10.1164 24.6258 10.1888C24.7977 10.2613 24.954 10.3674 25.0856 10.5012C25.2172 10.635 25.3217 10.7938 25.3929 10.9686C25.4641 11.1434 25.5008 11.3308 25.5008 11.52C25.5008 11.7092 25.4641 11.8965 25.3929 12.0713C25.3217 12.2461 25.2172 12.405 25.0856 12.5388H25.0892Z"
+                                    fill="#2478F5"
+                                  />
+                                </svg>
+                              </div>
+                            );
+                          }
+
+                          // No plotted pests covered → render nothing
+                          if (coveredPlotted.length === 0) return null;
+
+                          const pestId = singlePest?.id ?? null;
+                          if (!pestId) return null;
+
+                          // Use plottedPest stampType when available (more accurate than getPestStampType)
+                          const plottedPest =
+                            singlePest ??
+                            plottedPests.find(p => p.id === pestId);
+                          const iconSvg = pestIconMap[pestId] ?? null;
+                          const stampType =
+                            plottedPest?.stampType ?? getPestStampType(pestId);
+
+                          return (
+                            <div className={styles.planHeaderPestIcon}>
+                              {iconSvg ? (
+                                <span
+                                  className={styles.planHeaderPestIconSvg}
+                                  dangerouslySetInnerHTML={{ __html: iconSvg }}
+                                />
+                              ) : (
+                                <MapStampGlyph type={stampType} size={24} />
+                              )}
+                            </div>
+                          );
+                        })()}
+                        <div>
+                          <h3 className={qcStyles.planHeaderTitle}>
+                            {formatLineItemLabel(item)}
+                          </h3>
+                          {item.selectedVariantLabel && (
+                            <span className={styles.variantBadge}>
+                              {item.selectedVariantLabel}
                             </span>
                           )}
-                          {(item.recurringCost ?? 0) > 0 &&
-                            (item.initialCost ?? 0) > 0 && (
+                        </div>
+
+                        <div
+                          className={`${qcStyles.addonHeaderRight}${isSelected ? ` ${qcStyles.addonHeaderRightWithPill}` : ''}`}
+                        >
+                          {isSelected && (
+                            <span className={qcStyles.addedToPlanPill}>
+                              Added To Plan
+                            </span>
+                          )}
+                          <div className={qcStyles.planHeaderPricing}>
+                            {aggRecurring > 0 && (
+                              <span className={qcStyles.planHeaderRecurring}>
+                                <sup>$</sup>
+                                {aggRecurring.toFixed(0)}
+                                <span
+                                  className={qcStyles.planRecurringFrequency}
+                                >
+                                  /{abbreviateFrequency(item.frequency)}
+                                </span>
+                              </span>
+                            )}
+                            {aggRecurring > 0 && aggInitial > 0 && (
                               <span className={qcStyles.planHeaderDivider}>
                                 |
                               </span>
                             )}
-                          {(item.initialCost ?? 0) > 0 && (
-                            <span className={qcStyles.planHeaderInitial}>
-                              <sup>$</sup>
-                              {(item.initialCost ?? 0).toFixed(0)}
-                              <span className={qcStyles.initialText}>
-                                {item.frequency === 'one-time'
-                                  ? ' One Time'
-                                  : ' Initial'}
+                            {aggInitial > 0 && (
+                              <span className={qcStyles.planHeaderInitial}>
+                                <sup>$</sup>
+                                {aggInitial.toFixed(0)}
+                                <span className={qcStyles.initialText}>
+                                  {item.frequency === 'one-time'
+                                    ? ' One Time'
+                                    : ' Initial'}
+                                </span>
                               </span>
+                            )}
+                          </div>
+                          {isExpandable && (
+                            <span className={qcStyles.planHeaderIcon}>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="32"
+                                height="32"
+                                viewBox="0 0 32 32"
+                                fill="none"
+                              >
+                                <circle cx="16" cy="16" r="16" fill="#000" />
+                                <path
+                                  d="M10 14L16 20L22 14"
+                                  stroke="white"
+                                  strokeWidth="1.75"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
                             </span>
                           )}
                         </div>
-                        {hasContent && (
-                          <span className={qcStyles.planHeaderIcon}>
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              width="32"
-                              height="32"
-                              viewBox="0 0 32 32"
-                              fill="none"
-                            >
-                              <circle cx="16" cy="16" r="16" fill="#000" />
-                              <path
-                                d="M10 14L16 20L22 14"
-                                stroke="white"
-                                strokeWidth="1.75"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                              />
-                            </svg>
-                          </span>
-                        )}
                       </div>
-                    </div>
 
-                    {hasContent && (
-                      <div
-                        className={qcStyles.planContentWrapper}
-                        style={{ maxHeight: isExpanded ? '3000px' : '0' }}
-                      >
-                        <div className={qcStyles.planContent}>
-                          <div className={qcStyles.planContentGrid}>
-                            <div className={qcStyles.planContentLeft}>
-                              {imageUrl && (
-                                <div
-                                  className={qcStyles.planImageWrapperMobile}
-                                >
-                                  <Image
-                                    src={imageUrl}
-                                    alt={formatLineItemLabel(item)}
-                                    fill
-                                    className={qcStyles.planImage}
-                                  />
-                                </div>
-                              )}
-                              {description && (
-                                <p className={qcStyles.planDescription}>
-                                  {description}
-                                </p>
-                              )}
-                              {features.length > 0 && (
-                                <div className={qcStyles.planIncluded}>
-                                  <h4>What&apos;s Included:</h4>
-                                  <ul className={qcStyles.featuresList}>
-                                    {features.map((f, fi) => (
-                                      <li key={fi} className={qcStyles.feature}>
-                                        <span
-                                          className={qcStyles.featureCheckmark}
-                                        >
-                                          <svg
-                                            xmlns="http://www.w3.org/2000/svg"
-                                            width="20"
-                                            height="20"
-                                            viewBox="0 0 20 20"
-                                            fill="none"
+                      {isExpandable && (
+                        <div
+                          className={qcStyles.planContentWrapper}
+                          style={{ maxHeight: isExpanded ? '3000px' : '0' }}
+                        >
+                          {hasContent && (
+                            <div className={qcStyles.planContent}>
+                              <div className={qcStyles.planContentGrid}>
+                                {description && (
+                                  <p className={qcStyles.planDescription}>
+                                    {description}
+                                  </p>
+                                )}
+                                <div className={qcStyles.planContentLeft}>
+                                  {features.length > 0 && (
+                                    <div className={qcStyles.planIncluded}>
+                                      <h4>What&apos;s Included:</h4>
+                                      <ul className={qcStyles.featuresList}>
+                                        {features.map((f, fi) => (
+                                          <li
+                                            key={fi}
+                                            className={qcStyles.feature}
                                           >
-                                            <g clipPath="url(#clip-rv)">
-                                              <path
-                                                d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
-                                                stroke="#000"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                              />
-                                              <path
-                                                d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
-                                                stroke="#000"
-                                                strokeWidth="2"
-                                                strokeLinecap="round"
-                                                strokeLinejoin="round"
-                                              />
-                                            </g>
-                                            <defs>
-                                              <clipPath id="clip-rv">
-                                                <rect
-                                                  width="20"
-                                                  height="20"
-                                                  fill="white"
-                                                />
-                                              </clipPath>
-                                            </defs>
-                                          </svg>
-                                        </span>
-                                        {f}
-                                      </li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )}
-                              <div className={qcStyles.pricingSection}>
-                                <div className={qcStyles.priceContainer}>
-                                  {(item.recurringCost ?? 0) > 0 && (
-                                    <div className={qcStyles.priceLeft}>
-                                      <div className={qcStyles.priceRecurring}>
-                                        <sup>$</sup>
-                                        {(item.recurringCost ?? 0).toFixed(0)}
-                                        <sup className={qcStyles.priceAsterisk}>
-                                          *
-                                        </sup>
-                                        <span
-                                          className={qcStyles.priceFrequency}
+                                            <span
+                                              className={
+                                                qcStyles.featureCheckmark
+                                              }
+                                            >
+                                              <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 20 20"
+                                                fill="none"
+                                              >
+                                                <g clipPath="url(#clip-rv)">
+                                                  <path
+                                                    d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
+                                                    stroke="#000"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                  />
+                                                  <path
+                                                    d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
+                                                    stroke="#000"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                  />
+                                                </g>
+                                                <defs>
+                                                  <clipPath id="clip-rv">
+                                                    <rect
+                                                      width="20"
+                                                      height="20"
+                                                      fill="white"
+                                                    />
+                                                  </clipPath>
+                                                </defs>
+                                              </svg>
+                                            </span>
+                                            {f}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  <div className={qcStyles.pricingSection}>
+                                    <div className={qcStyles.priceContainer}>
+                                      {aggRecurring > 0 && (
+                                        <div className={qcStyles.priceLeft}>
+                                          <div
+                                            className={qcStyles.priceRecurring}
+                                          >
+                                            <sup>$</sup>
+                                            {aggRecurring.toFixed(0)}
+                                            <sup
+                                              className={qcStyles.priceAsterisk}
+                                            >
+                                              *
+                                            </sup>
+                                            <span
+                                              className={
+                                                qcStyles.priceFrequency
+                                              }
+                                            >
+                                              /
+                                              {abbreviateFrequency(
+                                                item.frequency
+                                              )}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {aggInitial > 0 && (
+                                        <div
+                                          className={
+                                            item.frequency === 'one-time' ||
+                                            aggRecurring === 0
+                                              ? qcStyles.priceLeft
+                                              : qcStyles.priceRight
+                                          }
                                         >
-                                          /{abbreviateFrequency(item.frequency)}
-                                        </span>
-                                      </div>
+                                          <div
+                                            className={qcStyles.priceRecurring}
+                                          >
+                                            <sup>$</sup>
+                                            {aggInitial.toFixed(0)}
+                                            {item.frequency !== 'one-time' &&
+                                              aggRecurring > 0 && (
+                                                <span
+                                                  className={
+                                                    qcStyles.priceFrequency
+                                                  }
+                                                >
+                                                  /Initial
+                                                </span>
+                                              )}
+                                          </div>
+                                        </div>
+                                      )}
                                     </div>
-                                  )}
-                                  {(item.initialCost ?? 0) > 0 && (
-                                    <div className={qcStyles.priceRight}>
-                                      <div className={qcStyles.priceInitial}>
-                                        <span className={qcStyles.initialLabel}>
-                                          {item.frequency === 'one-time'
-                                            ? 'One Time'
-                                            : 'Initial Only'}
-                                        </span>
-                                        <span className={qcStyles.priceNumber}>
-                                          <sup>$</sup>
-                                          {(item.initialCost ?? 0).toFixed(0)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                              {(disclaimer || videoUrl) && (
-                                <div
-                                  className={`${qcStyles.planDisclaimerVideoRow}${videoUrl ? ` ${qcStyles.hasVideo}` : ''}`}
-                                >
+                                  </div>
                                   {disclaimer && (
                                     <div className={qcStyles.planDisclaimer}>
                                       <p
@@ -1171,42 +1455,45 @@ export function ReviewStep({
                                       />
                                     </div>
                                   )}
+                                </div>
+                                <div className={qcStyles.planContentRight}>
+                                  {imageUrl && (
+                                    <div className={qcStyles.planImageWrapper}>
+                                      <Image
+                                        src={imageUrl}
+                                        alt={formatLineItemLabel(item)}
+                                        fill
+                                        className={qcStyles.planImage}
+                                      />
+                                    </div>
+                                  )}
+
                                   {videoUrl && (
                                     <button
                                       type="button"
-                                      className={qcStyles.planVideoThumbnail}
+                                      className={styles.planVideoCallout}
                                       onClick={() =>
                                         setVideoLightboxUrl(videoUrl)
                                       }
                                       aria-label="Play plan video"
                                     >
-                                      <video
-                                        src={videoUrl}
-                                        muted
-                                        preload="metadata"
-                                        className={
-                                          qcStyles.planVideoThumbnailVideo
-                                        }
-                                      />
                                       <span
-                                        className={
-                                          qcStyles.planVideoPlayOverlay
-                                        }
+                                        className={styles.planVideoCalloutText}
+                                      >
+                                        Watch Our Service Video
+                                      </span>
+                                      <span
+                                        className={styles.planVideoCalloutPlay}
                                       >
                                         <svg
-                                          width="48"
-                                          height="48"
-                                          viewBox="0 0 48 48"
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="31"
+                                          height="36"
+                                          viewBox="0 0 31 36"
                                           fill="none"
                                         >
-                                          <circle
-                                            cx="24"
-                                            cy="24"
-                                            r="24"
-                                            fill="rgba(0,0,0,0.5)"
-                                          />
                                           <path
-                                            d="M19 16l14 8-14 8V16z"
+                                            d="M30.75 17.7535L-1.67211e-06 35.5071L-1.20052e-07 1.77294e-05L30.75 17.7535Z"
                                             fill="white"
                                           />
                                         </svg>
@@ -1214,276 +1501,531 @@ export function ReviewStep({
                                     </button>
                                   )}
                                 </div>
-                              )}
-                            </div>
-                            <div className={qcStyles.planContentRight}>
-                              <div className={qcStyles.planImageWrapper}>
-                                {imageUrl ? (
-                                  <Image
-                                    src={imageUrl}
-                                    alt={formatLineItemLabel(item)}
-                                    fill
-                                    className={qcStyles.planImage}
-                                  />
-                                ) : (
-                                  <div
-                                    className={qcStyles.planImagePlaceholder}
-                                  >
-                                    <svg
-                                      width="100"
-                                      height="100"
-                                      viewBox="0 0 100 100"
-                                      fill="none"
-                                    >
-                                      <rect
-                                        width="100"
-                                        height="100"
-                                        fill="#E5E7EB"
-                                      />
-                                      <path
-                                        d="M50 30L60 50H40L50 30Z"
-                                        fill="#9CA3AF"
-                                      />
-                                      <circle
-                                        cx="50"
-                                        cy="65"
-                                        r="10"
-                                        fill="#9CA3AF"
-                                      />
-                                    </svg>
-                                  </div>
-                                )}
                               </div>
+                            </div>
+                          )}
+                          {/* ── Recommended add-ons for this plan ── */}
+                          {(() => {
+                            // All recommended add-on line items are saved with isRecommended !== undefined
+                            const recommendedLineItems = addonItems.filter(
+                              a =>
+                                a.parentLineItemId === item.id &&
+                                a.isRecommended !== undefined
+                            );
+
+                            // Preserve catalog order if available
+                            const planCatalogData =
+                              catalogDetails[item.catalogItemId ?? ''];
+                            const catalogOrder: string[] =
+                              planCatalogData?.recommended_addon_ids ?? [];
+                            const ordered =
+                              catalogOrder.length > 0
+                                ? ([
+                                    ...catalogOrder
+                                      .map(id =>
+                                        recommendedLineItems.find(
+                                          a => a.catalogItemId === id
+                                        )
+                                      )
+                                      .filter(Boolean),
+                                    ...recommendedLineItems.filter(
+                                      a =>
+                                        !catalogOrder.includes(
+                                          a.catalogItemId ?? ''
+                                        )
+                                    ),
+                                  ] as typeof recommendedLineItems)
+                                : recommendedLineItems;
+
+                            if (ordered.length === 0) return null;
+
+                            return (
+                              <div className={styles.planCardAddons}>
+                                <div className={styles.planCardAddonBtnGroup}>
+                                  {ordered.map(addon => {
+                                    const isChecked = selectedItemIds.has(
+                                      addon.id
+                                    );
+                                    const recurringCost =
+                                      addon.recurringCost ?? 0;
+                                    const initialCost = addon.initialCost ?? 0;
+                                    const priceLabel =
+                                      recurringCost > 0
+                                        ? `$${recurringCost.toFixed(0)}/${abbreviateFrequency(addon.frequency)}`
+                                        : initialCost > 0
+                                          ? `$${initialCost.toFixed(0)}`
+                                          : '';
+                                    return (
+                                      <div
+                                        key={addon.id}
+                                        className={styles.planCardAddonBtnWrap}
+                                      >
+                                        {addon.isRecommended === true && (
+                                          <span
+                                            className={
+                                              styles.planCardAddonRecommendedLabel
+                                            }
+                                          >
+                                            Recommended
+                                          </span>
+                                        )}
+                                        <button
+                                          type="button"
+                                          className={`${styles.planCardAddonBtn}${isChecked ? ` ${styles.planCardAddonBtnSelected}` : ''}`}
+                                          onClick={() =>
+                                            toggleItemSelected(addon.id)
+                                          }
+                                        >
+                                          {isChecked && (
+                                            <span
+                                              className={
+                                                styles.planCardAddonBtnCheck
+                                              }
+                                            >
+                                              <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="27"
+                                                height="27"
+                                                viewBox="0 0 27 27"
+                                                fill="none"
+                                              >
+                                                <circle
+                                                  cx="13.5"
+                                                  cy="13.5"
+                                                  r="13.5"
+                                                />
+                                                <path d="M13.75 4C11.8216 4 9.93657 4.57183 8.33319 5.64317C6.72982 6.71451 5.48013 8.23726 4.74218 10.0188C4.00422 11.8004 3.81114 13.7608 4.18735 15.6521C4.56355 17.5434 5.49215 19.2807 6.85571 20.6443C8.21928 22.0079 9.95656 22.9365 11.8479 23.3127C13.7392 23.6889 15.6996 23.4958 17.4812 22.7578C19.2627 22.0199 20.7855 20.7702 21.8568 19.1668C22.9282 17.5634 23.5 15.6784 23.5 13.75C23.4973 11.165 22.4692 8.68661 20.6413 6.85872C18.8134 5.03084 16.335 4.00273 13.75 4ZM18.0306 12.0306L12.7806 17.2806C12.711 17.3504 12.6283 17.4057 12.5372 17.4434C12.4462 17.4812 12.3486 17.5006 12.25 17.5006C12.1514 17.5006 12.0538 17.4812 11.9628 17.4434C11.8718 17.4057 11.789 17.3504 11.7194 17.2806L9.46938 15.0306C9.32865 14.8899 9.24959 14.699 9.24959 14.5C9.24959 14.301 9.32865 14.1101 9.46938 13.9694C9.61011 13.8286 9.80098 13.7496 10 13.7496C10.199 13.7496 10.3899 13.8286 10.5306 13.9694L12.25 15.6897L16.9694 10.9694C17.0391 10.8997 17.1218 10.8444 17.2128 10.8067C17.3039 10.769 17.4015 10.7496 17.5 10.7496C17.5986 10.7496 17.6961 10.769 17.7872 10.8067C17.8782 10.8444 17.9609 10.8997 18.0306 10.9694C18.1003 11.0391 18.1556 11.1218 18.1933 11.2128C18.231 11.3039 18.2504 11.4015 18.2504 11.5C18.2504 11.5985 18.231 11.6961 18.1933 11.7872C18.1556 11.8782 18.1003 11.9609 18.0306 12.0306Z" />
+                                              </svg>
+                                            </span>
+                                          )}
+                                          <span
+                                            className={
+                                              styles.planCardAddonBtnLabel
+                                            }
+                                          >
+                                            {formatLineItemLabel(addon)}
+                                          </span>
+                                          {priceLabel && (
+                                            <span
+                                              className={
+                                                styles.planCardAddonBtnPrice
+                                              }
+                                            >
+                                              {priceLabel}
+                                            </span>
+                                          )}
+                                        </button>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                {/* ── Add-ons (previously "Additional Recommendations") ── */}
+                {addonItems
+                  .filter(i => i.isRecommended === undefined)
+                  .map(addon => {
+                    const isChecked = selectedItemIds.has(addon.id);
+                    const isOnly =
+                      multipleItems && selectedItemIds.size === 1 && isChecked;
+                    return (
+                      <div
+                        key={addon.id}
+                        className={`${qcStyles.planCard} ${qcStyles.collapsible}`}
+                      >
+                        <div className={qcStyles.planHeader}>
+                          <label
+                            className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => toggleItemSelected(addon.id)}
+                              disabled={isOnly}
+                            />
+                            <span
+                              className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
+                            />
+                          </label>
+                          <div>
+                            <h3 className={qcStyles.planHeaderTitle}>
+                              {formatLineItemLabel(addon)}
+                            </h3>
+                          </div>
+                          <div className={qcStyles.addonHeaderRight}>
+                            <div className={qcStyles.planHeaderPricing}>
+                              {(addon.recurringCost ?? 0) > 0 && (
+                                <span className={qcStyles.planHeaderRecurring}>
+                                  <sup>$</sup>
+                                  {(addon.recurringCost ?? 0).toFixed(0)}
+                                  <span
+                                    className={qcStyles.planRecurringFrequency}
+                                  >
+                                    /{abbreviateFrequency(addon.frequency)}
+                                  </span>
+                                </span>
+                              )}
+                              {(addon.recurringCost ?? 0) > 0 &&
+                                (addon.initialCost ?? 0) > 0 && (
+                                  <span className={qcStyles.planHeaderDivider}>
+                                    |
+                                  </span>
+                                )}
+                              {(addon.initialCost ?? 0) > 0 && (
+                                <span className={qcStyles.planHeaderInitial}>
+                                  <sup>$</sup>
+                                  {(addon.initialCost ?? 0).toFixed(0)}
+                                  <span className={qcStyles.initialText}>
+                                    {' '}
+                                    Initial
+                                  </span>
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    );
+                  })}
+              </div>
+            )}
 
-          {/* ── Add-On Services section ── */}
-          {addonItems.length > 0 && (
-            <div className={qcStyles.addonsSection}>
-              <h2>Additional Recommendations</h2>
-              {addonItems.map(item => {
-                const detail = getPlanContent(item);
-                const hasContent = planHasContent(item);
-                const isExpanded = expandedAddonItems.has(item.id);
-                const isSelected = selectedItemIds.has(item.id);
-                const isOnly =
-                  multipleItems && selectedItemIds.size === 1 && isSelected;
+            {/* ── Additional Services We Offer ── */}
+            {featuredPlans.length > 0 && (
+              <section className={styles.additionalServicesSection}>
+                <h2 className={styles.additionalServicesHeading}>
+                  Additional Services We Offer
+                </h2>
+                <div
+                  className={qcStyles.plansContainer}
+                  style={{ marginBottom: 0 }}
+                >
+                  {featuredPlans.map(plan => {
+                    const detail = catalogDetails[plan.id];
+                    const description = detail?.plan_description ?? null;
+                    const features: string[] = detail?.plan_features ?? [];
+                    const imageUrl = detail?.plan_image_url ?? null;
+                    const videoUrl = detail?.plan_video_url ?? null;
+                    const disclaimer = detail?.plan_disclaimer ?? null;
+                    const hasContent = Boolean(
+                      description || imageUrl || videoUrl || features.length > 0
+                    );
+                    const isExpanded = expandedFeaturedId === plan.id;
+                    const recurringPrice = plan.recurring_price ?? 0;
+                    const initialPrice = plan.initial_price ?? 0;
+                    // Treat as one-time when billing_frequency is explicitly 'one-time'
+                    // OR when there is no recurring price (initial-only charge)
+                    const isOneTime =
+                      plan.billing_frequency === 'one-time' ||
+                      recurringPrice === 0;
 
-                const imageUrl = detail?.addon_image_url ?? null;
-                const description = detail?.addon_description ?? null;
-                const features: string[] = detail?.addon_features ?? [];
-
-                return (
-                  <div
-                    key={item.id}
-                    className={`${qcStyles.planCard} ${qcStyles.collapsible} ${isSelected ? qcStyles.selectedCard : ''} ${isExpanded ? qcStyles.expanded : ''}`}
-                  >
-                    <div
-                      className={qcStyles.planHeader}
-                      onClick={
-                        hasContent
-                          ? () => toggleAddonExpanded(item.id)
-                          : undefined
-                      }
-                      style={{ cursor: hasContent ? 'pointer' : 'default' }}
-                    >
-                      <label
-                        className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleItemSelected(item.id)}
-                          disabled={isOnly}
-                        />
-                        <span
-                          className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
-                        />
-                      </label>
-                      <h3 className={qcStyles.planHeaderTitle}>
-                        {formatLineItemLabel(item)}
-                      </h3>
+                    return (
                       <div
-                        className={`${qcStyles.addonHeaderRight}${isSelected ? ` ${qcStyles.addonHeaderRightWithPill}` : ''}`}
+                        key={plan.id}
+                        className={`${qcStyles.planCard} ${qcStyles.collapsible} ${isExpanded ? qcStyles.expanded : ''}`}
                       >
-                        {isSelected && (
-                          <span className={qcStyles.addedToPlanPill}>
-                            Added To Plan
-                          </span>
-                        )}
-                        <div className={qcStyles.planHeaderPricing}>
-                          {(item.recurringCost ?? 0) > 0 && (
-                            <span className={qcStyles.planHeaderRecurring}>
-                              <sup>$</sup>
-                              {(item.recurringCost ?? 0).toFixed(0)}
-                              <span className={qcStyles.planRecurringFrequency}>
-                                /{abbreviateFrequency(item.frequency)}
-                              </span>
-                            </span>
-                          )}
-                          {(item.recurringCost ?? 0) > 0 &&
-                            (item.initialCost ?? 0) > 0 && (
-                              <span className={qcStyles.planHeaderDivider}>
-                                |
+                        <div
+                          className={qcStyles.planHeader}
+                          onClick={
+                            hasContent
+                              ? () =>
+                                  setExpandedFeaturedId(
+                                    isExpanded ? null : plan.id
+                                  )
+                              : undefined
+                          }
+                          style={{ cursor: hasContent ? 'pointer' : 'default' }}
+                        >
+                          <label
+                            className={qcStyles.addonCheckbox}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={false}
+                              onChange={() => handleAddFeaturedPlan(plan)}
+                            />
+                            <span className={qcStyles.addonCheckboxCustom} />
+                          </label>
+                          <div>
+                            <h3 className={qcStyles.planHeaderTitle}>
+                              {plan.plan_name}
+                            </h3>
+                          </div>
+                          <div className={qcStyles.addonHeaderRight}>
+                            {(() => {
+                              if (
+                                isOneTime ||
+                                (!isOneTime &&
+                                  recurringPrice === 0 &&
+                                  initialPrice > 0)
+                              ) {
+                                return (
+                                  <span
+                                    className={styles.additionalServicePrice}
+                                  >
+                                    From&nbsp;<sup>$</sup>
+                                    <span
+                                      className={
+                                        styles.additionalServicePriceNumber
+                                      }
+                                    >
+                                      {initialPrice.toFixed(0)}
+                                    </span>
+                                  </span>
+                                );
+                              }
+                              if (recurringPrice > 0) {
+                                return (
+                                  <span
+                                    className={styles.additionalServicePrice}
+                                  >
+                                    From&nbsp;<sup>$</sup>
+                                    <span
+                                      className={
+                                        styles.additionalServicePriceNumber
+                                      }
+                                    >
+                                      {recurringPrice.toFixed(0)}
+                                    </span>
+                                    /
+                                    {abbreviateFrequency(
+                                      plan.billing_frequency
+                                    )}
+                                  </span>
+                                );
+                              }
+                              return null;
+                            })()}
+                            {hasContent && (
+                              <span className={qcStyles.planHeaderIcon}>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  width="32"
+                                  height="32"
+                                  viewBox="0 0 32 32"
+                                  fill="none"
+                                >
+                                  <circle cx="16" cy="16" r="16" fill="#000" />
+                                  <path
+                                    d="M10 14L16 20L22 14"
+                                    stroke="white"
+                                    strokeWidth="1.75"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                  />
+                                </svg>
                               </span>
                             )}
-                          {(item.initialCost ?? 0) > 0 && (
-                            <span className={qcStyles.planHeaderInitial}>
-                              <sup>$</sup>
-                              {(item.initialCost ?? 0).toFixed(0)}
-                              <span className={qcStyles.initialText}>
-                                {item.frequency === 'one-time'
-                                  ? ' One Time'
-                                  : ' Initial'}
-                              </span>
-                            </span>
-                          )}
+                          </div>
                         </div>
-                      </div>
-                      {hasContent && (
-                        <span className={qcStyles.planHeaderIcon}>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="32"
-                            height="32"
-                            viewBox="0 0 32 32"
-                            fill="none"
+
+                        {hasContent && (
+                          <div
+                            className={qcStyles.planContentWrapper}
+                            style={{ maxHeight: isExpanded ? '3000px' : '0' }}
                           >
-                            <circle cx="16" cy="16" r="16" fill="#000" />
-                            <path
-                              d="M10 14L16 20L22 14"
-                              stroke="white"
-                              strokeWidth="1.75"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </span>
-                      )}
-                    </div>
-
-                    {hasContent && (
-                      <div
-                        className={qcStyles.planContentWrapper}
-                        style={{ maxHeight: isExpanded ? '3000px' : '0' }}
-                      >
-                        <div className={qcStyles.planContent}>
-                          {imageUrl && (
-                            <div className={qcStyles.planImageWrapperMobile}>
-                              <Image
-                                src={imageUrl}
-                                alt={formatLineItemLabel(item)}
-                                fill
-                                className={qcStyles.planImage}
-                              />
-                            </div>
-                          )}
-                          {description && (
-                            <p className={qcStyles.planDescription}>
-                              {description}
-                            </p>
-                          )}
-                          {features.length > 0 && (
-                            <div className={qcStyles.planIncluded}>
-                              <h4>What&apos;s Included:</h4>
-                              <ul className={qcStyles.featuresList}>
-                                {features.map((f, fi) => (
-                                  <li key={fi} className={qcStyles.feature}>
-                                    <span className={qcStyles.featureCheckmark}>
-                                      <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="20"
-                                        height="20"
-                                        viewBox="0 0 20 20"
-                                        fill="none"
+                            <div className={qcStyles.planContent}>
+                              {description && (
+                                <p className={qcStyles.planDescription}>
+                                  {description}
+                                </p>
+                              )}
+                              <div className={qcStyles.planContentGrid}>
+                                <div className={qcStyles.planContentLeft}>
+                                  {features.length > 0 && (
+                                    <div className={qcStyles.planIncluded}>
+                                      <h4>What&apos;s Included:</h4>
+                                      <ul className={qcStyles.featuresList}>
+                                        {features.map((f, fi) => (
+                                          <li
+                                            key={fi}
+                                            className={qcStyles.feature}
+                                          >
+                                            <span
+                                              className={
+                                                qcStyles.featureCheckmark
+                                              }
+                                            >
+                                              <svg
+                                                xmlns="http://www.w3.org/2000/svg"
+                                                width="20"
+                                                height="20"
+                                                viewBox="0 0 20 20"
+                                                fill="none"
+                                              >
+                                                <g clipPath="url(#clip-fp)">
+                                                  <path
+                                                    d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
+                                                    stroke="#000"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                  />
+                                                  <path
+                                                    d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
+                                                    stroke="#000"
+                                                    strokeWidth="2"
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                  />
+                                                </g>
+                                                <defs>
+                                                  <clipPath id="clip-fp">
+                                                    <rect
+                                                      width="20"
+                                                      height="20"
+                                                      fill="white"
+                                                    />
+                                                  </clipPath>
+                                                </defs>
+                                              </svg>
+                                            </span>
+                                            {f}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )}
+                                  <div className={qcStyles.pricingSection}>
+                                    <div className={qcStyles.priceContainer}>
+                                      {!isOneTime && recurringPrice > 0 && (
+                                        <div className={qcStyles.priceLeft}>
+                                          <div
+                                            className={qcStyles.priceRecurring}
+                                          >
+                                            <sup>$</sup>
+                                            {recurringPrice.toFixed(0)}
+                                            <sup
+                                              className={qcStyles.priceAsterisk}
+                                            >
+                                              *
+                                            </sup>
+                                            <span
+                                              className={
+                                                qcStyles.priceFrequency
+                                              }
+                                            >
+                                              /
+                                              {abbreviateFrequency(
+                                                plan.billing_frequency
+                                              )}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      )}
+                                      {initialPrice > 0 && (
+                                        <div
+                                          className={
+                                            isOneTime
+                                              ? qcStyles.priceLeft
+                                              : qcStyles.priceRight
+                                          }
+                                        >
+                                          <div
+                                            className={qcStyles.priceRecurring}
+                                          >
+                                            <sup>$</sup>
+                                            {initialPrice.toFixed(0)}
+                                            {!isOneTime && (
+                                              <span
+                                                className={
+                                                  qcStyles.priceFrequency
+                                                }
+                                              >
+                                                /Initial
+                                              </span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  {disclaimer && (
+                                    <div className={qcStyles.planDisclaimer}>
+                                      <p
+                                        dangerouslySetInnerHTML={{
+                                          __html: disclaimer,
+                                        }}
+                                      />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className={qcStyles.planContentRight}>
+                                  {imageUrl && (
+                                    <div className={qcStyles.planImageWrapper}>
+                                      <Image
+                                        src={imageUrl}
+                                        alt={plan.plan_name}
+                                        fill
+                                        className={qcStyles.planImage}
+                                      />
+                                    </div>
+                                  )}
+                                  {videoUrl && (
+                                    <button
+                                      type="button"
+                                      className={styles.planVideoCallout}
+                                      onClick={() =>
+                                        setVideoLightboxUrl(videoUrl)
+                                      }
+                                      aria-label="Play plan video"
+                                    >
+                                      <span
+                                        className={styles.planVideoCalloutText}
                                       >
-                                        <g clipPath="url(#clip-ao)">
+                                        Watch Our Service Video
+                                      </span>
+                                      <span
+                                        className={styles.planVideoCalloutPlay}
+                                      >
+                                        <svg
+                                          xmlns="http://www.w3.org/2000/svg"
+                                          width="31"
+                                          height="36"
+                                          viewBox="0 0 31 36"
+                                          fill="none"
+                                        >
                                           <path
-                                            d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
-                                            stroke="#000"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
+                                            d="M30.75 17.7535L-1.67211e-06 35.5071L-1.20052e-07 1.77294e-05L30.75 17.7535Z"
+                                            fill="white"
                                           />
-                                          <path
-                                            d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
-                                            stroke="#000"
-                                            strokeWidth="2"
-                                            strokeLinecap="round"
-                                            strokeLinejoin="round"
-                                          />
-                                        </g>
-                                        <defs>
-                                          <clipPath id="clip-ao">
-                                            <rect
-                                              width="20"
-                                              height="20"
-                                              fill="white"
-                                            />
-                                          </clipPath>
-                                        </defs>
-                                      </svg>
-                                    </span>
-                                    {f}
-                                  </li>
-                                ))}
-                              </ul>
+                                        </svg>
+                                      </span>
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    );
+                  })}
+                </div>
+              </section>
+            )}
 
-          {/* ── Total pricing — matching QuoteTotalPricing exactly ── */}
-          {quoteLineItems.length > 0 && (
-            <div className={qcStyles.totalPricing}>
-              <div className={styles.totalPricingHeader}>
-                <h3>Customized Quote Total</h3>
-                {isEditing ? (
-                  <button
-                    type="button"
-                    className={styles.editSaveBtn}
-                    onClick={handleSaveEdit}
-                  >
-                    Save
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    className={styles.editSaveBtn}
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Edit
-                  </button>
-                )}
-              </div>
+            {/* ── Total pricing — matching QuoteTotalPricing exactly ── */}
+            {effectiveLineItems.length > 0 && (
+              <div className={qcStyles.totalPricing}>
+                <div className={styles.totalPricingHeader}>
+                  <h3>Customized Quote Total</h3>
+                </div>
 
-              {/* Total Initial Cost row */}
-              <div className={qcStyles.totalRow}>
-                <div>Total Initial Cost:</div>
-                <strong>
-                  <sup>$</sup>
-                  {adjustedInitial.toFixed(0)}
-                </strong>
+                {/* Items list */}
                 <div className={qcStyles.totalListWrapper}>
-                  <ul className={qcStyles.totalItemsList}>
+                  <div className={qcStyles.totalItemsList}>
                     {/* Plans & bundles */}
                     {(planItems.length > 0 || customItems.length > 0) && (
-                      <li className={qcStyles.totalSectionLabel}>Services</li>
+                      <div className={qcStyles.totalSectionLabel}>Services</div>
                     )}
                     {planItems.map(item => {
                       const isSelected = selectedItemIds.has(item.id);
@@ -1491,309 +2033,300 @@ export function ReviewStep({
                         multipleItems &&
                         selectedItemIds.size === 1 &&
                         isSelected;
-                      const isOneTime = item.frequency === 'one-time';
+                      const childAddons = addonItems.filter(
+                        a => a.parentLineItemId === item.id
+                      );
+                      const productChildren = effectiveLineItems.filter(
+                        c =>
+                          c.catalogItemKind === 'product' &&
+                          c.parentLineItemId === item.id
+                      );
+                      const selectedAddonChildren = childAddons.filter(a =>
+                        selectedItemIds.has(a.id)
+                      );
+                      const aggInitial =
+                        (item.initialCost ?? 0) +
+                        productChildren.reduce(
+                          (s, c) => s + (c.initialCost ?? 0),
+                          0
+                        ) +
+                        selectedAddonChildren.reduce(
+                          (s, a) => s + (a.initialCost ?? 0),
+                          0
+                        );
+                      const aggRecurring =
+                        (item.recurringCost ?? 0) +
+                        productChildren.reduce(
+                          (s, c) => s + (c.recurringCost ?? 0),
+                          0
+                        ) +
+                        selectedAddonChildren.reduce(
+                          (s, a) => s + (a.recurringCost ?? 0),
+                          0
+                        );
                       return (
-                        <li
-                          key={item.id}
-                          className={`${qcStyles.totalItem} ${!isSelected ? qcStyles.totalItemUnselected : ''}`}
-                        >
-                          <span className={qcStyles.totalItemLeft}>
-                            {multipleItems ? (
-                              <label
-                                className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isSelected}
-                                  onChange={() => toggleItemSelected(item.id)}
-                                  disabled={isOnly}
-                                />
-                                <span
-                                  className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
-                                />
-                              </label>
-                            ) : (
-                              <span className={qcStyles.totalItemCheckmark}>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="13"
-                                  height="11"
-                                  viewBox="0 0 13 11"
-                                  fill="none"
+                        <div key={item.id} className={qcStyles.totalItemGroup}>
+                          <div
+                            className={`${qcStyles.totalItem} ${!isSelected ? qcStyles.totalItemUnselected : ''}`}
+                          >
+                            <span className={qcStyles.totalItemLeft}>
+                              {multipleItems ? (
+                                <label
+                                  className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
                                 >
-                                  <path
-                                    d="M1 7.04907L3.5 9.64154L11.8333 1"
-                                    stroke="#0072DA"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => toggleItemSelected(item.id)}
+                                    disabled={isOnly}
                                   />
-                                </svg>
-                              </span>
-                            )}
-                            {formatLineItemLabel(item)}
-                          </span>
-                          <span className={qcStyles.totalItemPrice}>
-                            <>
-                              {(item.recurringCost ?? 0) > 0 && (
-                                <span
-                                  className={qcStyles.totalItemPriceRecurring}
-                                >
                                   <span
-                                    className={qcStyles.totalItemPriceAmount}
+                                    className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
+                                  />
+                                </label>
+                              ) : (
+                                <span className={qcStyles.totalItemCheckmark}>
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    width="13"
+                                    height="11"
+                                    viewBox="0 0 13 11"
+                                    fill="none"
                                   >
-                                    ${(item.recurringCost ?? 0).toFixed(0)}
-                                  </span>
-                                  <span className={qcStyles.totalItemPriceFreq}>
-                                    /{abbreviateFrequency(item.frequency)}
-                                  </span>
+                                    <path
+                                      d="M1 7.04907L3.5 9.64154L11.8333 1"
+                                      stroke="#0072DA"
+                                      strokeWidth="2"
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                    />
+                                  </svg>
                                 </span>
                               )}
-                              {(item.initialCost ?? 0) > 0 &&
-                                ((item.recurringCost ?? 0) === 0 ? (
+                              {formatLineItemLabel(item)}
+                            </span>
+                            <span className={qcStyles.totalItemPrice}>
+                              <>
+                                {aggRecurring > 0 && (
                                   <span
-                                    className={qcStyles.totalItemPriceAmount}
-                                  >
-                                    ${(item.initialCost ?? 0).toFixed(0)}
-                                  </span>
-                                ) : (
-                                  <span
-                                    className={qcStyles.totalItemPriceInitial}
+                                    className={qcStyles.totalItemPriceRecurring}
                                   >
                                     <span
                                       className={qcStyles.totalItemPriceAmount}
                                     >
-                                      ${(item.initialCost ?? 0).toFixed(0)}
+                                      ${aggRecurring.toFixed(0)}
                                     </span>
                                     <span
                                       className={qcStyles.totalItemPriceFreq}
                                     >
-                                      {' '}
-                                      initial
+                                      /{abbreviateFrequency(item.frequency)}
                                     </span>
                                   </span>
-                                ))}
-                            </>
-                          </span>
-                        </li>
-                      );
-                    })}
-                    {/* Add-ons */}
-                    {addonItems.length > 0 && (
-                      <li className={qcStyles.totalSectionLabel}>Add-Ons</li>
-                    )}
-                    {addonItems.map(item => {
-                      const isSelected = selectedItemIds.has(item.id);
-                      const isOnly =
-                        multipleItems &&
-                        selectedItemIds.size === 1 &&
-                        isSelected;
-                      const isOneTime = item.frequency === 'one-time';
-                      return (
-                        <li
-                          key={item.id}
-                          className={`${qcStyles.totalItem} ${!isSelected ? qcStyles.totalItemUnselected : ''}`}
-                        >
-                          <span className={qcStyles.totalItemLeft}>
-                            <label
-                              className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleItemSelected(item.id)}
-                                disabled={isOnly}
-                              />
-                              <span
-                                className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
-                              />
-                            </label>
-                            {formatLineItemLabel(item)}
-                          </span>
-                          <span className={qcStyles.totalItemPrice}>
-                            <>
-                              {(item.recurringCost ?? 0) > 0 && (
-                                <span
-                                  className={qcStyles.totalItemPriceRecurring}
-                                >
-                                  <span
-                                    className={qcStyles.totalItemPriceAmount}
-                                  >
-                                    ${(item.recurringCost ?? 0).toFixed(0)}
-                                  </span>
-                                  <span className={qcStyles.totalItemPriceFreq}>
-                                    /{abbreviateFrequency(item.frequency)}
-                                  </span>
-                                </span>
-                              )}
-                              {(item.initialCost ?? 0) > 0 &&
-                                ((item.recurringCost ?? 0) === 0 ? (
-                                  <span
-                                    className={qcStyles.totalItemPriceAmount}
-                                  >
-                                    ${(item.initialCost ?? 0).toFixed(0)}
-                                  </span>
-                                ) : (
-                                  <span
-                                    className={qcStyles.totalItemPriceInitial}
-                                  >
+                                )}
+                                {aggInitial > 0 &&
+                                  (aggRecurring === 0 ? (
                                     <span
                                       className={qcStyles.totalItemPriceAmount}
                                     >
-                                      ${(item.initialCost ?? 0).toFixed(0)}
+                                      ${aggInitial.toFixed(0)}
                                     </span>
+                                  ) : (
                                     <span
-                                      className={qcStyles.totalItemPriceFreq}
+                                      className={qcStyles.totalItemPriceInitial}
                                     >
-                                      {' '}
-                                      initial
+                                      <span
+                                        className={
+                                          qcStyles.totalItemPriceAmount
+                                        }
+                                      >
+                                        ${aggInitial.toFixed(0)}
+                                      </span>
+                                      <span
+                                        className={qcStyles.totalItemPriceFreq}
+                                      >
+                                        {' '}
+                                        initial
+                                      </span>
                                     </span>
-                                  </span>
-                                ))}
-                            </>
-                          </span>
-                        </li>
+                                  ))}
+                              </>
+                            </span>
+                          </div>
+                          {childAddons.map(addon => {
+                            const addonSelected = selectedItemIds.has(addon.id);
+                            const addonOnly =
+                              multipleItems &&
+                              selectedItemIds.size === 1 &&
+                              addonSelected;
+                            return (
+                              <div
+                                key={addon.id}
+                                className={`${qcStyles.totalItem} ${styles.totalAddonItem} ${!addonSelected ? qcStyles.totalItemUnselected : ''}`}
+                              >
+                                <span className={qcStyles.totalItemLeft}>
+                                  <label
+                                    className={`${qcStyles.addonCheckbox} ${styles.totalAddonCheckbox} ${addonOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={addonSelected}
+                                      onChange={() =>
+                                        toggleItemSelected(addon.id)
+                                      }
+                                      disabled={addonOnly}
+                                    />
+                                    <span
+                                      className={`${qcStyles.addonCheckboxCustom} ${addonOnly ? qcStyles.addonCheckboxDisabled : ''}`}
+                                    />
+                                  </label>
+                                  {formatLineItemLabel(addon)}
+                                </span>
+                                <span className={qcStyles.totalItemPrice}>
+                                  <>
+                                    {(addon.recurringCost ?? 0) > 0 && (
+                                      <span
+                                        className={
+                                          qcStyles.totalItemPriceRecurring
+                                        }
+                                      >
+                                        <span
+                                          className={
+                                            qcStyles.totalItemPriceAmount
+                                          }
+                                        >
+                                          $
+                                          {(addon.recurringCost ?? 0).toFixed(
+                                            0
+                                          )}
+                                        </span>
+                                        <span
+                                          className={
+                                            qcStyles.totalItemPriceFreq
+                                          }
+                                        >
+                                          /
+                                          {abbreviateFrequency(addon.frequency)}
+                                        </span>
+                                      </span>
+                                    )}
+                                    {(addon.initialCost ?? 0) > 0 &&
+                                      ((addon.recurringCost ?? 0) === 0 ? (
+                                        <span
+                                          className={
+                                            qcStyles.totalItemPriceAmount
+                                          }
+                                        >
+                                          ${(addon.initialCost ?? 0).toFixed(0)}
+                                        </span>
+                                      ) : (
+                                        <span
+                                          className={
+                                            qcStyles.totalItemPriceInitial
+                                          }
+                                        >
+                                          <span
+                                            className={
+                                              qcStyles.totalItemPriceAmount
+                                            }
+                                          >
+                                            $
+                                            {(addon.initialCost ?? 0).toFixed(
+                                              0
+                                            )}
+                                          </span>
+                                          <span
+                                            className={
+                                              qcStyles.totalItemPriceFreq
+                                            }
+                                          >
+                                            {' '}
+                                            initial
+                                          </span>
+                                        </span>
+                                      ))}
+                                  </>
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       );
                     })}
-                    {/* Discount row in list */}
-                    {discountDollarInitial > 0 && (
-                      <li
-                        className={`${qcStyles.totalItem} ${styles.discountItem}`}
-                      >
-                        <span className={qcStyles.totalItemLeft}>Discount</span>
-                        <span>-{formatCurrency(discountDollarInitial)}</span>
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              </div>
-
-              {/* Discount controls — only visible in edit mode */}
-              {isEditing && (
-                <div className={styles.discountRow}>
-                  <p className={styles.discountLabel}>
-                    Discount on initial price
-                  </p>
-                  <div className={styles.discountControls}>
-                    <div className={styles.discountInputWrap}>
-                      <input
-                        type="number"
-                        inputMode="decimal"
-                        min="0"
-                        max="10"
-                        step="0.01"
-                        className={styles.discountInput}
-                        placeholder="0.00"
-                        value={discountAmount ?? ''}
-                        onChange={e => {
-                          const val = parseFloat(e.target.value);
-                          setDiscountAmount(
-                            Number.isFinite(val) ? Math.min(val, 10) : null
-                          );
-                        }}
-                      />
-                      <span className={styles.discountSign}>%</span>
-                    </div>
                   </div>
                 </div>
-              )}
 
-              {/* Total Recurring Cost — all frequencies normalized to monthly */}
-              {recurringByFrequency.length > 0 &&
-                (() => {
-                  const totalMonthly = recurringByFrequency.reduce(
-                    (sum, { frequency, total }) => {
-                      const adjusted =
-                        totalRecurring > 0 && discountDollarRecurring > 0
-                          ? Math.max(
-                              0,
-                              total * (adjustedRecurring / totalRecurring)
-                            )
-                          : total;
-                      return sum + toMonthlyEquivalent(frequency, adjusted);
-                    },
-                    0
-                  );
-                  return (
-                    <div className={qcStyles.totalRow}>
-                      <div>Total Recurring Cost:</div>
-                      <span>
-                        <strong>
-                          <sup>$</sup>
-                          {totalMonthly.toFixed(0)}
-                        </strong>
-                        <span className={qcStyles.totalRowFreq}>
-                          /mo With EasyPay
+                {/* Discount-applied row */}
+                {showDiscount && (
+                  <div
+                    className={`${qcStyles.totalRow} ${styles.discountAppliedRow}`}
+                  >
+                    <div>
+                      {appliedDiscount?.discount_name
+                        ? `${appliedDiscount.discount_name} - Discount Applied`
+                        : 'Discount Applied'}
+                    </div>
+                    <strong>
+                      {appliedDiscount?.discount_type !== 'percentage' && '$'}
+                      {appliedDiscount?.discount_value}
+                      {appliedDiscount?.discount_type === 'percentage' && '%'}
+                    </strong>
+                  </div>
+                )}
+
+                {/* Total Initial Cost row */}
+                <div className={qcStyles.totalRow}>
+                  <div>Total Initial Cost:</div>
+                  <strong>
+                    <span
+                      className={showDiscount ? qcStyles.originalPriceText : ''}
+                    >
+                      {showDiscount && `$${displaySubtotal.toFixed(0)}`}
+                    </span>
+                    ${displayTotal.toFixed(0)}
+                  </strong>
+                </div>
+
+                {/* Total Recurring Cost — all frequencies normalized to monthly */}
+                {recurringByFrequency.length > 0 &&
+                  (() => {
+                    const totalMonthly = recurringByFrequency.reduce(
+                      (sum, { frequency, total }) => {
+                        const adjusted =
+                          totalRecurring > 0 && discountDollarRecurring > 0
+                            ? Math.max(
+                                0,
+                                total * (adjustedRecurring / totalRecurring)
+                              )
+                            : total;
+                        return sum + toMonthlyEquivalent(frequency, adjusted);
+                      },
+                      0
+                    );
+                    return (
+                      <div className={qcStyles.totalRow}>
+                        <div>Monthly EZPay</div>
+                        <span>
+                          <strong>${totalMonthly.toFixed(0)}</strong>
+                          <span className={qcStyles.totalRowFreq}>/mo</span>
                         </span>
-                      </span>
-                    </div>
-                  );
-                })()}
-            </div>
-          )}
+                      </div>
+                    );
+                  })()}
+              </div>
+            )}
 
-          {/* ── FAQs ── */}
-          {faqSources.length > 0 && (
-            <div className={qcStyles.faqsSection}>
-              {faqSources.length === 1 ? (
-                <>
-                  <h2
-                    className={`${qcStyles.faqsTitle} ${styles.faqsTitleOverride}`}
-                  >
-                    Frequently Asked Questions
-                  </h2>
-                  <div className={qcStyles.faqsContainer}>
-                    {getFaqsForItem(faqSources[0]).map(
-                      (
-                        faq: { question: string; answer: string },
-                        fi: number
-                      ) => (
-                        <FaqItem key={fi} faq={faq} />
-                      )
-                    )}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <h2
-                    className={`${qcStyles.faqsTitle} ${styles.faqsTitleOverride}`}
-                  >
-                    Frequently Asked Questions
-                  </h2>
-                  <div className={qcStyles.faqDropdownContainer}>
-                    <label
-                      htmlFor="rv-faq-select"
-                      className={qcStyles.faqDropdownLabel}
+            {/* ── FAQs ── */}
+            {faqSources.length > 0 && (
+              <div className={qcStyles.faqsSection}>
+                {faqSources.length === 1 ? (
+                  <>
+                    <h2
+                      className={`${qcStyles.faqsTitle} ${styles.faqsTitleOverride}`}
                     >
-                      Choose A Plan To View FAQs:
-                    </label>
-                    <select
-                      id="rv-faq-select"
-                      className={qcStyles.faqDropdown}
-                      value={clampedFaqTab}
-                      onChange={e => setActiveFaqTab(Number(e.target.value))}
-                    >
-                      {faqSources.map((item, ti) => (
-                        <option key={ti} value={ti}>
-                          {getItemDisplayName(item)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className={qcStyles.faqsLayoutGrid}>
-                    <div className={qcStyles.faqsSidebar}>
-                      {faqSources.map((item, ti) => (
-                        <button
-                          key={ti}
-                          className={`${qcStyles.faqTabButton} ${clampedFaqTab === ti ? qcStyles.faqTabButtonActive : ''}`}
-                          onClick={() => setActiveFaqTab(ti)}
-                        >
-                          {getItemDisplayName(item)}
-                        </button>
-                      ))}
-                    </div>
+                      Frequently Asked Questions
+                    </h2>
                     <div className={qcStyles.faqsContainer}>
-                      {getFaqsForItem(faqSources[clampedFaqTab]).map(
+                      {getFaqsForItem(faqSources[0]).map(
                         (
                           faq: { question: string; answer: string },
                           fi: number
@@ -1802,50 +2335,109 @@ export function ReviewStep({
                         )
                       )}
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+                  </>
+                ) : (
+                  <>
+                    <h2
+                      className={`${qcStyles.faqsTitle} ${styles.faqsTitleOverride}`}
+                    >
+                      Frequently Asked Questions
+                    </h2>
+                    <div className={qcStyles.faqDropdownContainer}>
+                      <label
+                        htmlFor="rv-faq-select"
+                        className={qcStyles.faqDropdownLabel}
+                      >
+                        Choose A Plan To View FAQs:
+                      </label>
+                      <select
+                        id="rv-faq-select"
+                        className={qcStyles.faqDropdown}
+                        value={clampedFaqTab}
+                        onChange={e => setActiveFaqTab(Number(e.target.value))}
+                      >
+                        {faqSources.map((item, ti) => (
+                          <option key={ti} value={ti}>
+                            {getItemDisplayName(item)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className={qcStyles.faqsLayoutGrid}>
+                      <div className={qcStyles.faqsSidebar}>
+                        {faqSources.map((item, ti) => (
+                          <button
+                            key={ti}
+                            className={`${qcStyles.faqTabButton} ${clampedFaqTab === ti ? qcStyles.faqTabButtonActive : ''}`}
+                            onClick={() => setActiveFaqTab(ti)}
+                          >
+                            {getItemDisplayName(item)}
+                          </button>
+                        ))}
+                      </div>
+                      <div className={qcStyles.faqsContainer}>
+                        {getFaqsForItem(faqSources[clampedFaqTab]).map(
+                          (
+                            faq: { question: string; answer: string },
+                            fi: number
+                          ) => (
+                            <FaqItem key={fi} faq={faq} />
+                          )
+                        )}
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
-          {/* Notes */}
-          {notes && (
-            <div className={styles.notesSection}>
-              <p className={styles.notesLabel}>Inspector Notes</p>
-              <p className={styles.notesText}>{notes}</p>
-            </div>
-          )}
+            {/* Notes */}
+            {notes && (
+              <div className={styles.notesSection}>
+                <p className={styles.notesLabel}>Inspector Notes</p>
+                <p className={styles.notesText}>{notes}</p>
+              </div>
+            )}
 
-          {/* Error */}
-          {errorMsg && <p className={styles.errorMsg}>{errorMsg}</p>}
+            {/* Error */}
+            {errorMsg && <p className={styles.errorMsg}>{errorMsg}</p>}
 
-          {/* Email capture */}
-          {showEmailInput && (
-            <div className={styles.emailCapture}>
-              <input
-                type="email"
-                className={styles.emailInput}
-                value={enteredEmail}
-                onChange={e => setEnteredEmail(e.target.value)}
-                placeholder="customer@example.com"
-              />
-              <button
-                type="button"
-                className={styles.emailSendBtn}
-                disabled={!enteredEmail.trim() || isBusy}
-                onClick={handleSendQuote}
-              >
-                Send
-              </button>
-            </div>
-          )}
+            {/* Email capture */}
+            {showEmailInput && (
+              <div className={styles.emailCapture}>
+                <input
+                  type="email"
+                  className={styles.emailInput}
+                  value={enteredEmail}
+                  onChange={e => setEnteredEmail(e.target.value)}
+                  placeholder="customer@example.com"
+                />
+                <button
+                  type="button"
+                  className={styles.emailSendBtn}
+                  disabled={!enteredEmail.trim() || isBusy}
+                  onClick={handleSendQuote}
+                >
+                  Send
+                </button>
+              </div>
+            )}
 
-          <div className={styles.actionSpacer} />
+            <div className={styles.actionSpacer} />
+          </div>
         </div>
 
         {/* ── Sticky action bar ── */}
         <div className={styles.stickyActions}>
           <div className={styles.stickyActionsInner}>
+            <button
+              type="button"
+              className={styles.scheduleBtn}
+              onClick={handleSendQuote}
+              disabled={isBusy}
+            >
+              {actionState === 'sending' ? 'Sending…' : 'Send Quote'}
+            </button>
             <button
               type="button"
               className={styles.sendBtn}
@@ -1865,14 +2457,6 @@ export function ReviewStep({
               {actionState === 'scheduling'
                 ? 'Scheduling…'
                 : 'Schedule Service'}
-            </button>
-            <button
-              type="button"
-              className={styles.scheduleBtn}
-              onClick={handleSendQuote}
-              disabled={isBusy}
-            >
-              {actionState === 'sending' ? 'Sending…' : 'Send Quote'}
             </button>
           </div>
         </div>
@@ -1910,9 +2494,7 @@ export function ReviewStep({
 
             {/* Section 1: Preferred day & time */}
             <div className={styles.sigSection}>
-              <p className={styles.sigSectionLabel}>
-                Preferred Day &amp; Time
-              </p>
+              <p className={styles.sigSectionLabel}>Preferred Day &amp; Time</p>
               <div className={styles.sigDateRow}>
                 <select
                   className={styles.sigDateInput}
@@ -1932,8 +2514,12 @@ export function ReviewStep({
                   onChange={e => setPreferredTime(e.target.value)}
                 >
                   <option value="">No preference</option>
-                  {getEnabledTimeOptions(branding?.time_options || DEFAULT_TIME_OPTIONS).map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  {getEnabledTimeOptions(
+                    branding?.time_options || DEFAULT_TIME_OPTIONS
+                  ).map(opt => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
                   ))}
                 </select>
               </div>

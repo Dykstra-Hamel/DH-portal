@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, ArrowLeft } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@/hooks/useUser';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -19,7 +19,7 @@ import {
   getPlottedPests,
 } from './steps/MapPlotStep';
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
-import type { QuoteLineItem } from './steps/QuoteBuildStep';
+import type { QuoteLineItem, AvailableDiscount } from './steps/QuoteBuildStep';
 import { ReviewStep } from './steps/ReviewStep';
 import styles from './ServiceWizard.module.scss';
 
@@ -71,10 +71,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     string | undefined
   >(undefined);
 
+  const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
+
   // Fetch brand primary color for stamp icons
   useEffect(() => {
     const companyId = selectedCompany?.id;
-    if (!companyId) return;
     fetch(`/api/companies/${companyId}/field-map-branding`)
       .then(r => (r.ok ? r.json() : null))
       .then(
@@ -91,6 +92,28 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             ? data.secondary_color
             : data.primary_color;
           if (primary) setBrandPrimaryColor(primary);
+        }
+      )
+      .catch(() => {});
+  }, [selectedCompany?.id]);
+
+  // Fetch pest icon map as soon as company is known
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
+    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}`)
+      .then(r => r.json())
+      .then(
+        (data: {
+          success: boolean;
+          data: { id: string; icon_svg: string }[];
+        }) => {
+          if (data.success && Array.isArray(data.data)) {
+            const iconMap: Record<string, string> = {};
+            for (const opt of data.data) {
+              if (opt.id && opt.icon_svg) iconMap[opt.id] = opt.icon_svg;
+            }
+            setPestIconMap(iconMap);
+          }
         }
       )
       .catch(() => {});
@@ -213,6 +236,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                 recurringCost:
                   item.final_recurring_price ?? item.recurring_price ?? null,
                 frequency: item.billing_frequency ?? null,
+                isSelected: item.is_selected ?? true,
               };
             })
           );
@@ -223,6 +247,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           setMaxStepReached(2);
         }
 
+        if (quoteData?.data?.applied_discount) {
+          setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+        }
+        setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+        setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
         setLeadId(directLeadId);
         if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
       } finally {
@@ -316,7 +345,18 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               });
             }
 
-            const lineItems: any[] = quoteData?.data?.line_items ?? [];
+            const lineItems: any[] = (quoteData?.data?.line_items ?? [])
+              .slice()
+              .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+            const quoteStatus: string =
+              quoteData?.data?.quote_status ?? 'draft';
+
+            if (quoteData?.data?.applied_discount) {
+              setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+            }
+            setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+            setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
+
             if (lineItems.length > 0) {
               setQuoteLineItems(
                 lineItems.map((item: any): QuoteLineItem => {
@@ -324,6 +364,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                     item.service_plan_id ??
                     item.addon_service_id ??
                     item.bundle_plan_id ??
+                    item.product_id ??
                     undefined;
                   const catalogItemKind: QuoteLineItem['catalogItemKind'] =
                     item.service_plan_id
@@ -332,29 +373,41 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                         ? 'addon'
                         : item.bundle_plan_id
                           ? 'bundle'
-                          : undefined;
+                          : item.product_id
+                            ? 'product'
+                            : undefined;
                   return {
                     id: item.id,
                     type: catalogItemId ? 'plan-addon' : 'custom',
                     catalogItemKind,
                     catalogItemId,
                     catalogItemName: item.plan_name,
+                    customName: item.plan_name,
                     coveredPestIds: [],
                     coveredPestLabels: [],
-                    initialCost:
-                      item.final_initial_price ?? item.initial_price ?? null,
-                    recurringCost:
-                      item.final_recurring_price ??
-                      item.recurring_price ??
-                      null,
+                    initialCost: item.initial_price ?? null,
+                    recurringCost: item.recurring_price ?? null,
                     frequency: item.billing_frequency ?? null,
+                    parentLineItemId: item.parent_line_item_id ?? undefined,
+                    quantity: item.quantity ?? null,
+                    isRecommended: item.is_recommended === null ? undefined : item.is_recommended,
+                    isSelected: item.is_selected ?? true,
                   };
                 })
               );
-              setCurrentStep(4);
-              setMaxStepReached(4);
+              if (quoteStatus !== 'draft') {
+                setCurrentStep(4);
+                setMaxStepReached(4);
+              } else {
+                setCurrentStep(3);
+                setMaxStepReached(3);
+              }
+            } else if (quoteData?.data?.id) {
+              // Quote record exists but no items → user already reached the Quote step
+              setCurrentStep(3);
+              setMaxStepReached(3);
             } else {
-              // Lead exists but no quote items — resume at Map step
+              // No quote record at all — resume at Map step
               setCurrentStep(2);
               setMaxStepReached(2);
             }
@@ -373,17 +426,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     loadStopData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>(() => [
-    {
-      id: crypto.randomUUID(),
-      type: 'plan-addon',
-      coveredPestIds: [],
-      coveredPestLabels: [],
-      initialCost: null,
-      recurringCost: null,
-      frequency: 'monthly',
-    },
-  ]);
+  const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
+  const [appliedDiscount, setAppliedDiscount] =
+    useState<AvailableDiscount | null>(null);
+  const [quoteSubtotalInitial, setQuoteSubtotalInitial] = useState<number | null>(null);
+  const [quoteTotalInitial, setQuoteTotalInitial] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] =
     useState(false);
@@ -469,9 +516,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           leadId,
           companyId: selectedCompany?.id ?? '',
           quoteLineItems,
-          discountTarget: 'initial',
-          discountAmount: null,
-          discountType: '$',
+          discountTarget: appliedDiscount?.applies_to_price ?? 'initial',
+          discountAmount: appliedDiscount?.discount_value ?? null,
+          discountType:
+            appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
+          discountId: appliedDiscount?.id ?? null,
         }),
       })
         .then(r => r.json())
@@ -485,7 +534,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [quoteLineItems, currentStep, leadId]);
+  }, [quoteLineItems, appliedDiscount, currentStep, leadId]);
 
   function canAdvance(): boolean {
     switch (currentStep) {
@@ -579,6 +628,26 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Failed to save inspection');
         setLeadId(data.leadId);
+
+        // Create an empty draft quote as a breadcrumb that step 3 was reached
+        if (!returnToReviewAfterMapEdit && !quoteId) {
+          const qRes = await fetch('/api/field-map/save-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              leadId: data.leadId,
+              companyId: selectedCompany?.id ?? '',
+              quoteLineItems: [],
+              discountTarget: appliedDiscount?.applies_to_price ?? 'initial',
+              discountAmount: appliedDiscount?.discount_value ?? null,
+              discountType:
+                appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
+              quoteStatus: 'draft',
+            }),
+          });
+          const qData = await qRes.json();
+          if (qRes.ok && qData.quoteId) setQuoteId(qData.quoteId);
+        }
       } catch (err) {
         setStepSaveError(
           err instanceof Error ? err.message : 'Failed to save inspection'
@@ -603,6 +672,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         setStepSaveError('No lead found. Please go back to the photos step.');
         return;
       }
+      // Cancel any pending debounced auto-save to prevent a race condition
+      if (autoSaveTimerRef.current) {
+        clearTimeout(autoSaveTimerRef.current);
+        autoSaveTimerRef.current = null;
+      }
       setIsSavingStep(true);
       try {
         const res = await fetch('/api/field-map/save-quote', {
@@ -612,14 +686,19 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             leadId,
             companyId: selectedCompany?.id ?? '',
             quoteLineItems,
-            discountTarget: 'initial',
-            discountAmount: null,
-            discountType: '$',
+            discountTarget: appliedDiscount?.applies_to_price ?? 'initial',
+            discountAmount: appliedDiscount?.discount_value ?? null,
+            discountType:
+              appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
+            discountId: appliedDiscount?.id ?? null,
+            quoteStatus: 'quoted',
           }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Failed to save quote');
         setQuoteId(data.quoteId);
+        setQuoteSubtotalInitial(data.subtotalInitialPrice ?? null);
+        setQuoteTotalInitial(data.totalInitialPrice ?? null);
       } catch (err) {
         setStepSaveError(
           err instanceof Error ? err.message : 'Failed to save quote'
@@ -662,9 +741,15 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             clientName={clientInfo.name}
             clientEmail={clientInfo.email}
             clientPhone={clientInfo.phone}
-            onClientNameChange={v => setClientInfo(prev => ({ ...prev, name: v }))}
-            onClientEmailChange={v => setClientInfo(prev => ({ ...prev, email: v }))}
-            onClientPhoneChange={v => setClientInfo(prev => ({ ...prev, phone: v }))}
+            onClientNameChange={v =>
+              setClientInfo(prev => ({ ...prev, name: v }))
+            }
+            onClientEmailChange={v =>
+              setClientInfo(prev => ({ ...prev, email: v }))
+            }
+            onClientPhoneChange={v =>
+              setClientInfo(prev => ({ ...prev, phone: v }))
+            }
             companyId={selectedCompany?.id ?? ''}
           />
         );
@@ -691,6 +776,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               onNext={handleNext}
               canNext={canAdvance()}
               companyId={selectedCompany?.id ?? ''}
+              onPestOptionsLoaded={setPestIconMap}
             />
           </div>
         );
@@ -703,6 +789,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               plottedPests={plottedPests}
               companyId={selectedCompany?.id ?? ''}
               mapMeasurements={mapMeasurements}
+              pestIconMap={pestIconMap}
+              selectedDiscount={appliedDiscount}
+              onDiscountChange={setAppliedDiscount}
             />
           </div>
         );
@@ -724,6 +813,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             companyId={selectedCompany?.id ?? ''}
             leadId={leadId}
             quoteId={quoteId}
+            pestIconMap={pestIconMap}
+            plottedPests={plottedPests}
+            appliedDiscount={appliedDiscount}
+            quoteSubtotalInitial={quoteSubtotalInitial}
+            quoteTotalInitial={quoteTotalInitial}
             onBack={handleBack}
           />
         );
@@ -819,7 +913,21 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       </div>
 
       {/* Step content */}
-      <div className={styles.stepContent}>{renderStepContent()}</div>
+      <div className={styles.stepContent}>
+        {isSavingStep ? (
+          <div className={styles.geocodingState}>
+            <div className={styles.geocodingSpinner} />
+            <p>
+              {currentStep === 0 && 'Saving address\u2026'}
+              {currentStep === 1 && 'Saving photos\u2026'}
+              {currentStep === 2 && 'Saving inspection\u2026'}
+              {currentStep === 3 && 'Saving quote\u2026'}
+            </p>
+          </div>
+        ) : (
+          renderStepContent()
+        )}
+      </div>
 
       {/* Address step footer */}
       {currentStep === 0 && (
@@ -833,7 +941,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             onClick={handleBack}
             aria-label="Previous step"
           >
-            Go Back
+            <ArrowLeft size={18} className={styles.prevArrow} />
+            Previous
           </button>
           <button
             type="button"
@@ -857,9 +966,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             className={styles.prevBtn}
             onClick={handleBack}
             aria-label="Previous step"
-            disabled={isSavingStep}
           >
-            Go Back
+            <ArrowLeft size={18} className={styles.prevArrow} />
+            Previous
           </button>
           <button
             type="button"

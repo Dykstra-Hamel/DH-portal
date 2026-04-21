@@ -23,7 +23,7 @@ export async function GET(
     // Use admin client so plan_pest_coverage rows are readable regardless of RLS policy gaps
     const supabase = createAdminClient();
 
-    // Fetch all active service plans for the company, including pest coverage
+    // Fetch all active service plans for the company, including pest coverage and linked products
     const { data: plans, error } = await supabase
       .from('service_plans')
       .select(`
@@ -36,6 +36,12 @@ export async function GET(
             name,
             slug
           )
+        ),
+        service_plan_products (
+          product_id
+        ),
+        service_plan_recommended_addons (
+          addon_id
         )
       `)
       .eq('company_id', companyId)
@@ -58,7 +64,11 @@ export async function GET(
         pest_name: coverage.pest_types?.name ?? '',
         pest_slug: coverage.pest_types?.slug ?? null,
       })),
+      plan_product_ids: (plan.service_plan_products ?? []).map((r: any) => r.product_id as string),
+      recommended_addon_ids: (plan.service_plan_recommended_addons ?? []).map((r: any) => r.addon_id as string),
       plan_pest_coverage: undefined,
+      service_plan_products: undefined,
+      service_plan_recommended_addons: undefined,
     }));
 
     return NextResponse.json({

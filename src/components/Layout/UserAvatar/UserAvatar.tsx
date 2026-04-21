@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { User, Settings, LogOut, Shield } from 'lucide-react';
+import { User, Settings, LogOut, Shield, Download } from 'lucide-react';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { createClient } from '@/lib/supabase/client';
 import { User as SupabaseUser } from '@supabase/supabase-js';
 import { getAvatarColor } from '@/lib/avatarColor';
@@ -25,7 +26,9 @@ export function UserAvatar() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [loading, setLoading] = useState(true);
   const [avatarError, setAvatarError] = useState(false);
+  const [showIOSInstructions, setShowIOSInstructions] = useState(false);
   const router = useRouter();
+  const { isIOS, showInstallButton, handleInstall } = usePWAInstall();
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -85,6 +88,13 @@ export function UserAvatar() {
         break;
       case 'admin':
         router.push('/admin');
+        break;
+      case 'install-app':
+        if (isIOS) {
+          setShowIOSInstructions(true);
+        } else {
+          handleInstall();
+        }
         break;
       case 'signout':
         handleSignOut();
@@ -215,6 +225,16 @@ export function UserAvatar() {
             </div>
 
             <div className={styles.dropdownContent}>
+              {showInstallButton && (
+                <button
+                  className={`${styles.dropdownItem} ${styles.installButton}`}
+                  onClick={() => handleDropdownAction('install-app')}
+                >
+                  <Download size={16} />
+                  <span>Install App</span>
+                </button>
+              )}
+
               <button
                 className={styles.dropdownItem}
                 onClick={() => handleDropdownAction('profile')}
@@ -255,6 +275,23 @@ export function UserAvatar() {
             </div>
           </div>
         </>
+      )}
+      {showIOSInstructions && (
+        <div className={styles.iosModal} onClick={() => setShowIOSInstructions(false)}>
+          <div className={styles.iosModalCard} onClick={(e) => e.stopPropagation()}>
+            <p className={styles.iosModalTitle}>Install App</p>
+            <p className={styles.iosModalInstructions}>
+              Tap the <span className={styles.iosShareIcon}>⬆</span> <strong>Share</strong> icon
+              in Safari&apos;s toolbar, then select <strong>&ldquo;Add to Home Screen&rdquo;</strong>.
+            </p>
+            <button
+              className={styles.iosModalClose}
+              onClick={() => setShowIOSInstructions(false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );
