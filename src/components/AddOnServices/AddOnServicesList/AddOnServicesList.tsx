@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import Image from 'next/image';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import styles from './AddOnServicesList.module.scss';
 import { AddOnService } from '@/types/addon-service';
+import ConfirmationModal from '@/components/Common/ConfirmationModal/ConfirmationModal';
 
 interface AddOnServicesListProps {
   companyId: string;
@@ -21,6 +21,8 @@ export default function AddOnServicesList({
 }: AddOnServicesListProps) {
   const [addons, setAddons] = useState<AddOnService[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     fetchAddons();
@@ -40,113 +42,107 @@ export default function AddOnServicesList({
     }
   };
 
-  const handleDelete = async (addonId: string) => {
-    if (
-      !confirm(
-        'Are you sure you want to delete this add-on service? This action cannot be undone.'
-      )
-    ) {
-      return;
-    }
+  const filteredAddons = addons
+    .filter(addon =>
+      addon.addon_name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => a.addon_name.localeCompare(b.addon_name));
 
-    onDelete(addonId);
-  };
+  if (loading) {
+    return <div className={styles.loading}>Loading add-on services...</div>;
+  }
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h2>Add-On Services</h2>
-        <button onClick={onAdd} className={styles.addButton}>
-          <Plus size={16} />
-          Add New Add-On
-        </button>
-      </div>
-
-      {loading ? (
-        <div className={styles.loading}>
-          <div className={styles.spinner} />
-          <p>Loading add-on services...</p>
-        </div>
-      ) : addons.length === 0 ? (
+      {addons.length === 0 ? (
         <div className={styles.emptyState}>
           <p>No add-on services created yet.</p>
-          <button onClick={onAdd} className={styles.addButton}>
+          <button onClick={onAdd} className={styles.createButton}>
             <Plus size={16} />
             Create Your First Add-On
           </button>
         </div>
       ) : (
-        <div className={styles.grid}>
-          {addons.map(addon => (
-            <div key={addon.id} className={styles.card}>
-              {addon.addon_image_url && (
-                <div className={styles.cardImage}>
-                  <Image
-                    src={addon.addon_image_url}
-                    alt={addon.addon_name}
-                    width={200}
-                    height={200}
-                    quality={85}
-                  />
-                </div>
-              )}
+        <>
+          <div className={styles.filterBar}>
+            <input
+              type="text"
+              placeholder="Search add-ons..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className={styles.searchInput}
+            />
+            <button onClick={onAdd} className={styles.createButton}>
+              <Plus size={16} />
+              Add New Add-On
+            </button>
+          </div>
 
-              <div className={styles.cardBody}>
-                <div className={styles.cardHeader}>
-                  <h3>{addon.addon_name}</h3>
+          <div className={styles.table}>
+            <div className={styles.tableHeader}>
+              <div>Name</div>
+              <div>Category</div>
+              <div>Pricing</div>
+              <div>Eligibility</div>
+              <div>Status</div>
+              <div>Actions</div>
+            </div>
+
+            {filteredAddons.length === 0 ? (
+              <div className={styles.noResults}>No add-ons match your search.</div>
+            ) : filteredAddons.map(addon => (
+              <div key={addon.id} className={styles.tableRow}>
+                <div className={styles.addonName}>
+                  {addon.addon_name}
                   {addon.highlight_badge && (
                     <span className={styles.badge}>{addon.highlight_badge}</span>
                   )}
                 </div>
-
-                {addon.addon_description && (
-                  <p className={styles.description}>{addon.addon_description}</p>
-                )}
-
+                <div>{addon.addon_category || '—'}</div>
                 <div className={styles.pricing}>
-                  {addon.initial_price && (
-                    <span className={styles.initialPrice}>
-                      ${addon.initial_price} initial
-                    </span>
+                  {addon.initial_price != null && (
+                    <div>${addon.initial_price} initial</div>
                   )}
-                  <span className={styles.recurringPrice}>
-                    ${addon.recurring_price}/{addon.billing_frequency}
+                  <div>${addon.recurring_price} / {addon.billing_frequency}</div>
+                </div>
+                <div>
+                  <span className={`${styles.eligibility} ${addon.eligibility_mode === 'all' ? styles.eligibilityAll : styles.eligibilitySpecific}`}>
+                    {addon.eligibility_mode === 'all' ? 'All plans' : 'Limited'}
                   </span>
                 </div>
-
-                <div className={styles.eligibility}>
-                  {addon.eligibility_mode === 'all' ? (
-                    <span className={styles.eligibilityAll}>
-                      ✓ Available for all service plans
-                    </span>
-                  ) : (
-                    <span className={styles.eligibilitySpecific}>
-                      ⓘ Limited availability
-                    </span>
-                  )}
+                <div>
+                  <span className={`${styles.statusIndicator} ${addon.is_active ? styles.active : styles.inactive}`}>
+                    {addon.is_active ? 'Active' : 'Inactive'}
+                  </span>
                 </div>
-
                 <div className={styles.actions}>
-                  <button
-                    onClick={() => onEdit(addon)}
-                    className={styles.editButton}
-                  >
-                    <Edit size={16} />
+                  <button onClick={() => onEdit(addon)} className={styles.editButton}>
                     Edit
                   </button>
-                  <button
-                    onClick={() => handleDelete(addon.id)}
-                    className={styles.deleteButton}
-                  >
-                    <Trash2 size={16} />
+                  <button onClick={() => setPendingDeleteId(addon.id)} className={styles.deleteButton}>
                     Delete
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        </>
       )}
+
+      <ConfirmationModal
+        isOpen={!!pendingDeleteId}
+        title="Delete Add-On Service"
+        message="Are you sure you want to delete this add-on service? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            onDelete(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

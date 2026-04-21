@@ -55,14 +55,6 @@ export default function AddOnServicesManager({
 
   return (
     <div className={styles.manager}>
-      <div className={styles.header}>
-        <h2>Add-On Services</h2>
-        <p>
-          Manage add-on services that customers can purchase alongside base
-          service plans.
-        </p>
-      </div>
-
       <AddOnServicesList
         key={refreshKey}
         companyId={companyId}
