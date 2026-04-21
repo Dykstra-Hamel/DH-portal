@@ -176,7 +176,7 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
 
     try {
       setErrorMessage(null);
-      const response = await fetch(`/api/admin/service-plans/${planId}`, {
+      const response = await fetch(`/api/admin/service-plans/${companyId}?id=${planId}`, {
         method: 'DELETE',
       });
 
