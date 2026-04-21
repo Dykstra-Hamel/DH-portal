@@ -113,12 +113,12 @@
   padding: 20px 34px;
   margin-top: 8px;
 
-  @media (max-width: 992px) {
-    justify-content: flex-start;
+  @media (max-width: 768px) {
+    justify-content: center;
     flex-wrap: wrap;
     gap: 16px;
     padding: 16px 20px;
-    text-align: left;
+    text-align: center;
   }
 }
 
@@ -253,6 +253,7 @@
 .heroPestsLabel {
   font-size: 14px;
   font-weight: 700;
+  text-align: center;
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--gray-700);
@@ -371,6 +372,7 @@
   font-size: 14px;
   font-weight: 600;
   font-family: var(--secondary-font, var(--primary-font));
+  color: var(--brand-secondary);
   cursor: pointer;
   white-space: nowrap;
   transition: all 0.15s ease;
@@ -431,6 +433,7 @@
 
   h3 {
     margin: 0;
+    color: var(--brand-secondary);
   }
 }
 
@@ -701,12 +704,12 @@
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--gray-300);
-  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  padding: 12px 34px calc(12px + env(safe-area-inset-bottom, 0px));
   z-index: 10;
 }
 
 .stickyActionsInner {
-  max-width: 1215px;
+  max-width: 750px;
   margin: 0 auto;
   display: flex;
   gap: 12px;
@@ -718,7 +721,7 @@
   background: var(--brand-primary);
   color: var(--gray-25);
   border: none;
-  border-radius: 30px;
+  border-radius: 4px;
   font-size: 16px;
   font-weight: 700;
   font-family: var(--primary-font);
@@ -744,9 +747,9 @@
   flex: 1;
   padding: 15px 20px;
   background: var(--gray-25);
-  color: var(--brand-primary);
-  border: 2px solid var(--brand-primary);
-  border-radius: 30px;
+  color: var(--brand-secondary);
+  border: 2px solid var(--brand-secondary);
+  border-radius: 4px;
   font-size: 16px;
   font-weight: 700;
   font-family: var(--primary-font);
@@ -755,7 +758,7 @@
   letter-spacing: -0.2px;
 
   &:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand-primary) 8%, white);
+    background: color-mix(in srgb, var(--brand-secondary) 8%, white);
   }
   &:active:not(:disabled) {
     transform: scale(0.98);
@@ -1189,14 +1192,19 @@
   font-size: 12px !important;
   padding-top: 3px !important;
   padding-bottom: 3px !important;
-  color: #6b7280;
+  margin-left: 30px;
+  color: var(--gray-700);
+
+  @media (max-width: 768px) {
+    margin-left: 24px;
+  }
 }
 
 /* Shrinks the checkbox for total addon rows */
 .totalAddonCheckbox span {
-  width: 22px !important;
-  height: 22px !important;
-  border-radius: 3px !important;
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 2px !important;
   background-size: 12px 10px !important;
 }
 
@@ -1286,13 +1294,44 @@
   display: block;
 }
 
-/* ── Video thumbnail full-width in right column ── */
-.planVideoThumbnailRight {
-  width: 100% !important;
-  height: auto !important;
-  aspect-ratio: 16 / 9;
-  border-radius: 8px;
+/* ── Video callout button ── */
+.planVideoCallout {
+  display: flex;
+  align-items: center;
+  width: 100%;
   margin-top: 12px;
+  border-radius: 10px;
+  background: #e8edf7;
+  border: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  gap: 16px;
+  text-align: left;
+
+  &:hover {
+    background: #dce4f3;
+  }
+}
+
+.planVideoCalloutText {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  font-family: var(--secondary-font, var(--primary-font));
+  line-height: 27px;
+  text-align: center;
+}
+
+.planVideoCalloutPlay {
+  flex-shrink: 0;
+  width: 131px;
+  height: 79px;
+  background: var(--brand-secondary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ── Recommended add-on button row ── */
@@ -1366,16 +1405,25 @@
 
 .planCardAddonBtnCheck {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  width: 18px;
-  height: 18px;
+  top: -12px;
+  right: -12px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
-  background: var(--brand-secondary);
+  background: var(--gray-25);
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid #fff;
+
+  svg {
+    circle {
+      fill: var(--gray-25);
+    }
+
+    path {
+      fill: var(--brand-secondary);
+    }
+  }
 }
 
 .planCardAddonBtnPrice {
@@ -1384,4 +1432,49 @@
   font-weight: 400;
   color: var(--gray-500);
   font-family: var(--secondary-font, var(--primary-font));
+}
+
+.discountAppliedRow {
+  color: var(--gray-700);
+  font-size: 16px;
+
+  div {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+
+  strong {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+}
+
+/* ── Additional Services We Offer section ── */
+.additionalServicesSection {
+  margin-bottom: 32px;
+}
+
+.additionalServicePrice {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-800);
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  sup {
+    font-size: 12px;
+  }
+}
+
+.additionalServicePriceNumber {
+  font-size: 20px;
+}
+
+.additionalServicesHeading {
+  font-size: 24px !important;
+  font-weight: 700;
+  font-family: var(--primary-font);
+  color: var(--gray-800) !important;
+  margin: 0 0 16px;
 }

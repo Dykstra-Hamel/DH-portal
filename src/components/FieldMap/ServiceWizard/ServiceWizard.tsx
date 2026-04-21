@@ -220,6 +220,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                 recurringCost:
                   item.final_recurring_price ?? item.recurring_price ?? null,
                 frequency: item.billing_frequency ?? null,
+                isSelected: item.is_selected ?? true,
               };
             })
           );
@@ -230,6 +231,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           setMaxStepReached(2);
         }
 
+        if (quoteData?.data?.applied_discount) {
+          setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+        }
+        setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+        setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
         setLeadId(directLeadId);
         if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
       } finally {
@@ -332,6 +338,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             if (quoteData?.data?.applied_discount) {
               setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
             }
+            setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+            setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
 
             if (lineItems.length > 0) {
               setQuoteLineItems(
@@ -367,6 +375,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                     parentLineItemId: item.parent_line_item_id ?? undefined,
                     quantity: item.quantity ?? null,
                     isRecommended: item.is_recommended === null ? undefined : item.is_recommended,
+                    isSelected: item.is_selected ?? true,
                   };
                 })
               );
@@ -404,6 +413,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
   const [appliedDiscount, setAppliedDiscount] =
     useState<AvailableDiscount | null>(null);
+  const [quoteSubtotalInitial, setQuoteSubtotalInitial] = useState<number | null>(null);
+  const [quoteTotalInitial, setQuoteTotalInitial] = useState<number | null>(null);
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] =
     useState(false);
@@ -670,6 +681,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error ?? 'Failed to save quote');
         setQuoteId(data.quoteId);
+        setQuoteSubtotalInitial(data.subtotalInitialPrice ?? null);
+        setQuoteTotalInitial(data.totalInitialPrice ?? null);
       } catch (err) {
         setStepSaveError(
           err instanceof Error ? err.message : 'Failed to save quote'
@@ -786,6 +799,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             quoteId={quoteId}
             pestIconMap={pestIconMap}
             plottedPests={plottedPests}
+            appliedDiscount={appliedDiscount}
+            quoteSubtotalInitial={quoteSubtotalInitial}
+            quoteTotalInitial={quoteTotalInitial}
             onBack={handleBack}
           />
         );

@@ -53,6 +53,8 @@ export interface QuoteLineItem {
   // For recommended add-ons: true = inspector highlighted, false = auto-added but not highlighted
   // undefined = not a recommended add-on slot (inspector manually added from Additional Recommendations)
   isRecommended?: boolean;
+  // DB-persisted selection state; undefined for freshly-built in-memory items
+  isSelected?: boolean;
 }
 
 export interface PlottedPest {
@@ -173,17 +175,21 @@ export function getQuoteTotals(lineItems: QuoteLineItem[]): {
   totalRecurring: number;
   recurringByFrequency: RecurringByFrequency[];
 } {
-  const totalInitial = lineItems.reduce(
+  // Exclude addons where isSelected === false (auto-added but not confirmed by inspector).
+  // They store a computed cost for display but should not contribute to totals until selected.
+  const billableItems = lineItems.filter(item => item.isSelected !== false);
+
+  const totalInitial = billableItems.reduce(
     (sum, item) => sum + (item.initialCost ?? 0),
     0
   );
-  const totalRecurring = lineItems.reduce(
+  const totalRecurring = billableItems.reduce(
     (sum, item) => sum + (item.recurringCost ?? 0),
     0
   );
 
   const freqMap = new Map<string, number>();
-  for (const item of lineItems) {
+  for (const item of billableItems) {
     if ((item.recurringCost ?? 0) === 0) continue;
     const key = item.frequency ?? 'unspecified';
     freqMap.set(key, (freqMap.get(key) ?? 0) + (item.recurringCost ?? 0));
@@ -1435,9 +1441,32 @@ export function QuoteBuildStep({
   }
 
   function updateItem(id: string, patch: Partial<QuoteLineItem>) {
-    onChange(
-      lineItems.map(item => (item.id === id ? { ...item, ...patch } : item))
+    const updatedItems = lineItems.map(item =>
+      item.id === id ? { ...item, ...patch } : item
     );
+
+    // When parent initialCost changes, recompute all percentage-priced child addons
+    if ('initialCost' in patch && patch.initialCost != null) {
+      const newParentCost = patch.initialCost;
+      const cascaded = updatedItems.map(item => {
+        if (item.parentLineItemId !== id) return item;
+        const catalogAddon = addonCatalog.find(a => a.id === item.catalogItemId);
+        if (!catalogAddon?.percentagePricing) return item;
+        const { percentage, years = 1, minimum = 0 } = catalogAddon.percentagePricing;
+        const computed = Math.max((percentage / 100) * newParentCost * years, minimum);
+        return {
+          ...item,
+          initialCost: computed,
+          percentageJobCost: newParentCost,
+          percentagePricingNote: `${percentage}% of $${newParentCost.toLocaleString('en-US')}${years > 1 ? ` × ${years} yrs` : ''} = $${computed.toFixed(2)}`,
+          is_custom_priced: true,
+          custom_initial_price: computed,
+        };
+      });
+      onChange(cascaded);
+    } else {
+      onChange(updatedItems);
+    }
   }
 
   function removeItem(id: string) {
@@ -1870,6 +1899,25 @@ export function QuoteBuildStep({
       if (!addon) continue;
       const resolvedFrequency = addon.billingFrequency ?? 'monthly';
       const isAddonOneTime = resolvedFrequency === 'one-time';
+
+      // Compute percentage pricing using parent plan's cost as the job cost
+      let resolvedInitial = addon.initialPrice ?? null;
+      let addonPercentageJobCost: number | null = null;
+      let addonPercentagePricingNote: string | null = null;
+      let addonIsCustomPriced = false;
+      let addonCustomInitialPrice: number | null = null;
+
+      if (addon.percentagePricing && (primaryItem.initialCost ?? 0) > 0) {
+        const { percentage, years = 1, minimum = 0 } = addon.percentagePricing;
+        const jobCost = primaryItem.initialCost!;
+        const computed = Math.max((percentage / 100) * jobCost * years, minimum);
+        resolvedInitial = computed;
+        addonPercentageJobCost = jobCost;
+        addonPercentagePricingNote = `${percentage}% of $${jobCost.toLocaleString('en-US')}${years > 1 ? ` × ${years} yrs` : ''} = $${computed.toFixed(2)}`;
+        addonIsCustomPriced = true;
+        addonCustomInitialPrice = computed;
+      }
+
       newItems.push({
         id: crypto.randomUUID(),
         type: 'plan-addon',
@@ -1879,17 +1927,18 @@ export function QuoteBuildStep({
         isPrimary: false,
         coveredPestIds: addon.pestCoverageIds,
         coveredPestLabels: [],
-        initialCost: addon.initialPrice,
+        initialCost: resolvedInitial,
         recurringCost: addon.recurringPrice,
         frequency: isAddonOneTime ? 'one-time' : resolvedFrequency,
         selectedVariantLabel: null,
         quantity: null,
-        percentageJobCost: null,
-        percentagePricingNote: null,
-        is_custom_priced: false,
-        custom_initial_price: null,
+        percentageJobCost: addonPercentageJobCost,
+        percentagePricingNote: addonPercentagePricingNote,
+        is_custom_priced: addonIsCustomPriced,
+        custom_initial_price: addonCustomInitialPrice,
         parentLineItemId: primaryItem.id,
         isRecommended: modalAddonIds.has(addonId), // true = inspector highlighted, false = auto-added
+        isSelected: false, // all recommended addons start unselected
       });
     }
 
@@ -1900,6 +1949,25 @@ export function QuoteBuildStep({
       if (!addon) continue;
       const resolvedFrequency = addon.billingFrequency ?? 'monthly';
       const isAddonOneTime = resolvedFrequency === 'one-time';
+
+      // Compute percentage pricing using parent plan's cost as the job cost
+      let resolvedInitial = addon.initialPrice ?? null;
+      let addonPercentageJobCost: number | null = null;
+      let addonPercentagePricingNote: string | null = null;
+      let addonIsCustomPriced = false;
+      let addonCustomInitialPrice: number | null = null;
+
+      if (addon.percentagePricing && (primaryItem.initialCost ?? 0) > 0) {
+        const { percentage, years = 1, minimum = 0 } = addon.percentagePricing;
+        const jobCost = primaryItem.initialCost!;
+        const computed = Math.max((percentage / 100) * jobCost * years, minimum);
+        resolvedInitial = computed;
+        addonPercentageJobCost = jobCost;
+        addonPercentagePricingNote = `${percentage}% of $${jobCost.toLocaleString('en-US')}${years > 1 ? ` × ${years} yrs` : ''} = $${computed.toFixed(2)}`;
+        addonIsCustomPriced = true;
+        addonCustomInitialPrice = computed;
+      }
+
       newItems.push({
         id: crypto.randomUUID(),
         type: 'plan-addon',
@@ -1909,17 +1977,18 @@ export function QuoteBuildStep({
         isPrimary: false,
         coveredPestIds: addon.pestCoverageIds,
         coveredPestLabels: [],
-        initialCost: addon.initialPrice,
+        initialCost: resolvedInitial,
         recurringCost: addon.recurringPrice,
         frequency: isAddonOneTime ? 'one-time' : resolvedFrequency,
         selectedVariantLabel: null,
         quantity: null,
-        percentageJobCost: null,
-        percentagePricingNote: null,
-        is_custom_priced: false,
-        custom_initial_price: null,
+        percentageJobCost: addonPercentageJobCost,
+        percentagePricingNote: addonPercentagePricingNote,
+        is_custom_priced: addonIsCustomPriced,
+        custom_initial_price: addonCustomInitialPrice,
         parentLineItemId: primaryItem.id,
         // isRecommended left undefined — non-recommended inspector addition
+        isSelected: true,
       });
     }
 
@@ -2164,7 +2233,7 @@ export function QuoteBuildStep({
         <div className={styles.lineItemsList}>
           {serviceCards.map((item, index) => {
             const children = lineItems.filter(
-              i => i.parentLineItemId === item.id
+              i => i.parentLineItemId === item.id && i.isSelected !== false
             );
             const aggInitial =
               (item.initialCost ?? 0) +

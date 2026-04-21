@@ -19,6 +19,7 @@ interface QuoteLineItem {
   quantity?: number | null;
   // true = inspector highlighted, false = auto-added recommended, undefined = not a recommended slot
   isRecommended?: boolean;
+  isSelected?: boolean;
 }
 
 function getLineItemLabel(item: QuoteLineItem): string {
@@ -90,9 +91,10 @@ export async function POST(request: NextRequest) {
 
     // Line items
     const lineItems: QuoteLineItem[] = Array.isArray(quoteLineItems) ? quoteLineItems : [];
+    const billableItems = lineItems.filter(item => item.isSelected !== false);
 
-    const totalInitial = lineItems.reduce((s, i) => s + (i.initialCost ?? 0), 0);
-    const totalRecurring = lineItems.reduce(
+    const totalInitial = billableItems.reduce((s, i) => s + (i.initialCost ?? 0), 0);
+    const totalRecurring = billableItems.reduce(
       (s, i) => s + toMonthlyEquivalent(i.frequency, i.recurringCost ?? 0),
       0
     );
@@ -261,7 +263,12 @@ export async function POST(request: NextRequest) {
       .update({ estimated_value: adjustedInitial > 0 ? adjustedInitial : (totalInitial > 0 ? totalInitial : null) })
       .eq('id', leadId);
 
-    return NextResponse.json({ success: true, quoteId });
+    return NextResponse.json({
+      success: true,
+      quoteId,
+      subtotalInitialPrice: totalInitial,
+      totalInitialPrice: adjustedInitial,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Internal server error';
     return NextResponse.json({ error: message }, { status: 500 });

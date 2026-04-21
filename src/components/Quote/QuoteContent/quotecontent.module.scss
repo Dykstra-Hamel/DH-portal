@@ -103,19 +103,23 @@
 }
 
 .contentArea {
-  max-width: 1215px;
   width: 100%;
   background: var(--gray-75);
   margin: 0 auto;
-  padding: 40px 40px 0;
+  padding: 40px 34px 0;
   display: flex;
   flex-direction: column;
   position: relative;
   padding-bottom: 80px;
 
   @media (width <= 480px) {
-    padding: 20px;
+    padding: 32px 20px;
   }
+}
+
+.contentAreaInner {
+  max-width: 750px;
+  margin: 0 auto;
 }
 
 .bottomButtonsWrapper {
@@ -228,13 +232,23 @@
   gap: 32px;
   padding: 24px 0;
 
-  @media (max-width: 768px) {
-    grid-template-columns: 1fr;
-    gap: 24px;
+  .planDescription {
+    grid-column: span 2;
   }
 
   @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 24px;
     padding: 0;
+
+    .planDescription {
+      order: 2;
+      grid-column: 1;
+    }
+
+    .planContentLeft {
+      margin-top: 16px;
+    }
   }
 }
 
@@ -242,12 +256,20 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
+
+  @media (max-width: 768px) {
+    order: 3;
+  }
 }
 
 .planContentRight {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  @media (max-width: 768px) {
+    order: 1;
+    margin-top: 16px;
+  }
 }
 
 .planImageWrapper {
@@ -258,12 +280,7 @@
   background: var(--gray-50);
   position: relative;
 
-  @media (width <= 768px) {
-    width: 100%;
-  }
-
   @media (max-width: 768px) {
-    display: none;
     width: 100%;
     min-height: 250px;
     border-radius: 8px;
@@ -424,6 +441,10 @@
     .planHeader {
       position: relative;
 
+      @media (max-width: 768px) {
+        padding: 20px;
+      }
+
       &::after {
         content: '';
         position: absolute;
@@ -434,6 +455,11 @@
         background: var(--gray-300);
         opacity: 0;
         transition: opacity 0.3s ease;
+
+        @media (max-width: 768px) {
+          left: 20px;
+          right: 20px;
+        }
 
         @media (max-width: 490px) {
           display: none;
@@ -458,7 +484,7 @@
   transition: all 0.3s;
   gap: 16px;
 
-  @media (max-width: 490px) {
+  @media (max-width: 768px) {
     position: relative;
     flex-wrap: wrap;
     justify-content: flex-start;
@@ -472,6 +498,7 @@
   font-size: 24px;
   font-weight: 700;
   color: var(--brand-secondary) !important;
+  font-family: var(--font-default) !important;
 
   @media (max-width: 490px) {
     font-size: 22px !important;
@@ -677,6 +704,7 @@
   display: flex;
   gap: 20px;
   align-items: flex-end;
+  font-family: var(--font-default);
 }
 
 // Left column - Recurring price
@@ -684,13 +712,13 @@
 .priceRecurring {
   display: block;
   position: relative;
-  font-size: 64px;
+  font-size: 44px;
   font-weight: 700;
-  color: var(--gray-700);
+  color: var(--gray-800);
   line-height: 105%;
 
   sup {
-    font-size: 40px;
+    font-size: 26px;
   }
 
   .priceAsterisk {
@@ -711,7 +739,7 @@
 }
 
 .priceFrequency {
-  font-size: 20px;
+  font-size: 14px;
   line-height: 1;
 
   @media (max-width: 640px) {
@@ -1095,6 +1123,12 @@
   margin-bottom: 32px;
   border-radius: 16px;
   border: 1px solid var(--gray-300);
+  font-family: var(--font-default);
+  background: #fff;
+
+  @media (max-width: 768px) {
+    padding: 20px;
+  }
 }
 
 .totalRow {
@@ -1110,6 +1144,11 @@
     padding-bottom: 10px;
   }
 
+  &:last-of-type {
+    border-top: 1px solid var(--gray-300);
+    margin-top: 10px;
+  }
+
   div {
     font-size: 18px;
     font-weight: 700;
@@ -1122,7 +1161,7 @@
 
   .totalItemPriceAmount {
     font-weight: 600;
-    color: var(--gray-400);
+    color: var(--gray-700);
     font-size: 14px;
   }
 
@@ -1182,11 +1221,15 @@
   font-size: 16px;
   line-height: 18px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--gray-700);
 }
 
 .totalItemUnselected {
   color: var(--gray-400);
+
+  .totalItemPriceAmount {
+    color: var(--gray-400);
+  }
 }
 
 .totalItemLeft {
@@ -1211,7 +1254,7 @@
 .totalItemPriceRecurring {
   font-size: 14px;
   font-weight: 600;
-  color: var(--gray-400);
+  color: var(--gray-700);
   white-space: nowrap;
 }
 
@@ -1222,7 +1265,7 @@
     font-size: 14px;
     font-weight: 600;
     line-height: 18px;
-    color: var(--gray-400);
+    color: var(--gray-700);
   }
 }
 
@@ -1231,14 +1274,14 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 18px;
-    color: var(--gray-400);
+    color: var(--gray-700);
   }
 }
 
 .totalItemPriceInitial {
   font-size: 14px;
   font-weight: 500;
-  color: var(--gray-400);
+  color: var(--gray-700);
   white-space: nowrap;
 
   &::before {
@@ -1547,9 +1590,8 @@
 }
 
 .originalPriceText {
-  color: var(--gray-400);
   text-decoration: line-through;
-  font-size: 16px;
+  margin-right: 8px;
 }
 
 .discountAmount {
@@ -1716,7 +1758,7 @@
 }
 
 // Responsive design
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   .stepHeading {
     font-size: 28px;
   }
@@ -1947,7 +1989,7 @@
   max-width: 1215px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 40px;
+  padding: 40px;
   display: grid;
   position: relative;
   z-index: 1;
@@ -1966,6 +2008,7 @@
   display: flex;
   flex-direction: column;
   gap: 38px;
+  margin-top: 24px;
 
   &.heroContentCompact {
     gap: 24px;
@@ -2970,8 +3013,8 @@
 }
 
 .addonCheckboxCustom {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border: 2px solid var(--gray-300);
   border-radius: 4px;
   background: white;
