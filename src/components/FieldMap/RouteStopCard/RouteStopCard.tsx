@@ -127,11 +127,6 @@ export function RouteStopCard({
           </div>
           <p className={styles.address}>{stop.address}</p>
         </div>
-        {stop.serviceType && !isTechnicianOnly && (
-          <div className={styles.serviceTypeMid}>
-            <span className={styles.serviceTypeChip}>{stop.serviceType}</span>
-          </div>
-        )}
         <div className={styles.chevronBtn}>
           <svg
             xmlns="http://www.w3.org/2000/svg"

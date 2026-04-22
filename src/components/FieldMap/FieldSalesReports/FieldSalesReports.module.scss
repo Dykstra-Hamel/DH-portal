@@ -347,15 +347,28 @@
 }
 
 .listItemLink {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  text-align: left;
   display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
   color: inherit;
   text-decoration: none;
+  cursor: pointer;
 
   &:active {
     opacity: 0.8;
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: wait;
   }
 }
 

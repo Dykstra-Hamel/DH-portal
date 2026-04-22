@@ -44,7 +44,7 @@ export function FieldSalesNav() {
     } else if (isInspector) {
       router.push('/field-sales/field-map/new');
     } else {
-      router.push('/field-sales/tech-leads/new?fresh=1&type=new-lead');
+      router.push('/field-sales/tech-leads/new?type=new-lead');
     }
   };
 
@@ -91,7 +91,7 @@ export function FieldSalesNav() {
               className={styles.sheetOption}
               onClick={() => {
                 setShowPopup(false);
-                router.push('/field-sales/tech-leads/new?fresh=1');
+                router.push('/field-sales/tech-leads/new');
               }}
             >
               <span className={styles.sheetOptionIcon}>
