@@ -1,6 +1,13 @@
 'use client';
 
-import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  Suspense,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -38,12 +45,16 @@ function FieldSalesDashboardInner() {
   );
   const { profile, user } = useUser();
   const { setPageHeader } = usePageActions();
-  const { counts, newItemIndicators, clearNewItemIndicator } = useRealtimeCounts();
+  const { counts, newItemIndicators, clearNewItemIndicator } =
+    useRealtimeCounts();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('route');
   const [routeStops, setRouteStops] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
-  const [sliderStyle, setSliderStyle] = useState<{ left: number; width: number } | null>(null);
+  const [sliderStyle, setSliderStyle] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [createTaskTrigger, setCreateTaskTrigger] = useState(0);
@@ -90,10 +101,8 @@ function FieldSalesDashboardInner() {
   // Set page header
   useEffect(() => {
     if (!profile) return;
-    const firstName = profile.first_name || 'Your';
-    const title = isTechnicianOnly
-      ? `${firstName}'s Tech Dashboard`
-      : `${firstName}'s Sales Dashboard`;
+    const firstName = `${profile.first_name}'s` || 'Your';
+    const title = `${firstName} Dashboard`;
     setPageHeader({ title, description: '' });
     return () => {
       setPageHeader(null);
@@ -106,7 +115,9 @@ function FieldSalesDashboardInner() {
     const today = new Date().toISOString().split('T')[0];
     fetch(`/api/field-map/route?date=${today}&companyId=${selectedCompany.id}`)
       .then(r => (r.ok ? r.json() : null))
-      .then(d => setRouteStops(d && Array.isArray(d.stops) ? d.stops.length : 0))
+      .then(d =>
+        setRouteStops(d && Array.isArray(d.stops) ? d.stops.length : 0)
+      )
       .catch(() => setRouteStops(0));
   }, [selectedCompany?.id]);
 
@@ -218,7 +229,9 @@ function FieldSalesDashboardInner() {
             )}
 
             <button
-              ref={el => { tabRefs.current[TAB_ORDER.indexOf('route')] = el; }}
+              ref={el => {
+                tabRefs.current[TAB_ORDER.indexOf('route')] = el;
+              }}
               type="button"
               className={`${styles.tab} ${activeTab === 'route' ? styles.tabActive : ''}`}
               onClick={() => handleTabClick('route')}
@@ -229,7 +242,9 @@ function FieldSalesDashboardInner() {
 
             {isTechnicianOnly && (
               <button
-                ref={el => { tabRefs.current[TAB_ORDER.indexOf('opportunities')] = el; }}
+                ref={el => {
+                  tabRefs.current[TAB_ORDER.indexOf('opportunities')] = el;
+                }}
                 type="button"
                 className={`${styles.tab} ${activeTab === 'opportunities' ? styles.tabActive : ''}`}
                 onClick={() => handleTabClick('opportunities')}
@@ -241,7 +256,9 @@ function FieldSalesDashboardInner() {
 
             {!isTechnicianOnly && (
               <button
-                ref={el => { tabRefs.current[TAB_ORDER.indexOf('leads')] = el; }}
+                ref={el => {
+                  tabRefs.current[TAB_ORDER.indexOf('leads')] = el;
+                }}
                 type="button"
                 className={`${styles.tab} ${activeTab === 'leads' ? styles.tabActive : ''}`}
                 onClick={() => handleTabClick('leads')}
@@ -257,7 +274,9 @@ function FieldSalesDashboardInner() {
 
             {!isTechnicianOnly && (
               <button
-                ref={el => { tabRefs.current[TAB_ORDER.indexOf('actions')] = el; }}
+                ref={el => {
+                  tabRefs.current[TAB_ORDER.indexOf('actions')] = el;
+                }}
                 type="button"
                 className={`${styles.tab} ${activeTab === 'actions' ? styles.tabActive : ''}`}
                 onClick={() => handleTabClick('actions')}
@@ -273,7 +292,9 @@ function FieldSalesDashboardInner() {
 
             {!isTechnicianOnly && (
               <button
-                ref={el => { tabRefs.current[TAB_ORDER.indexOf('tasks')] = el; }}
+                ref={el => {
+                  tabRefs.current[TAB_ORDER.indexOf('tasks')] = el;
+                }}
                 type="button"
                 className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
                 onClick={() => handleTabClick('tasks')}
@@ -286,7 +307,6 @@ function FieldSalesDashboardInner() {
                 </span>
               </button>
             )}
-
           </div>
 
           {/* Mobile dropdown — visible only under 768px */}
@@ -379,33 +399,39 @@ function FieldSalesDashboardInner() {
             </div>
           )}
 
-          {activeTab === 'actions' && !isTechnicianOnly && user && selectedCompany && (
-            <div className={styles.panelSection}>
-              <ActionsAutomationsPanel
-                companyId={selectedCompany.id}
-                userId={user.id}
-              />
-            </div>
-          )}
-
-          {activeTab === 'tasks' && !isTechnicianOnly && user && selectedCompany && (
-            <div className={styles.panelSection}>
-              <div className={styles.tasksHeader}>
-                <button
-                  type="button"
-                  className={styles.createTaskBtn}
-                  onClick={() => setCreateTaskTrigger(t => t + 1)}
-                >
-                  + Create Task
-                </button>
+          {activeTab === 'actions' &&
+            !isTechnicianOnly &&
+            user &&
+            selectedCompany && (
+              <div className={styles.panelSection}>
+                <ActionsAutomationsPanel
+                  companyId={selectedCompany.id}
+                  userId={user.id}
+                />
               </div>
-              <AdditionalTasksPanel
-                companyId={selectedCompany.id}
-                userId={user.id}
-                externalCreateTrigger={createTaskTrigger}
-              />
-            </div>
-          )}
+            )}
+
+          {activeTab === 'tasks' &&
+            !isTechnicianOnly &&
+            user &&
+            selectedCompany && (
+              <div className={styles.panelSection}>
+                <div className={styles.tasksHeader}>
+                  <button
+                    type="button"
+                    className={styles.createTaskBtn}
+                    onClick={() => setCreateTaskTrigger(t => t + 1)}
+                  >
+                    + Create Task
+                  </button>
+                </div>
+                <AdditionalTasksPanel
+                  companyId={selectedCompany.id}
+                  userId={user.id}
+                  externalCreateTrigger={createTaskTrigger}
+                />
+              </div>
+            )}
         </div>
 
         <FieldSalesNav />

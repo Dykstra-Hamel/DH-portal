@@ -118,7 +118,7 @@
   align-items: center;
   justify-content: center;
   min-width: 20px;
-  height: 20px;
+  height: 21px;
   background: var(--gray-400);
   border-radius: 999px;
   color: var(--white, #fff);
@@ -127,11 +127,11 @@
   font-weight: 700;
   line-height: 1;
   white-space: nowrap;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
 }
 
 .tabCountNew {
-  background: #fb2c36;
+  background: var(--error-600);
 }
 
 // ─── Mobile dropdown (replaces tab bar under 768px) ──────────────────────────
