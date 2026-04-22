@@ -118,13 +118,13 @@
 
 .stepWrapper {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding-bottom: 80px;
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
 }
 
 .stepWrapperNoScroll {
   overflow: hidden;
-  padding-bottom: 0;
   min-height: 0;
 }
 
@@ -810,18 +810,25 @@
 // ─── Action Bar ───────────────────────────────────────────────────────────────
 
 .actionBar {
-  position: sticky;
-  bottom: 0;
+  position: fixed;
   left: 0;
   right: 0;
+  bottom: 0;
+  z-index: 10;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  background: var(--white);
+  border-top: 1px solid var(--border-color);
+}
+
+.actionBarButtons {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  background: var(--white);
-  border-top: 1px solid var(--border-color);
-  flex-shrink: 0;
 }
 
 .backBtn {
@@ -896,131 +903,6 @@
   padding: 0;
   font: inherit;
   margin-left: 0.25rem;
-}
-
-// ─── Thank You Screen ────────────────────────────────────────────────────────
-
-.thankYouScreen {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  padding: 32px 24px;
-  text-align: center;
-  gap: 16px;
-  background: var(--white);
-}
-
-.thankYouIcon {
-  color: var(--green-500);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.thankYouTitle {
-  font-size: 26px;
-  font-weight: 700;
-  color: var(--gray-900);
-  margin: 0;
-  font-family: var(--font-default);
-}
-
-.thankYouDesc {
-  font-size: 16px;
-  color: var(--gray-500);
-  margin: 0;
-  font-family: var(--font-default);
-}
-
-.scheduleCallout {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  width: 100%;
-}
-
-.scheduleCalloutText {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--gray-800);
-  margin: 0;
-  font-family: var(--font-default);
-}
-
-.scheduleCallBtn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  width: 100%;
-  padding: 18px 16px;
-  background: var(--green-500);
-  color: var(--white);
-  border-radius: var(--border-radius-lg);
-  text-decoration: none;
-  font-size: 18px;
-  font-weight: 700;
-  font-family: var(--font-default);
-  transition: background 0.15s ease, transform 0.1s ease;
-
-  &:hover { background: var(--green-600); }
-  &:active { transform: scale(0.98); }
-}
-
-.schedulePhoneDisplay {
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--gray-800);
-  margin: 0;
-  font-family: var(--font-default);
-  letter-spacing: 0.02em;
-}
-
-.thankYouActions {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  width: 100%;
-  margin-top: 16px;
-}
-
-.primaryBtn {
-  width: 100%;
-  min-height: 52px;
-  background: var(--blue-500);
-  color: var(--white);
-  border: none;
-  border-radius: var(--border-radius-md);
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: var(--font-default);
-
-  &:hover {
-    background: var(--blue-600);
-  }
-}
-
-.secondaryBtn {
-  width: 100%;
-  min-height: 52px;
-  background: var(--gray-100);
-  color: var(--gray-600);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 0.15s;
-  font-family: var(--font-default);
-
-  &:hover {
-    background: var(--gray-200);
-  }
 }
 
 // ─── Loading / Empty States ───────────────────────────────────────────────────

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { getCustomerDisplayName } from '@/lib/display-utils';
+import { formatAge } from '@/lib/date-utils';
 import { DataTable, ColumnDefinition, CardViewConfig } from '@/components/Common/DataTable';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
@@ -57,17 +58,6 @@ interface FieldSalesLead {
   is_viewed?: boolean;
 }
 
-function formatTimeInQueue(createdAt: string): string {
-  const now = new Date().getTime();
-  const created = new Date(createdAt).getTime();
-  const diffMs = now - created;
-  const diffMinutes = Math.floor(diffMs / (1000 * 60));
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-  if (diffMinutes < 60) return `${diffMinutes}m`;
-  if (diffHours < 24) return `${diffHours}h ${diffMinutes % 60}m`;
-  return `${diffDays}d`;
-}
 
 function getAddressText(lead: FieldSalesLead): string {
   const c = lead.customer;
@@ -167,7 +157,7 @@ const BASE_COLUMNS: ColumnDefinition<FieldSalesLead>[] = [
     title: 'In Queue',
     sortable: false,
     render: (lead) => (
-      <span className={styles.queueTime}>{formatTimeInQueue(lead.created_at)}</span>
+      <span className={styles.queueTime}>{formatAge(lead.created_at)}</span>
     ),
   },
   {
@@ -289,7 +279,7 @@ function buildSimpleCardViewConfig(
       key: 'age',
       label: 'Age',
       width: '64px',
-      render: lead => formatTimeInQueue(lead.created_at),
+      render: lead => formatAge(lead.created_at),
     },
     {
       key: 'name',
@@ -329,7 +319,8 @@ function buildSimpleCardViewConfig(
 function buildSummaryCardViewConfig(
   companyId: string,
   viewedIds: Set<string>,
-  markViewed: (leadId: string) => void
+  markViewed: (leadId: string) => void,
+  isMobile: boolean
 ): CardViewConfig<FieldSalesLead> {
   const renderSummaryAvatar = (lead: FieldSalesLead) => {
     const u = lead.assigned_user;
@@ -367,46 +358,79 @@ function buildSummaryCardViewConfig(
     );
   };
 
+  const getLocation = (lead: FieldSalesLead): string => {
+    const primary = lead.customer?.customer_service_addresses?.find(
+      a => a.is_primary_address
+    );
+    return (
+      primary?.service_address?.city ?? lead.customer?.city ?? 'Unknown'
+    );
+  };
+
+  const desktopTopFields: CardViewConfig<FieldSalesLead>['topFields'] = [
+    {
+      key: 'age',
+      label: 'Age',
+      width: '56px',
+      render: lead => formatAge(lead.created_at),
+    },
+    {
+      key: 'name',
+      label: 'Client Name',
+      width: 'minmax(0, 2fr)',
+      render: lead => getCustomerDisplayName(lead.customer as any) ?? 'Unknown',
+    },
+    {
+      key: 'location',
+      label: 'Location',
+      width: 'minmax(0, 2fr)',
+      render: getLocation,
+    },
+    {
+      key: 'format',
+      label: 'Format',
+      width: 'minmax(0, 1fr)',
+      render: lead => lead.lead_type ?? '—',
+    },
+    {
+      key: 'source',
+      label: 'Source',
+      width: 'minmax(0, 1fr)',
+      render: lead => lead.lead_source ?? '—',
+    },
+  ];
+
+  const mobileTopFields: CardViewConfig<FieldSalesLead>['topFields'] = [
+    {
+      key: 'age',
+      label: 'Age',
+      width: '48px',
+      render: lead => formatAge(lead.created_at),
+    },
+    {
+      key: 'name',
+      label: 'Client Name',
+      width: 'minmax(0, 1.4fr)',
+      render: lead => getCustomerDisplayName(lead.customer as any) ?? 'Unknown',
+    },
+    {
+      key: 'details',
+      label: 'Details',
+      width: 'minmax(0, 1.2fr)',
+      render: lead => (
+        <div className={styles.detailsStack}>
+          <span>{getLocation(lead)}</span>
+          <span>{lead.lead_type ?? '—'}</span>
+          <span>{lead.lead_source ?? '—'}</span>
+        </div>
+      ),
+    },
+  ];
+
+  const topFields = isMobile ? mobileTopFields : desktopTopFields;
+
   return {
-    topFields: [
-      {
-        key: 'age',
-        label: 'Age',
-        width: '56px',
-        render: lead => formatTimeInQueue(lead.created_at),
-      },
-      {
-        key: 'name',
-        label: 'Client Name',
-        width: 'minmax(0, 2fr)',
-        render: lead => getCustomerDisplayName(lead.customer as any) ?? 'Unknown',
-      },
-      {
-        key: 'location',
-        label: 'Location',
-        width: 'minmax(0, 2fr)',
-        render: lead => {
-          const primary = lead.customer?.customer_service_addresses?.find(
-            a => a.is_primary_address
-          );
-          return (
-            primary?.service_address?.city ?? lead.customer?.city ?? 'Unknown'
-          );
-        },
-      },
-      {
-        key: 'format',
-        label: 'Format',
-        width: 'minmax(0, 1fr)',
-        render: lead => lead.lead_type ?? '—',
-      },
-      {
-        key: 'source',
-        label: 'Source',
-        width: 'minmax(0, 1fr)',
-        render: lead => lead.lead_source ?? '—',
-      },
-    ],
+    topFields,
     summary: {
       label: 'Summary:',
       render: lead => lead.comments?.trim() || 'No Details available.',
@@ -554,15 +578,30 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
     ? '80px 200px 1fr 180px 1fr'
     : '80px 200px 1fr 180px 140px 1fr';
 
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 767px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const cardViewConfig = useMemo(() => {
     if (activeTab === 'new') {
-      return buildSummaryCardViewConfig(companyId, viewedIds, markViewed);
+      return buildSummaryCardViewConfig(
+        companyId,
+        viewedIds,
+        markViewed,
+        isMobile
+      );
     }
     return buildSimpleCardViewConfig(
       companyId,
       activeTab === 'my' ? nextTasks : undefined
     );
-  }, [activeTab, companyId, viewedIds, markViewed, nextTasks]);
+  }, [activeTab, companyId, viewedIds, markViewed, nextTasks, isMobile]);
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery.trim()) return leads;

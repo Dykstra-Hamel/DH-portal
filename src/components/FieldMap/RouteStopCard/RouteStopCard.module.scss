@@ -19,8 +19,7 @@
 }
 
 .infoRow {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr) auto;
+  display: flex;
   align-items: center;
   gap: 16px;
   padding: 16px;
@@ -29,6 +28,7 @@
 .serviceTypeMid {
   display: flex;
   align-items: center;
+  flex-shrink: 0;
   min-width: 0;
   padding: 0 4px;
 }
@@ -192,4 +192,19 @@
   display: block;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
+}
+
+@media (max-width: 767px) {
+  .time,
+  .clientName,
+  .address,
+  .status,
+  .serviceTypeChip,
+  .serviceType {
+    font-size: 12px;
+  }
+
+  .inspectionOverlay {
+    font-size: 9px;
+  }
 }

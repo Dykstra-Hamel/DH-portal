@@ -127,7 +127,7 @@ export function RouteStopCard({
           </div>
           <p className={styles.address}>{stop.address}</p>
         </div>
-        {stop.serviceType && (
+        {stop.serviceType && !isTechnicianOnly && (
           <div className={styles.serviceTypeMid}>
             <span className={styles.serviceTypeChip}>{stop.serviceType}</span>
           </div>
@@ -151,6 +151,7 @@ export function RouteStopCard({
         </div>
       </div>
       {imageSrc &&
+        !isTechnicianOnly &&
         (stop.housePhotoUrl && imageSrc === stop.housePhotoUrl ? (
           <div
             className={styles.houseImageWrap}

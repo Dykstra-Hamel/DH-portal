@@ -129,6 +129,100 @@
   background: #fb2c36;
 }
 
+// ─── Mobile dropdown (replaces tab bar under 768px) ──────────────────────────
+
+.mobileTabSelect {
+  display: none;
+  position: relative;
+  background: #ebebeb;
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.mobileTabTrigger {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 40px;
+  border: none;
+  background: var(--gray-20, #fafafa);
+  border-radius: 4px;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 0 12px 0 rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.mobileTabChevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  transition: transform 0.2s ease;
+}
+
+.mobileTabChevronOpen {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.mobileTabMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 8px 24px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobileTabMenuItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .tabBar {
+    display: none;
+  }
+
+  .mobileTabSelect {
+    display: block;
+  }
+}
+
 // ─── Content Area ─────────────────────────────────────────────────────────────
 
 .contentArea {

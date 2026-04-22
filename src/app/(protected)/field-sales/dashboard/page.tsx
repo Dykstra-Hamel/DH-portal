@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
@@ -12,12 +13,22 @@ import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsD
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
 import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
 import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
-import AdditionalTasksPanel from '@/components/Tasks/AdditionalTasksPanel/AdditionalTasksPanel';
+import { Toast } from '@/components/Common/Toast';
 import styles from './dashboard.module.scss';
 
-type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions' | 'tasks';
+type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions';
 
 export default function FieldSalesDashboard() {
+  return (
+    <Suspense fallback={null}>
+      <FieldSalesDashboardInner />
+    </Suspense>
+  );
+}
+
+function FieldSalesDashboardInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const { selectedCompany, isAdmin } = useCompany();
   const { departments } = useUserDepartments(
@@ -25,15 +36,33 @@ export default function FieldSalesDashboard() {
     selectedCompany?.id ?? ''
   );
   const { profile, user } = useUser();
-  const { setPageHeader, registerPageAction, unregisterPageAction } = usePageActions();
+  const { setPageHeader } = usePageActions();
   const { counts, newItemIndicators, clearNewItemIndicator } = useRealtimeCounts();
 
   const [activeTab, setActiveTab] = useState<DashboardTab>('route');
   const [routeStops, setRouteStops] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
-  const [createTrigger, setCreateTrigger] = useState(0);
   const [sliderStyle, setSliderStyle] = useState<{ left: number; width: number } | null>(null);
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
+  const mobileDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Show a success toast after returning from a TechLeads wizard submission.
+  useEffect(() => {
+    const submitted = searchParams.get('submitted');
+    if (submitted !== 'new-lead' && submitted !== 'upsell') return;
+    setSuccessToast(
+      submitted === 'upsell'
+        ? 'Opportunity submitted successfully'
+        : 'Lead submitted successfully'
+    );
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('submitted');
+    const qs = params.toString();
+    router.replace(`/field-sales/dashboard${qs ? `?${qs}` : ''}`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const supabase = createClient();
@@ -51,8 +80,8 @@ export default function FieldSalesDashboard() {
   const TAB_ORDER = useMemo<DashboardTab[]>(
     () =>
       isTechnicianOnly
-        ? ['route', 'opportunities', 'tasks']
-        : ['route', 'leads', 'actions', 'tasks'],
+        ? ['route', 'opportunities']
+        : ['route', 'leads', 'actions'],
     [isTechnicianOnly]
   );
 
@@ -68,14 +97,6 @@ export default function FieldSalesDashboard() {
       setPageHeader(null);
     };
   }, [profile, isTechnicianOnly, setPageHeader]);
-
-  // Register add action when tasks tab is active
-  useEffect(() => {
-    if (activeTab === 'tasks') {
-      registerPageAction('add', () => setCreateTrigger(prev => prev + 1));
-      return () => unregisterPageAction('add');
-    }
-  }, [activeTab, registerPageAction, unregisterPageAction]);
 
   // Fetch route stops count
   useEffect(() => {
@@ -132,14 +153,46 @@ export default function FieldSalesDashboard() {
 
   const handleTabClick = (tab: DashboardTab) => {
     setActiveTab(tab);
+    setMobileDropdownOpen(false);
     if (tab === 'actions') clearNewItemIndicator('my_actions');
-    if (tab === 'tasks') clearNewItemIndicator('my_tasks');
     if (tab === 'leads' || tab === 'opportunities')
       clearNewItemIndicator('my_leads');
   };
 
-  // Regular (non-action) tasks = total active - actions
-  const regularTasksCount = Math.max(0, counts.my_tasks - counts.my_actions);
+  useEffect(() => {
+    if (!mobileDropdownOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (
+        mobileDropdownRef.current &&
+        !mobileDropdownRef.current.contains(e.target as Node)
+      ) {
+        setMobileDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [mobileDropdownOpen]);
+
+  const tabConfig: Record<
+    DashboardTab,
+    { label: string; count: number; isNew?: boolean }
+  > = {
+    route: { label: 'My Route', count: routeStops },
+    leads: {
+      label: 'My Leads & Sales',
+      count: counts.my_leads,
+      isNew: newItemIndicators.my_leads,
+    },
+    opportunities: {
+      label: 'My Opportunities',
+      count: opportunitiesCount,
+    },
+    actions: {
+      label: 'My Actions',
+      count: counts.my_actions,
+      isNew: newItemIndicators.my_actions,
+    },
+  };
 
   // Inspector / Admin / Technician view (with tabs)
   if (isTechnicianOnly || isInspector) {
@@ -210,19 +263,70 @@ export default function FieldSalesDashboard() {
               </button>
             )}
 
+          </div>
+
+          {/* Mobile dropdown — visible only under 768px */}
+          <div className={styles.mobileTabSelect} ref={mobileDropdownRef}>
             <button
-              ref={el => { tabRefs.current[TAB_ORDER.indexOf('tasks')] = el; }}
               type="button"
-              className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
-              onClick={() => handleTabClick('tasks')}
+              className={styles.mobileTabTrigger}
+              onClick={() => setMobileDropdownOpen(prev => !prev)}
+              aria-haspopup="listbox"
+              aria-expanded={mobileDropdownOpen}
             >
-              <span className={styles.tabLabel}>My Tasks</span>
+              <span className={styles.tabLabel}>
+                {tabConfig[activeTab].label}
+              </span>
               <span
-                className={`${styles.tabCount} ${newItemIndicators.my_tasks ? styles.tabCountNew : ''}`}
+                className={`${styles.tabCount} ${tabConfig[activeTab].isNew ? styles.tabCountNew : ''}`}
               >
-                {regularTasksCount}
+                {tabConfig[activeTab].count}
+              </span>
+              <span
+                className={`${styles.mobileTabChevron} ${mobileDropdownOpen ? styles.mobileTabChevronOpen : ''}`}
+                aria-hidden="true"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                >
+                  <path
+                    d="M6 7.77734L10 12.2218L14 7.77734"
+                    stroke="#6A7282"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
               </span>
             </button>
+
+            {mobileDropdownOpen && (
+              <div className={styles.mobileTabMenu} role="listbox">
+                {TAB_ORDER.filter(t => t !== activeTab).map(tab => (
+                  <button
+                    key={tab}
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    className={styles.mobileTabMenuItem}
+                    onClick={() => handleTabClick(tab)}
+                  >
+                    <span className={styles.tabLabel}>
+                      {tabConfig[tab].label}
+                    </span>
+                    <span
+                      className={`${styles.tabCount} ${tabConfig[tab].isNew ? styles.tabCountNew : ''}`}
+                    >
+                      {tabConfig[tab].count}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -259,19 +363,16 @@ export default function FieldSalesDashboard() {
               />
             </div>
           )}
-
-          {activeTab === 'tasks' && user && selectedCompany && (
-            <div className={styles.panelSection}>
-              <AdditionalTasksPanel
-                companyId={selectedCompany.id}
-                userId={user.id}
-                externalCreateTrigger={createTrigger}
-              />
-            </div>
-          )}
         </div>
 
         <FieldSalesNav />
+        <Toast
+          message={successToast ?? ''}
+          isVisible={!!successToast}
+          onClose={() => setSuccessToast(null)}
+          type="success"
+          centered
+        />
       </div>
     );
   }
@@ -280,6 +381,12 @@ export default function FieldSalesDashboard() {
   return (
     <div className={styles.wrapper}>
       <FieldSalesNav />
+      <Toast
+        message={successToast ?? ''}
+        isVisible={!!successToast}
+        onClose={() => setSuccessToast(null)}
+        type="success"
+      />
     </div>
   );
 }

@@ -5,6 +5,66 @@
   padding-bottom: 16px;
 }
 
+// ─── Details column (mobile summary view) ────────────────────────────────────
+
+.detailsStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--gray-800, #252c37);
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span + span {
+    color: var(--gray-500, #6b7280);
+    font-size: 12px;
+  }
+}
+
+// ─── Mobile bottom row — stack summary, then avatar + action on one line ─────
+
+@media (max-width: 767px) {
+  .container [data-card-section='top'] {
+    align-items: flex-start;
+  }
+
+  .container [data-card-section='separator'] {
+    display: none;
+  }
+
+  .container [data-card-section='bottom'] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .container [data-card-section='summary'] {
+    flex: 1 1 100%;
+    flex-basis: 100%;
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .container [data-card-section='bottom-middle'] {
+    flex: 1 1 auto;
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .container [data-card-section='bottom-action'] {
+    margin-left: auto;
+    grid-column: auto;
+  }
+}
+
 // ─── Address Cell ─────────────────────────────────────────────────────────────
 
 .addressCell {
