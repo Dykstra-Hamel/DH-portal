@@ -4,14 +4,14 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--white);
+  background: var(--gray-25);
   font-family: var(--font-default);
 }
 
 // ─── Progress Bar ────────────────────────────────────────────────────────────
 
 .progressSection {
-  background: var(--white);
+  background: var(--gray-25);
   border-bottom: 1px solid var(--border-color);
   flex-shrink: 0;
 }
@@ -395,15 +395,13 @@
   padding: 16px;
   background: var(--white);
   border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-lg);
+  border-radius: 4px;
   font-size: 15px;
   font-weight: 500;
   color: var(--gray-700);
   cursor: pointer;
   font-family: var(--font-default);
-  transition:
-    background 0.15s,
-    border-color 0.15s;
+  transition: all 0.15s;
 
   svg {
     color: var(--blue-500);
@@ -831,46 +829,55 @@
   gap: 12px;
 }
 
-.backBtn {
-  min-height: 48px;
-  padding: 0 20px;
-  background: var(--gray-100);
-  color: var(--gray-600);
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
-  font-size: 15px;
-  font-weight: 500;
+.prevBtn {
+  height: 48px;
+  border-radius: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--gray-300);
+  background: transparent;
+  color: var(--gray-700);
+  font-weight: 700;
+  font-size: 14px;
   cursor: pointer;
-  transition: background 0.15s;
-  font-family: var(--font-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 1;
+  max-width: 175px;
+  position: relative;
+  gap: 4px;
 
-  &:hover {
-    background: var(--gray-200);
+  .prevArrow {
+    color: var(--gray-400);
   }
 }
 
 .nextBtn {
-  flex: 1;
-  min-height: 48px;
-  background: var(--blue-500);
-  color: var(--white);
+  flex: none;
+  height: 48px;
+  padding: 0 24px;
+  min-width: 120px;
+  border-radius: 4px;
   border: none;
-  border-radius: var(--border-radius-md);
-  font-size: 16px;
+  background: var(--blue-600);
+  color: var(--white);
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
-  transition:
-    background 0.15s,
-    opacity 0.15s;
   font-family: var(--font-default);
+  white-space: nowrap;
+  flex-grow: 1;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
 
   &:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: not-allowed;
   }
 
-  &:not(:disabled):hover {
-    background: var(--blue-600);
+  &:active:not(:disabled) {
+    transform: scale(0.98);
   }
 }
 
@@ -1514,8 +1521,14 @@
 }
 
 @keyframes sheetSlideUp {
-  from { transform: translateY(100%); opacity: 0; }
-  to   { transform: translateY(0);    opacity: 1; }
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 .exitPromptTitle {
@@ -1549,8 +1562,12 @@
   font-family: var(--font-default);
   cursor: pointer;
 
-  &:hover { background: var(--blue-600); }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    background: var(--blue-600);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 }
 
 .exitDiscardBtn {
@@ -1566,8 +1583,12 @@
   font-family: var(--font-default);
   cursor: pointer;
 
-  &:hover { background: var(--error-200); }
-  &:active { transform: scale(0.98); }
+  &:hover {
+    background: var(--error-200);
+  }
+  &:active {
+    transform: scale(0.98);
+  }
 }
 
 .exitCancelBtn {
@@ -1581,5 +1602,7 @@
   font-family: var(--font-default);
   cursor: pointer;
 
-  &:hover { color: var(--gray-700); }
+  &:hover {
+    color: var(--gray-700);
+  }
 }

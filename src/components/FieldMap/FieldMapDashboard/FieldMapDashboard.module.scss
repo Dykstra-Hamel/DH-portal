@@ -110,6 +110,11 @@
   flex-direction: column;
 }
 
+.topSection,
+.upNextHeading {
+  padding: 0 24px;
+}
+
 // ─── Inline Street View (embedded mode) ───────────────────────────────────────
 
 .inlineStreetViewWrap {
@@ -142,7 +147,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 20px;
 }
 
@@ -153,6 +158,7 @@
   line-height: 24px;
   color: var(--gray-700);
   margin: 0;
+  white-space: nowrap;
 }
 
 .dateTrigger {
@@ -185,7 +191,7 @@
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
-  white-space: nowrap;
+  text-align: left;
 }
 
 .hiddenDateInput {
@@ -283,10 +289,22 @@
   color: #252c37;
 }
 
+.stopListContainerWrapper {
+  padding: 0 24px;
+
+  @media (width < 1200px) {
+    padding: 0;
+  }
+}
+
 .stopListContainer {
   border-radius: 8px;
-  background: #ebebeb;
-  padding: 15px;
+  background: var(--gray-100);
+  padding: 16px;
+
+  @media (width < 1200px) {
+    border-radius: 0;
+  }
 }
 
 .stopList {
