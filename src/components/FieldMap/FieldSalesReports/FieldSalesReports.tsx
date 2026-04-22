@@ -13,6 +13,10 @@ import {
   ClipboardList,
   Route as RouteIcon,
 } from 'lucide-react';
+import {
+  TechLeadDetailModal,
+  type TechLead,
+} from '@/components/TechLeads/TechLeadDetailModal/TechLeadDetailModal';
 import styles from './FieldSalesReports.module.scss';
 
 interface SparklinePoint {
@@ -176,6 +180,26 @@ export function FieldSalesReports({
   const [data, setData] = useState<ReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedLead, setSelectedLead] = useState<TechLead | null>(null);
+  const [leadLoading, setLeadLoading] = useState<string | null>(null);
+
+  const openLead = async (leadId: string) => {
+    if (leadLoading) return;
+    setLeadLoading(leadId);
+    try {
+      const res = await fetch(
+        `/api/tech-leads/leads?companyId=${companyId}&leadId=${leadId}`
+      );
+      if (res.ok) {
+        const json = await res.json();
+        if (json.lead) setSelectedLead(json.lead);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setLeadLoading(null);
+    }
+  };
 
   useEffect(() => {
     if (!companyId) return;
@@ -501,9 +525,11 @@ export function FieldSalesReports({
               <ul className={styles.list}>
                 {techLeads.recentLeads.map(lead => (
                   <li key={lead.id} className={styles.listItem}>
-                    <Link
-                      href={`/field-sales/leads/${lead.id}`}
+                    <button
+                      type="button"
+                      onClick={() => openLead(lead.id)}
                       className={styles.listItemLink}
+                      disabled={leadLoading === lead.id}
                     >
                       <div className={styles.listItemBody}>
                         <div className={styles.listItemTitle}>
@@ -537,13 +563,20 @@ export function FieldSalesReports({
                           {formatRelative(lead.createdAt)}
                         </span>
                       </div>
-                    </Link>
+                    </button>
                   </li>
                 ))}
               </ul>
             </div>
           )}
         </section>
+      )}
+
+      {selectedLead && (
+        <TechLeadDetailModal
+          lead={selectedLead}
+          onClose={() => setSelectedLead(null)}
+        />
       )}
     </div>
   );

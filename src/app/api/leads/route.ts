@@ -376,6 +376,7 @@ export async function POST(request: NextRequest) {
       mapPlotData,
       branchId,
       routeStopId,
+      techDiscussed,
     } = body;
 
     // Mutable assignment variables — may be updated by auto-assignment logic below
@@ -621,6 +622,8 @@ export async function POST(request: NextRequest) {
           assigned_to: assignedTo || null,
           submitted_by: submittedBy,
           branch_id: branchId ?? null,
+          tech_discussed:
+            leadSource === 'technician' ? !!techDiscussed : null,
           created_at: new Date().toISOString(),
         },
       ])
