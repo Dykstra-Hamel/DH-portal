@@ -9,7 +9,7 @@ import {
 import styles from './FieldMapDashboard.module.scss';
 
 function formatDateHeader(date: Date): string {
-  const weekday = date.toLocaleDateString('en-US', { weekday: 'long' });
+  const weekday = date.toLocaleDateString('en-US', { weekday: 'short' });
   const rest = date.toLocaleDateString('en-US', {
     month: 'long',
     day: 'numeric',

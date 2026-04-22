@@ -12,7 +12,7 @@
 
 .progressSection {
   background: var(--gray-25);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--gray-300);
   flex-shrink: 0;
 }
 
@@ -168,7 +168,7 @@
   padding: 24px 16px;
   min-height: 120px;
   background: var(--gray-50);
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--gray-300);
   border-radius: var(--border-radius-lg);
   cursor: pointer;
   transition:
@@ -196,7 +196,7 @@
   padding: 24px 16px;
   min-height: 120px;
   background: var(--gray-50);
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--gray-300);
   border-radius: var(--border-radius-lg);
   text-align: center;
   cursor: not-allowed;
@@ -267,7 +267,7 @@
   text-align: center;
   min-height: 120px;
   border-radius: var(--border-radius-lg);
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--gray-300);
   background: var(--gray-50);
   padding: 20px 16px;
   cursor: pointer;
@@ -394,7 +394,7 @@
   width: 100%;
   padding: 16px;
   background: var(--white);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: 4px;
   font-size: 15px;
   font-weight: 500;
@@ -460,8 +460,8 @@
 .fieldInput {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid var(--border-color);
-  border-radius: var(--border-radius-md);
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
   font-size: 15px;
   color: var(--gray-900);
   background: var(--white);
@@ -533,7 +533,7 @@
   max-width: 300px;
   padding: 8px 14px;
   background: var(--gray-100);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: 20px;
   font-size: 12px;
   font-weight: 500;
@@ -588,7 +588,7 @@
   font-size: 12px;
   color: var(--gray-500);
   background: var(--gray-50);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: var(--border-radius-md);
   padding: 8px 12px;
   margin: 0;
@@ -612,7 +612,7 @@
 .searchInput {
   width: 100%;
   padding: 12px 40px 12px 14px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: var(--border-radius-md);
   font-size: 15px;
   box-sizing: border-box;
@@ -653,7 +653,7 @@
   width: 100%;
   padding: 14px;
   background: var(--gray-50);
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--gray-300);
   border-radius: var(--border-radius-lg);
   cursor: pointer;
   text-align: left;
@@ -724,7 +724,7 @@
   padding: 14px;
   background: var(--gray-50);
   border-radius: var(--border-radius-lg);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -781,7 +781,7 @@
   aspect-ratio: 1;
   object-fit: cover;
   border-radius: var(--border-radius-md);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
 }
 
 .flagRow {
@@ -818,7 +818,7 @@
   gap: 8px;
   padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
   background: var(--white);
-  border-top: 1px solid var(--border-color);
+  border-top: 1px solid var(--gray-300);
 }
 
 .actionBarButtons {
@@ -1101,7 +1101,7 @@
 
 .serviceSection {
   background: var(--gray-50);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: var(--border-radius-lg);
   padding: 12px 14px;
   display: flex;
@@ -1158,7 +1158,7 @@
   gap: 3px;
   padding: 10px 12px;
   background: var(--white);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: var(--border-radius-md);
 }
 
@@ -1227,7 +1227,7 @@
 .planCard {
   width: 100%;
   background: var(--white);
-  border: 2px solid var(--border-color);
+  border: 2px solid var(--gray-300);
   border-radius: 12px;
   padding: 16px;
   text-align: left;
@@ -1358,7 +1358,7 @@
 
 .confirmSection {
   padding: 16px 0;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--gray-300);
 
   &:last-child {
     border-bottom: none;
@@ -1455,7 +1455,7 @@
 }
 
 .signatureWrapper {
-  border: 1.5px solid var(--border-color);
+  border: 1.5px solid var(--gray-300);
   border-radius: 8px;
   overflow: hidden;
   margin: 10px 0 8px;
@@ -1472,7 +1472,7 @@
 
 .signatureClearBtn {
   background: none;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--gray-300);
   border-radius: 6px;
   padding: 6px 14px;
   font-size: 13px;

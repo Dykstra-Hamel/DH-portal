@@ -39,6 +39,10 @@
 .tabBarWrapper {
   margin: 24px 0 0;
   padding: 0 24px;
+
+  @media (max-width: 768px) {
+    padding: 0 16px;
+  }
 }
 
 .tabBar {
