@@ -2180,7 +2180,7 @@ export function NewOpportunityWizard() {
       setBackInterceptor(null);
     };
   }, [stepIndex, setBackInterceptor]);
-  const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
+  const [isSyncingCustomer, setIsSyncingCustomer] = useState(isFromRouteStop);
   const [syncError, setSyncError] = useState<string | null>(null);
 
   // PestPac integration state
@@ -2378,6 +2378,10 @@ export function NewOpportunityWizard() {
           email: c.email ?? prev.email,
           addressInput: addressInput || prev.addressInput,
         }));
+        if (c.phone) {
+          const photosIndex = wizardSteps.indexOf('photos');
+          if (photosIndex !== -1) setStepIndex(photosIndex);
+        }
       } else {
         throw new Error('No customer linked to this stop');
       }
@@ -2386,7 +2390,7 @@ export function NewOpportunityWizard() {
     } finally {
       setIsSyncingCustomer(false);
     }
-  }, [routeStopIdParam, selectedCompany?.id]);
+  }, [routeStopIdParam, selectedCompany?.id, wizardSteps]);
 
   const handleSyncRetry = () => {
     isSyncFired.current = false;
@@ -2935,8 +2939,17 @@ export function NewOpportunityWizard() {
   ) as StepId[];
   const progressIndex = progressSteps.indexOf(currentStepId);
 
+  const showRouteStopLoader = isFromRouteStop && isSyncingCustomer;
+
   return (
     <div className={styles.wizardContainer} ref={wizardContainerRef}>
+      {showRouteStopLoader ? (
+        <div className={styles.routeStopLoader}>
+          <span className={styles.spinnerDark} />
+          <p>Loading customer…</p>
+        </div>
+      ) : (
+      <>
       {/* Progress indicator — only show after type selection */}
       {stepIndex > 0 && (
         <div className={styles.progressSection}>
@@ -3262,6 +3275,8 @@ export function NewOpportunityWizard() {
         )}
         </div>
       </div>
+      </>
+      )}
 
       {/* Exit prompt modal */}
       {showExitPrompt && (
