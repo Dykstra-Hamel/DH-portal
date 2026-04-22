@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { UserPlus, TrendingUp, ChevronDown, X } from 'lucide-react';
+import { UserPlus, TrendingUp, ChevronDown } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -36,7 +36,6 @@ type StepId =
   | 'select-site'
   | 'service-plan-select'
   | 'service-details'
-  | 'review'
   | 'service-today-confirm';
 
 const STEP_ID_LABELS: Record<StepId, string> = {
@@ -48,7 +47,6 @@ const STEP_ID_LABELS: Record<StepId, string> = {
   'select-site': 'Site',
   'service-plan-select': 'Plan',
   'service-details': 'Services',
-  review: 'Review',
   'service-today-confirm': 'Confirm',
 };
 
@@ -767,7 +765,7 @@ function StepAIReview({
       </div>
 
       <div className={styles.fieldGroup}>
-        <label className={styles.fieldLabel}>Notes</label>
+        <label className={styles.fieldLabel}>Note To Sales</label>
         <textarea
           className={styles.fieldTextarea}
           value={notes}
@@ -790,6 +788,14 @@ function StepAIReview({
         <label className={styles.checkboxLabel}>
           <input
             type="checkbox"
+            checked={techMentioned}
+            onChange={e => onTechMentionedChange(e.target.checked)}
+          />
+          <span>Discussed with customer</span>
+        </label>
+        <label className={styles.checkboxLabel}>
+          <input
+            type="checkbox"
             checked={customerMentioned}
             onChange={e => onCustomerMentionedChange(e.target.checked)}
           />
@@ -802,14 +808,6 @@ function StepAIReview({
             onChange={e => onHighPriorityChange(e.target.checked)}
           />
           <span>High priority</span>
-        </label>
-        <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={techMentioned}
-            onChange={e => onTechMentionedChange(e.target.checked)}
-          />
-          <span>Tech mentioned it to customer</span>
         </label>
       </div>
     </div>
@@ -827,7 +825,7 @@ function StepNewCustomer({
 }) {
   return (
     <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>New Customer</h2>
+      <h2 className={styles.stepTitle}>New Lead</h2>
       <p className={styles.stepDesc}>Enter the customer&apos;s details</p>
 
       <div className={styles.newCustomerRow}>
@@ -2006,136 +2004,6 @@ function StepServiceTodayConfirm({
   );
 }
 
-function StepReview({
-  leadType,
-  photos,
-  aiResult,
-  notes,
-  customerMentioned,
-  isHighPriority,
-  selectedPestLabel,
-  otherPest,
-  selectedCustomer,
-}: {
-  leadType: LeadType;
-  photos: PhotoPreview[];
-  aiResult: AIResult;
-  notes: string;
-  customerMentioned: boolean;
-  isHighPriority: boolean;
-  selectedPestLabel: string | null;
-  otherPest: string;
-  selectedCustomer: CustomerResult | null;
-}) {
-  const addr = selectedCustomer ? getPrimaryAddress(selectedCustomer) : null;
-  const trimmedOtherPest = otherPest.trim();
-
-  return (
-    <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>Review</h2>
-      <p className={styles.stepDesc}>Confirm before submitting</p>
-
-      <div className={styles.reviewSection}>
-        <h3 className={styles.reviewSectionTitle}>Customer & Site</h3>
-        {selectedCustomer ? (
-          <>
-            <p className={styles.reviewValue}>
-              {getCustomerDisplayName(selectedCustomer)}
-            </p>
-            {addr && (
-              <p className={styles.reviewValueMuted}>
-                {addr.street_address}, {addr.city}, {addr.state} {addr.zip_code}
-              </p>
-            )}
-          </>
-        ) : (
-          <p className={styles.reviewValueMuted}>No customer selected</p>
-        )}
-      </div>
-
-      <div className={styles.reviewSection}>
-        <h3 className={styles.reviewSectionTitle}>Opportunity Type</h3>
-        <p className={styles.reviewValue}>
-          {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
-        </p>
-      </div>
-
-      <div className={styles.reviewSection}>
-        <h3 className={styles.reviewSectionTitle}>Photos</h3>
-        <p className={styles.reviewValue}>
-          {photos.length} photo{photos.length !== 1 ? 's' : ''} attached
-        </p>
-        {photos.length > 0 && (
-          <div className={styles.reviewPhotoRow}>
-            {photos.map((p, i) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={i}
-                src={p.dataUrl}
-                alt={`Photo ${i + 1}`}
-                className={styles.reviewThumb}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className={styles.reviewSection}>
-        <h3 className={styles.reviewSectionTitle}>Findings</h3>
-        {aiResult.issue_detected && (
-          <p className={styles.reviewRow}>
-            <strong>Issue:</strong> {aiResult.issue_detected}
-          </p>
-        )}
-        {selectedPestLabel && (
-          <p className={styles.reviewRow}>
-            <strong>Primary Pest:</strong> {selectedPestLabel}
-          </p>
-        )}
-        {!selectedPestLabel && trimmedOtherPest && (
-          <p className={styles.reviewRow}>
-            <strong>Primary Pest:</strong> Other ({trimmedOtherPest})
-          </p>
-        )}
-        {aiResult.service_category && (
-          <p className={styles.reviewRow}>
-            <strong>Category:</strong> {aiResult.service_category}
-          </p>
-        )}
-        {aiResult.ai_summary && (
-          <p className={styles.reviewRow}>
-            <strong>Summary:</strong> {aiResult.ai_summary}
-          </p>
-        )}
-        {aiResult.severity && (
-          <p className={styles.reviewRow}>
-            <strong>Severity:</strong> {aiResult.severity}
-          </p>
-        )}
-      </div>
-
-      <div className={styles.reviewSection}>
-        <h3 className={styles.reviewSectionTitle}>Notes & Flags</h3>
-        {notes ? (
-          <p className={styles.reviewValue}>{notes}</p>
-        ) : (
-          <p className={styles.reviewValueMuted}>No notes added</p>
-        )}
-        <div className={styles.flagRow}>
-          {customerMentioned && (
-            <span className={styles.flag}>Customer mentioned</span>
-          )}
-          {isHighPriority && (
-            <span className={`${styles.flag} ${styles.flagHigh}`}>
-              High priority
-            </span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // ─── Main Wizard ──────────────────────────────────────────────────────────────
 
 export function NewOpportunityWizard() {
@@ -2237,36 +2105,27 @@ export function NewOpportunityWizard() {
     null
   );
 
-  // Draft persistence
-  const [draftRestored, setDraftRestored] = useState(false);
-
   const companyId = selectedCompany?.id ?? '';
   const selectedPestOption =
     pestOptions.find(option => option.id === selectedPestValue) ?? null;
 
   const { recentCustomers, addRecent } = useRecentTechLeadCustomers(companyId);
 
-  // Computed wizard steps based on lead type and PestPac availability
+  // Computed wizard steps based on lead type.
+  // Upsells come from an existing route stop so customer info is already known;
+  // new leads still need the customer step.
   const wizardSteps = useMemo((): StepId[] => {
-    if (leadType === 'new-lead') {
-      return [
-        'type-select',
-        'new-customer',
-        'photos',
-        'ai-review',
-        'review',
-      ];
+    if (leadType === 'upsell') {
+      return ['type-select', 'photos', 'ai-review'];
     }
-    // Upsell: stop at ai-review (Refer To Sales); fuller flow preserved below for later
     return ['type-select', 'new-customer', 'photos', 'ai-review'];
-    // const steps: StepId[] = ['type-select', 'photos', 'ai-review'];
-    // if (!isFromRouteStop) steps.push('select-site');
-    // steps.push(isPestPacEnabled ? 'service-details' : 'service-plan-select');
-    // steps.push('review', 'service-today-confirm');
-    // return steps;
   }, [leadType]);
 
   const currentStepId = wizardSteps[stepIndex];
+  const wizardStepsRef = useRef(wizardSteps);
+  useEffect(() => {
+    wizardStepsRef.current = wizardSteps;
+  }, [wizardSteps]);
   const draftKey = companyId ? `techleads_draft_${companyId}` : null;
 
   useEffect(() => {
@@ -2274,19 +2133,12 @@ export function NewOpportunityWizard() {
     setStepIndex(Math.max(0, wizardSteps.length - 1));
   }, [stepIndex, wizardSteps]);
 
-  // Restore draft from localStorage when companyId becomes available.
-  // Skip (and clear any existing draft) if the URL has ?fresh=1 — this signals
-  // the user explicitly started a new flow (e.g. from the + button).
+  // Restore draft from localStorage only when the user explicitly opted in by
+  // landing here via the My Opportunities "Restore Draft" flow (?restore=1).
+  // Otherwise we start fresh every time.
   useEffect(() => {
     if (!draftKey || stepIndex > 0) return;
-    if (searchParams.get('fresh') === '1') {
-      try {
-        localStorage.removeItem(draftKey);
-      } catch {
-        // ignore
-      }
-      return;
-    }
+    if (searchParams.get('restore') !== '1') return;
     try {
       const saved = localStorage.getItem(draftKey);
       if (!saved) return;
@@ -2320,7 +2172,6 @@ export function NewOpportunityWizard() {
       if (typeof d.stepIndex === 'number' && d.stepIndex > 0) {
         setStepIndex(d.stepIndex);
       }
-      setDraftRestored(true);
     } catch {
       // Corrupt draft — ignore
     }
@@ -2379,7 +2230,7 @@ export function NewOpportunityWizard() {
           addressInput: addressInput || prev.addressInput,
         }));
         if (c.phone) {
-          const photosIndex = wizardSteps.indexOf('photos');
+          const photosIndex = wizardStepsRef.current.indexOf('photos');
           if (photosIndex !== -1) setStepIndex(photosIndex);
         }
       } else {
@@ -2390,7 +2241,7 @@ export function NewOpportunityWizard() {
     } finally {
       setIsSyncingCustomer(false);
     }
-  }, [routeStopIdParam, selectedCompany?.id, wizardSteps]);
+  }, [routeStopIdParam, selectedCompany?.id, addRecent]);
 
   const handleSyncRetry = () => {
     isSyncFired.current = false;
@@ -2463,7 +2314,6 @@ export function NewOpportunityWizard() {
         localStorage.removeItem(draftKey);
       } catch {}
     }
-    setDraftRestored(false);
   };
 
   // Fetch current user's display name for "Service Today" attribution note
@@ -2669,9 +2519,9 @@ export function NewOpportunityWizard() {
         .join('\n\n');
 
       const checkboxNotes = [
+        techMentioned ? 'Discussed with customer.' : null,
         customerMentioned ? 'Customer mentioned this issue.' : null,
         isHighPriority ? 'High priority.' : null,
-        techMentioned ? 'Tech mentioned it to customer.' : null,
       ]
         .filter(Boolean)
         .join('\n');
@@ -2687,6 +2537,7 @@ export function NewOpportunityWizard() {
         leadSource: 'technician',
         leadType: 'manual',
         serviceType: aiResult.service_category || undefined,
+        techDiscussed: techMentioned,
         ...(routeStopIdParam ? { routeStopId: routeStopIdParam } : {}),
       };
 
@@ -2924,7 +2775,11 @@ export function NewOpportunityWizard() {
   };
 
   const handleBack = () => {
-    if (stepIndex > 0) setStepIndex(i => i - 1);
+    if (stepIndex > 1) {
+      setStepIndex(i => i - 1);
+    } else if (stepIndex === 1) {
+      router.push('/field-sales/dashboard');
+    }
   };
 
   // Determine if the next button should show a loading state
@@ -2974,32 +2829,6 @@ export function NewOpportunityWizard() {
         </div>
       )}
 
-      {/* Draft restored banner */}
-      {draftRestored && (
-        <div className={styles.draftBanner}>
-          <span>Draft restored</span>
-          <div className={styles.draftBannerActions}>
-            <button
-              type="button"
-              className={styles.draftDiscardBtn}
-              onClick={() => {
-                clearDraft();
-                resetWizard();
-              }}
-            >
-              Discard
-            </button>
-            <button
-              type="button"
-              className={styles.draftDismissBtn}
-              onClick={() => setDraftRestored(false)}
-              aria-label="Dismiss"
-            >
-              <X size={14} />
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Step content */}
       <div className={styles.stepWrapper}>
@@ -3100,22 +2929,6 @@ export function NewOpportunityWizard() {
           />
         )}
 
-        {currentStepId === 'review' && (
-          <StepReview
-            leadType={leadType}
-            photos={photos}
-            aiResult={aiResult}
-            notes={notes}
-            customerMentioned={customerMentioned}
-            isHighPriority={isHighPriority}
-            selectedPestLabel={selectedPestOption?.name ?? null}
-            otherPest={
-              selectedPestValue === OTHER_PEST_OPTION_VALUE ? otherPest : ''
-            }
-            selectedCustomer={selectedCustomer}
-          />
-        )}
-
         {currentStepId === 'service-today-confirm' && (
           <StepServiceTodayConfirm
             selectedPlan={selectedServicePlan}
@@ -3176,9 +2989,8 @@ export function NewOpportunityWizard() {
 
         {currentStepId !== 'type-select' &&
           currentStepId !== 'photos' &&
-          currentStepId !== 'review' &&
-          currentStepId !== 'service-today-confirm' &&
-          !(currentStepId === 'ai-review' && leadType === 'upsell') && (
+          currentStepId !== 'ai-review' &&
+          currentStepId !== 'service-today-confirm' && (
             <button
               className={styles.nextBtn}
               onClick={handleNext}
@@ -3195,7 +3007,7 @@ export function NewOpportunityWizard() {
             </button>
           )}
 
-        {currentStepId === 'ai-review' && leadType === 'upsell' && (
+        {currentStepId === 'ai-review' && (
           <button
             className={styles.scheduleBtn}
             onClick={() => handleSubmit('default')}
@@ -3208,51 +3020,6 @@ export function NewOpportunityWizard() {
               </>
             ) : (
               <>Refer To Sales</>
-            )}
-          </button>
-        )}
-
-        {currentStepId === 'review' && leadType === 'upsell' && (
-          <div className={styles.reviewActions}>
-            <button
-              className={styles.scheduleBtn}
-              onClick={() => handleSubmit('default')}
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? (
-                <>
-                  <span className={styles.spinner} />
-                  Submitting…
-                </>
-              ) : (
-                <>Refer To Sales</>
-              )}
-            </button>
-            {!selectedServicePlan?.requires_quote && (
-              <button
-                className={styles.serviceTodayBtn}
-                onClick={() => setStepIndex(i => i + 1)}
-                disabled={isSubmitting}
-              >
-                <>Sell It</>
-              </button>
-            )}
-          </div>
-        )}
-
-        {currentStepId === 'review' && leadType === 'new-lead' && (
-          <button
-            className={styles.submitBtn}
-            onClick={() => handleSubmit('default')}
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <span className={styles.spinner} />
-                Submitting…
-              </>
-            ) : (
-              'Submit'
             )}
           </button>
         )}

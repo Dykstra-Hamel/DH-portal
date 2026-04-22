@@ -13,10 +13,11 @@ import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsD
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
 import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
 import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
+import AdditionalTasksPanel from '@/components/Tasks/AdditionalTasksPanel/AdditionalTasksPanel';
 import { Toast } from '@/components/Common/Toast';
 import styles from './dashboard.module.scss';
 
-type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions';
+type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions' | 'tasks';
 
 export default function FieldSalesDashboard() {
   return (
@@ -45,6 +46,7 @@ function FieldSalesDashboardInner() {
   const [sliderStyle, setSliderStyle] = useState<{ left: number; width: number } | null>(null);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [createTaskTrigger, setCreateTaskTrigger] = useState(0);
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
   const mobileDropdownRef = useRef<HTMLDivElement | null>(null);
 
@@ -81,7 +83,7 @@ function FieldSalesDashboardInner() {
     () =>
       isTechnicianOnly
         ? ['route', 'opportunities']
-        : ['route', 'leads', 'actions'],
+        : ['route', 'leads', 'actions', 'tasks'],
     [isTechnicianOnly]
   );
 
@@ -155,6 +157,7 @@ function FieldSalesDashboardInner() {
     setActiveTab(tab);
     setMobileDropdownOpen(false);
     if (tab === 'actions') clearNewItemIndicator('my_actions');
+    if (tab === 'tasks') clearNewItemIndicator('my_tasks');
     if (tab === 'leads' || tab === 'opportunities')
       clearNewItemIndicator('my_leads');
   };
@@ -191,6 +194,11 @@ function FieldSalesDashboardInner() {
       label: 'My Actions',
       count: counts.my_actions,
       isNew: newItemIndicators.my_actions,
+    },
+    tasks: {
+      label: 'My Tasks',
+      count: counts.my_tasks,
+      isNew: newItemIndicators.my_tasks,
     },
   };
 
@@ -259,6 +267,22 @@ function FieldSalesDashboardInner() {
                   className={`${styles.tabCount} ${newItemIndicators.my_actions ? styles.tabCountNew : ''}`}
                 >
                   {counts.my_actions}
+                </span>
+              </button>
+            )}
+
+            {!isTechnicianOnly && (
+              <button
+                ref={el => { tabRefs.current[TAB_ORDER.indexOf('tasks')] = el; }}
+                type="button"
+                className={`${styles.tab} ${activeTab === 'tasks' ? styles.tabActive : ''}`}
+                onClick={() => handleTabClick('tasks')}
+              >
+                <span className={styles.tabLabel}>My Tasks</span>
+                <span
+                  className={`${styles.tabCount} ${newItemIndicators.my_tasks ? styles.tabCountNew : ''}`}
+                >
+                  {counts.my_tasks}
                 </span>
               </button>
             )}
@@ -360,6 +384,25 @@ function FieldSalesDashboardInner() {
               <ActionsAutomationsPanel
                 companyId={selectedCompany.id}
                 userId={user.id}
+              />
+            </div>
+          )}
+
+          {activeTab === 'tasks' && !isTechnicianOnly && user && selectedCompany && (
+            <div className={styles.panelSection}>
+              <div className={styles.tasksHeader}>
+                <button
+                  type="button"
+                  className={styles.createTaskBtn}
+                  onClick={() => setCreateTaskTrigger(t => t + 1)}
+                >
+                  + Create Task
+                </button>
+              </div>
+              <AdditionalTasksPanel
+                companyId={selectedCompany.id}
+                userId={user.id}
+                externalCreateTrigger={createTaskTrigger}
               />
             </div>
           )}
