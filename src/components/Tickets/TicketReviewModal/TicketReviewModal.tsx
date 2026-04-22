@@ -18,6 +18,7 @@ import { FormSubmission } from '@/types/form-submission';
 import { authenticatedFetch } from '@/lib/api-client';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
+import { useBranches } from '@/hooks/useBranches';
 import {
   Modal,
   ModalTop,
@@ -123,6 +124,10 @@ export default function TicketReviewModal({
     'sales' | 'customer_service' | 'spam' | 'other'
   >(getInitialQualification());
   const [selectedAssignee, setSelectedAssignee] = useState<string>('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(ticket.branch_id ?? null);
+  const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
+  const branchDropdownRef = useRef<HTMLDivElement>(null);
+  const { branches: availableBranches } = useBranches(ticket.company_id);
   const [callRecord, setCallRecord] = useState<CallRecord | undefined>();
   const [formSubmission, setFormSubmission] = useState<FormSubmission | undefined>();
   const [localTicket, setLocalTicket] = useState<Ticket>(ticket);
@@ -225,6 +230,31 @@ export default function TicketReviewModal({
     name: getDisplayName(),
     avatar: getAvatarUrl(),
     initials: getInitials(),
+  };
+
+  // Close branch dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (branchDropdownRef.current && !branchDropdownRef.current.contains(e.target as Node)) {
+        setIsBranchDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleBranchSelect = async (branchId: string | null) => {
+    setSelectedBranchId(branchId);
+    setIsBranchDropdownOpen(false);
+    try {
+      await authenticatedFetch(`/api/tickets/${ticket.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ branch_id: branchId }),
+      });
+    } catch (error) {
+      console.error('Error updating ticket branch:', error);
+    }
   };
 
   const animateToStep = (newStep: 'review' | 'assignment') => {
@@ -1144,6 +1174,49 @@ export default function TicketReviewModal({
         )}
         <div className={styles.actionsWrapper}>
           {renderRadioButtons()}
+
+          {/* Branch selector — only shown when company has active branches */}
+          {availableBranches.length > 0 && (
+            <div ref={branchDropdownRef} className={styles.customDropdown} style={{ marginTop: '12px' }}>
+              <label style={{ fontSize: '13px', fontWeight: 500, color: '#6A7282', display: 'block', marginBottom: '4px' }}>
+                Branch:
+              </label>
+              <button
+                className={`${styles.dropdownButton} ${isBranchDropdownOpen ? styles.open : ''}`}
+                onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
+                disabled={isQualifying}
+              >
+                <div className={styles.selectedOption}>
+                  <span className={styles.optionText}>
+                    {availableBranches.find(b => b.id === selectedBranchId)?.name ?? 'No Branch'}
+                  </span>
+                </div>
+                <ChevronDown size={16} className={styles.chevronIcon} />
+              </button>
+              {isBranchDropdownOpen && (
+                <div className={styles.dropdownMenu}>
+                  <button
+                    className={`${styles.dropdownOption} ${!selectedBranchId ? styles.selected : ''}`}
+                    onClick={() => handleBranchSelect(null)}
+                  >
+                    <span className={styles.optionText}>No Branch</span>
+                  </button>
+                  {availableBranches.map(branch => (
+                    <button
+                      key={branch.id}
+                      className={`${styles.dropdownOption} ${selectedBranchId === branch.id ? styles.selected : ''}`}
+                      onClick={() => handleBranchSelect(branch.id)}
+                    >
+                      <span className={styles.optionText}>
+                        {branch.name}{branch.is_primary ? ' (Primary)' : ''}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className={styles.dividerLine}></div>
           {(selectedQualification === 'sales' ||
             selectedQualification === 'customer_service') && (

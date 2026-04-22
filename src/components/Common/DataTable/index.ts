@@ -7,4 +7,5 @@ export type {
   SortConfig,
   DefaultItemRowProps,
   ActionButtonConfig,
+  CardViewConfig,
 } from './DataTable.types';

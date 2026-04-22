@@ -1,0 +1,76 @@
+.panel {
+  overflow: hidden;
+}
+
+.panelHeader {
+  padding: 16px 20px 0 0;
+}
+
+.panelTitle {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0 0 12px 0;
+}
+
+// ─── Card-view helpers (shared status bar + action button styles) ────────────
+
+.progressCell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.progressLabel {
+  font-size: 0.75rem;
+  color: var(--blue-500);
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.progressLabelOverdue {
+  color: var(--error-600);
+}
+
+.progressTrack {
+  flex: 1;
+  height: 8px;
+  background: var(--gray-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--blue-400);
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+.progressFillOverdue {
+  background: var(--error-500);
+}
+
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 7px 8px 7px 12px;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--gray-100);
+  }
+}

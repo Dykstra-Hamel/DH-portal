@@ -205,6 +205,17 @@ export default function AdminTasksPage() {
     return meta;
   }, [tasks]);
 
+  const contentAndSocialMediaTaskIds = useMemo(() => {
+    const ids = new Set<string>();
+    tasks.forEach((task) => {
+      const depts = task.monthly_service_task_department_assignments || [];
+      if (depts.some(d => d.department?.name === 'Content' || d.department?.name === 'Social Media')) {
+        ids.add(task.id);
+      }
+    });
+    return ids;
+  }, [tasks]);
+
   const companyOptions = useMemo(() => {
     const map = new Map<string, string>();
     projects.forEach(project => {
@@ -934,7 +945,8 @@ export default function AdminTasksPage() {
   const monthlyServices = filteredTasks.filter(
     (task) =>
       task.status !== 'completed' &&
-      !!(task as TaskWithMonthlyServiceMeta).monthly_service_id
+      !!(task as TaskWithMonthlyServiceMeta).monthly_service_id &&
+      !contentAndSocialMediaTaskIds.has(task.id)
   );
   const projectTasks = filteredTasks.filter(
     (task) =>

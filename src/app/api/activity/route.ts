@@ -45,7 +45,8 @@ export async function GET(request: NextRequest) {
           email,
           first_name,
           last_name,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         )
       `
       )
@@ -145,7 +146,8 @@ export async function POST(request: NextRequest) {
           email,
           first_name,
           last_name,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         )
       `
       )

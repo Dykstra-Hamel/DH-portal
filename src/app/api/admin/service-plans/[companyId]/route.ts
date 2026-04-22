@@ -51,6 +51,7 @@ interface CreateServicePlanRequest {
   highlight_badge?: string;
   color_scheme?: any;
   requires_quote?: boolean;
+  is_featured?: boolean;
   plan_image_url?: string;
   plan_disclaimer?: string;
   plan_video_url?: string | null;
@@ -62,7 +63,17 @@ interface CreateServicePlanRequest {
     initial_cost_per_interval: number;
     recurring_cost_per_interval: number;
   };
+  yard_sqft_pricing?: {
+    pricing_mode?: 'linear' | 'custom';
+    initial_cost_per_interval: number;
+    recurring_cost_per_interval: number;
+    custom_initial_prices?: number[];
+    custom_recurring_prices?: number[];
+  } | null;
   pest_coverage?: Array<{ pest_id: string; coverage_level: string }>;
+  plan_products?: string[];
+  recommended_addon_ids?: string[];
+  plan_recommended_addons?: string[];
 }
 
 interface UpdateServicePlanRequest extends CreateServicePlanRequest {
@@ -87,7 +98,7 @@ export async function GET(
 
     const supabase = createAdminClient();
 
-    // Fetch service plans with pest coverage
+    // Fetch service plans with pest coverage, product associations, and recommended addons
     const { data: servicePlans, error } = await supabase
       .from('service_plans')
       .select(`
@@ -106,7 +117,9 @@ export async function GET(
               slug
             )
           )
-        )
+        ),
+        service_plan_products ( product_id ),
+        service_plan_recommended_addons ( addon_id )
       `)
       .eq('company_id', companyId)
       .order('display_order', { ascending: true });
@@ -131,6 +144,10 @@ export async function GET(
         pest_category: coverage.pest_types.pest_categories?.name || 'Unknown',
       })),
       plan_pest_coverage: undefined, // Remove the nested structure
+      plan_products: plan.service_plan_products.map((r: any) => r.product_id as string),
+      service_plan_products: undefined,
+      recommended_addon_ids: plan.service_plan_recommended_addons.map((r: any) => r.addon_id as string),
+      service_plan_recommended_addons: undefined,
     }));
 
     return NextResponse.json({
@@ -170,8 +187,9 @@ export async function POST(
       );
     }
 
-    // Check if linear feet pricing is configured
+    // Check if linear feet pricing or simple per-unit pricing is configured
     const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
+    const hasPerUnitPricing = !!(planData as any).pricing_unit;
 
     if (planData.plan_category === 'one-time') {
       // One-time service validation
@@ -185,10 +203,10 @@ export async function POST(
       planData.billing_frequency = null;
     } else {
       // Subscription plan validation
-      // Allow $0 initial price if linear feet pricing is configured
-      if (!hasLinearFeetPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
+      // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0 && !((planData.recurring_price ?? 0) > 0)) {
         return NextResponse.json(
-          { error: 'Initial price must be greater than 0 unless linear feet pricing is configured' },
+          { error: 'Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured' },
           { status: 400 }
         );
       }
@@ -210,8 +228,8 @@ export async function POST(
 
     const supabase = createAdminClient();
 
-    // Extract pest coverage data
-    const { pest_coverage, ...planFields } = planData;
+    // Extract pest coverage, product associations, and recommended addons
+    const { pest_coverage, plan_products, recommended_addon_ids, plan_recommended_addons: _planRecommendedAddons, ...planFields } = planData;
 
     // Create the service plan
     const { data: newPlan, error: planError } = await supabase
@@ -251,6 +269,28 @@ export async function POST(
       }
     }
 
+    // Add product associations if provided
+    if (plan_products && plan_products.length > 0) {
+      const { error: productsError } = await supabase
+        .from('service_plan_products')
+        .insert(plan_products.map((productId: string) => ({ plan_id: newPlan.id, product_id: productId })));
+
+      if (productsError) {
+        console.error('Error adding plan products:', productsError);
+      }
+    }
+
+    // Add recommended addon associations if provided
+    if (recommended_addon_ids && recommended_addon_ids.length > 0) {
+      const { error: recommendedAddonsError } = await supabase
+        .from('service_plan_recommended_addons')
+        .insert(recommended_addon_ids.map((addonId: string) => ({ plan_id: newPlan.id, addon_id: addonId })));
+
+      if (recommendedAddonsError) {
+        console.error('Error adding recommended addons:', recommendedAddonsError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: newPlan,
@@ -281,8 +321,9 @@ export async function PUT(
       );
     }
 
-    // Check if linear feet pricing is configured
+    // Check if linear feet pricing or simple per-unit pricing is configured
     const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
+    const hasPerUnitPricing = !!(planData as any).pricing_unit;
 
     // Validate and enforce recurring field rules based on plan_category
     if (planData.plan_category === 'one-time') {
@@ -291,10 +332,10 @@ export async function PUT(
       planData.billing_frequency = null;
     } else if (planData.plan_category && planData.plan_category !== 'one-time') {
       // Validate subscription plans have required fields
-      // Allow $0 initial price if linear feet pricing is configured
-      if (!hasLinearFeetPricing && planData.initial_price !== undefined && planData.initial_price === 0) {
+      // Allow $0 initial price if linear feet pricing or per-unit pricing is configured
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && planData.initial_price !== undefined && planData.initial_price === 0 && !((planData.recurring_price ?? 0) > 0)) {
         return NextResponse.json(
-          { error: 'Initial price must be greater than 0 unless linear feet pricing is configured' },
+          { error: 'Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured' },
           { status: 400 }
         );
       }
@@ -310,8 +351,8 @@ export async function PUT(
 
     const supabase = createAdminClient();
 
-    // Extract pest coverage data
-    const { pest_coverage, id, ...planFields } = planData;
+    // Extract pest coverage, product associations, and recommended addons
+    const { pest_coverage, plan_products, recommended_addon_ids, plan_recommended_addons: _planRecommendedAddons, id, ...planFields } = planData;
 
     // Update the service plan
     const { data: updatedPlan, error: planError } = await supabase
@@ -358,6 +399,30 @@ export async function PUT(
           console.error('Error updating pest coverage:', coverageError);
           // Continue without failing
         }
+      }
+    }
+
+    // Update product associations (always replace)
+    await supabase.from('service_plan_products').delete().eq('plan_id', id);
+    if (plan_products && plan_products.length > 0) {
+      const { error: productsError } = await supabase
+        .from('service_plan_products')
+        .insert(plan_products.map((productId: string) => ({ plan_id: id, product_id: productId })));
+
+      if (productsError) {
+        console.error('Error updating plan products:', productsError);
+      }
+    }
+
+    // Update recommended addon associations (always replace)
+    await supabase.from('service_plan_recommended_addons').delete().eq('plan_id', id);
+    if (recommended_addon_ids && recommended_addon_ids.length > 0) {
+      const { error: recommendedAddonsError } = await supabase
+        .from('service_plan_recommended_addons')
+        .insert(recommended_addon_ids.map((addonId: string) => ({ plan_id: id, addon_id: addonId })));
+
+      if (recommendedAddonsError) {
+        console.error('Error updating recommended addons:', recommendedAddonsError);
       }
     }
 

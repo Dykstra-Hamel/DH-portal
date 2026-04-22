@@ -32,7 +32,7 @@
   --color-text: #2b2b2b;
   --color-text-gray: #484848;
   --color-border-gray: #bfbfbf;
-  --color-white: #ffffff;
+  --gray-25: #ffffff;
   --color-bg-light: #f9fafb;
   --color-bg-blue-light: rgba(0, 82, 155, 0.05);
 
@@ -41,7 +41,7 @@
   --shadow-card: 0px 0px 24px rgba(0, 0, 0, 0.15);
 
   font-family: var(--secondary-font), sans-serif;
-  background: var(--color-white);
+  background: var(--gray-25);
   color: var(--color-text);
   width: 100%;
   // Ensure all child elements inherit the brand's primary font
@@ -103,18 +103,23 @@
 }
 
 .contentArea {
-  max-width: 1215px;
   width: 100%;
-  margin: 40px auto 0;
-  padding: 0 40px;
+  background: var(--gray-75);
+  margin: 0 auto;
+  padding: 40px 34px 0;
   display: flex;
   flex-direction: column;
   position: relative;
   padding-bottom: 80px;
 
   @media (width <= 480px) {
-    padding: 0 20px;
+    padding: 32px 20px;
   }
+}
+
+.contentAreaInner {
+  max-width: 750px;
+  margin: 0 auto;
 }
 
 .bottomButtonsWrapper {
@@ -227,13 +232,23 @@
   gap: 32px;
   padding: 24px 0;
 
-  @media (max-width: 1024px) {
-    grid-template-columns: 1fr;
-    gap: 24px;
+  .planDescription {
+    grid-column: span 2;
   }
 
   @media (max-width: 768px) {
+    grid-template-columns: 1fr;
+    gap: 24px;
     padding: 0;
+
+    .planDescription {
+      order: 2;
+      grid-column: 1;
+    }
+
+    .planContentLeft {
+      margin-top: 16px;
+    }
   }
 }
 
@@ -241,42 +256,37 @@
   display: flex;
   flex-direction: column;
   gap: 32px;
+
+  @media (max-width: 768px) {
+    order: 3;
+  }
 }
 
 .planContentRight {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  @media (max-width: 768px) {
+    order: 1;
+    margin-top: 16px;
+  }
 }
 
 .planImageWrapper {
-  width: 522px;
-  min-height: 470px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: var(--gray-50);
-  position: relative;
-
-  @media (width <= 1024px) {
-    width: 100%;
-  }
-
-  @media (max-width: 1024px) {
-    display: none;
-  }
-}
-
-.planImageWrapperMobile {
-  display: none;
   width: 100%;
-  min-height: 240px;
-  border-radius: 16px;
+  min-height: 250px;
+  border-radius: 8px;
   overflow: hidden;
   background: var(--gray-50);
   position: relative;
 
-  @media (max-width: 1024px) {
-    display: block;
+  @media (max-width: 768px) {
+    width: 100%;
+    min-height: 250px;
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--gray-50);
+    position: relative;
   }
 }
 
@@ -286,7 +296,6 @@
   object-fit: cover;
   display: block;
   position: relative;
-  border-radius: 16px;
 }
 
 .planImagePlaceholder {
@@ -296,7 +305,7 @@
   align-items: center;
   justify-content: center;
   background: var(--gray-300);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .planDisclaimerVideoRow {
@@ -396,7 +405,10 @@
 .plansContainer {
   margin-bottom: 40px;
   h2 {
-    margin-bottom: 32px;
+    margin-bottom: 24px;
+    font-size: 24px;
+    color: var(--gray-800);
+    font-family: var(--primary-font);
   }
 }
 
@@ -408,16 +420,13 @@
   transition: all 0.3s ease;
 
   &.collapsible {
-    background: #ffffff;
+    background: #fff;
     border: 1px solid var(--gray-300);
-    border-radius: 16px;
+    border-radius: 8px;
     box-shadow: inset 0 0 0 0px var(--blue-500);
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
-
-    &.selectedCard {
-      border-color: transparent;
-      box-shadow: inset 0 0 0 2px var(--blue-500);
-    }
+    transition:
+      box-shadow 0.2s ease,
+      border-color 0.2s ease;
 
     &.expanded {
       .planHeaderIcon {
@@ -432,6 +441,10 @@
     .planHeader {
       position: relative;
 
+      @media (max-width: 768px) {
+        padding: 20px;
+      }
+
       &::after {
         content: '';
         position: absolute;
@@ -444,6 +457,11 @@
         transition: opacity 0.3s ease;
 
         @media (max-width: 768px) {
+          left: 20px;
+          right: 20px;
+        }
+
+        @media (max-width: 490px) {
           display: none;
         }
       }
@@ -479,9 +497,10 @@
 .planHeaderTitle {
   font-size: 24px;
   font-weight: 700;
-  color: var(--brand-primary) !important;
+  color: var(--brand-secondary) !important;
+  font-family: var(--font-default) !important;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     font-size: 22px !important;
     text-align: left;
     flex: 1;
@@ -500,14 +519,14 @@
   margin-left: auto;
   flex-shrink: 0;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     flex-basis: 100%;
     margin-left: 0;
     padding-left: 38px;
   }
 
   &.addonHeaderRightWithPill {
-    @media (max-width: 768px) {
+    @media (max-width: 490px) {
       padding-left: 0;
     }
   }
@@ -533,9 +552,9 @@
 .planHeaderDivider {
   font-size: 16px;
   font-weight: 400;
-  color: #9ca3af;
+  color: var(--gray-400);
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     font-size: 14px;
   }
 }
@@ -560,15 +579,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--primary-color, #3b82f6);
+  width: 32px;
+  height: 32px;
+  color: var(--brand-secondary);
   transition: transform 0.3s ease;
   flex-shrink: 0;
 
-  @media (max-width: 768px) {
+  @media (max-width: 490px) {
     position: absolute;
-    top: 20px;
+    top: 24px;
     right: 24px;
   }
 
@@ -576,7 +595,7 @@
     display: block;
 
     circle {
-      fill: var(--brand-primary);
+      fill: var(--brand-secondary);
     }
   }
 }
@@ -599,7 +618,7 @@
   font-size: 10px;
   font-weight: 600;
   letter-spacing: 1.9px;
-  color: var(--primary-color, #3b82f6);
+  color: var(--brand-secondary);
   text-transform: uppercase;
 }
 
@@ -623,11 +642,9 @@
 
 // Features section
 .planIncluded {
-  padding-top: 32px;
-  border-top: 1px solid var(--gray-300);
   h4 {
-    font-size: 18px;
-    font-weight: 600;
+    font-size: 16px;
+    font-weight: 700;
     margin-bottom: 16px;
   }
 }
@@ -667,7 +684,7 @@
     height: 100%;
 
     path {
-      stroke: var(--accent-color);
+      stroke: var(--brand-secondary);
     }
   }
 }
@@ -687,7 +704,7 @@
   display: flex;
   gap: 20px;
   align-items: flex-end;
-
+  font-family: var(--font-default);
 }
 
 // Left column - Recurring price
@@ -695,13 +712,13 @@
 .priceRecurring {
   display: block;
   position: relative;
-  font-size: 64px;
+  font-size: 44px;
   font-weight: 700;
-  color: var(--gray-700);
+  color: var(--gray-800);
   line-height: 105%;
 
   sup {
-    font-size: 40px;
+    font-size: 26px;
   }
 
   .priceAsterisk {
@@ -722,7 +739,7 @@
 }
 
 .priceFrequency {
-  font-size: 20px;
+  font-size: 14px;
   line-height: 1;
 
   @media (max-width: 640px) {
@@ -737,7 +754,6 @@
   gap: 8px;
   border-left: 2px solid var(--gray-300);
   padding-left: 20px;
-
 }
 
 .priceInitial {
@@ -1074,7 +1090,7 @@
 
 .originalPrice {
   text-decoration: line-through;
-  color: #9ca3af;
+  color: var(--gray-400);
   font-size: 14px;
 }
 
@@ -1107,6 +1123,12 @@
   margin-bottom: 32px;
   border-radius: 16px;
   border: 1px solid var(--gray-300);
+  font-family: var(--font-default);
+  background: #fff;
+
+  @media (max-width: 768px) {
+    padding: 20px;
+  }
 }
 
 .totalRow {
@@ -1122,6 +1144,11 @@
     padding-bottom: 10px;
   }
 
+  &:last-of-type {
+    border-top: 1px solid var(--gray-300);
+    margin-top: 10px;
+  }
+
   div {
     font-size: 18px;
     font-weight: 700;
@@ -1134,6 +1161,8 @@
 
   .totalItemPriceAmount {
     font-weight: 600;
+    color: var(--gray-700);
+    font-size: 14px;
   }
 
   .totalItemPriceFreq {
@@ -1180,6 +1209,10 @@
   }
 }
 
+.totalItemGroup {
+  display: block;
+}
+
 .totalItem {
   display: flex;
   align-items: center;
@@ -1188,11 +1221,15 @@
   font-size: 16px;
   line-height: 18px;
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--gray-700);
 }
 
 .totalItemUnselected {
-  color: #9ca3af;
+  color: var(--gray-400);
+
+  .totalItemPriceAmount {
+    color: var(--gray-400);
+  }
 }
 
 .totalItemLeft {
@@ -1209,7 +1246,6 @@
   gap: 0;
 
   @media (max-width: 768px) {
-    flex-direction: column;
     align-items: flex-end;
     gap: 2px;
   }
@@ -1218,7 +1254,7 @@
 .totalItemPriceRecurring {
   font-size: 14px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--gray-700);
   white-space: nowrap;
 }
 
@@ -1229,7 +1265,7 @@
     font-size: 14px;
     font-weight: 600;
     line-height: 18px;
-    color: #9ca3af;
+    color: var(--gray-700);
   }
 }
 
@@ -1238,14 +1274,14 @@
     font-size: 12px;
     font-weight: 500;
     line-height: 18px;
-    color: #9ca3af;
+    color: var(--gray-700);
   }
 }
 
 .totalItemPriceInitial {
   font-size: 14px;
   font-weight: 500;
-  color: #9ca3af;
+  color: var(--gray-700);
   white-space: nowrap;
 
   &::before {
@@ -1554,9 +1590,8 @@
 }
 
 .originalPriceText {
-  color: #9ca3af;
   text-decoration: line-through;
-  font-size: 16px;
+  margin-right: 8px;
 }
 
 .discountAmount {
@@ -1723,7 +1758,7 @@
 }
 
 // Responsive design
-@media (max-width: 1024px) {
+@media (max-width: 768px) {
   .stepHeading {
     font-size: 28px;
   }
@@ -1783,7 +1818,7 @@
 
 .header {
   --header-bg-opacity: 0.05;
-  background: var(--color-white);
+  background: var(--gray-25);
   padding: 32px 0 0;
   top: 0;
   position: relative;
@@ -1922,29 +1957,31 @@
 // ========================================
 
 .heroSection {
-  background: var(--color-white);
+  background: var(--gray-25);
   padding: 80px 0;
-  border-radius: 0 0 16px 16px;
   position: relative;
   overflow-x: hidden;
 
+  @media (max-width: 768px) {
+    padding: 10px 0;
+  }
+}
+
+.heroSectionWithBackground {
   &::before {
     content: '';
     position: absolute;
     inset: 0;
     background: var(--accent-color);
-    border-radius: 0 0 16px 16px;
     opacity: 0.05;
     pointer-events: none;
-
-    @media (max-width: 768px) {
-      background: var(--accent-color);
-      background: linear-gradient(180deg, var(--accent-color) 0%, #fff 100%);
-    }
+    z-index: 0;
   }
 
   @media (max-width: 768px) {
-    padding: 10px 0;
+    &::before {
+      background: linear-gradient(to bottom, var(--accent-color), transparent);
+    }
   }
 }
 
@@ -1952,9 +1989,10 @@
   max-width: 1215px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 40px;
+  padding: 40px;
   display: grid;
   position: relative;
+  z-index: 1;
   grid-template-columns: 1fr 1fr;
   gap: 80px;
   align-items: center;
@@ -1970,6 +2008,11 @@
   display: flex;
   flex-direction: column;
   gap: 38px;
+  margin-top: 24px;
+
+  &.heroContentCompact {
+    gap: 24px;
+  }
 
   @media (max-width: 992px) {
     padding: 0 20px;
@@ -2101,7 +2144,7 @@
 .primaryButton {
   position: relative;
   background: var(--brand-secondary);
-  color: var(--color-white);
+  color: var(--gray-25);
   border: none;
   padding: 14px 20px;
   border-radius: 30px;
@@ -2213,7 +2256,7 @@
 
 .footer {
   padding: 60px 0 40px 0;
-  background: var(--color-white);
+  background: var(--gray-25);
 }
 
 .footerContainer {
@@ -2785,7 +2828,7 @@
   }
 
   &:disabled {
-    background: #9ca3af;
+    background: var(--gray-400);
     cursor: not-allowed;
   }
 }
@@ -2970,8 +3013,8 @@
 }
 
 .addonCheckboxCustom {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border: 2px solid var(--gray-300);
   border-radius: 4px;
   background: white;
@@ -3030,8 +3073,8 @@
 }
 
 .addonCheckbox:has(input:checked) .addonCheckboxCustom {
-  border-color: var(--blue-500);
-  background-color: var(--blue-500);
+  border-color: var(--brand-primary, --blue-500);
+  background-color: var(--brand-primary, --blue-500);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='13' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: center;
@@ -3050,7 +3093,7 @@
   width: 99px;
   height: 24px;
   border-radius: 30px;
-  background: var(--blue-500);
+  background: var(--brand-primary);
   color: #fff;
   font-size: 12px;
   font-weight: 600;

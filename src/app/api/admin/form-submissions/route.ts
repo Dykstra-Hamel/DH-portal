@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { getUserBranchFilter } from '@/lib/branch-filter';
 
 /**
  * Helper function to get form submission counts for all tabs
@@ -145,6 +146,12 @@ export async function GET(request: NextRequest) {
 
       userCompanyIds = userCompanies.map(uc => uc.company_id);
       query = query.in('company_id', userCompanyIds);
+    }
+
+    // Branch filtering: restrict to user's assigned branches
+    if (companyId) {
+      const branchFilter = await getUserBranchFilter(adminSupabase, user.id, companyId, isGlobalAdmin);
+      if (branchFilter) query = query.or(branchFilter);
     }
 
     // Apply pagination

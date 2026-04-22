@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { GuardedLink } from '@/components/Common/GuardedLink/GuardedLink';
 import { usePathname } from 'next/navigation';
-import { Mails } from 'lucide-react';
+import { Mails, MapPinned, Truck } from 'lucide-react';
 import { useNavigation } from '@/contexts/NavigationContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useCurrentUserPageAccess } from '@/hooks/useUserDepartments';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
+import { createClient } from '@/lib/supabase/client';
 import styles from './secondarySidenav.module.scss';
 
 // Simple RedDot component for new item indicators
@@ -134,11 +135,32 @@ export function SecondarySideNav({
   const { hasAccess: hasSchedulingAccess } =
     useCurrentUserPageAccess('scheduling');
   const { hasAccess: hasSupportAccess } = useCurrentUserPageAccess('support');
+  const { hasAccess: hasTechnicianAccess } = useCurrentUserPageAccess('technician');
 
   // Global admins see everything, otherwise check department access
   const shouldShowSales = isAdmin || hasSalesAccess;
   const shouldShowScheduling = isAdmin || hasSchedulingAccess;
   const shouldShowSupport = isAdmin || hasSupportAccess;
+  const shouldShowTechLeads = isAdmin || hasTechnicianAccess;
+
+  // Company role check for routing (owner/admin/manager at company level)
+  const [companyRole, setCompanyRole] = useState<string | null>(null);
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) return;
+      supabase
+        .from('user_companies')
+        .select('role')
+        .eq('user_id', data.user.id)
+        .eq('company_id', selectedCompany.id)
+        .single()
+        .then(({ data: uc }) => setCompanyRole(uc?.role ?? null));
+    });
+  }, [selectedCompany?.id]);
+
+  const shouldShowRouting = false;
 
   // Handle client-side hydration
   useEffect(() => {
@@ -367,6 +389,12 @@ export function SecondarySideNav({
         );
       case 'campaigns':
         return <Mails size={24} />;
+      case 'tech-leads':
+        return <Truck size={24} />;
+      case 'field-map':
+        return <MapPinned size={24} />;
+      case 'field-sales':
+        return <Truck size={24} />;
       default:
         return null;
     }
@@ -610,6 +638,55 @@ export function SecondarySideNav({
             ],
           },
         ];
+      case 'tech-leads':
+        return [
+          {
+            items: [
+              { text: 'Dashboard', href: '/tech-leads' },
+              { text: 'New Opportunity', href: '/tech-leads/new' },
+              { text: 'My Opportunities', href: '/tech-leads/opportunities' },
+            ],
+          },
+        ];
+      case 'field-map':
+        return [
+          {
+            items: [
+              { text: 'Dashboard', href: '/field-map' },
+              { text: 'New Inspection', href: '/field-map/new' },
+              { text: 'History', href: '/field-map/history' },
+            ],
+          },
+        ];
+      case 'field-sales':
+        return [
+          {
+            items: [
+              { text: 'Dashboard', href: '/field-sales/dashboard' },
+              { text: 'Reports', href: '/field-sales/reports' },
+            ],
+          },
+          // Tech Leads and Field Map sections hidden for now.
+          // ...(shouldShowTechLeads ? [{
+          //   title: 'Tech Leads',
+          //   items: [
+          //     { text: 'My Opportunities', href: '/field-sales/tech-leads/opportunities' },
+          //   ],
+          // }] : []),
+          // {
+          //   title: 'Field Map',
+          //   items: [
+          //     { text: 'History', href: '/field-sales/field-map/history' },
+          //   ],
+          // },
+          ...(shouldShowRouting ? [{
+            title: 'Routing',
+            items: [
+              { text: 'Routes', href: '/field-sales/routes' },
+              { text: 'Schedules', href: '/field-sales/schedules' },
+            ],
+          }] : []),
+        ];
       case 'tickets':
       default:
         return [
@@ -744,6 +821,8 @@ export function SecondarySideNav({
           <h2 className={styles.sectionTitle}>
             {activePrimaryNav === 'project-management'
               ? 'Tracker'
+              : activePrimaryNav === 'field-sales'
+              ? 'Field Sales'
               : activePrimaryNav.charAt(0).toUpperCase() +
                 activePrimaryNav.slice(1)}
           </h2>
@@ -774,7 +853,18 @@ export function SecondarySideNav({
                     (item.href === '/tickets/new' &&
                       (pathname.startsWith('/tickets/new') ||
                         pathname.startsWith('/tickets/calls-and-forms'))) ||
+                    (item.href === '/field-map' &&
+                      (pathname === '/field-map' ||
+                        pathname.startsWith('/field-map/service/'))) ||
+                    (item.href === '/field-sales/dashboard' &&
+                      pathname.startsWith('/field-sales/leads/')) ||
                     (item.href.startsWith('/tickets/') &&
+                      pathname.startsWith(item.href)) ||
+                    (item.href.startsWith('/field-map/') &&
+                      pathname.startsWith(item.href)) ||
+                    (item.href.startsWith('/tech-leads/') &&
+                      pathname.startsWith(item.href)) ||
+                    (item.href.startsWith('/field-sales/') &&
                       pathname.startsWith(item.href));
 
                   return (

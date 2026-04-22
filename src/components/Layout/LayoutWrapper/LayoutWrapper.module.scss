@@ -42,12 +42,28 @@
 
 .techLeadsMainContent {
   padding: 0 !important;
+  scrollbar-gutter: auto;
+}
+
+.fieldMapWizardMainContent {
+  padding: 0 !important;
   overflow: hidden;
   scrollbar-gutter: auto;
 }
 
-
 :global(.pageWrapper).techLeadsPageWrapper {
+  width: 100%;
+  min-height: 100%;
+  max-width: 1357px;
+  margin: 0 auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+
+:global(.pageWrapper).fieldMapWizardPageWrapper {
   width: 100%;
   max-width: 1309px;
   margin: 0 auto;

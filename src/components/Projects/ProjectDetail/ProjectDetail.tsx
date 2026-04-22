@@ -1245,7 +1245,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     firstName={requestedByProfile.first_name || undefined}
                     lastName={requestedByProfile.last_name || undefined}
                     email={requestedByProfile.email}
-                    avatarUrl={requestedByProfile.avatar_url || null}
+                    avatarUrl={requestedByProfile.uploaded_avatar_url || requestedByProfile.avatar_url || null}
                     size="small"
                     showTooltip={true}
                   />
@@ -1296,7 +1296,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                             firstName={member.user_profile?.first_name || undefined}
                             lastName={member.user_profile?.last_name || undefined}
                             email={member.user_profile?.email || ''}
-                            avatarUrl={member.user_profile?.avatar_url || null}
+                            avatarUrl={member.user_profile?.uploaded_avatar_url || member.user_profile?.avatar_url || null}
                             size="small"
                             showTooltip={true}
                           />
@@ -1395,7 +1395,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                     firstName={activity.user_profile?.first_name || undefined}
                     lastName={activity.user_profile?.last_name || undefined}
                     email={activity.user_profile?.email || ''}
-                    avatarUrl={activity.user_profile?.avatar_url || null}
+                    avatarUrl={activity.user_profile?.uploaded_avatar_url || activity.user_profile?.avatar_url || null}
                     size="small"
                     showTooltip={true}
                     className={styles.activityAvatar}

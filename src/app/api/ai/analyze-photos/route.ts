@@ -64,7 +64,7 @@ Return ONLY valid JSON in this exact format:
 {
   "issue_detected": "Brief description of the main issue or finding visible in the photos",
   "service_category": "One of: Pest Control, Termite Treatment, Mosquito Service, Rodent Control, Wildlife Removal, General Inspection, or Other",
-  "ai_summary": "2-3 sentence summary of findings and recommended action",
+  "ai_summary": "2-3 sentence summary of findings and recommended action. Write in a direct, matter-of-fact tone as if a human technician is describing what they found — do not reference the images or photos (e.g. avoid 'The images show...' or 'The photos clearly indicate...'). Start with the observation directly, e.g. 'There is evidence of...' or 'Extensive damage is visible...'",
   "suggested_pest_type": "Specific pest type if identifiable (e.g. German Cockroach, Norway Rat, Subterranean Termite) or null",
   "matched_pest_option": "Exact name from the company pest options list, or null",
   "severity": "low or medium or high or null"

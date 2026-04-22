@@ -42,13 +42,24 @@ export async function PUT(
       );
     }
 
+    const allowedRoles = ['admin', 'user', 'customer', 'project_manager'];
+    const role = body.role && allowedRoles.includes(body.role) ? body.role : undefined;
+
+    const updatePayload: Record<string, string | null> = {
+      first_name: userData.first_name,
+      last_name: userData.last_name,
+      email: userData.email,
+    };
+    if (role !== undefined) updatePayload.role = role;
+
+    // Optional profile fields
+    if ('title' in body) updatePayload.title = sanitizeString(body.title || '').slice(0, 150) || null;
+    if ('phone' in body) updatePayload.phone = sanitizeString(body.phone || '').slice(0, 50) || null;
+    if ('contact_email' in body) updatePayload.contact_email = sanitizeString(body.contact_email || '').slice(0, 255) || null;
+
     const { error } = await supabase
       .from('profiles')
-      .update({
-        first_name: userData.first_name,
-        last_name: userData.last_name,
-        email: userData.email,
-      })
+      .update(updatePayload)
       .eq('id', userId);
 
     if (error) {

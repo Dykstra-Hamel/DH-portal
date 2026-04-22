@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceRoleClient } from '@/lib/supabase/server';
+import { parseTimeOptions } from '@/lib/time-options';
 
 export async function GET(
   request: NextRequest,
@@ -60,6 +61,7 @@ export async function GET(
         'wisetack_enabled',
         'wisetack_url',
         'quote_accent_color_preference',
+        'requested_time_options',
       ]);
 
     // Parse settings into usable format
@@ -97,6 +99,7 @@ export async function GET(
         wisetack_enabled: companySettings.wisetack_enabled === 'true',
         wisetack_url: companySettings.wisetack_url || '',
         quote_accent_color_preference: (companySettings.quote_accent_color_preference as 'primary' | 'secondary') || 'primary',
+        time_options: parseTimeOptions(companySettings.requested_time_options),
       },
       branding: {
         logo_url: brandData?.logo_url || null,

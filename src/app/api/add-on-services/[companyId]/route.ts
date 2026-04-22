@@ -13,10 +13,13 @@ export async function GET(
     const { companyId } = await params;
     const supabase = await createClient();
 
-    // Fetch add-ons for the company
+    // Fetch add-ons for the company, including eligibility data
     const { data: addons, error } = await supabase
       .from('add_on_services')
-      .select('*')
+      .select(`
+        *,
+        addon_service_plan_eligibility ( service_plan_id )
+      `)
       .eq('company_id', companyId)
       .eq('is_active', true)
       .order('display_order', { ascending: true });
@@ -29,7 +32,15 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, addons });
+    const transformedAddons = (addons || []).map((a: any) => ({
+      ...a,
+      eligible_plan_ids: (a.addon_service_plan_eligibility ?? []).map(
+        (r: any) => r.service_plan_id as string
+      ),
+      addon_service_plan_eligibility: undefined,
+    }));
+
+    return NextResponse.json({ success: true, addons: transformedAddons });
   } catch (error) {
     console.error('Error in GET /api/add-on-services/[companyId]:', error);
     return NextResponse.json(
@@ -79,6 +90,12 @@ export async function POST(
         eligibility_mode: body.eligibility_mode || 'all',
         is_active: body.is_active !== undefined ? body.is_active : true,
         requires_quote: body.requires_quote || false,
+        price_per_unit: body.price_per_unit ?? null,
+        pricing_type: body.pricing_type || 'flat',
+        additional_unit_price: body.additional_unit_price ?? null,
+        minimum_price: body.minimum_price ?? null,
+        variants: body.variants || [],
+        percentage_pricing: body.percentage_pricing || null,
       })
       .select()
       .single();

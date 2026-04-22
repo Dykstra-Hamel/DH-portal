@@ -13,6 +13,7 @@ export interface User {
   last_name: string;
   email: string;
   avatar_url?: string;
+  uploaded_avatar_url?: string | null;
 }
 
 export interface Client {

@@ -9,11 +9,12 @@
 import { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 import RichTextEditor from '../Common/RichTextEditor/RichTextEditor';
+import { TimeOption, DEFAULT_TIME_OPTIONS, parseTimeOptions } from '@/lib/time-options';
 import styles from './CompanyManagement.module.scss';
 
 interface QuotePageSectionProps {
   companyId: string;
-  onSave: (data: { quote_terms: string; quote_thanks_content: string; wisetack_enabled: boolean; wisetack_url: string; quote_accent_color_preference: string }) => void;
+  onSave: (data: { quote_terms: string; quote_thanks_content: string; wisetack_enabled: boolean; wisetack_url: string; quote_accent_color_preference: string; requested_time_options: TimeOption[] }) => void;
   saving: boolean;
 }
 
@@ -27,6 +28,7 @@ export default function QuotePageSection({
   const [wisetackEnabled, setWisetackEnabled] = useState(false);
   const [wisetackUrl, setWisetackUrl] = useState('');
   const [quoteAccentColorPreference, setQuoteAccentColorPreference] = useState<'primary' | 'secondary'>('primary');
+  const [timeOptions, setTimeOptions] = useState<TimeOption[]>(DEFAULT_TIME_OPTIONS);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export default function QuotePageSection({
         setWisetackEnabled(settings.wisetack_enabled?.value === 'true');
         setWisetackUrl(settings.wisetack_url?.value || '');
         setQuoteAccentColorPreference((settings.quote_accent_color_preference?.value as 'primary' | 'secondary') || 'primary');
+        setTimeOptions(parseTimeOptions(settings.requested_time_options?.value));
       }
     } catch (error) {
       console.error('Error loading quote page settings:', error);
@@ -59,6 +62,7 @@ export default function QuotePageSection({
       wisetack_enabled: wisetackEnabled,
       wisetack_url: wisetackUrl,
       quote_accent_color_preference: quoteAccentColorPreference,
+      requested_time_options: timeOptions,
     });
   };
 
@@ -139,6 +143,38 @@ export default function QuotePageSection({
         <p className={styles.fieldDescription}>
           Choose which brand color is used as the primary accent on the public quote page. &quot;Reversed&quot; swaps the primary and secondary brand colors.
         </p>
+      </div>
+
+      <div className={styles.formGroup}>
+        <label>Appointment Time Slots</label>
+        <p className={styles.fieldDescription}>
+          Configure which time slot options customers see when scheduling. You can rename labels and enable or disable each option.
+        </p>
+        {timeOptions.map((opt, index) => (
+          <div key={opt.value} className={styles.toggleRow} style={{ marginBottom: 8 }}>
+            <input
+              type="checkbox"
+              id={`time-opt-${opt.value}`}
+              checked={opt.enabled}
+              onChange={e => {
+                const updated = [...timeOptions];
+                updated[index] = { ...updated[index], enabled: e.target.checked };
+                setTimeOptions(updated);
+              }}
+            />
+            <input
+              type="text"
+              value={opt.label}
+              onChange={e => {
+                const updated = [...timeOptions];
+                updated[index] = { ...updated[index], label: e.target.value };
+                setTimeOptions(updated);
+              }}
+              className={styles.textInput}
+              style={{ marginLeft: 8, flex: 1 }}
+            />
+          </div>
+        ))}
       </div>
 
       <div className={styles.actions}>

@@ -24,6 +24,7 @@ import {
   CheckSquare,
   Brain,
   Puzzle,
+  GitBranch,
 } from 'lucide-react';
 import Image from 'next/image';
 import PricingSettingsManager from './PricingSettingsManager';
@@ -32,11 +33,14 @@ import DiscountManager from './DiscountManager';
 import EmailDomainManager from './EmailDomainManager';
 import ServicePlansManager from './ServicePlansManager';
 import ServiceAreasManager from './ServiceAreasManager';
+import BranchesManager from './BranchesManager';
 import CompanyPestSelector from './CompanyPestSelector';
 import CompanyFeaturesManager from './CompanyFeaturesManager';
 import BusinessHoursEditor, { BusinessHoursData } from './BusinessHoursEditor';
 import QuotePageSection from './QuotePageSection';
+import { DEFAULT_TIME_OPTIONS } from '@/lib/time-options';
 import PestPacSettingsManager from './PestPacSettingsManager';
+import FieldMapSettingsManager from './FieldMapSettingsManager';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import headerStyles from '@/components/Layout/GlobalLowerHeader/GlobalLowerHeader.module.scss';
 import styles from './CompanyManagement.module.scss';
@@ -93,6 +97,7 @@ type ActiveSection =
   | 'pest-management'
   | 'service-plans'
   | 'service-areas'
+  | 'branches'
   | 'pricing-settings'
   | 'sales-config'
   | 'discounts'
@@ -115,7 +120,6 @@ function normalizeWebsiteUrl(url: string): string {
 
 export default function CompanyManagement({
   companyId,
-  user,
 }: CompanyManagementProps) {
   const router = useRouter();
   const supabase = createClient();
@@ -345,6 +349,11 @@ export default function CompanyManagement({
                 value: updatedData.quote_accent_color_preference || 'primary',
                 type: 'string',
                 description: 'Which brand color is used as the primary accent on the public quote page',
+              },
+              requested_time_options: {
+                value: JSON.stringify(updatedData.requested_time_options || DEFAULT_TIME_OPTIONS),
+                type: 'json',
+                description: 'Time slot options shown on scheduling forms',
               },
             },
           }),
@@ -588,6 +597,7 @@ export default function CompanyManagement({
     { id: 'pest-management', label: 'Pest Management', icon: Bug },
     { id: 'service-plans', label: 'Service Plans', icon: FileText },
     { id: 'service-areas', label: 'Service Areas', icon: Map },
+    { id: 'branches', label: 'Branches', icon: GitBranch },
     { id: 'pricing-settings', label: 'Pricing Settings', icon: DollarSign },
     { id: 'sales-config', label: 'Sales Config', icon: Target },
     { id: 'discounts', label: 'Discounts', icon: Tag },
@@ -699,6 +709,9 @@ export default function CompanyManagement({
           {activeSection === 'service-areas' && (
             <ServiceAreasManager companyId={companyId} />
           )}
+          {activeSection === 'branches' && (
+            <BranchesManager companyId={companyId} />
+          )}
           {activeSection === 'pricing-settings' && (
             <PricingSettingsManager companyId={companyId} />
           )}
@@ -712,18 +725,21 @@ export default function CompanyManagement({
             <EmailDomainManager companyId={companyId} />
           )}
           {activeSection === 'ai-content' && (
-            <AiContentSection
-              aiContext={aiContext}
-              onAiContextChange={setAiContext}
-              brandVoiceFormality={brandVoiceFormality}
-              onFormalityChange={setBrandVoiceFormality}
-              brandVoiceHumor={brandVoiceHumor}
-              onHumorChange={setBrandVoiceHumor}
-              wordsNotToUse={wordsNotToUse}
-              onWordsChange={setWordsNotToUse}
-              onSave={data => handleSave('ai-content', data)}
-              saving={saving}
-            />
+            <>
+              <AiContentSection
+                aiContext={aiContext}
+                onAiContextChange={setAiContext}
+                brandVoiceFormality={brandVoiceFormality}
+                onFormalityChange={setBrandVoiceFormality}
+                brandVoiceHumor={brandVoiceHumor}
+                onHumorChange={setBrandVoiceHumor}
+                wordsNotToUse={wordsNotToUse}
+                onWordsChange={setWordsNotToUse}
+                onSave={data => handleSave('ai-content', data)}
+                saving={saving}
+              />
+              <AIStandingInstructionsSection companyId={companyId} />
+            </>
           )}
           {activeSection === 'quote-page' && (
             <QuotePageSection
@@ -733,7 +749,10 @@ export default function CompanyManagement({
             />
           )}
           {activeSection === 'integrations' && (
-            <PestPacSettingsManager companyId={companyId} />
+            <>
+              <PestPacSettingsManager companyId={companyId} />
+              <FieldMapSettingsManager companyId={companyId} />
+            </>
           )}
         </div>
       </div>
@@ -1057,7 +1076,7 @@ function BusinessSection({ company, onSave, saving }: BusinessSectionProps) {
     }
 
     // Save business info (industry, size)
-    await onSave({ industry: formData.industry, size: formData.size });
+    onSave({ industry: formData.industry, size: formData.size });
 
     // Save short_code, timezone, business hours, and URLs settings separately
     try {
@@ -1670,6 +1689,380 @@ function AiContentSection({
           {saving ? 'Saving...' : 'Save AI Settings'}
         </button>
       </form>
+    </div>
+  );
+}
+
+// ─── AI Standing Instructions Section ─────────────────────────────────────────
+
+interface StandingInstruction {
+  id: string;
+  scope: string;
+  content_type: string | null;
+  instruction_text: string;
+  is_active: boolean;
+  source: string;
+  created_at: string;
+}
+
+interface AiFeedbackRecord {
+  id: string;
+  feature_type: string;
+  content_type: string | null;
+  notes: string | null;
+  original_prompt: string | null;
+  created_at: string;
+}
+
+const SCOPE_LABELS: Record<string, string> = {
+  all: 'All',
+  draft: 'Draft',
+  headlines: 'Headlines',
+  edit: 'Inline Edit',
+};
+
+const CONTENT_TYPE_LABELS_INSTR: Record<string, string> = {
+  blog: 'Blog',
+  evergreen: 'Evergreen',
+  location: 'Location',
+  pillar: 'Pillar',
+  cluster: 'Cluster',
+  pest_id: 'Pest ID',
+  other: 'Other',
+};
+
+function AIStandingInstructionsSection({ companyId }: { companyId: string }) {
+  const [instructions, setInstructions] = useState<StandingInstruction[]>([]);
+  const [globalInstructions, setGlobalInstructions] = useState<StandingInstruction[]>([]);
+  const [feedback, setFeedback] = useState<AiFeedbackRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [feedbackExpanded, setFeedbackExpanded] = useState(false);
+
+  const [newScope, setNewScope] = useState<string>('all');
+  const [newContentType, setNewContentType] = useState<string>('');
+  const [newText, setNewText] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [savingGlobal, setSavingGlobal] = useState(false);
+
+  const [prefillText, setPrefillText] = useState('');
+
+  useEffect(() => {
+    loadData();
+  }, [companyId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [instrRes, globalRes, fbRes] = await Promise.all([
+        fetch(`/api/admin/companies/${companyId}/ai-instructions`),
+        fetch('/api/admin/ai-instructions'),
+        fetch(`/api/admin/companies/${companyId}/ai-feedback`),
+      ]);
+      if (instrRes.ok) {
+        const d = await instrRes.json();
+        setInstructions(d.instructions ?? []);
+      }
+      if (globalRes.ok) {
+        const d = await globalRes.json();
+        setGlobalInstructions(d.instructions ?? []);
+      }
+      if (fbRes.ok) {
+        const d = await fbRes.json();
+        setFeedback(d.feedback ?? []);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (prefillText) {
+      setNewText(prefillText);
+      setPrefillText('');
+    }
+  }, [prefillText]);
+
+  const handleAdd = async (e: React.FormEvent, target: 'company' | 'global') => {
+    e.preventDefault();
+    if (!newText.trim()) return;
+    const isGlobal = target === 'global';
+    if (isGlobal) setSavingGlobal(true);
+    else setSaving(true);
+    setSaveError('');
+    try {
+      const url = isGlobal
+        ? '/api/admin/ai-instructions'
+        : `/api/admin/companies/${companyId}/ai-instructions`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          scope: newScope,
+          content_type: newContentType || null,
+          instruction_text: newText.trim(),
+          source: 'manual',
+        }),
+      });
+      if (!res.ok) {
+        setSaveError('Failed to save. Please try again.');
+        return;
+      }
+      setNewText('');
+      setNewScope('all');
+      setNewContentType('');
+      await loadData();
+    } catch {
+      setSaveError('Failed to save. Please try again.');
+    } finally {
+      setSaving(false);
+      setSavingGlobal(false);
+    }
+  };
+
+  const handleToggleActive = async (instr: StandingInstruction) => {
+    await fetch(`/api/admin/companies/${companyId}/ai-instructions/${instr.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !instr.is_active }),
+    });
+    setInstructions(prev => prev.map(i => i.id === instr.id ? { ...i, is_active: !instr.is_active } : i));
+  };
+
+  const handleToggleGlobalActive = async (instr: StandingInstruction) => {
+    await fetch(`/api/admin/ai-instructions/${instr.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_active: !instr.is_active }),
+    });
+    setGlobalInstructions(prev => prev.map(i => i.id === instr.id ? { ...i, is_active: !instr.is_active } : i));
+  };
+
+  const handleDelete = async (instrId: string) => {
+    await fetch(`/api/admin/companies/${companyId}/ai-instructions/${instrId}`, {
+      method: 'DELETE',
+    });
+    setInstructions(prev => prev.filter(i => i.id !== instrId));
+  };
+
+  const handleDeleteGlobal = async (instrId: string) => {
+    await fetch(`/api/admin/ai-instructions/${instrId}`, {
+      method: 'DELETE',
+    });
+    setGlobalInstructions(prev => prev.filter(i => i.id !== instrId));
+  };
+
+  const handlePromoteFeedback = async (fb: AiFeedbackRecord) => {
+    setPrefillText(fb.notes || '');
+    setFeedbackExpanded(false);
+    // Mark as promoted
+    await fetch(`/api/admin/companies/${companyId}/ai-feedback/${fb.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promoted_to_instruction: true }),
+    });
+    setFeedback(prev => prev.filter(f => f.id !== fb.id));
+  };
+
+  const instructionRowMarkup = (
+    instr: StandingInstruction,
+    onToggle: () => void,
+    onDelete: () => void,
+    isGlobal = false
+  ) => (
+    <div key={instr.id} className={`${styles.instructionRow} ${!instr.is_active ? styles.instructionInactive : ''}`}>
+      <div className={styles.instructionMeta}>
+        <span className={styles.scopeBadge}>{SCOPE_LABELS[instr.scope] ?? instr.scope}</span>
+        <span className={styles.contentTypeBadge}>
+          {instr.content_type ? (CONTENT_TYPE_LABELS_INSTR[instr.content_type] ?? instr.content_type) : 'All types'}
+        </span>
+        {isGlobal && (
+          <span className={styles.globalBadge}>Global</span>
+        )}
+      </div>
+      <div className={styles.instructionText}>{instr.instruction_text}</div>
+      <div className={styles.instructionActions}>
+        <button
+          type="button"
+          className={styles.toggleBtn}
+          onClick={onToggle}
+          title={instr.is_active ? 'Deactivate' : 'Activate'}
+        >
+          {instr.is_active ? 'Active' : 'Inactive'}
+        </button>
+        <button
+          type="button"
+          className={styles.deleteBtn}
+          onClick={onDelete}
+          title="Delete instruction"
+        >
+          &#x2715;
+        </button>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className={styles.section}>
+      <h2>Standing Instructions</h2>
+      <p style={{ fontSize: 14, color: '#6b7280', marginBottom: 16 }}>
+        Rules injected automatically into every AI generation prompt for this company.
+      </p>
+
+      {loading ? (
+        <p style={{ fontSize: 14, color: '#6b7280' }}>Loading...</p>
+      ) : (
+        <>
+          {/* Company instructions list */}
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginBottom: 8 }}>Company Rules</h3>
+          {instructions.length === 0 ? (
+            <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 16 }}>No company instructions yet. Add one below.</p>
+          ) : (
+            <div className={styles.instructionsList}>
+              {instructions.map(instr =>
+                instructionRowMarkup(
+                  instr,
+                  () => handleToggleActive(instr),
+                  () => handleDelete(instr.id)
+                )
+              )}
+            </div>
+          )}
+
+          {/* Global instructions list */}
+          <h3 style={{ fontSize: 13, fontWeight: 600, color: '#374151', marginTop: 20, marginBottom: 8 }}>Global Rules</h3>
+          <p style={{ fontSize: 13, color: '#6b7280', marginBottom: 10 }}>
+            Applied to all companies. Changes here affect every client.
+          </p>
+          {globalInstructions.length === 0 ? (
+            <p style={{ fontSize: 14, color: '#9ca3af', marginBottom: 16 }}>No global instructions yet.</p>
+          ) : (
+            <div className={styles.instructionsList}>
+              {globalInstructions.map(instr =>
+                instructionRowMarkup(
+                  instr,
+                  () => handleToggleGlobalActive(instr),
+                  () => handleDeleteGlobal(instr.id),
+                  true
+                )
+              )}
+            </div>
+          )}
+
+          {/* Add instruction form */}
+          <form onSubmit={e => e.preventDefault()} className={styles.addInstructionForm}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>Add Rule</h3>
+            <div className={styles.instrFormRow}>
+              <div className={styles.formGroup} style={{ flex: '0 0 140px' }}>
+                <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 4 }}>Scope</label>
+                <select
+                  value={newScope}
+                  onChange={e => setNewScope(e.target.value)}
+                  style={{ width: '100%', padding: '6px 8px', fontSize: 13, borderRadius: 5, border: '1px solid #d1d5db' }}
+                >
+                  <option value="all">All features</option>
+                  <option value="draft">Draft only</option>
+                  <option value="headlines">Headlines only</option>
+                  <option value="edit">Inline edit only</option>
+                </select>
+              </div>
+              <div className={styles.formGroup} style={{ flex: '0 0 140px' }}>
+                <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 4 }}>Content Type</label>
+                <select
+                  value={newContentType}
+                  onChange={e => setNewContentType(e.target.value)}
+                  style={{ width: '100%', padding: '6px 8px', fontSize: 13, borderRadius: 5, border: '1px solid #d1d5db' }}
+                >
+                  <option value="">All types</option>
+                  <option value="blog">Blog</option>
+                  <option value="evergreen">Evergreen</option>
+                  <option value="location">Location</option>
+                  <option value="pillar">Pillar</option>
+                  <option value="cluster">Cluster</option>
+                  <option value="pest_id">Pest ID</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div className={styles.formGroup} style={{ flex: 1 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, display: 'block', marginBottom: 4 }}>Instruction</label>
+                <textarea
+                  value={newText}
+                  onChange={e => setNewText(e.target.value)}
+                  placeholder="e.g. Always mention our satisfaction guarantee at the end."
+                  rows={2}
+                  style={{ width: '100%', padding: '6px 8px', fontSize: 13, borderRadius: 5, border: '1px solid #d1d5db', resize: 'vertical', fontFamily: 'inherit' }}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end', paddingBottom: 2 }}>
+                <button
+                  type="button"
+                  disabled={saving || !newText.trim()}
+                  className={styles.saveButton}
+                  style={{ marginTop: 0, whiteSpace: 'nowrap' }}
+                  onClick={e => handleAdd(e, 'company')}
+                >
+                  {saving ? 'Saving...' : 'Add for This Company'}
+                </button>
+                <button
+                  type="button"
+                  disabled={savingGlobal || !newText.trim()}
+                  className={styles.saveButton}
+                  style={{ marginTop: 0, whiteSpace: 'nowrap', background: '#7c3aed', borderColor: '#7c3aed' }}
+                  onClick={e => handleAdd(e, 'global')}
+                >
+                  {savingGlobal ? 'Saving...' : 'Add for All Companies'}
+                </button>
+              </div>
+            </div>
+            {saveError && <p style={{ fontSize: 13, color: '#ef4444', marginTop: 6 }}>{saveError}</p>}
+          </form>
+
+          {/* Pending feedback section */}
+          {feedback.length > 0 && (
+            <div className={styles.feedbackPanel}>
+              <button
+                type="button"
+                className={styles.feedbackToggle}
+                onClick={() => setFeedbackExpanded(v => !v)}
+              >
+                {feedbackExpanded ? '▾' : '▸'} Pending Feedback ({feedback.length})
+              </button>
+              {feedbackExpanded && (
+                <div className={styles.feedbackList}>
+                  {feedback.map(fb => (
+                    <div key={fb.id} className={styles.feedbackCard}>
+                      <div className={styles.feedbackCardMeta}>
+                        <span className={styles.scopeBadge}>{SCOPE_LABELS[fb.feature_type] ?? fb.feature_type}</span>
+                        {fb.content_type && (
+                          <span className={styles.contentTypeBadge}>
+                            {CONTENT_TYPE_LABELS_INSTR[fb.content_type] ?? fb.content_type}
+                          </span>
+                        )}
+                        <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                          {new Date(fb.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                      {fb.notes && (
+                        <div className={styles.feedbackNotes}>&ldquo;{fb.notes}&rdquo;</div>
+                      )}
+                      {fb.original_prompt && (
+                        <div className={styles.feedbackPrompt}>Prompt used: {fb.original_prompt}</div>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.promoteBtn}
+                        onClick={() => handlePromoteFeedback(fb)}
+                      >
+                        Create rule from this
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

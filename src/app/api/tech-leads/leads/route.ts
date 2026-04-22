@@ -13,6 +13,7 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
+    const leadId = searchParams.get('leadId');
 
     if (!companyId) {
       return NextResponse.json({ error: 'Company ID is required' }, { status: 400 });
@@ -20,7 +21,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient();
 
-    const { data: leads, error } = await supabase
+    let query = supabase
       .from('leads')
       .select(
         `
@@ -34,6 +35,7 @@ export async function GET(request: NextRequest) {
         service_type,
         pest_type,
         estimated_value,
+        photo_urls,
         customers(
           first_name,
           last_name,
@@ -52,11 +54,19 @@ export async function GET(request: NextRequest) {
         )
         `
       )
-      .eq('lead_source', 'technician')
       .eq('submitted_by', user.id)
-      .eq('company_id', companyId)
-      .order('created_at', { ascending: false })
-      .limit(50);
+      .eq('company_id', companyId);
+
+    if (leadId) {
+      query = query.eq('id', leadId).limit(1);
+    } else {
+      query = query
+        .eq('lead_source', 'technician')
+        .order('created_at', { ascending: false })
+        .limit(50);
+    }
+
+    const { data: leads, error } = await query;
 
     if (error) {
       console.error('Error fetching tech leads:', error);
@@ -96,6 +106,10 @@ export async function GET(request: NextRequest) {
       ...lead,
       submitted_notes: notesByLead[lead.id] ?? [],
     }));
+
+    if (leadId) {
+      return NextResponse.json({ lead: enrichedLeads[0] ?? null });
+    }
 
     return NextResponse.json({ leads: enrichedLeads });
   } catch (error) {

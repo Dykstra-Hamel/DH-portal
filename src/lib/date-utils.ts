@@ -40,6 +40,35 @@ export function formatDuration(minutes: number): string {
 }
 
 /**
+ * Format an elapsed duration as a compact age label using the largest
+ * appropriate unit: minutes, hours, or days.
+ *
+ * Examples: "10m", "32m", "1hr", "23hr", "1d", "10d".
+ *
+ * Accepts a Date, ISO string, or millisecond timestamp. Returns "0m" for
+ * invalid or future timestamps.
+ */
+export function formatAge(input: Date | string | number): string {
+  const past =
+    input instanceof Date
+      ? input.getTime()
+      : typeof input === 'number'
+        ? input
+        : new Date(input).getTime();
+
+  if (Number.isNaN(past)) return '0m';
+
+  const diffMs = Math.max(0, Date.now() - past);
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(diffMs / 3600000);
+  const days = Math.floor(diffMs / 86400000);
+
+  if (minutes < 60) return `${minutes}m`;
+  if (hours < 24) return `${hours}hr`;
+  return `${days}d`;
+}
+
+/**
  * Get relative time string (e.g., "2 hours ago")
  */
 export function getTimeAgo(date: Date | string): string {

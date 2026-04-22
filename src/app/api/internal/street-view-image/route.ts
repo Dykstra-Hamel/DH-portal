@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
     const width = searchParams.get('width') || '600';
     const height = searchParams.get('height') || '400';
     const type = searchParams.get('type') || 'streetview';
+    const zoomParam = searchParams.get('zoom') || '18';
+    const markerParam = searchParams.get('marker');
+    const includeMarker = markerParam !== 'false';
 
     // Validate input
     if (!latitude || !longitude) {
@@ -24,8 +27,12 @@ export async function GET(request: NextRequest) {
     // Validate dimensions
     const maxWidth = 640;
     const maxHeight = 640;
-    const imageWidth = Math.min(parseInt(width), maxWidth);
-    const imageHeight = Math.min(parseInt(height), maxHeight);
+    const parsedWidth = Number.parseInt(width, 10);
+    const parsedHeight = Number.parseInt(height, 10);
+    const parsedZoom = Number.parseInt(zoomParam, 10);
+    const imageWidth = Math.min(Number.isFinite(parsedWidth) ? parsedWidth : 600, maxWidth);
+    const imageHeight = Math.min(Number.isFinite(parsedHeight) ? parsedHeight : 400, maxHeight);
+    const zoom = Number.isFinite(parsedZoom) ? Math.min(21, Math.max(14, parsedZoom)) : 18;
 
     // Get API key from server-side environment
     const apiKey = process.env.GOOGLE_PLACES_API_KEY;
@@ -45,13 +52,14 @@ export async function GET(request: NextRequest) {
         `location=${latitude},${longitude}&` +
         `key=${apiKey}`;
     } else if (type === 'satellite') {
+      const markerSegment = includeMarker ? `markers=color:red%7C${latitude},${longitude}&` : '';
       // Generate Static Maps API satellite URL
       googleMapsUrl = `https://maps.googleapis.com/maps/api/staticmap?` +
         `center=${latitude},${longitude}&` +
-        `zoom=18&` +
+        `zoom=${zoom}&` +
         `size=${imageWidth}x${imageHeight}&` +
         `maptype=satellite&` +
-        `markers=color:red%7C${latitude},${longitude}&` +
+        markerSegment +
         `key=${apiKey}`;
     } else {
       return NextResponse.json(

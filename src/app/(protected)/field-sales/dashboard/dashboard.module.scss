@@ -1,0 +1,297 @@
+.wrapper {
+  height: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.section {
+  flex: 0 0 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+// ─── Inspector / Admin Layout ─────────────────────────────────────────────────
+
+.wrapperInspector {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--gray-25);
+  scrollbar-width: none;
+  padding-bottom: 80px;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+// ─── Tab Bar ─────────────────────────────────────────────────────────────────
+
+.tabBarWrapper {
+  margin: 24px 0 0;
+  padding: 0 24px;
+
+  @media (max-width: 768px) {
+    padding: 0 16px;
+  }
+}
+
+.tabBar {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  background: #ebebeb;
+  border-radius: 8px;
+  padding: 10px;
+  height: 59px;
+  box-sizing: border-box;
+}
+
+// Sliding background pill — left/width set by JS, animated via CSS transition
+.tabSlider {
+  position: absolute;
+  top: 10px;
+  bottom: 10px;
+  background: var(--gray-20, #fafafa);
+  border-radius: 4px;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 0 12px 0 rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  z-index: 0;
+  transition:
+    left 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    width 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tab {
+  flex: 1 1 0;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  padding: 0 6px;
+  cursor: pointer;
+  overflow: hidden;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+// tabActive only used to keep the active label/count visually distinct if needed
+.tabActive {
+  background: transparent; // slider handles the background
+}
+
+.tabLabel {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+  text-align: center;
+  color: var(--gray-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.tabCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 21px;
+  background: var(--gray-400);
+  border-radius: 999px;
+  color: var(--white, #fff);
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.tabCountNew {
+  background: var(--error-600);
+}
+
+// ─── Mobile dropdown (replaces tab bar under 768px) ──────────────────────────
+
+.mobileTabSelect {
+  display: none;
+  position: relative;
+  background: #ebebeb;
+  border-radius: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.mobileTabTrigger {
+  width: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 40px;
+  border: none;
+  background: var(--gray-20, #fafafa);
+  border-radius: 4px;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 0 12px 0 rgba(0, 0, 0, 0.06);
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+  }
+}
+
+.mobileTabChevron {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: inline-flex;
+  transition: transform 0.2s ease;
+}
+
+.mobileTabChevronOpen {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.mobileTabMenu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 20;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow:
+    0 4px 6px 0 rgba(0, 0, 0, 0.04),
+    0 8px 24px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobileTabMenuItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-100, #f3f4f6);
+  }
+
+  &:focus {
+    outline: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .tabBar {
+    display: none;
+  }
+
+  .mobileTabSelect {
+    display: block;
+  }
+}
+
+// ─── Content Area ─────────────────────────────────────────────────────────────
+
+.contentArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-top: 32px;
+}
+
+.leadsSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+  gap: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.panelSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+  overflow-y: auto;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.opportunitiesSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tasksHeader {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 0 12px;
+}
+
+.createTaskBtn {
+  padding: 8px 16px;
+  background: var(--blue-600);
+  color: var(--white);
+  border: none;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+
+  &:hover {
+    background: var(--blue-600);
+  }
+}

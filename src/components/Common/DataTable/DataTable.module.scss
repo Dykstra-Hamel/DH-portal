@@ -7,6 +7,12 @@
   min-width: 0;
   min-height: 400px;
   overflow-x: auto;
+
+  @media (max-width: 1280px) {
+    background: transparent;
+    border: none;
+    padding: 0;
+  }
 }
 
 .loading,
@@ -16,7 +22,7 @@
   justify-content: center;
   height: 200px;
   color: var(--gray-600);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 16px;
 }
 
@@ -84,7 +90,7 @@
   display: flex;
   flex-direction: column;
   gap: 0;
-  min-width: 0;
+  min-width: max-content;
 }
 
 .headerRow {
@@ -101,7 +107,7 @@
 
   // Header text styling
   color: var(--gray-800);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 12px;
   font-style: normal;
   font-weight: 700;
@@ -152,7 +158,7 @@
 .defaultCell {
   display: flex;
   align-items: flex-start;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   justify-content: flex-start;
   font-style: normal;
@@ -418,31 +424,32 @@
 
 // Table-specific column configurations
 .ticketTable {
-  --table-columns: 120px 180px 140px 250px 100px 120px 150px 1fr;
+  --table-columns: 120px 180px 140px 250px 100px 120px 150px minmax(150px, 1fr);
 }
 
 .supportCaseTable {
-  --table-columns: 120px 180px 140px 250px 150px 120px 170px 1fr;
+  --table-columns: 120px 180px 140px 250px 150px 120px 170px minmax(150px, 1fr);
 }
 
 .leadTable {
-  --table-columns: 180px 180px 200px 220px 180px 90px 1fr;
+  --table-columns: 180px 180px 200px 220px 180px 90px minmax(150px, 1fr);
 }
 
 .callTable {
-  --table-columns: 180px 180px 150px 100px 100px 120px 100px 1fr;
+  --table-columns: 180px 180px 150px 100px 100px 120px 100px minmax(150px, 1fr);
 }
 
 .customerTable {
-  --table-columns: 320px 280px 120px 100px 100px 120px 150px 1fr;
+  --table-columns: 320px 280px 120px 100px 100px 120px 150px minmax(150px, 1fr);
 }
 
 .customerTableWithCompany {
-  --table-columns: 300px 240px 120px 140px 100px 100px 120px 120px 1fr;
+  --table-columns: 300px 240px 120px 140px 100px 100px 120px 120px
+    minmax(150px, 1fr);
 }
 
 .taskTable {
-  --table-columns: 1fr 100px 90px 150px 150px 1fr;
+  --table-columns: minmax(200px, 1fr) 100px 90px 150px 150px minmax(150px, 1fr);
 }
 
 .taskTable .headerRow,
@@ -567,6 +574,176 @@
   font-size: 13px;
   font-weight: 500;
   color: var(--gray-700);
+}
+
+// ─── Card view (narrow viewports) ────────────────────────────────────────────
+
+.cardListContainer {
+  border-radius: 8px;
+  background: var(--gray-100, #ebebeb);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardListHeader {
+  display: grid;
+  grid-template-columns: var(--card-grid-template, 1fr);
+  gap: 16px;
+  padding: 0 16px;
+  align-items: flex-end;
+}
+
+.cardListHeaderCell {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--gray-400, #999);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardList {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--gray-25, #fafafa);
+  border: 1px solid var(--gray-300, #b8b8b8);
+  border-radius: 8px;
+  padding: 16px;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+
+  &:focus-visible {
+    outline: none;
+  }
+}
+
+.cardUnread {
+  background: var(--blue-25, #f5f9ff);
+  border-color: var(--blue-600, #2478f5);
+  box-shadow: inset 0 0 0 1px var(--blue-600, #2478f5);
+}
+
+.cardTopRow {
+  display: grid;
+  grid-template-columns: var(--card-grid-template, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.cardTopCell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cardFieldLabel {
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  color: var(--gray-400, #999);
+}
+
+.cardFieldValue {
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  color: #252c37;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardTopCell[data-field-key='age'] .cardFieldValue {
+  color: #4a5565;
+}
+
+.cardSeparator {
+  height: 1px;
+  background: var(--gray-300, #b8b8b8);
+  width: 100%;
+}
+
+.cardBottomRow {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.cardSummary {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  grid-column: 1 / -3;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--gray-700, #3d3d3d);
+}
+
+.cardSummaryLabel {
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cardSummaryText {
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.cardMiddle {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  grid-column: -3 / -2;
+}
+
+.cardAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gray-200);
+}
+
+.cardStatusBar {
+  min-width: 120px;
+}
+
+.cardAction {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  grid-column: -2 / -1;
 }
 
 // Monthly Service Link

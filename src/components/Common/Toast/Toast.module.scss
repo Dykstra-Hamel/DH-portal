@@ -34,6 +34,17 @@
     transform: none;
     max-width: calc(100vw - 2rem);
   }
+
+  &.centered {
+    left: 50%;
+    transform: translateX(-50%);
+
+    @media (max-width: 768px) {
+      left: 1rem;
+      right: 1rem;
+      transform: none;
+    }
+  }
 }
 
 .iconContainer {

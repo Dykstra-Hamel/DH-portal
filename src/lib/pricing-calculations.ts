@@ -6,6 +6,29 @@ import {
 } from '@/types/pricing';
 
 /**
+ * Convert a recurring-frequency amount to its monthly equivalent.
+ * e.g. $120/year → $10/mo, $45/quarter → $15/mo
+ */
+export function toMonthlyEquivalent(
+  frequency: string | null,
+  amount: number
+): number {
+  const factors: Record<string, number> = {
+    monthly: 1,
+    'bi-monthly': 6 / 12, // every 2 months = 6×/year
+    quarterly: 4 / 12,
+    'semi-annually': 2 / 12,
+    'semi-annual': 2 / 12,
+    'bi-annually': 2 / 12,
+    annually: 1 / 12,
+    annual: 1 / 12,
+  };
+  const key = (frequency ?? 'monthly').toLowerCase();
+  return amount * (factors[key] ?? 1);
+}
+import type { ServiceVariant } from '@/types/addon-service';
+
+/**
  * Generate home size dropdown options based on company intervals
  * Example output: "0-1500 Sq Ft", "1501-2000 Sq Ft (+$20 initial, +$10/month)", "3000+ Sq Ft"
  */
@@ -275,6 +298,78 @@ export function generateYardSizeOptions(
 }
 
 /**
+ * Generate yard sq ft dropdown options based on company intervals
+ * Example output: "0-5,000 Sq Ft", "5,001-6,000 Sq Ft (+$25 initial, +$15/month)", "20,000+ Sq Ft"
+ */
+export function generateYardSqftOptions(
+  companySettings: CompanyPricingSettings,
+  servicePlanPricing?: ServicePlanPricing
+): SizeOption[] {
+  const options: SizeOption[] = [];
+  const { base_yard_sq_ft, yard_sq_ft_interval, max_yard_sq_ft } =
+    companySettings;
+
+  let currentSize = 0;
+  let intervalIndex = 0;
+
+  while (currentSize <= max_yard_sq_ft) {
+    const rangeStart = currentSize;
+    const rangeEnd =
+      currentSize === 0
+        ? base_yard_sq_ft
+        : Math.min(currentSize + yard_sq_ft_interval, max_yard_sq_ft);
+
+    const isLastInterval = rangeEnd >= max_yard_sq_ft;
+
+    let initialIncrease = 0;
+    let recurringIncrease = 0;
+
+    if (servicePlanPricing?.yard_sqft_pricing) {
+      const pricing = servicePlanPricing.yard_sqft_pricing;
+      const mode = pricing.pricing_mode || 'linear';
+
+      if (mode === 'custom') {
+        initialIncrease = pricing.custom_initial_prices?.[intervalIndex] ?? 0;
+        recurringIncrease = pricing.custom_recurring_prices?.[intervalIndex] ?? 0;
+      } else {
+        initialIncrease = intervalIndex * (pricing.initial_cost_per_interval ?? 0);
+        recurringIncrease = intervalIndex * (pricing.recurring_cost_per_interval ?? 0);
+      }
+    }
+
+    let label = '';
+    if (currentSize === 0) {
+      label = `0-${rangeEnd.toLocaleString()} Sq Ft`;
+    } else if (isLastInterval) {
+      label = `${rangeStart.toLocaleString()}+ Sq Ft`;
+    } else {
+      label = `${rangeStart.toLocaleString()}-${rangeEnd.toLocaleString()} Sq Ft`;
+    }
+
+    options.push({
+      value: isLastInterval ? `${rangeStart}+` : `${rangeStart}-${rangeEnd}`,
+      label,
+      intervalIndex,
+      initialIncrease,
+      recurringIncrease,
+      rangeStart,
+      rangeEnd: isLastInterval ? null : rangeEnd,
+    });
+
+    if (isLastInterval) break;
+
+    if (currentSize === 0) {
+      currentSize = base_yard_sq_ft + 1;
+    } else {
+      currentSize = rangeEnd + 1;
+    }
+    intervalIndex++;
+  }
+
+  return options;
+}
+
+/**
  * Generate linear feet dropdown options based on company intervals
  * Example output: "0-100 Linear Ft", "101-150 Linear Ft (+$15 initial, +$8/month)", "500+ Linear Ft"
  */
@@ -445,24 +540,46 @@ export function calculateLinearFeetPrice(
 }
 
 /**
- * Calculate total pricing based on selected home size, yard size, and linear feet intervals
+ * Calculate total pricing based on selected home size, yard size, and linear feet intervals.
+ * Applies an optional minimum_price floor to the computed totals.
  */
 export function calculateTotalPricing(
   baseInitialPrice: number,
   baseRecurringPrice: number,
   homeSizeOption?: SizeOption,
   yardSizeOption?: SizeOption,
-  linearFeetOption?: SizeOption
+  linearFeetOption?: SizeOption,
+  minimumPrice?: number | null,
+  yardSqftOption?: SizeOption
 ): PricingCalculation {
   const homeSizeInitialIncrease = homeSizeOption?.initialIncrease || 0;
   const homeSizeRecurringIncrease = homeSizeOption?.recurringIncrease || 0;
   const yardSizeInitialIncrease = yardSizeOption?.initialIncrease || 0;
   const yardSizeRecurringIncrease = yardSizeOption?.recurringIncrease || 0;
+  const yardSqftInitialIncrease = yardSqftOption?.initialIncrease || 0;
+  const yardSqftRecurringIncrease = yardSqftOption?.recurringIncrease || 0;
   const linearFeetInitialIncrease = linearFeetOption?.initialIncrease || 0;
   const linearFeetRecurringIncrease = linearFeetOption?.recurringIncrease || 0;
 
   // Handle null/undefined baseRecurringPrice for one-time services
   const safeBaseRecurringPrice = baseRecurringPrice || 0;
+
+  const rawInitial =
+    baseInitialPrice +
+    homeSizeInitialIncrease +
+    yardSizeInitialIncrease +
+    yardSqftInitialIncrease +
+    linearFeetInitialIncrease;
+  const rawRecurring =
+    safeBaseRecurringPrice +
+    homeSizeRecurringIncrease +
+    yardSizeRecurringIncrease +
+    yardSqftRecurringIncrease +
+    linearFeetRecurringIncrease;
+
+  // Apply minimum price floor to the initial (one-time or setup) cost
+  const totalInitialPrice =
+    minimumPrice != null ? Math.max(rawInitial, minimumPrice) : rawInitial;
 
   return {
     baseInitialPrice,
@@ -471,16 +588,35 @@ export function calculateTotalPricing(
     homeSizeRecurringIncrease,
     yardSizeInitialIncrease,
     yardSizeRecurringIncrease,
+    yardSqftInitialIncrease,
+    yardSqftRecurringIncrease,
     linearFeetInitialIncrease,
     linearFeetRecurringIncrease,
-    totalInitialPrice:
-      baseInitialPrice + homeSizeInitialIncrease + yardSizeInitialIncrease + linearFeetInitialIncrease,
-    totalRecurringPrice:
-      safeBaseRecurringPrice +
-      homeSizeRecurringIncrease +
-      yardSizeRecurringIncrease +
-      linearFeetRecurringIncrease,
+    totalInitialPrice,
+    totalRecurringPrice: rawRecurring,
   };
+}
+
+/**
+ * Resolve the effective price from a variant selection.
+ * Returns the variant's price if a matching variant exists; falls back to the base price.
+ *
+ * @param variants   - The add-on's or plan's variants array
+ * @param selectedLabel - The label the user selected (or null if no selection)
+ * @param basePrice  - The base initial_price or price_per_unit to fall back to
+ * @param field      - Which variant field to read ('initial_price' or 'price_per_unit')
+ */
+export function resolveVariantPrice(
+  variants: ServiceVariant[],
+  selectedLabel: string | null | undefined,
+  basePrice: number | null,
+  field: 'initial_price' | 'price_per_unit' = 'initial_price'
+): number | null {
+  if (!selectedLabel || !variants.length) return basePrice;
+  const match = variants.find(v => v.label === selectedLabel);
+  if (!match) return basePrice;
+  const value = match[field];
+  return value != null ? value : basePrice;
 }
 
 /**
@@ -506,17 +642,30 @@ export function findSizeOptionByValue(
  */
 export function calculateIntervalCount(
   settings: CompanyPricingSettings,
-  dimension: 'home' | 'yard' | 'linear_feet'
+  dimension: 'home' | 'yard' | 'yard_sqft' | 'linear_feet'
 ): number {
-  // Generate the actual options and return the length
-  // This ensures the count always matches what generateHomeSizeOptions/generateYardSizeOptions/generateLinearFeetOptions creates
   const options = dimension === 'home'
     ? generateHomeSizeOptions(settings)
     : dimension === 'yard'
     ? generateYardSizeOptions(settings)
+    : dimension === 'yard_sqft'
+    ? generateYardSqftOptions(settings)
     : generateLinearFeetOptions(settings);
 
   return options.length;
+}
+
+/**
+ * Calculate price for per-unit pricing (per_sqft, per_linear_foot, per_acre).
+ * Formula: max(quantity × pricePerUnit, minimumPrice ?? 0)
+ */
+export function calculatePerUnitPrice(
+  quantity: number,
+  pricePerUnit: number,
+  minimumPrice?: number | null
+): number {
+  const raw = quantity * pricePerUnit;
+  return minimumPrice != null ? Math.max(raw, minimumPrice) : raw;
 }
 
 /**
@@ -525,18 +674,19 @@ export function calculateIntervalCount(
  */
 export function getIntervalLabel(
   settings: CompanyPricingSettings | null | undefined,
-  dimension: 'home' | 'yard' | 'linear_feet',
+  dimension: 'home' | 'yard' | 'yard_sqft' | 'linear_feet',
   intervalIndex: number
 ): string {
   if (!settings) {
     return `Interval ${intervalIndex}`;
   }
 
-  // Generate all options and find the matching one
   const options = dimension === 'home'
     ? generateHomeSizeOptions(settings)
     : dimension === 'yard'
     ? generateYardSizeOptions(settings)
+    : dimension === 'yard_sqft'
+    ? generateYardSqftOptions(settings)
     : generateLinearFeetOptions(settings);
 
   return options[intervalIndex]?.label || `Interval ${intervalIndex}`;

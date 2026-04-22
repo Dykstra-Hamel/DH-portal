@@ -5,6 +5,8 @@ import styles from './ServicePlansManager.module.scss';
 import ServicePlanModal from '../Widget/WidgetConfig/ServicePlanModal';
 import AddOnServicesManager from './AddOnServicesManager';
 import BundlePlansManager from './BundlePlansManager';
+import ProductsManager from './ProductsManager';
+import ConfirmationModal from '../Common/ConfirmationModal/ConfirmationModal';
 
 interface ServicePlan {
   id: string;
@@ -27,6 +29,9 @@ interface ServicePlan {
   plan_image_url: string | null;
   plan_disclaimer: string | null;
   plan_terms: string | null;
+  pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
+  price_per_unit: number | null;
+  minimum_price: number | null;
   is_active: boolean;
   pest_coverage?: Array<{
     pest_id: string;
@@ -66,7 +71,10 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
   const [showPlanModal, setShowPlanModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'plans' | 'addons' | 'bundles'>('plans');
+  const [activeTab, setActiveTab] = useState<'plans' | 'addons' | 'bundles' | 'products'>('plans');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [pestFilter, setPestFilter] = useState<string>('');
 
   useEffect(() => {
     if (companyId) {
@@ -166,13 +174,9 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
   };
 
   const deletePlan = async (planId: string) => {
-    if (!confirm('Are you sure you want to delete this service plan?')) {
-      return;
-    }
-
     try {
       setErrorMessage(null);
-      const response = await fetch(`/api/admin/service-plans/${planId}`, {
+      const response = await fetch(`/api/admin/service-plans/${companyId}?id=${planId}`, {
         method: 'DELETE',
       });
 
@@ -190,6 +194,16 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
       setErrorMessage('Error deleting service plan');
     }
   };
+
+  const filteredPlans = servicePlans
+    .filter(plan => {
+      const matchesSearch = plan.plan_name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesPest = pestFilter
+        ? plan.pest_coverage?.some(p => p.pest_id === pestFilter)
+        : true;
+      return matchesSearch && matchesPest;
+    })
+    .sort((a, b) => a.plan_name.localeCompare(b.plan_name));
 
   if (loading) {
     return (
@@ -230,6 +244,13 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
             >
               Bundle Plans
             </button>
+            <button
+              type="button"
+              className={`${styles.tab} ${activeTab === 'products' ? styles.activeTab : ''}`}
+              onClick={() => setActiveTab('products')}
+            >
+              Products
+            </button>
           </div>
         </div>
         {activeTab === 'plans' && (
@@ -257,6 +278,27 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
               </button>
             </div>
           ) : (
+            <>
+              <div className={styles.filterBar}>
+                <input
+                  type="text"
+                  placeholder="Search plans..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className={styles.searchInput}
+                />
+                <select
+                  value={pestFilter}
+                  onChange={e => setPestFilter(e.target.value)}
+                  className={styles.pestSelect}
+                >
+                  <option value="">All pest coverage</option>
+                  {availablePestTypes.map(pest => (
+                    <option key={pest.id} value={pest.id}>{pest.name}</option>
+                  ))}
+                </select>
+              </div>
+
             <div className={styles.plansTable}>
               <div className={styles.plansTableHeader}>
                 <div>Plan Name</div>
@@ -266,7 +308,9 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
                 <div>Status</div>
                 <div>Actions</div>
               </div>
-              {servicePlans.map(plan => (
+              {filteredPlans.length === 0 ? (
+                <div className={styles.noResults}>No plans match your search.</div>
+              ) : filteredPlans.map(plan => (
                 <div key={plan.id} className={styles.planRow}>
                   <div className={styles.planName}>
                     {plan.plan_name}
@@ -289,23 +333,28 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
                     <button onClick={() => openPlanModal(plan)} className={styles.editButton}>
                       Edit
                     </button>
-                    <button onClick={() => deletePlan(plan.id)} className={styles.deleteButton}>
+                    <button onClick={() => setPendingDeleteId(plan.id)} className={styles.deleteButton}>
                       Delete
                     </button>
                   </div>
                 </div>
               ))}
             </div>
+            </>
           )}
         </>
       )}
 
       {activeTab === 'addons' && (
-        <AddOnServicesManager companyId={companyId} />
+        <AddOnServicesManager companyId={companyId} servicePlans={servicePlans} />
       )}
 
       {activeTab === 'bundles' && (
         <BundlePlansManager companyId={companyId} />
+      )}
+
+      {activeTab === 'products' && (
+        <ProductsManager companyId={companyId} />
       )}
 
       {showPlanModal && (
@@ -318,6 +367,21 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
           companyId={companyId}
         />
       )}
+
+      <ConfirmationModal
+        isOpen={!!pendingDeleteId}
+        title="Delete Service Plan"
+        message="Are you sure you want to delete this service plan? This action cannot be undone."
+        confirmText="Delete"
+        confirmVariant="danger"
+        onConfirm={() => {
+          if (pendingDeleteId) {
+            deletePlan(pendingDeleteId);
+            setPendingDeleteId(null);
+          }
+        }}
+        onCancel={() => setPendingDeleteId(null)}
+      />
     </div>
   );
 }

@@ -49,7 +49,6 @@ export default function ProjectTaskForm({
     priority: 'medium',
     assigned_to: '',
     due_date: '',
-    start_date: '',
     parent_task_id: '',
     category_ids: [],
     department_id: '',
@@ -134,7 +133,6 @@ export default function ProjectTaskForm({
         priority: editingTask.priority,
         assigned_to: editingTask.assigned_to || '',
         due_date: editingTask.due_date || '',
-        start_date: editingTask.start_date || '',
         parent_task_id: editingTask.parent_task_id || '',
         category_ids: editingTask.categories?.map(category => category.id).slice(0, 1) || [],
         department_id: editingTask.department_id || '',
@@ -155,7 +153,6 @@ export default function ProjectTaskForm({
         priority: 'medium',
         assigned_to: '',
         due_date: '',
-        start_date: '',
         parent_task_id: '',
         category_ids: [],
         department_id: '',
@@ -402,35 +399,19 @@ export default function ProjectTaskForm({
             <section className={styles.section}>
               <h3 className={styles.sectionTitle}>Timeline</h3>
 
-              <div className={styles.formRow}>
-                <div className={styles.formGroup}>
-                  <label htmlFor="start_date" className={styles.label}>
-                    Start Date
-                  </label>
-                  <input
-                    type="date"
-                    id="start_date"
-                    name="start_date"
-                    value={formData.start_date}
-                    onChange={handleChange}
-                    className={styles.input}
-                  />
-                </div>
-
-                <div className={styles.formGroup}>
-                  <label htmlFor="due_date" className={styles.label}>
-                    Due Date
-                  </label>
-                  <input
-                    type="date"
-                    id="due_date"
-                    name="due_date"
-                    value={formData.due_date}
-                    onChange={handleChange}
-                    max={projectDueDate || undefined}
-                    className={styles.input}
-                  />
-                </div>
+              <div className={styles.formGroup}>
+                <label htmlFor="due_date" className={styles.label}>
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  id="due_date"
+                  name="due_date"
+                  value={formData.due_date}
+                  onChange={handleChange}
+                  max={projectDueDate || undefined}
+                  className={styles.input}
+                />
               </div>
             </section>
 

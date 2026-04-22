@@ -32,7 +32,7 @@
 
 .noCallsText {
   color: var(--white);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 16px;
   font-weight: 500;
   line-height: 24px;
@@ -67,7 +67,7 @@
 
 .liveCallText {
   color: var(--white);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -126,7 +126,7 @@
 
 .gridCell {
   color: var(--white);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -214,7 +214,7 @@
   align-items: center;
   gap: 6px;
   color: var(--white);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 750;
   line-height: 20px;
@@ -230,7 +230,7 @@
   align-items: center;
   gap: 6px;
   color: var(--white);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 14px;
   font-weight: 750;
   line-height: 20px;
@@ -272,7 +272,7 @@
 
   span {
     color: var(--white);
-    font-family: var(--font-satoshi);
+    font-family: var(--font-default);
     font-size: 14px;
     font-weight: 500;
     line-height: 20px;

@@ -11,6 +11,7 @@ import { GlobalCompanyDropdown } from './CompanyDropdown/GlobalCompanyDropdown';
 import { MobileCompanySwitcher } from './CompanyDropdown/MobileCompanySwitcher';
 import { useWizard } from '@/contexts/WizardContext';
 import { useCompany } from '@/contexts/CompanyContext';
+import { usePageActions } from '@/contexts/PageActionsContext';
 import styles from './GlobalHeader.module.scss';
 
 interface GlobalHeaderProps {
@@ -26,9 +27,14 @@ export function GlobalHeader({
   const router = useRouter();
   const { wizardTitle, backInterceptor } = useWizard();
   const { isProjectManager } = useCompany();
+  const { pageHeader } = usePageActions();
   const isTechLeads = pathname.startsWith('/tech-leads');
+  const isFieldMap = pathname.startsWith('/field-map');
+  const isFieldSales = pathname.startsWith('/field-sales');
+  const isAppShell = isTechLeads || isFieldMap || isFieldSales;
+  const showAppShellTitle = isAppShell && !!pageHeader?.title;
   const hideSearch =
-    isTechLeads ||
+    isAppShell ||
     pathname === '/project-management' ||
     pathname.startsWith('/project-management/') ||
     pathname === '/admin/project-management' ||
@@ -48,7 +54,7 @@ export function GlobalHeader({
     pathname.startsWith('/admin/project-management/') ||
     pathname.startsWith('/admin/monthly-services') ||
     pathname.startsWith('/admin/content-pieces/') ||
-    pathname.startsWith('/tech-leads');
+    isAppShell;
 
   return (
     <header className={styles.globalHeader}>
@@ -63,7 +69,7 @@ export function GlobalHeader({
               <Menu size={24} />
             </button>
           )}
-          {isTechLeads && (
+          {isAppShell && !isFieldSales && (
             <button
               type="button"
               className={styles.backButton}
@@ -80,6 +86,9 @@ export function GlobalHeader({
             </button>
           )}
           {!hideBreadcrumbs && <Breadcrumbs />}
+          {showAppShellTitle && (
+            <span className={styles.appShellTitle}>{pageHeader!.title}</span>
+          )}
         </div>
         <div className={styles.centerSection}></div>
         <div className={styles.rightSection}>

@@ -113,6 +113,10 @@ export interface Ticket {
   created_at: string;
   updated_at: string;
 
+  // Branch assignment
+  branch_id?: string | null;
+  branch?: { id: string; name: string } | null;
+
   // Joined data from related tables
   reviewed_by_profile?: {
     id: string;
@@ -120,6 +124,7 @@ export interface Ticket {
     last_name?: string;
     email: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   customer?: {
     id: string;
@@ -195,6 +200,7 @@ export interface TicketFormData {
   next_follow_up_at?: string;
   priority: TicketPriority;
   pest_type?: string;
+  branch_id?: string | null;
 }
 
 // Interface for ticket-to-lead conversion

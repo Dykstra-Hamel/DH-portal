@@ -126,7 +126,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
   const getBrandContainerFontStyle = () => {
     if (primaryFontLoaded) {
       return {
-        fontFamily: `"${primaryFontLoaded}", var(--font-satoshi)`,
+        fontFamily: `"${primaryFontLoaded}", var(--font-default)`,
       };
     }
     return {};

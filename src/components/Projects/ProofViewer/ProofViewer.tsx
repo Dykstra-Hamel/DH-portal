@@ -32,6 +32,7 @@ interface ProofViewerProps {
     last_name: string | null;
     email: string | null;
     avatar_url: string | null;
+    uploaded_avatar_url?: string | null;
   }>;
   activePinId: string | null;
   hoveredPinId: string | null;

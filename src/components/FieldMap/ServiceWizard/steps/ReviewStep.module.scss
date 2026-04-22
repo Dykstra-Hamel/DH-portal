@@ -1,0 +1,1480 @@
+/* ── Full-screen overlay ── */
+/* Covers the app shell so the review step looks like the public quote page */
+.fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  overflow-y: auto;
+  background: var(--gray-25);
+}
+
+/* ── Loading spinner ── */
+.loadingSpinner {
+  width: 44px;
+  height: 44px;
+  border: 4px solid #e5e7eb;
+  border-top-color: var(--brand-primary);
+  border-radius: 50%;
+  animation: spin 0.75s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ── Review header (with back button + logo) ── */
+.reviewHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--gray-25);
+  position: relative;
+  z-index: 10;
+  border-bottom: 1px solid var(--gray-200);
+  transition: all 0.2s ease;
+}
+
+.reviewHeaderScrolled {
+  box-shadow: 0 4px 6px color-mix(in srgb, #d1d5db 60%, transparent);
+}
+
+.backBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: 50%;
+  background: var(--gray-50);
+  color: var(--gray-700);
+  cursor: pointer;
+  flex-shrink: 0;
+  left: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.15s;
+}
+
+.heroLogoWrapper {
+  width: 175px;
+  height: auto;
+  min-height: 75px;
+  display: flex;
+  position: relative;
+  justify-content: center;
+  align-items: center;
+}
+
+.reviewHeaderLogo {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+
+.reviewHeaderName {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-primary);
+  font-family: var(--primary-font);
+  letter-spacing: -0.01em;
+}
+
+/* ── Hero section compact padding override ── */
+.heroSectionCompact {
+  padding: 0;
+}
+
+/* ── Hero content centering (until image stacks at 992px) ── */
+.heroContentCentered {
+  @media (max-width: 992px) {
+    text-align: center;
+    align-items: center;
+
+    .heroPests {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+  }
+}
+
+/* ── Inspector + address card ── */
+.inspectorCard {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-radius: 8px;
+  background: #f4f5f8;
+  padding: 20px 34px;
+  margin-top: 8px;
+
+  @media (max-width: 768px) {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+    text-align: center;
+  }
+}
+
+.inspectorInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.inspectorAvatar {
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+}
+
+.inspectorAvatarFallback {
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: var(--gray-25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.inspectorText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inspectorName {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 22px;
+  color: var(--gray-700);
+  font-family: var(--primary-font);
+}
+
+.inspectorTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.inspectorSeparator {
+  width: 1px;
+  align-self: stretch;
+  background: var(--gray-300);
+  flex-shrink: 0;
+
+  @media (max-width: 992px) {
+    display: none;
+  }
+}
+
+.inspectorAddress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  gap: 4px;
+
+  @media (max-width: 992px) {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 16px;
+  }
+}
+
+.inspectorAddressSeparator {
+  display: none;
+
+  @media (max-width: 992px) {
+    display: block;
+    width: 1px;
+    align-self: stretch;
+    background: #b8b8b8;
+    flex-shrink: 0;
+  }
+}
+
+.inspectorAddressLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.addressLabelBreak {
+  @media (min-width: 993px) {
+    display: none;
+  }
+}
+
+.inspectorAddressValue {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+/* ── Hero extras ── */
+.heroEyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--brand-secondary);
+  margin: 0 0 12px;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.heroPestsLabel {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gray-700);
+  margin: 0 0 10px;
+}
+
+/* Pest icon row — mirrors QuoteBuildStep layout */
+.heroPestIconRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+
+.heroPestIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand-secondary);
+}
+
+.heroPestIconCircle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gray-25);
+  border: 2px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroPestIconSvg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+
+  svg path {
+    fill: currentColor;
+  }
+}
+
+.heroPestIconLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: currentColor;
+  text-align: center;
+  line-height: 1.3;
+}
+
+/* Map layer — normal flow, drives container height, opacity animated via inline style */
+.heroMapLayer {
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.45s ease;
+}
+
+/* House photo — absolutely covers the map, crossfades in */
+.heroPhotoLayer {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.45s ease;
+  pointer-events: none;
+
+  &.heroPhotoLayerVisible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Close Map button — top-right of map view */
+.heroCloseMapBtn {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px 6px 14px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #5c5c5c;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 16px;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+
+  svg {
+    flex-shrink: 0;
+  }
+}
+
+/* Toggle button — bottom-left */
+.heroViewToggleBtn {
+  position: absolute;
+  bottom: 23px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: 8px;
+  border: none;
+  background: rgba(239, 239, 239, 0.82);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: var(--brand-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: rgba(239, 239, 239, 0.96);
+  }
+
+  &:active {
+    transform: translateX(-50%) scale(0.97);
+  }
+}
+
+/* Map in the hero right column — match heroImage sizing */
+.heroMapWrap {
+  position: relative;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: none;
+  min-height: 519px;
+  width: 100%;
+  align-self: stretch;
+
+  @media (max-width: 992px) {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  @media (max-width: 768px) {
+    min-height: 320px;
+    margin: 0 -20px;
+    width: calc(100% + 40px);
+  }
+}
+
+/* ── Service section ── */
+.serviceSection {
+  margin-bottom: 32px;
+}
+
+.sectionHeading {
+  /* Uses quoteContainer h2 styles — just add margin */
+  margin-bottom: 24px !important;
+}
+
+.lineItemsGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* ── Total pricing header with edit button ── */
+.totalPricingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+    color: var(--brand-secondary);
+  }
+}
+
+.editSaveBtn {
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid #d1d5db;
+  background: var(--gray-25);
+  color: #374151;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: #f3f4f6;
+  }
+}
+
+/* ── Editable price inputs in the totals list ── */
+.priceEditGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.priceEditCol {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.priceEditColLabel {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9ca3af;
+  text-align: center;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.priceEditField {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--gray-25);
+
+  &:focus-within {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  }
+}
+
+.priceEditPrefix {
+  padding: 0 3px 0 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.priceEditInput {
+  width: 56px;
+  padding: 4px 4px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #111827;
+  text-align: right;
+
+  &:focus {
+    outline: none;
+  }
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+.priceEditSuffix {
+  padding: 0 6px 0 2px;
+  font-size: 11px;
+  color: #6b7280;
+  flex-shrink: 0;
+}
+
+/* ── Discount $ / % toggle ── */
+.discountTypeToggle {
+  display: flex;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.discountTypeBtn {
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: var(--gray-25);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:first-child {
+    border-right: 1px solid #d1d5db;
+  }
+}
+
+.discountTypeBtnActive {
+  background: var(--brand-primary);
+  color: var(--gray-25);
+}
+
+/* ── Discount item in the list ── */
+.discountItem {
+  color: #16a34a !important;
+}
+
+/* ── Discount controls (inside totalPricing card) ── */
+.discountRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0 4px;
+  flex-wrap: wrap;
+}
+
+.discountLabel {
+  font-size: 14px;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--primary-font));
+  margin: 0;
+}
+
+.discountControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.discountSelect {
+  padding: 7px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 13px;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #374151;
+  background: var(--gray-25);
+  appearance: auto;
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  }
+}
+
+.discountInputWrap {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--gray-25);
+  padding: 0 4px 0 8px;
+  width: 110px;
+
+  &:focus-within {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 2px
+      color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  }
+}
+
+.discountSign {
+  padding: 0 4px 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+
+.discountInput {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 8px 7px 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #111827;
+
+  &::placeholder {
+    color: #d1d5db;
+  }
+  &:focus {
+    outline: none;
+  }
+  &::-webkit-inner-spin-button,
+  &::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+}
+
+/* ── Notes ── */
+.notesSection {
+  margin-top: 24px;
+  padding: 16px 20px;
+  background: #f9fafb;
+  border: 1px solid var(--gray-300);
+  border-radius: 12px;
+}
+
+.notesLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  margin: 0 0 8px;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.notesText {
+  font-size: 14px;
+  color: #374151;
+  line-height: 1.6;
+  margin: 0;
+  white-space: pre-wrap;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+/* ── Spacer for sticky bar ── */
+.actionSpacer {
+  height: 100px;
+}
+
+/* ── FAQ title — match Customized Quote Total h3 size ── */
+.faqsTitleOverride {
+  font-size: 24px !important;
+  font-weight: 700 !important;
+  margin-bottom: 40px;
+}
+
+/* ── Sticky action bar ── */
+.stickyActions {
+  position: sticky;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-top: 1px solid var(--gray-300);
+  padding: 12px 34px calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 10;
+}
+
+.stickyActionsInner {
+  max-width: 750px;
+  margin: 0 auto;
+  display: flex;
+  gap: 12px;
+}
+
+.sendBtn {
+  flex: 1;
+  padding: 15px 20px;
+  background: var(--brand-primary);
+  color: var(--gray-25);
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--primary-font);
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+  letter-spacing: -0.2px;
+
+  &:hover:not(:disabled) {
+    opacity: 0.88;
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.scheduleBtn {
+  flex: 1;
+  padding: 15px 20px;
+  background: var(--gray-25);
+  color: var(--brand-secondary);
+  border: 2px solid var(--brand-secondary);
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--primary-font);
+  cursor: pointer;
+  transition: all 0.1s ease;
+  letter-spacing: -0.2px;
+
+  &:hover:not(:disabled) {
+    background: color-mix(in srgb, var(--brand-secondary) 8%, white);
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* ── Error / email capture ── */
+.errorMsg {
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  font-size: 13px;
+  color: #dc2626;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.emailCapture {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.emailInput {
+  flex: 1;
+  padding: 11px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 14px;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #111827;
+  background: var(--gray-25);
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  }
+  &::placeholder {
+    color: #9ca3af;
+  }
+}
+
+.emailSendBtn {
+  padding: 0 18px;
+  background: var(--brand-primary);
+  color: var(--gray-25);
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+/* ── Success screen ── */
+.successPage {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 48px 24px;
+  gap: 16px;
+  text-align: center;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #16a34a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.successTitle {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--brand-primary);
+  letter-spacing: -0.5px;
+  font-family: var(--primary-font);
+}
+
+.successSub {
+  margin: 0;
+  font-size: 16px;
+  color: #6b7280;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+.successBtn {
+  margin-top: 8px;
+  padding: 14px 36px;
+  background: var(--brand-primary);
+  color: var(--gray-25);
+  border: none;
+  border-radius: 30px;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--primary-font);
+  cursor: pointer;
+}
+
+/* ── Signature modal ── */
+.sigOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 10001;
+  padding: 0;
+}
+
+.sigSheet {
+  width: 100%;
+  max-width: 680px;
+  max-height: 90vh;
+  overflow-y: auto;
+  background: var(--gray-25);
+  border-radius: 20px 20px 0 0;
+  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.sigTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: #111827;
+  font-family: var(--primary-font);
+}
+
+.sigSub {
+  margin: -8px 0 0;
+  font-size: 13px;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.sigLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: #6b7280;
+  font-family: var(--secondary-font, var(--primary-font));
+  display: block;
+  margin-bottom: 6px;
+}
+
+.sigNameInput {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  font-size: 15px;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #111827;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px
+      color-mix(in srgb, var(--brand-primary) 12%, transparent);
+  }
+}
+
+.sigCanvasWrap {
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--gray-25);
+}
+
+.sigClear {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b7280;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: var(--secondary-font, var(--primary-font));
+  text-align: left;
+}
+
+.sigDate {
+  font-size: 12px;
+  color: #9ca3af;
+  font-family: var(--secondary-font, var(--primary-font));
+  margin: 0;
+}
+
+.sigFooter {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sigCancelBtn {
+  padding: 11px 20px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 12px;
+  background: var(--gray-25);
+  color: #374151;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+}
+
+.sigConfirmBtn {
+  padding: 11px 24px;
+  background: var(--brand-primary);
+  color: var(--gray-25);
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.sigError {
+  margin: 0;
+  font-size: 13px;
+  color: #dc2626;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+/* ── Unified schedule modal additions ── */
+
+.sigHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sigCloseBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gray-100);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--gray-500);
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: var(--gray-200);
+  }
+}
+
+.sigSection {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.sigSectionLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gray-500);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.sigDateRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sigDateInput,
+.sigTimeSelect {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--secondary-font, var(--primary-font));
+  color: #111827;
+  background: #f9fafb;
+  outline: none;
+  box-sizing: border-box;
+
+  &:focus {
+    border-color: var(--brand-primary);
+    background: var(--gray-25);
+  }
+}
+
+.termsBody {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1.5px solid #d1d5db;
+  border-radius: 10px;
+  padding: 12px;
+  background: #f9fafb;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #374151;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  font-family: var(--secondary-font, var(--primary-font));
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin: 8px 0 4px;
+  }
+  p {
+    margin: 0 0 6px;
+  }
+  ul,
+  ol {
+    margin: 0 0 6px;
+    padding-left: 18px;
+  }
+}
+
+.specificTermsBlock {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+
+  h4 {
+    margin: 0 0 6px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+  }
+}
+
+.termsCheckRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #374151;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+
+  input[type='checkbox'] {
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    cursor: pointer;
+  }
+
+  label {
+    cursor: pointer;
+    flex: 1;
+  }
+}
+
+.termsCheckboxLocked {
+  opacity: 0.4;
+}
+
+.termsHint {
+  margin: 6px 0 0;
+  color: #f97316;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.viewedBadge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #16a34a;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.variantBadge {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  letter-spacing: 0.02em;
+}
+
+/* ── Addon rows inside the totals list ── */
+.totalAddonItem {
+  font-size: 12px !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+  margin-left: 30px;
+  color: var(--gray-700);
+
+  @media (max-width: 768px) {
+    margin-left: 24px;
+  }
+}
+
+/* Shrinks the checkbox for total addon rows */
+.totalAddonCheckbox span {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 2px !important;
+  background-size: 12px 10px !important;
+}
+
+/* ── Inline add-ons inside plan card ── */
+.planCardAddons {
+  border-top: 1px solid #e5e7eb;
+  padding: 12px 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 24px;
+}
+
+.planCardAddonRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Shrinks the custom checkbox box for compact addon rows */
+.planCardAddonCheckbox span {
+  width: 22px !important;
+  height: 22px !important;
+  border-radius: 3px !important;
+  background-size: 12px 10px !important;
+}
+
+.planCardAddonName {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: #374151;
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.planCardAddonPrice {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+}
+
+.planCardAddonRecommended {
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb; // blue-600
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── Plan card header: pest icon ── */
+.planHeaderPestIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--brand-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: #fff;
+  svg {
+    path {
+      fill: var(--brand-secondary);
+    }
+  }
+}
+
+.planHeaderPestIconSvg {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg,
+  img {
+    width: 30px;
+    height: 30px;
+  }
+}
+
+.planHeaderShieldIcon {
+  display: block;
+}
+
+/* ── Video callout button ── */
+.planVideoCallout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 10px;
+  background: #e8edf7;
+  border: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  gap: 16px;
+  text-align: left;
+
+  &:hover {
+    background: #dce4f3;
+  }
+}
+
+.planVideoCalloutText {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  font-family: var(--secondary-font, var(--primary-font));
+  line-height: 27px;
+  text-align: center;
+}
+
+.planVideoCalloutPlay {
+  flex-shrink: 0;
+  width: 131px;
+  height: 79px;
+  background: var(--brand-secondary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Recommended add-on button row ── */
+.planCardAddonBtnGroup {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  padding: 16px 0 8px;
+}
+
+.planCardAddonBtnWrap {
+  display: flex;
+  position: relative;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.planCardAddonRecommendedLabel {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  font-family: var(--secondary-font, var(--primary-font));
+  background: #fff;
+  padding: 4px 8px;
+  display: block;
+  position: absolute;
+  left: 50%;
+  top: -45px;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.planCardAddonBtnLabel {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-500);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.planCardAddonBtn {
+  position: relative;
+  padding: 10px 20px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  background: #fff;
+  font-family: var(--secondary-font, var(--primary-font));
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  min-width: 120px;
+  text-align: center;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.planCardAddonBtnSelected {
+  border-color: var(--brand-secondary);
+  box-shadow: 0 0 0 1px var(--brand-secondary);
+
+  .planCardAddonBtnLabel {
+    color: var(--brand-secondary);
+  }
+}
+
+.planCardAddonBtnCheck {
+  position: absolute;
+  top: -12px;
+  right: -12px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--gray-25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    circle {
+      fill: var(--gray-25);
+    }
+
+    path {
+      fill: var(--brand-secondary);
+    }
+  }
+}
+
+.planCardAddonBtnPrice {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--gray-500);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.discountAppliedRow {
+  color: var(--gray-700);
+  font-size: 16px;
+
+  div {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+
+  strong {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+}
+
+/* ── Additional Services We Offer section ── */
+.additionalServicesSection {
+  margin-bottom: 32px;
+}
+
+.additionalServicePrice {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--gray-800);
+  font-family: var(--secondary-font, var(--primary-font));
+  white-space: nowrap;
+  flex-shrink: 0;
+
+  sup {
+    font-size: 12px;
+  }
+}
+
+.additionalServicePriceNumber {
+  font-size: 20px;
+}
+
+.additionalServicesHeading {
+  font-size: 24px !important;
+  font-weight: 700;
+  font-family: var(--primary-font);
+  color: var(--gray-800) !important;
+  margin: 0 0 16px;
+}

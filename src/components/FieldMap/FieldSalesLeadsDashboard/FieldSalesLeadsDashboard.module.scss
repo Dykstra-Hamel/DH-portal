@@ -1,0 +1,239 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding-bottom: 16px;
+}
+
+// ─── Details column (mobile summary view) ────────────────────────────────────
+
+.detailsStack {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--gray-800, #252c37);
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  span + span {
+    color: var(--gray-500, #6b7280);
+    font-size: 12px;
+  }
+}
+
+// ─── Mobile bottom row — stack summary, then avatar + action on one line ─────
+
+@media (max-width: 767px) {
+  .container [data-card-section='top'] {
+    align-items: flex-start;
+  }
+
+  .container [data-card-section='separator'] {
+    display: none;
+  }
+
+  .container [data-card-section='bottom'] {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .container [data-card-section='summary'] {
+    flex: 1 1 100%;
+    flex-basis: 100%;
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .container [data-card-section='bottom-middle'] {
+    flex: 1 1 auto;
+    grid-column: auto;
+    min-width: 0;
+  }
+
+  .container [data-card-section='bottom-action'] {
+    margin-left: auto;
+    grid-column: auto;
+  }
+}
+
+// ─── Address Cell ─────────────────────────────────────────────────────────────
+
+.addressCell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+// ─── Queue Time & Customer Name (used in column render functions) ──────────────
+
+.queueTime {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-500, #6b7280);
+  white-space: nowrap;
+}
+
+.customerName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900, #111827);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+// ─── Status Pill ──────────────────────────────────────────────────────────────
+
+.statusPill {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 90px;
+  max-width: 140px;
+}
+
+.statusTrack {
+  height: 5px;
+  background: var(--gray-200);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.statusFill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--blue-400);
+}
+
+.statusLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue-400);
+  white-space: nowrap;
+}
+
+// Per-status fill color overrides
+.status_won .statusFill {
+  background: var(--green-500, #22c55e);
+}
+.status_won .statusLabel {
+  color: var(--green-600, #16a34a);
+}
+
+.status_lost .statusFill {
+  background: var(--error-500, #ef4444);
+}
+.status_lost .statusLabel {
+  color: var(--error-600, #dc2626);
+}
+
+.status_closed .statusFill {
+  background: var(--gray-400, #9ca3af);
+}
+.status_closed .statusLabel {
+  color: var(--gray-500, #6b7280);
+}
+
+.status_unassigned .statusFill {
+  background: var(--error-600, #f53d2e);
+}
+.status_unassigned .statusLabel {
+  color: var(--error-600, #f53d2e);
+}
+
+// ─── Unassigned avatar placeholder ────────────────────────────────────────────
+
+.unassignedAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--error-600, #f53d2e);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+// ─── Single-row progress cell (card view) ─────────────────────────────────────
+
+.progressCell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  width: 100%;
+}
+
+.progressAvatar {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  > * {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+.progressColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.progressCell .statusTrack {
+  height: 8px;
+  border-radius: 999px;
+}
+
+.progressCell .statusLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+// ─── Review Button ────────────────────────────────────────────────────────────
+
+.reviewBtn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  background: var(--gray-50);
+  color: var(--gray-800);
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  padding: 11px 8px 11px 12px;
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+
+  &:hover {
+    background: var(--gray-100);
+    text-decoration: none;
+  }
+}

@@ -7,6 +7,7 @@ import {
   verifyCompanyAccess,
   getSupabaseClient
 } from '@/lib/api-utils';
+import { getUserBranchFilter } from '@/lib/branch-filter';
 
 export async function GET(request: NextRequest) {
   try {
@@ -93,8 +94,17 @@ export async function GET(request: NextRequest) {
     // Apply filters
     if (companyId) {
       query = query.eq('company_id', companyId);
+
+      // Branch filtering: restrict to user's assigned branches (server-side)
+      const branchId = searchParams.get('branchId');
+      if (branchId) {
+        query = query.eq('branch_id', branchId);
+      } else {
+        const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+        if (branchFilter) query = query.or(branchFilter);
+      }
     }
-    
+
     if (status) {
       query = query.eq('status', status);
     }
@@ -175,7 +185,7 @@ export async function GET(request: NextRequest) {
       const queryClient = createAdminClient();
       const { data: profilesData, error: profilesError } = await queryClient
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .in('id', Array.from(userIds));
 
 

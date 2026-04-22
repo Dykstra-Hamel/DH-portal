@@ -756,7 +756,7 @@ export default function ProjectTaskList({
                 firstName={profile.first_name || undefined}
                 lastName={profile.last_name || undefined}
                 email={profile.email || ''}
-                avatarUrl={profile.avatar_url}
+                avatarUrl={profile.uploaded_avatar_url || profile.avatar_url}
                 size="small"
                 showTooltip={true}
               />

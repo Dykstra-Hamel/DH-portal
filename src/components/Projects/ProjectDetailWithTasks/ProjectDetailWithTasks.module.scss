@@ -43,13 +43,13 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--gray-800, #1f2937);
-  font-family: var(--font-satoshi, 'Satoshi Variable', sans-serif);
+  font-family: var(--font-default);
 }
 
 .dropZoneSubtext {
   font-size: 13px;
   color: var(--gray-500, #6b7280);
-  font-family: var(--font-satoshi, 'Satoshi Variable', sans-serif);
+  font-family: var(--font-default);
 }
 
 .content {
@@ -137,7 +137,7 @@
 }
 
 .projectShortcode {
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 20px;
   font-weight: 800;
   color: var(--gray-950, #0f172a);
@@ -517,7 +517,7 @@
 }
 
 .taskCategoryTitle {
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 16px;
   font-weight: 700;
   color: var(--gray-900, #111827);
@@ -553,7 +553,7 @@
 }
 
 .sectionTitle {
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 18px;
   font-weight: 700;
   color: var(--gray-900, #111827);
@@ -575,7 +575,7 @@
 }
 
 .commentsHeader {
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 16px;
   font-weight: 700;
   color: var(--gray-900, #111827);
@@ -1438,7 +1438,7 @@
 }
 
 .confirmationModalTitle {
-  font-family: 'Satoshi Variable', var(--font-satoshi);
+  font-family: var(--font-default);
   font-size: 18px;
   font-weight: 700;
   color: var(--gray-900, #111827);

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
@@ -31,6 +31,11 @@ interface Profile {
   last_name: string;
   email: string;
   role?: string;
+  title?: string;
+  phone?: string;
+  contact_email?: string;
+  uploaded_avatar_url?: string;
+  avatar_url?: string;
 }
 
 interface Company {
@@ -74,6 +79,15 @@ export default function SettingsPage() {
   const [activeSection, setActiveSection] = useState<'user' | 'company'>(
     'user'
   );
+
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({ title: '', phone: '', contact_email: '' });
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileMessage, setProfileMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const router = useRouter();
 
   // Use global company context
@@ -113,6 +127,11 @@ export default function SettingsPage() {
 
       if (!profileError && profileData) {
         setProfile(profileData);
+        setProfileForm({
+          title: profileData.title || '',
+          phone: profileData.phone || '',
+          contact_email: profileData.contact_email || '',
+        });
       }
 
       setLoading(false);
@@ -131,6 +150,70 @@ export default function SettingsPage() {
 
     return () => subscription.unsubscribe();
   }, [router]);
+
+  const handleProfileSave = async () => {
+    setProfileSaving(true);
+    setProfileMessage(null);
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileForm),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to save profile');
+      setProfile(prev => prev ? { ...prev, ...data.profile } : data.profile);
+      setProfileMessage({ type: 'success', text: 'Profile saved.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err instanceof Error ? err.message : 'Failed to save profile' });
+    } finally {
+      setProfileSaving(false);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const localPreview = URL.createObjectURL(file);
+    setAvatarPreview(localPreview);
+
+    setAvatarUploading(true);
+    setProfileMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/profile/avatar', { method: 'POST', body: formData });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setProfile(prev => prev ? { ...prev, uploaded_avatar_url: data.url } : prev);
+      setAvatarPreview(data.url);
+      setProfileMessage({ type: 'success', text: 'Avatar updated.' });
+    } catch (err) {
+      setProfileMessage({ type: 'error', text: err instanceof Error ? err.message : 'Upload failed' });
+      setAvatarPreview(null);
+    } finally {
+      setAvatarUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const getProfileAvatarUrl = () => {
+    if (avatarPreview) return avatarPreview;
+    if (profile?.uploaded_avatar_url) return profile.uploaded_avatar_url;
+    if (profile?.avatar_url) return profile.avatar_url;
+    if (user?.user_metadata?.avatar_url) return user.user_metadata.avatar_url;
+    if (user?.user_metadata?.picture) return user.user_metadata.picture;
+    return null;
+  };
+
+  const getProfileInitials = () => {
+    if (profile?.first_name && profile?.last_name) {
+      return `${profile.first_name.charAt(0)}${profile.last_name.charAt(0)}`.toUpperCase();
+    }
+    if (user?.email) return user.email.charAt(0).toUpperCase();
+    return 'U';
+  };
 
   const fetchSettings = useCallback(async () => {
     if (!selectedCompany?.id) return;
@@ -255,9 +338,45 @@ export default function SettingsPage() {
               <div className={styles.settingGroup}>
                 <h3 className={styles.groupTitle}>Profile Information</h3>
                 <p className={styles.groupDescription}>
-                  Your personal account information.
+                  Update your profile details and avatar.
                 </p>
 
+                {profileMessage && (
+                  <div className={`${styles.message} ${styles[profileMessage.type]}`}>
+                    {profileMessage.type === 'success' ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+                    {profileMessage.text}
+                  </div>
+                )}
+
+                {/* Avatar upload */}
+                <div className={styles.avatarUploadWrap}>
+                  <button
+                    type="button"
+                    className={styles.avatarBtn}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={avatarUploading}
+                    aria-label="Change profile photo"
+                  >
+                    {getProfileAvatarUrl() ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={getProfileAvatarUrl()!} alt="Profile" className={styles.avatarImg} />
+                    ) : (
+                      <span className={styles.avatarInitials}>{getProfileInitials()}</span>
+                    )}
+                    <span className={styles.avatarEditOverlay}>
+                      {avatarUploading ? 'Uploading…' : 'Change Photo'}
+                    </span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className={styles.avatarFileInput}
+                    onChange={handleAvatarChange}
+                  />
+                </div>
+
+                {/* Read-only: Name & Login Email */}
                 <div className={styles.setting}>
                   <div className={styles.settingInfo}>
                     <label className={styles.settingLabel}>Name</label>
@@ -269,11 +388,61 @@ export default function SettingsPage() {
 
                 <div className={styles.setting}>
                   <div className={styles.settingInfo}>
-                    <label className={styles.settingLabel}>Email</label>
+                    <label className={styles.settingLabel}>Login Email</label>
                     <p className={styles.settingDescription}>
                       {profile?.email || user?.email}
                     </p>
                   </div>
+                </div>
+
+                {/* Editable fields */}
+                <div className={styles.profileFormGrid}>
+                  <div className={styles.profileField}>
+                    <label className={styles.settingLabel} htmlFor="profile-title">Title</label>
+                    <input
+                      id="profile-title"
+                      type="text"
+                      className={styles.profileInput}
+                      placeholder="e.g. Lead Sales Inspector"
+                      value={profileForm.title}
+                      onChange={e => setProfileForm(prev => ({ ...prev, title: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className={styles.profileField}>
+                    <label className={styles.settingLabel} htmlFor="profile-phone">Contact Phone</label>
+                    <input
+                      id="profile-phone"
+                      type="tel"
+                      className={styles.profileInput}
+                      placeholder="e.g. (555) 867-5309"
+                      value={profileForm.phone}
+                      onChange={e => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
+                    />
+                  </div>
+
+                  <div className={styles.profileField}>
+                    <label className={styles.settingLabel} htmlFor="profile-contact-email">Contact Email</label>
+                    <input
+                      id="profile-contact-email"
+                      type="email"
+                      className={styles.profileInput}
+                      placeholder="e.g. john@yourcompany.com"
+                      value={profileForm.contact_email}
+                      onChange={e => setProfileForm(prev => ({ ...prev, contact_email: e.target.value }))}
+                    />
+                  </div>
+                </div>
+
+                <div className={styles.profileSaveRow}>
+                  <button
+                    type="button"
+                    className={styles.profileSaveBtn}
+                    onClick={handleProfileSave}
+                    disabled={profileSaving}
+                  >
+                    {profileSaving ? 'Saving…' : 'Save Profile'}
+                  </button>
                 </div>
               </div>
               {/* Email Notification Preferences */}

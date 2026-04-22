@@ -1,20 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { getUserBranchFilter } from '@/lib/branch-filter';
 import { ReportsResponse } from '@/services/reportsService';
 
 async function getReportMetrics(
   supabase: any,
   companyId: string,
   startDate: string,
-  endDate: string
+  endDate: string,
+  branchFilter?: string | null
 ) {
   // Get all leads for the company within the date range
-  const { data: leads, count: totalLeadsCount } = await supabase
+  let leadsQuery = supabase
     .from('leads')
     .select('id, lead_status, estimated_value', { count: 'exact' })
     .eq('company_id', companyId)
     .gte('created_at', startDate)
     .lte('created_at', endDate);
+  if (branchFilter) leadsQuery = leadsQuery.or(branchFilter);
+  const { data: leads, count: totalLeadsCount } = await leadsQuery;
 
   // Count leads by status
   const leadsWon = leads?.filter((l: any) => l.lead_status === 'won').length || 0;
@@ -35,11 +40,13 @@ async function getReportMetrics(
   );
 
   // Get call metrics from call_records (using call_records as source of truth)
-  // First, get all company leads and customers to filter call_records
-  const { data: companyLeadIds } = await supabase
+  // First, get all company leads (branch-filtered) to filter call_records
+  let leadIdsQuery = supabase
     .from('leads')
     .select('id')
     .eq('company_id', companyId);
+  if (branchFilter) leadIdsQuery = leadIdsQuery.or(branchFilter);
+  const { data: companyLeadIds } = await leadIdsQuery;
 
   const { data: companyCustomerIds } = await supabase
     .from('customers')
@@ -126,8 +133,26 @@ export async function GET(request: NextRequest) {
 
     const supabase = createAdminClient();
 
+    // Get branch filter for authenticated user (non-blocking: no filter if unauthenticated)
+    let branchFilter: string | null = null;
+    try {
+      const authSupabase = await createClient();
+      const { data: { user } } = await authSupabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await authSupabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        const isGlobalAdmin = profile?.role === 'admin';
+        branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+      }
+    } catch {
+      // If auth fails, proceed without branch filter
+    }
+
     // Get current period metrics
-    const currentMetrics = await getReportMetrics(supabase, companyId, startDate, endDate);
+    const currentMetrics = await getReportMetrics(supabase, companyId, startDate, endDate, branchFilter);
 
     // Get comparison period metrics if enabled
     let previousMetrics = null;
@@ -136,7 +161,8 @@ export async function GET(request: NextRequest) {
         supabase,
         companyId,
         compareStartDate,
-        compareEndDate
+        compareEndDate,
+        branchFilter
       );
     }
 

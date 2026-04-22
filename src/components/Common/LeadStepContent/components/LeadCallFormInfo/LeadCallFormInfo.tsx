@@ -3,13 +3,34 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
-import { Pencil, X, ChevronLeft, ChevronRight, Truck } from 'lucide-react';
+import { Pencil, X, ChevronLeft, ChevronRight, Truck, MapPin } from 'lucide-react';
 import { Lead, LeadSource } from '@/types/lead';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { authenticatedFetch } from '@/lib/api-client';
+import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
+import type { MapPlotData } from '@/components/FieldMap/MapPlot/types';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
+
+// Renders a read-only MapPlotCanvas from map_plot_data stored on the lead
+function FieldMapPlotSection({ mapPlotData, companyId }: { mapPlotData: MapPlotData | null; companyId?: string }) {
+  if (!mapPlotData) return null;
+
+  return (
+    <div className={styles.transcriptSection}>
+      <div className={styles.transcriptHeader}>
+        <h4 className={cardStyles.dataLabel}>Field Map Plot</h4>
+      </div>
+      <MapPlotCanvas
+        mapPlotData={mapPlotData}
+        onChange={() => {}}
+        isReadOnly
+        companyId={companyId}
+      />
+    </div>
+  );
+}
 
 interface LeadCallFormInfoProps {
   lead: Lead;
@@ -136,7 +157,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             firstName={lead.submitted_user.first_name || undefined}
             lastName={lead.submitted_user.last_name || undefined}
             email={lead.submitted_user.email}
-            avatarUrl={lead.submitted_user.avatar_url || null}
+            avatarUrl={lead.submitted_user.uploaded_avatar_url || lead.submitted_user.avatar_url || null}
             size="small"
             showTooltip={true}
           />
@@ -177,7 +198,7 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
           {lead.comments && (
             <div className={styles.transcriptSection}>
               <div className={styles.transcriptHeader}>
-                <h4 className={cardStyles.dataLabel}>AI Summary</h4>
+                <h4 className={cardStyles.dataLabel}>Summary</h4>
               </div>
               <div className={styles.summaryPlainContent}>
                 <span className={cardStyles.transcriptText}>{lead.comments}</span>
@@ -243,6 +264,30 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
             </div>,
             portalContainer ?? document.body
           )}
+        </div>
+      ) : lead.lead_source === 'inspector' ? (
+        <div className={styles.cardContent}>
+          <div className={styles.callInsightsGrid}>
+            <div className={styles.callDetailItem}>
+              <span className={cardStyles.dataLabel}>Source</span>
+              <span className={cardStyles.dataText} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <MapPin size={16} strokeWidth={1.5} />
+                FieldMap
+              </span>
+            </div>
+            {renderSubmittedBy()}
+          </div>
+          {lead.comments && (
+            <div className={styles.transcriptSection}>
+              <div className={styles.transcriptHeader}>
+                <h4 className={cardStyles.dataLabel}>Inspection Notes</h4>
+              </div>
+              <div className={styles.summaryPlainContent}>
+                <span className={cardStyles.transcriptText}>{lead.comments}</span>
+              </div>
+            </div>
+          )}
+          <FieldMapPlotSection mapPlotData={lead.map_plot_data ?? null} companyId={lead.company_id} />
         </div>
       ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>

@@ -28,8 +28,8 @@
   &.headerIconPlain {
     background: transparent;
     border-radius: 0;
-    width: 96px;
-    height: 96px;
+    width: auto;
+    height: auto;
   }
 }
 
@@ -38,14 +38,14 @@
   font-weight: 700;
   color: var(--gray-900);
   margin: 0 0 8px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .subtitle {
   font-size: 16px;
   color: var(--gray-500);
   margin: 0;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .ctaSection {
@@ -66,8 +66,10 @@
   font-size: 18px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, transform 0.1s ease;
-  font-family: var(--font-satoshi);
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease;
+  font-family: var(--font-default);
 
   &:active {
     transform: scale(0.98);
@@ -107,7 +109,7 @@
   font-size: 28px;
   font-weight: 700;
   color: var(--slate-700);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .statNumberWon {
@@ -125,5 +127,5 @@
 .statLabel {
   font-size: 13px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }

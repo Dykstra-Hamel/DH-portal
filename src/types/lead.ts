@@ -1,3 +1,5 @@
+import type { MapPlotData } from '@/components/FieldMap/MapPlot/types';
+
 export type LeadFormat = 'call' | 'form' | 'email' | 'text';
 
 // New taxonomy values (use these for all new records)
@@ -10,6 +12,7 @@ export type LeadSource =
   | 'campaign'
   | 'widget'
   | 'technician'
+  | 'inspector'
   | 'other'
   // Legacy values (existing records only — do not use for new records)
   | 'organic'
@@ -119,6 +122,10 @@ export interface Lead {
     [key: string]: any;
   };
 
+  // Branch assignment
+  branch_id?: string | null;
+  branch?: { id: string; name: string } | null;
+
   // Joined data from related tables
   customer?: {
     id: string;
@@ -143,6 +150,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
     departments?: string[];
   };
   scheduler_user?: {
@@ -151,6 +159,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   submitted_user?: {
     id: string;
@@ -158,6 +167,7 @@ export interface Lead {
     first_name?: string;
     last_name?: string;
     avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
   };
   campaign?: {
     id: string;
@@ -187,6 +197,9 @@ export interface Lead {
     home_size_range?: string; // Range like "0-1500", "1501-2000"
     yard_size_range?: string; // Range like "0-0.25", "0.26-0.50"
   };
+  // Field Map inspection data
+  map_plot_data?: MapPlotData | null;
+
   call_record?: {
     id: string;
     call_id: string;

@@ -37,7 +37,7 @@ export async function GET(
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email, avatar_url),
+        user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
         attachments:comment_attachments!project_comment_id(id, file_path, file_name, file_size, mime_type, created_at)
       `
       )
@@ -176,7 +176,7 @@ export async function POST(
       .select(
         `
         *,
-        user_profile:profiles(id, first_name, last_name, email, avatar_url)
+        user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
       `
       )
       .single();

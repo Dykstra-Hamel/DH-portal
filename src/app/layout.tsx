@@ -1,11 +1,19 @@
 import type { Metadata, Viewport } from 'next';
-import { Outfit } from 'next/font/google';
+import { Figtree, Outfit } from 'next/font/google';
 import localFont from 'next/font/local';
 import { LayoutWrapper } from '@/components/Layout/LayoutWrapper/LayoutWrapper';
 import { UserbackProvider } from '@/components/Common/UserbackProvider';
 import { PWAServiceWorkerRegistration } from '@/components/Common/PWAServiceWorkerRegistration';
 import ScrollToTop from '@/components/Common/ScrollToTop';
 import '@/styles/main.scss';
+
+const figtree = Figtree({
+  subsets: ['latin'],
+  variable: '--font-default',
+  display: 'swap',
+  weight: ['300', '400', '500', '600', '700', '800', '900'],
+  style: ['normal', 'italic'],
+});
 
 const outfit = Outfit({
   subsets: ['latin'],
@@ -40,8 +48,16 @@ export const metadata: Metadata = {
     ],
     apple: [
       { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
-      { url: '/apple-touch-icon-152x152.png', sizes: '152x152', type: 'image/png' },
-      { url: '/apple-touch-icon-167x167.png', sizes: '167x167', type: 'image/png' },
+      {
+        url: '/apple-touch-icon-152x152.png',
+        sizes: '152x152',
+        type: 'image/png',
+      },
+      {
+        url: '/apple-touch-icon-167x167.png',
+        sizes: '167x167',
+        type: 'image/png',
+      },
     ],
   },
 };
@@ -56,7 +72,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.className} ${veganDays.variable}`}>
+    <html
+      lang="en"
+      className={`${figtree.variable} ${outfit.variable} ${veganDays.variable}`}
+    >
+      <head>
+        {/* Capture beforeinstallprompt before React hydrates so the install button works on first page load */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__pwaInstallPrompt=e;window.dispatchEvent(new Event('pwa-prompt-ready'));});`,
+          }}
+        />
+      </head>
       <body>
         <ScrollToTop />
         <UserbackProvider>

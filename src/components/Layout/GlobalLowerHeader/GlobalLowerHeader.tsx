@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect, ReactNode } from 'react';
-import Image from 'next/image';
 import { ChevronDown, Users } from 'lucide-react';
+import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import styles from './GlobalLowerHeader.module.scss';
 
 interface ActionButton {
@@ -13,8 +13,11 @@ interface ActionButton {
 interface AssignableUser {
   id: string;
   email: string;
+  first_name?: string;
+  last_name?: string;
   display_name: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
   departments: string[];
 }
 
@@ -24,6 +27,13 @@ interface AssignedUser {
   first_name?: string;
   last_name?: string;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
+}
+
+interface BranchOption {
+  id: string;
+  name: string;
+  is_primary: boolean;
 }
 
 interface LeadAssignmentControls {
@@ -40,6 +50,9 @@ interface LeadAssignmentControls {
   onAssigneeChange: (id: string) => void;
   onSchedulerChange: (id: string) => void;
   onStatusChange: (status: string) => void;
+  currentBranchId?: string | null;
+  availableBranches?: BranchOption[];
+  onBranchChange?: (branchId: string | null) => void;
 }
 
 interface SupportCaseAssignmentControls {
@@ -50,6 +63,9 @@ interface SupportCaseAssignmentControls {
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onAssigneeChange: (id: string) => void;
   onStatusChange: (status: string) => void;
+  currentBranchId?: string | null;
+  availableBranches?: BranchOption[];
+  onBranchChange?: (branchId: string | null) => void;
 }
 
 interface GlobalLowerHeaderProps {
@@ -91,9 +107,6 @@ const TeamAvatar = () => (
   </div>
 );
 
-const DefaultAvatar = ({ name }: { name: string }) => (
-  <div className={styles.defaultAvatar}>{name.charAt(0).toUpperCase()}</div>
-);
 
 export function GlobalLowerHeader({
   title,
@@ -112,6 +125,7 @@ export function GlobalLowerHeader({
   const [isLeadTypeOpen, setIsLeadTypeOpen] = useState(false);
   const [isAssignedToOpen, setIsAssignedToOpen] = useState(false);
   const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [isBranchOpen, setIsBranchOpen] = useState(false);
   const [hasShadow, setHasShadow] = useState(false);
 
   const leadTypeRef = useRef<HTMLDivElement>(null);
@@ -119,6 +133,7 @@ export function GlobalLowerHeader({
   const statusRef = useRef<HTMLDivElement>(null);
   const supportAssignedToRef = useRef<HTMLDivElement>(null);
   const supportStatusRef = useRef<HTMLDivElement>(null);
+  const branchRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -152,6 +167,12 @@ export function GlobalLowerHeader({
         !supportStatusRef.current.contains(event.target as Node)
       ) {
         setIsStatusOpen(false);
+      }
+      if (
+        branchRef.current &&
+        !branchRef.current.contains(event.target as Node)
+      ) {
+        setIsBranchOpen(false);
       }
     };
 
@@ -237,17 +258,21 @@ export function GlobalLowerHeader({
             'Unknown',
           subtitle: schedulerUser.email || '',
           avatar: schedulerUser.avatar_url || null,
+          userId: schedulerUser.id,
+          email: schedulerUser.email || '',
+          firstName: schedulerUser.first_name,
+          lastName: schedulerUser.last_name,
         };
       }
-      return { name: 'Select Scheduler', subtitle: '', avatar: null };
+      return { name: 'Select Scheduler', subtitle: '', avatar: null, userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
 
     // Show salesperson for earlier statuses
     if (assignedTo === 'sales_team') {
-      return { name: 'Sales Team', subtitle: '', avatar: 'team' };
+      return { name: 'Sales Team', subtitle: '', avatar: 'team', userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
     if (assignedTo === 'support_team') {
-      return { name: 'Support Team', subtitle: '', avatar: 'team' };
+      return { name: 'Support Team', subtitle: '', avatar: 'team', userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
     if (assignedUser) {
       return {
@@ -255,10 +280,14 @@ export function GlobalLowerHeader({
           `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() ||
           'Unknown',
         subtitle: assignedUser.email || '',
-        avatar: assignedUser.avatar_url || null,
+        avatar: assignedUser.uploaded_avatar_url || assignedUser.avatar_url || null,
+        userId: assignedUser.id,
+        email: assignedUser.email || '',
+        firstName: assignedUser.first_name,
+        lastName: assignedUser.last_name,
       };
     }
-    return { name: 'Select', subtitle: '', avatar: null };
+    return { name: 'Select', subtitle: '', avatar: null, userId: undefined, email: '', firstName: undefined, lastName: undefined };
   };
 
   const isSchedulingStatus = () => {
@@ -298,7 +327,7 @@ export function GlobalLowerHeader({
     const { assignedTo, assignedUser } = supportCaseAssignmentControls;
 
     if (assignedTo === 'support_team') {
-      return { name: 'Support Team', subtitle: '', avatar: 'team' };
+      return { name: 'Support Team', subtitle: '', avatar: 'team', userId: undefined, email: '', firstName: undefined, lastName: undefined };
     }
     if (assignedUser) {
       return {
@@ -306,10 +335,14 @@ export function GlobalLowerHeader({
           `${assignedUser.first_name || ''} ${assignedUser.last_name || ''}`.trim() ||
           'Unknown',
         subtitle: assignedUser.email || '',
-        avatar: assignedUser.avatar_url || null,
+        avatar: assignedUser.uploaded_avatar_url || assignedUser.avatar_url || null,
+        userId: assignedUser.id,
+        email: assignedUser.email || '',
+        firstName: assignedUser.first_name,
+        lastName: assignedUser.last_name,
       };
     }
-    return { name: 'Select', subtitle: '', avatar: null };
+    return { name: 'Select', subtitle: '', avatar: null, userId: undefined, email: '', firstName: undefined, lastName: undefined };
   };
 
   const getSupportTeamCount = () => {
@@ -424,18 +457,17 @@ export function GlobalLowerHeader({
                     if (display.avatar === 'team') {
                       return <TeamAvatar />;
                     }
-                    if (display.avatar) {
-                      return (
-                        <Image
-                          src={display.avatar}
-                          alt={display.name}
-                          width={24}
-                          height={24}
-                          className={styles.avatar}
-                        />
-                      );
-                    }
-                    return <DefaultAvatar name={display.name} />;
+                    return (
+                      <MiniAvatar
+                        firstName={display.firstName}
+                        lastName={display.lastName}
+                        email={display.email || ''}
+                        userId={display.userId}
+                        avatarUrl={display.avatar as string | null}
+                        size="small"
+                        showTooltip={false}
+                      />
+                    );
                   })()}
                   <span className={styles.controlValue}>
                     {getAssignedToDisplay().name}
@@ -461,19 +493,15 @@ export function GlobalLowerHeader({
                         }}
                       >
                         <div className={styles.optionContent}>
-                          {leadAssignmentControls.currentUser.avatar ? (
-                            <Image
-                              src={leadAssignmentControls.currentUser.avatar}
-                              alt={leadAssignmentControls.currentUser.name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar
-                              name={leadAssignmentControls.currentUser.name}
-                            />
-                          )}
+                          <MiniAvatar
+                            firstName={leadAssignmentControls.currentUser.name.split(' ')[0]}
+                            lastName={leadAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
+                            email={leadAssignmentControls.currentUser.email}
+                            userId={leadAssignmentControls.currentUser.id}
+                            avatarUrl={leadAssignmentControls.currentUser.avatar}
+                            size="small"
+                            showTooltip={false}
+                          />
                           <div className={styles.optionInfo}>
                             <div className={styles.optionName}>
                               {leadAssignmentControls.currentUser.name}
@@ -496,17 +524,16 @@ export function GlobalLowerHeader({
                             }}
                           >
                             <div className={styles.optionContent}>
-                              {user.avatar_url ? (
-                                <Image
-                                  src={user.avatar_url}
-                                  alt={user.display_name}
-                                  width={32}
-                                  height={32}
-                                  className={styles.avatar}
-                                />
-                              ) : (
-                                <DefaultAvatar name={user.display_name} />
-                              )}
+                              <MiniAvatar
+                                firstName={user.first_name || user.display_name}
+                                lastName={user.last_name}
+                                email={user.email}
+                                userId={user.id}
+                                avatarUrl={user.avatar_url}
+                                uploadedAvatarUrl={user.uploaded_avatar_url}
+                                size="small"
+                                showTooltip={false}
+                              />
                               <div className={styles.optionInfo}>
                                 <div className={styles.optionName}>
                                   {user.display_name}
@@ -532,19 +559,15 @@ export function GlobalLowerHeader({
                         }}
                       >
                         <div className={styles.optionContent}>
-                          {leadAssignmentControls.currentUser.avatar ? (
-                            <Image
-                              src={leadAssignmentControls.currentUser.avatar}
-                              alt={leadAssignmentControls.currentUser.name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar
-                              name={leadAssignmentControls.currentUser.name}
-                            />
-                          )}
+                          <MiniAvatar
+                            firstName={leadAssignmentControls.currentUser.name.split(' ')[0]}
+                            lastName={leadAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
+                            email={leadAssignmentControls.currentUser.email}
+                            userId={leadAssignmentControls.currentUser.id}
+                            avatarUrl={leadAssignmentControls.currentUser.avatar}
+                            size="small"
+                            showTooltip={false}
+                          />
                           <div className={styles.optionInfo}>
                             <div className={styles.optionName}>
                               {leadAssignmentControls.currentUser.name}
@@ -622,17 +645,16 @@ export function GlobalLowerHeader({
                               }}
                             >
                               <div className={styles.optionContent}>
-                                {user.avatar_url ? (
-                                  <Image
-                                    src={user.avatar_url}
-                                    alt={user.display_name}
-                                    width={32}
-                                    height={32}
-                                    className={styles.avatar}
-                                  />
-                                ) : (
-                                  <DefaultAvatar name={user.display_name} />
-                                )}
+                                <MiniAvatar
+                                  firstName={user.first_name || user.display_name}
+                                  lastName={user.last_name}
+                                  email={user.email}
+                                  userId={user.id}
+                                  avatarUrl={user.avatar_url}
+                                uploadedAvatarUrl={user.uploaded_avatar_url}
+                                  size="small"
+                                  showTooltip={false}
+                                />
                                 <div className={styles.optionInfo}>
                                   <div className={styles.optionName}>
                                     {user.display_name}
@@ -689,6 +711,52 @@ export function GlobalLowerHeader({
                 </div>
               )}
             </div>
+
+            {/* Branch Dropdown (only rendered when company has branches) */}
+            {leadAssignmentControls.availableBranches && leadAssignmentControls.availableBranches.length > 0 && (
+              <div className={styles.controlGroup} ref={branchRef}>
+                <label className={styles.controlLabel}>Branch:</label>
+                <button
+                  className={styles.controlDropdown}
+                  onClick={() => setIsBranchOpen(!isBranchOpen)}
+                >
+                  <span className={styles.controlValue}>
+                    {leadAssignmentControls.availableBranches.find(
+                      b => b.id === leadAssignmentControls.currentBranchId
+                    )?.name ?? 'No Branch'}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
+                  />
+                </button>
+                {isBranchOpen && (
+                  <div className={styles.dropdownMenu}>
+                    <button
+                      className={`${styles.dropdownOption} ${!leadAssignmentControls.currentBranchId ? styles.selected : ''}`}
+                      onClick={() => {
+                        leadAssignmentControls.onBranchChange?.(null);
+                        setIsBranchOpen(false);
+                      }}
+                    >
+                      No Branch
+                    </button>
+                    {leadAssignmentControls.availableBranches.map(branch => (
+                      <button
+                        key={branch.id}
+                        className={`${styles.dropdownOption} ${leadAssignmentControls.currentBranchId === branch.id ? styles.selected : ''}`}
+                        onClick={() => {
+                          leadAssignmentControls.onBranchChange?.(branch.id);
+                          setIsBranchOpen(false);
+                        }}
+                      >
+                        {branch.name}{branch.is_primary ? ' (Primary)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -707,18 +775,17 @@ export function GlobalLowerHeader({
                     if (display.avatar === 'team') {
                       return <TeamAvatar />;
                     }
-                    if (display.avatar) {
-                      return (
-                        <Image
-                          src={display.avatar}
-                          alt={display.name}
-                          width={24}
-                          height={24}
-                          className={styles.avatar}
-                        />
-                      );
-                    }
-                    return <DefaultAvatar name={display.name} />;
+                    return (
+                      <MiniAvatar
+                        firstName={display.firstName}
+                        lastName={display.lastName}
+                        email={display.email || ''}
+                        userId={display.userId}
+                        avatarUrl={display.avatar as string | null}
+                        size="small"
+                        showTooltip={false}
+                      />
+                    );
                   })()}
                   <span className={styles.controlValue}>
                     {getSupportCaseAssignedToDisplay().name}
@@ -741,19 +808,15 @@ export function GlobalLowerHeader({
                     }}
                   >
                     <div className={styles.optionContent}>
-                      {supportCaseAssignmentControls.currentUser.avatar ? (
-                        <Image
-                          src={supportCaseAssignmentControls.currentUser.avatar}
-                          alt={supportCaseAssignmentControls.currentUser.name}
-                          width={32}
-                          height={32}
-                          className={styles.avatar}
-                        />
-                      ) : (
-                        <DefaultAvatar
-                          name={supportCaseAssignmentControls.currentUser.name}
-                        />
-                      )}
+                      <MiniAvatar
+                        firstName={supportCaseAssignmentControls.currentUser.name.split(' ')[0]}
+                        lastName={supportCaseAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
+                        email={supportCaseAssignmentControls.currentUser.email}
+                        userId={supportCaseAssignmentControls.currentUser.id}
+                        avatarUrl={supportCaseAssignmentControls.currentUser.avatar}
+                        size="small"
+                        showTooltip={false}
+                      />
                       <div className={styles.optionInfo}>
                         <div className={styles.optionName}>
                           {supportCaseAssignmentControls.currentUser.name}
@@ -801,17 +864,16 @@ export function GlobalLowerHeader({
                         }}
                       >
                         <div className={styles.optionContent}>
-                          {user.avatar_url ? (
-                            <Image
-                              src={user.avatar_url}
-                              alt={user.display_name}
-                              width={32}
-                              height={32}
-                              className={styles.avatar}
-                            />
-                          ) : (
-                            <DefaultAvatar name={user.display_name} />
-                          )}
+                          <MiniAvatar
+                            firstName={user.first_name || user.display_name}
+                            lastName={user.last_name}
+                            email={user.email}
+                            userId={user.id}
+                            avatarUrl={user.avatar_url}
+                                uploadedAvatarUrl={user.uploaded_avatar_url}
+                            size="small"
+                            showTooltip={false}
+                          />
                           <div className={styles.optionInfo}>
                             <div className={styles.optionName}>
                               {user.display_name}
@@ -864,6 +926,52 @@ export function GlobalLowerHeader({
                 </div>
               )}
             </div>
+
+            {/* Branch Dropdown */}
+            {supportCaseAssignmentControls.availableBranches && supportCaseAssignmentControls.availableBranches.length > 0 && (
+              <div className={styles.controlGroup} ref={branchRef}>
+                <label className={styles.controlLabel}>Branch:</label>
+                <button
+                  className={styles.controlDropdown}
+                  onClick={() => setIsBranchOpen(!isBranchOpen)}
+                >
+                  <span className={styles.controlValue}>
+                    {supportCaseAssignmentControls.availableBranches.find(
+                      b => b.id === supportCaseAssignmentControls.currentBranchId
+                    )?.name ?? 'No Branch'}
+                  </span>
+                  <ChevronDown
+                    size={16}
+                    className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
+                  />
+                </button>
+                {isBranchOpen && (
+                  <div className={styles.dropdownMenu}>
+                    <button
+                      className={`${styles.dropdownOption} ${!supportCaseAssignmentControls.currentBranchId ? styles.selected : ''}`}
+                      onClick={() => {
+                        supportCaseAssignmentControls.onBranchChange?.(null);
+                        setIsBranchOpen(false);
+                      }}
+                    >
+                      No Branch
+                    </button>
+                    {supportCaseAssignmentControls.availableBranches.map(branch => (
+                      <button
+                        key={branch.id}
+                        className={`${styles.dropdownOption} ${supportCaseAssignmentControls.currentBranchId === branch.id ? styles.selected : ''}`}
+                        onClick={() => {
+                          supportCaseAssignmentControls.onBranchChange?.(branch.id);
+                          setIsBranchOpen(false);
+                        }}
+                      >
+                        {branch.name}{branch.is_primary ? ' (Primary)' : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
         {((actionButtons && actionButtons?.length > 0) ||

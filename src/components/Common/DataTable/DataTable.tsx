@@ -11,8 +11,25 @@ import React, {
 import SortableColumnHeader from '@/components/Common/SortableColumnHeader/SortableColumnHeader';
 import { Toast } from '@/components/Common/Toast';
 import DefaultItemRow from './DefaultItemRow';
+import CardItemRow from './CardItemRow';
 import { DataTableProps, SortConfig } from './DataTable.types';
 import styles from './DataTable.module.scss';
+
+// Watches a max-width media query and returns whether it currently matches.
+// Initialized to `false` so server-rendered markup (desktop) matches the
+// client's first paint, then flips on mount if the viewport is narrow.
+function useIsNarrow(breakpoint: number): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia(`(max-width: ${breakpoint}px)`);
+    setNarrow(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setNarrow(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [breakpoint]);
+  return narrow;
+}
 
 export default function DataTable<T>({
   data,
@@ -35,6 +52,8 @@ export default function DataTable<T>({
   emptyStateMessage = 'No items found for this category.',
   tableType = 'tickets',
   customColumnWidths,
+  cardView,
+  cardBreakpoint = 1280,
   defaultSort,
   onShowToast,
   // Callbacks
@@ -42,22 +61,33 @@ export default function DataTable<T>({
   onSortChange,
   onSearchChange,
 }: DataTableProps<T>) {
+  const isNarrow = useIsNarrow(cardBreakpoint);
+  const useCardView = !!cardView;
+
   // Internal state - DataTable manages its own UI state
   const [activeTab, setActiveTab] = useState<string>(tabs?.[0]?.key || 'all');
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>(defaultSort || null);
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(
+    defaultSort || null
+  );
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   // Handler functions - update internal state AND notify parent
-  const handleTabChange = useCallback((newTab: string) => {
-    setActiveTab(newTab);
-    onTabChange?.(newTab); // Notify parent to fetch new data
-  }, [onTabChange]);
+  const handleTabChange = useCallback(
+    (newTab: string) => {
+      setActiveTab(newTab);
+      onTabChange?.(newTab); // Notify parent to fetch new data
+    },
+    [onTabChange]
+  );
 
-  const handleSearchChange = useCallback((newQuery: string) => {
-    setSearchQuery(newQuery);
-    onSearchChange?.(newQuery); // Notify parent to fetch filtered data
-  }, [onSearchChange]);
+  const handleSearchChange = useCallback(
+    (newQuery: string) => {
+      setSearchQuery(newQuery);
+      onSearchChange?.(newQuery); // Notify parent to fetch filtered data
+    },
+    [onSearchChange]
+  );
 
   // Keep search visible when there's a query
   useEffect(() => {
@@ -112,8 +142,23 @@ export default function DataTable<T>({
   }, [filteredData, searchQuery, searchEnabled]);
 
   // Handle sorting
-  const handleSort = useCallback((key: string) => {
-    setSortConfig(prevSort => {
+  const handleSort = useCallback(
+    (key: string) => {
+      setSortConfig(prevSort => {
+        let newSort: SortConfig | null;
+        if (!prevSort || prevSort.key !== key) {
+          newSort = { key, direction: 'asc' };
+        } else if (prevSort.direction === 'asc') {
+          newSort = { key, direction: 'desc' };
+        } else {
+          newSort = null; // Clear sort
+        }
+
+        return newSort;
+      });
+
+      // Calculate the new sort outside of setState for immediate callback
+      const prevSort = sortConfig;
       let newSort: SortConfig | null;
       if (!prevSort || prevSort.key !== key) {
         newSort = { key, direction: 'asc' };
@@ -123,29 +168,17 @@ export default function DataTable<T>({
         newSort = null; // Clear sort
       }
 
-      return newSort;
-    });
-
-    // Calculate the new sort outside of setState for immediate callback
-    const prevSort = sortConfig;
-    let newSort: SortConfig | null;
-    if (!prevSort || prevSort.key !== key) {
-      newSort = { key, direction: 'asc' };
-    } else if (prevSort.direction === 'asc') {
-      newSort = { key, direction: 'desc' };
-    } else {
-      newSort = null; // Clear sort
-    }
-
-    // Always notify parent of sort change (including when clearing)
-    if (newSort) {
-      onSortChange?.(newSort.key, newSort.direction);
-    } else if (onSortChange) {
-      // When clearing sort, notify parent with default sort or no sort
-      // For now, we'll just call with the original key and 'asc' to reset
-      onSortChange(key, 'asc');
-    }
-  }, [sortConfig, onSortChange]);
+      // Always notify parent of sort change (including when clearing)
+      if (newSort) {
+        onSortChange?.(newSort.key, newSort.direction);
+      } else if (onSortChange) {
+        // When clearing sort, notify parent with default sort or no sort
+        // For now, we'll just call with the original key and 'asc' to reset
+        onSortChange(key, 'asc');
+      }
+    },
+    [sortConfig, onSortChange]
+  );
 
   // Sort data based on current sort configuration
   const sortedData = useMemo(() => {
@@ -232,7 +265,8 @@ export default function DataTable<T>({
       if (!currentLoadMoreRef) return;
 
       const rect = currentLoadMoreRef.getBoundingClientRect();
-      const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+      const viewportHeight =
+        window.innerHeight || document.documentElement.clientHeight;
       const isInViewport = rect.top >= 0 && rect.bottom <= viewportHeight;
 
       if (isInViewport) {
@@ -249,7 +283,11 @@ export default function DataTable<T>({
   }, [handleLoadMore, infiniteScrollEnabled]);
 
   useLayoutEffect(() => {
-    if (!preserveWindowScrollAnchor || !infiniteScrollEnabled || !dataRowsRef.current) {
+    if (
+      !preserveWindowScrollAnchor ||
+      !infiniteScrollEnabled ||
+      !dataRowsRef.current
+    ) {
       prevLoadingMoreRef.current = loadingMore;
       if (!loadingMore) {
         anchorRowRef.current = null;
@@ -280,7 +318,9 @@ export default function DataTable<T>({
       const anchor = anchorRowRef.current;
       if (!anchor) return;
 
-      const target = getRows().find(row => row.dataset.rowKey === anchor.rowKey);
+      const target = getRows().find(
+        row => row.dataset.rowKey === anchor.rowKey
+      );
       if (!target) return;
 
       const delta = target.getBoundingClientRect().top - anchor.top;
@@ -314,11 +354,14 @@ export default function DataTable<T>({
   ]);
 
   // Handle toast
-  const handleShowToast = useCallback((message: string) => {
-    setToastMessage(message);
-    setShowToast(true);
-    onShowToast?.(message);
-  }, [onShowToast]);
+  const handleShowToast = useCallback(
+    (message: string) => {
+      setToastMessage(message);
+      setShowToast(true);
+      onShowToast?.(message);
+    },
+    [onShowToast]
+  );
 
   const handleToastClose = () => {
     setShowToast(false);
@@ -358,7 +401,10 @@ export default function DataTable<T>({
       const id = record.id;
       const type = record._type;
 
-      if ((typeof id === 'string' || typeof id === 'number') && typeof type === 'string') {
+      if (
+        (typeof id === 'string' || typeof id === 'number') &&
+        typeof type === 'string'
+      ) {
         return `${type}-${id}`;
       }
 
@@ -394,7 +440,9 @@ export default function DataTable<T>({
 
           {loading ? (
             <div className={styles.dataContainer} aria-busy="true">
-              <div className={`${styles.headerRow} ${styles.skeletonHeaderRow}`}>
+              <div
+                className={`${styles.headerRow} ${styles.skeletonHeaderRow}`}
+              >
                 {columns.map((column, index) => (
                   <div key={column.key} className={styles.skeletonCell}>
                     <span
@@ -431,6 +479,71 @@ export default function DataTable<T>({
             </div>
           ) : sortedData.length === 0 ? (
             <div className={styles.emptyState}>{emptyStateMessage}</div>
+          ) : useCardView && cardView ? (
+            (() => {
+              const isSingleRow =
+                !cardView.summary && !cardView.avatar && !cardView.statusBar;
+              const actionCol =
+                isSingleRow && cardView.primaryAction ? '140px' : '0px';
+              const fieldWidths = cardView.topFields
+                .map(f => f.width ?? 'minmax(0, 1fr)')
+                .join(' ');
+              const gridTemplate = `${fieldWidths} ${actionCol}`;
+              return (
+                <div
+                  className={styles.cardListContainer}
+                  style={
+                    {
+                      '--card-cols': cardView.topFields.length,
+                      '--card-action-col': actionCol,
+                      '--card-grid-template': gridTemplate,
+                    } as React.CSSProperties
+                  }
+                >
+                  <div className={styles.cardListHeader}>
+                    {cardView.topFields.map(field => (
+                      <div
+                        key={field.key}
+                        className={styles.cardListHeaderCell}
+                      >
+                        {field.label}
+                      </div>
+                    ))}
+                  </div>
+                  <div className={styles.cardList} ref={dataRowsRef}>
+                    {visibleSortedData.map((item, index) => {
+                      const rowKey = getRowKey(item, index);
+                      return (
+                        <CardItemRow
+                          key={rowKey}
+                          rowKey={rowKey}
+                          item={item}
+                          config={cardView}
+                          onAction={handleItemAction}
+                        />
+                      );
+                    })}
+
+                    {infiniteScrollEnabled && (
+                      <div
+                        ref={loadMoreRef}
+                        className={styles.loadMoreIndicator}
+                      >
+                        {loadingMore && (
+                          <div className={styles.loadMoreSpinner}>
+                            <div className={styles.spinner}></div>
+                            <span>Loading more...</span>
+                          </div>
+                        )}
+                        {hasMore && !loadingMore && (
+                          <div className={styles.loadMorePlaceholder} />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()
           ) : (
             <div className={styles.dataContainer}>
               {/* Header Row */}

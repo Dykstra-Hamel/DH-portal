@@ -13,21 +13,24 @@ This file contains reference information for AI agents (Claude, etc.) working in
 
 ### Authentication
 
-Every request requires two headers:
+The docs and this codebase use a combined auth pattern:
 
 ```
+Authorization: Bearer {oauth_access_token}   # used in this app
 ApiKey: {your_api_key}
 tenant-id: {your_tenant_id}
 Content-Type: application/json
 ```
 
-- The API key is obtained from the WorkWave developer portal per company/tenant.
-- Store as environment variables: `PESTPAC_API_KEY`, `PESTPAC_TENANT_ID`
-- There is no OAuth flow — all requests use static API key + tenant ID.
+- WorkWave docs examples commonly show `ApiKey` + `tenant-id`.
+- In DH Portal, PestPac calls are authenticated with OAuth token + `ApiKey` + `tenant-id`.
+- OAuth token endpoint used by this app: `https://is.workwave.com/oauth2/token?scope=openid`
+- Company credentials are stored in `company_settings` (keys: `pestpac_api_key`, `pestpac_tenant_id`, `pestpac_oauth_client_id`, `pestpac_oauth_client_secret`, `pestpac_wwid_username`, `pestpac_wwid_password`).
 
 **Example curl:**
 ```bash
 curl -X GET "https://api.workwave.com/pestpac/v1/clients" \
+  -H "Authorization: Bearer YOUR_ACCESS_TOKEN" \
   -H "ApiKey: YOUR_API_KEY" \
   -H "tenant-id: YOUR_TENANT_ID" \
   -H "Content-Type: application/json"
@@ -84,107 +87,120 @@ All endpoints are relative to this base URL.
 
 ---
 
-### Key Resources & Endpoint Patterns
+### Endpoint Reference (Expanded)
 
-All resources follow consistent REST URL patterns:
+The following resource groups are visible in the WorkWave portal captures (`2026-03-16`). This list is the working reference for agents in this repo.
 
-#### Clients (Customers)
-```
-GET    /clients                          List all clients
-POST   /clients                          Create a client
-GET    /clients/{clientID}               Get a single client
-PUT    /clients/{clientID}               Replace a client
-PATCH  /clients/{clientID}               Partial update a client
-DELETE /clients/{clientID}               Delete a client
-```
+#### Resource groups shown in docs
 
-#### Locations (Service Sites)
+`ActivityLog`, `AdjustmentReason`, `Areas`, `AreaTypes`, `AutoComplete`, `Automation`, `BillTos`, `Branches`, `Builders`, `Bundles`, `Calls`, `CancelReasons`, `CompanySetup`, `Conditions`, `ConditionsLookups`, `Contacts`, `Corporations`, `Counties`, `CreditCardBilling`, `Devices`, `DeviceTypes`, `Diagrams`, `DiscountCodes`, `Divisions`, `Documents`, `Email`, `Employees`, `FinancedInvoices`, `FormComments`, `Frequencies`, `GainLoss`, `GLCode`, `Invoices`, `Jobs`, `Leads`, `ListManagement`, `LocationAreaTypes`, `LocationBundles`, `Locations`, `NoteCodes`, `Notes`, `NotificationMessage`, `Notifications`, `NotServicedReasons`, `PaymentAccounts`, `Payments`, `PayOverTime`, `ProgramTypes`, `Routes`, `SalesEvents`, `Schedules`, `Scheduling`, `ServiceClasses`, `ServiceOrderAttributeCategories`, `ServiceOrderAttributes`, `ServiceOrderBatches`, `ServiceOrders`, `Services`, `ServiceSetups`, `Skills`, `SourceClasses`, `Sources`, `States`, `TargetEvidenceTypes`, `TargetPests`, `Tasks`, `TaskTypes`, `TaxCodes`, `TechnicianRegions`, `Thresholds`, `TimeBlocks`, `Types`, `UserDefChoice`, `UserDefFields`, `WebHooks`.
+
+#### High-use endpoint patterns in this codebase
+
+##### Customers and locations
 ```
-GET    /clients/{clientID}/locations     List locations for a client
-POST   /clients/{clientID}/locations     Add a location to a client
-GET    /locations/{locationID}           Get a single location
-PATCH  /locations/{locationID}           Update a location
-DELETE /locations/{locationID}           Delete a location
+GET    /Locations
+GET    /Locations/{locationID}
+GET    /Clients/{clientID}
+GET    /Contacts
 ```
 
-#### Orders
+##### Service orders (important for FieldMap)
 ```
-GET    /orders                           List orders
-POST   /orders                           Create an order
-GET    /orders/{orderID}                 Get a single order
-PATCH  /orders/{orderID}                 Update an order
-DELETE /orders/{orderID}                 Delete an order
-```
-
-#### Services (Order Line Items)
-```
-GET    /orders/{orderID}/services        List services on an order
-POST   /orders/{orderID}/services        Add a service to an order
-PATCH  /services/{serviceID}             Update a service
-DELETE /services/{serviceID}             Remove a service
-```
-
-#### Service Types
-```
-GET    /servicetypes                     List all service types
-GET    /servicetypes/{serviceTypeID}     Get a service type
-```
-
-#### Employees
-```
-GET    /employees                        List employees
-GET    /employees/{employeeID}           Get a single employee
-POST   /employees                        Create an employee
-PATCH  /employees/{employeeID}           Update an employee
+GET    /ServiceOrders
+GET    /ServiceOrders/{id}
+POST   /ServiceOrders
+PATCH  /ServiceOrders/{id}
+DELETE /ServiceOrders/{id}
+GET    /ServiceOrders/{id}/documents
+GET    /ServiceOrders/{id}/conditions
+POST   /ServiceOrders/{id}/notes
+GET    /ServiceOrders/{id}/inspectionReport
+POST   /ServiceOrders/{orderId}/lineItems
+PUT    /ServiceOrders/{orderId}/lineItems/{lineItemId}
+DELETE /ServiceOrders/{orderId}/lineItems/{lineItemId}
+POST   /ServiceOrders/{orderId}/materials
+PUT    /ServiceOrders/{orderId}/materials/{materialLineId}
+DELETE /ServiceOrders/{orderId}/materials/{materialLineId}
+POST   /ServiceOrders/{orderId}/targets
+DELETE /ServiceOrders/{orderId}/targets/{targetCode}
+GET    /ServiceOrders/{orderId}/attributes
+POST   /ServiceOrders/{orderId}/attributes
+DELETE /ServiceOrders/{orderId}/attributes/{attributeId}
 ```
 
-#### Routes
+##### Routes and schedule lookups
 ```
-GET    /routes                           List routes
-GET    /routes/{routeID}                 Get a single route
-POST   /routes                           Create a route
-PATCH  /routes/{routeID}                 Update a route
-GET    /routes/{routeID}/stops           Get route stops
-```
-
-#### Invoices & Billing
-```
-GET    /invoices                         List invoices
-GET    /invoices/{invoiceID}             Get a single invoice
-POST   /invoices                         Create an invoice
-PATCH  /invoices/{invoiceID}             Update an invoice
+GET    /Routes
+GET    /Routes/{routeID}
+GET    /Routes/{routeID}/Stops     # supported for some tenants
+GET    /lookups/Routes
+GET    /lookups/Schedules
+POST   /Scheduling/availableTimeWindows
 ```
 
-#### Payments
+##### Service setup and service catalog
 ```
-POST   /payments                         Process a payment
-GET    /payments/{paymentID}             Get payment details
-```
-
-**Payment request body fields:**
-- `clientID` — the client being charged
-- `amount` — payment amount (decimal)
-- `paymentMethod` — payment method type
-- `referenceNumber` — optional reference
-
-#### Documents
-```
-POST   /documents                        Upload a document (multipart/form-data)
-GET    /documents/{documentID}           Retrieve a document
-DELETE /documents/{documentID}           Delete a document
+GET    /ServiceSetups/{id}
+PATCH  /ServiceSetups/{id}
+POST   /ServiceSetups
+GET    /lookups/Services
+GET    /lookups/ServiceClasses
+GET    /lookups/ServiceOrderAttributes
+GET    /lookups/ServiceOrderAttributeCategories
 ```
 
-**Document upload** uses `multipart/form-data` (not JSON). Include file binary + metadata fields.
-
-#### Webhooks
+##### Billing and payments
 ```
-GET    /webhooks                         List registered webhooks
-POST   /webhooks                         Register a webhook
-DELETE /webhooks/{webhookID}             Remove a webhook
+GET    /BillTos
+GET    /Invoices
+GET    /Payments
+POST   /Payments
+GET    /PaymentAccounts
+POST   /PaymentAccounts/{cardId}/charge
+POST   /PaymentAccounts/{cardId}/authorize
+POST   /PaymentAccounts/return
+POST   /PaymentAccounts/capture
 ```
 
-**Webhook events include:** order created/updated, payment processed, service completed, route updated, and others.
-Webhook payloads are POST'd to your registered callback URL with a JSON body describing the event.
+##### Webhooks and activity
+```
+POST   /ActivityLog
+GET    /WebHooks
+POST   /WebHooks
+PUT    /WebHooks/{id}
+DELETE /WebHooks/{id}
+```
+
+##### Tasks and operational lookups
+```
+GET    /Tasks
+POST   /Tasks
+PUT    /Tasks/{id}
+DELETE /Tasks/{id}
+GET    /lookups/TaskTypes
+GET    /lookups/TargetPests
+GET    /lookups/TaxCodes
+GET    /lookups/TechnicianRegions
+GET    /TimeBlocks
+```
+
+#### Webhook entity/action support shown in docs
+
+- `Bill-To`: create, update, delete
+- `Branch`: create, update, delete
+- `Card On File`: create, update, delete
+- `Condition`: create, update, delete
+- `Contacts`: create, update, delete
+- `CreditMemo`: create, update, apply
+- `Employee`: create, update, delete
+- `Invoice`: create, update, void
+- `Lead`: create, update, delete
+- `Location`: create, update, delete
+- `Notes`: create, update, delete
+- `Payment`: create, update, apply
+- `Service Order`: create, update, post, delete
+- `Service Setup`: create, update, delete
 
 ---
 

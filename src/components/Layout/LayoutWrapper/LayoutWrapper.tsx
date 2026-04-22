@@ -45,6 +45,19 @@ function LayoutContent({ children }: LayoutWrapperProps) {
     pathname === '/admin/project-management';
 
   const isTechLeadsPage = pathname.startsWith('/tech-leads');
+  const isFieldMapPage = pathname.startsWith('/field-map');
+  const isFieldSalesPage = pathname.startsWith('/field-sales');
+  const isAppShellPage = isTechLeadsPage || isFieldMapPage || isFieldSalesPage;
+  const hideSecondarySidebar = isTechLeadsPage || isFieldMapPage;
+  const isFieldMapWizardPage = Boolean(
+    pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
+    pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/) ||
+    pathname === '/field-map/new' ||
+    pathname === '/field-sales/field-map/new'
+  );
+  const isFieldSalesLeadDetail = Boolean(
+    pathname.match(/^\/field-sales\/leads\/[^\/]+$/)
+  );
 
   // Pages that should have the full layout (header + sidebar)
   const shouldShowLayout =
@@ -115,8 +128,8 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           return {
             title: pageHeader.title,
             description: pageHeader.description,
-            showAddButton: true,
-            addButtonText: 'Add Ticket',
+            showAddButton: false,
+            customActions: pageHeader.customActions,
           };
         }
         return {
@@ -183,6 +196,20 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           description: 'Customize your brand settings and appearance here.',
           showAddButton: false,
         };
+      case '/field-map':
+        return {
+          title: 'Field Map',
+          description: "View today's route and start inspections.",
+          showAddButton: false,
+        };
+      case '/field-map/history':
+        return {
+          title: 'Inspection History',
+          description: 'Review completed field map inspections.',
+          showAddButton: false,
+        };
+      case '/field-map/new':
+        return null;
       case '/admin':
         return {
           title: 'Admin Dashboard',
@@ -369,7 +396,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           };
         }
         // Show lower header for lead detail pages
-        if (pathname.match(/^\/tickets\/leads\/[^\/]+$/)) {
+        if (
+          pathname.match(/^\/tickets\/leads\/[^\/]+$/) ||
+          pathname.match(/^\/field-sales\/leads\/[^\/]+$/)
+        ) {
           // Use dynamic page header if set, otherwise hide header
           if (pageHeader) {
             return {
@@ -526,6 +556,12 @@ function LayoutContent({ children }: LayoutWrapperProps) {
           }
           return null;
         }
+        if (
+          pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
+          pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/)
+        ) {
+          return null;
+        }
 
         return {
           title: 'Page',
@@ -544,10 +580,10 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   return (
     <div className={styles.layoutWrapper}>
       <div className={styles.contentWrapper}>
-        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} hideSecondary={isTechLeadsPage} />
+        <Sidebar isActive={isSidebarActive} onLinkClick={closeSidebar} hideSecondary={hideSecondarySidebar} />
         <div className={styles.rightContent}>
           <GlobalHeader onMenuToggle={toggleSidebar} />
-          {!isTechLeadsPage && pageConfig && (
+          {(!isAppShellPage || isFieldSalesLeadDetail) && pageConfig && (
             <GlobalLowerHeader
               title={pageConfig.title}
               titleLeading={
@@ -579,7 +615,11 @@ function LayoutContent({ children }: LayoutWrapperProps) {
             className={[
               styles.mainContent,
               isProjectManagementPage ? styles.projectManagementMainContent : '',
-              isTechLeadsPage ? styles.techLeadsMainContent : '',
+              isFieldMapWizardPage
+                ? styles.fieldMapWizardMainContent
+                : isAppShellPage
+                ? styles.techLeadsMainContent
+                : '',
             ].filter(Boolean).join(' ')}
             data-scroll-container="main"
           >
@@ -587,7 +627,9 @@ function LayoutContent({ children }: LayoutWrapperProps) {
               className={`pageWrapper ${
                 isProjectManagementPage
                   ? styles.projectManagementPageWrapper
-                  : isTechLeadsPage
+                  : isFieldMapWizardPage
+                  ? styles.fieldMapWizardPageWrapper
+                  : isAppShellPage
                   ? styles.techLeadsPageWrapper
                   : ''
               }`}

@@ -47,7 +47,7 @@ export async function GET(
           created_at,
           updated_at,
           user_id,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         activity:project_task_activity (
           id,
@@ -56,14 +56,15 @@ export async function GET(
           new_value,
           created_at,
           user_id,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         profiles:assigned_to (
           id,
           first_name,
           last_name,
           email,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         )
       `
       )

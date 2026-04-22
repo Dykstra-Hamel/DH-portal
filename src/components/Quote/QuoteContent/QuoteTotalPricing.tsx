@@ -8,7 +8,8 @@
 import styles from './quotecontent.module.scss';
 
 interface QuoteTotalPricingProps {
-  regularLineItems: any[];
+  primaryLineItems: any[];
+  secondaryLineItems: any[];
   availableAddons: any[];
   selectedAddonIds: string[];
   onToggleAddon: (id: string) => void;
@@ -40,20 +41,22 @@ const abbreviateFrequency = (frequency: string) => {
 };
 
 export default function QuoteTotalPricing({
-  regularLineItems,
+  primaryLineItems,
+  secondaryLineItems,
   availableAddons,
   selectedAddonIds,
   onToggleAddon,
   selectedPlanIds,
   onTogglePlan,
 }: QuoteTotalPricingProps) {
-  const selectedPlans = regularLineItems.filter(item =>
+  const allPlanItems = [...primaryLineItems, ...secondaryLineItems];
+  const selectedPlans = allPlanItems.filter(item =>
     selectedPlanIds.includes(item.id)
   );
   const selectedAddons = availableAddons.filter(addon =>
     selectedAddonIds.includes(addon.id)
   );
-  const isOnlyOnePlan = regularLineItems.length > 1 && selectedPlanIds.length === 1;
+  const isOnlyOnePlan = allPlanItems.length > 1 && selectedPlanIds.length === 1;
 
   const totalInitial =
     selectedPlans.reduce(
@@ -76,9 +79,10 @@ export default function QuoteTotalPricing({
     const recurring = isAddon ? item.recurring_price : (item.final_recurring_price || item.recurring_price);
     const initial = isAddon ? item.initial_price : (item.final_initial_price || item.initial_price);
     const freq = item.billing_frequency;
+    const isOneTime = freq === 'one-time';
     return (
       <>
-        {recurring > 0 && (
+        {recurring > 0 && !isOneTime && (
           <span className={styles.totalItemPriceRecurring}>
             <span className={styles.totalItemPriceAmount}>${formatCurrency(recurring)}</span>
             <span className={styles.totalItemPriceFreq}>/{abbreviateFrequency(freq)}</span>
@@ -87,7 +91,7 @@ export default function QuoteTotalPricing({
         {initial > 0 && (
           <span className={styles.totalItemPriceInitial}>
             <span className={styles.totalItemPriceAmount}>${formatCurrency(initial)}</span>
-            <span className={styles.totalItemPriceFreq}> initial</span>
+            <span className={styles.totalItemPriceFreq}>{isOneTime ? ' one time' : ' initial'}</span>
           </span>
         )}
       </>
@@ -105,15 +109,50 @@ export default function QuoteTotalPricing({
         </strong>
         <div className={styles.totalListWrapper}>
           <ul className={styles.totalItemsList}>
-            {/* Services sub-section */}
-            <li className={styles.totalSectionLabel}>Services</li>
-            {regularLineItems.map((item, idx) => {
+            {/* Primary plans sub-section */}
+            <li className={styles.totalSectionLabel}>Service Quote</li>
+            {primaryLineItems.map((item, idx) => {
               const isSelected = selectedPlanIds.includes(item.id);
               const isOnly = isOnlyOnePlan && isSelected;
               return (
                 <li key={idx} className={`${styles.totalItem} ${!isSelected ? styles.totalItemUnselected : ''}`}>
                   <span className={styles.totalItemLeft}>
-                    {regularLineItems.length > 1 ? (
+                    {allPlanItems.length > 1 ? (
+                      <label
+                        className={`${styles.addonCheckbox} ${isOnly ? styles.addonCheckboxLastPlan : ''}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => onTogglePlan(item.id)}
+                          disabled={isOnly}
+                        />
+                        <span className={`${styles.addonCheckboxCustom} ${isOnly ? styles.addonCheckboxDisabled : ''}`} />
+                      </label>
+                    ) : (
+                      <span className={styles.totalItemCheckmark}>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="13" height="11" viewBox="0 0 13 11" fill="none">
+                          <path d="M1 7.04907L3.5 9.64154L11.8333 1" stroke="#0072DA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </span>
+                    )}
+                    {item.plan_name}
+                  </span>
+                  <span className={styles.totalItemPrice}>{renderItemPrice(item)}</span>
+                </li>
+              );
+            })}
+            {/* Secondary plans sub-section */}
+            {secondaryLineItems.length > 0 && (
+              <li className={styles.totalSectionLabel}>Additional Recommendations</li>
+            )}
+            {secondaryLineItems.map((item, idx) => {
+              const isSelected = selectedPlanIds.includes(item.id);
+              const isOnly = isOnlyOnePlan && isSelected;
+              return (
+                <li key={`secondary-${idx}`} className={`${styles.totalItem} ${!isSelected ? styles.totalItemUnselected : ''}`}>
+                  <span className={styles.totalItemLeft}>
+                    {allPlanItems.length > 1 ? (
                       <label
                         className={`${styles.addonCheckbox} ${isOnly ? styles.addonCheckboxLastPlan : ''}`}
                       >
@@ -164,16 +203,18 @@ export default function QuoteTotalPricing({
           </ul>
         </div>
       </div>
-      <div className={styles.totalRow}>
-        <div>Total Recurring Cost:</div>
-        <span>
-          <strong>
-            <sup>$</sup>
-            {formatCurrency(totalRecurring)}
-          </strong>
-          <span className={styles.totalRowFreq}>/{abbreviateFrequency(billingFrequency)}</span>
-        </span>
-      </div>
+      {totalRecurring > 0 && (
+        <div className={styles.totalRow}>
+          <div>Total Recurring Cost:</div>
+          <span>
+            <strong>
+              <sup>$</sup>
+              {formatCurrency(totalRecurring)}
+            </strong>
+            <span className={styles.totalRowFreq}>/{abbreviateFrequency(billingFrequency)}</span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

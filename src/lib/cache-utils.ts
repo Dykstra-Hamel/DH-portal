@@ -121,4 +121,6 @@ export const CACHE_KEYS = {
   COMPANIES_LIST: 'cache:companies:list',
   USER_PROFILE: 'cache:user:profile',
   COMPANY_BRANDING: (companyId: string) => `cache:company:${companyId}:branding`,
+  USER_DEPARTMENTS: (userId: string, companyId: string) =>
+    `cache:user:${userId}:departments:${companyId}`,
 } as const;

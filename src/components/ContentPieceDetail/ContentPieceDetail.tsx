@@ -97,7 +97,6 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
   const [editContentType, setEditContentType] = useState(contentPiece.content_type || '');
   const [editTitle, setEditTitle] = useState(contentPiece.title || '');
   const [editTopic, setEditTopic] = useState(contentPiece.topic || '');
-  const [editPublishDate, setEditPublishDate] = useState(contentPiece.publish_date || '');
   const [editLink, setEditLink] = useState(contentPiece.link || '');
   const [editGoogleDocLink, setEditGoogleDocLink] = useState<string>(contentPiece.google_doc_link ?? '');
   const [editNotes, setEditNotes] = useState(contentPiece.notes || '');
@@ -148,6 +147,12 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
   });
   const [overwriteModalOpen, setOverwriteModalOpen] = useState(false);
   const [pendingDraftIndex, setPendingDraftIndex] = useState<number | null>(null);
+  const [savingDraftInstruction, setSavingDraftInstruction] = useState(false);
+  const [draftInstructionSaved, setDraftInstructionSaved] = useState(false);
+  const [draftSaveMenuOpen, setDraftSaveMenuOpen] = useState(false);
+  const [savingHeadlineInstruction, setSavingHeadlineInstruction] = useState(false);
+  const [headlineInstructionSaved, setHeadlineInstructionSaved] = useState(false);
+  const [headlineSaveMenuOpen, setHeadlineSaveMenuOpen] = useState(false);
   const [navWarningOpen, setNavWarningOpen] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
 
@@ -186,7 +191,6 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
           content_type: editContentType || null,
           title: editTitle || null,
           topic: editTopic || null,
-          publish_date: editPublishDate || null,
           link: editLink || null,
           google_doc_link: editGoogleDocLink || null,
           notes: editNotes || null,
@@ -432,6 +436,29 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
     }
   };
 
+  const saveAsInstruction = async (
+    scope: 'draft' | 'headlines',
+    instructionText: string,
+    target: 'company' | 'global'
+  ) => {
+    if (!instructionText.trim()) return;
+    const headers = await getAuthHeaders();
+    const url = target === 'global'
+      ? '/api/admin/ai-instructions'
+      : `/api/admin/companies/${contentPiece.company_id}/ai-instructions`;
+    if (target === 'company' && !contentPiece.company_id) return;
+    await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        scope,
+        content_type: editContentType || null,
+        instruction_text: instructionText.trim(),
+        source: 'saved_prompt',
+      }),
+    });
+  };
+
   const applyDraft = async (index: number) => {
     if (!draftSuggestions) return;
     setSelectedDraftIndex(index);
@@ -593,33 +620,22 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>Edit Details</h2>
           <div className={styles.form}>
-            <div className={styles.formRow}>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Content Type</label>
-                <select
-                  className={styles.select}
-                  value={editContentType}
-                  onChange={e => setEditContentType(e.target.value)}
-                >
-                  <option value="">Select type...</option>
-                  <option value="blog">Blog</option>
-                  <option value="evergreen">Evergreen</option>
-                  <option value="location">Location</option>
-                  <option value="pillar">Pillar</option>
-                  <option value="cluster">Cluster</option>
-                  <option value="pest_id">Pest ID</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              <div className={styles.formGroup}>
-                <label className={styles.label}>Publish Date</label>
-                <input
-                  type="date"
-                  className={styles.input}
-                  value={editPublishDate}
-                  onChange={e => setEditPublishDate(e.target.value)}
-                />
-              </div>
+            <div className={styles.formGroup}>
+              <label className={styles.label}>Content Type</label>
+              <select
+                className={styles.select}
+                value={editContentType}
+                onChange={e => setEditContentType(e.target.value)}
+              >
+                <option value="">Select type...</option>
+                <option value="blog">Blog</option>
+                <option value="evergreen">Evergreen</option>
+                <option value="location">Location</option>
+                <option value="pillar">Pillar</option>
+                <option value="cluster">Cluster</option>
+                <option value="pest_id">Pest ID</option>
+                <option value="other">Other</option>
+              </select>
             </div>
 
             <div className={styles.formGroup}>
@@ -761,6 +777,8 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
             value={editContent}
             onChange={(html) => { setEditContent(html); setIsContentDirty(true); }}
             placeholder="Write or paste your content here, or generate a draft with AI..."
+            contentClassName={styles.editorContentScroll}
+            companyId={contentPiece.company_id ?? undefined}
           />
           <div className={styles.formActions}>
             <button
@@ -853,17 +871,62 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                 <textarea
                   className={styles.aiPrompt}
                   value={headlinePrompt}
-                  onChange={e => setHeadlinePrompt(e.target.value)}
+                  onChange={e => { setHeadlinePrompt(e.target.value); setHeadlineInstructionSaved(false); setHeadlineSaveMenuOpen(false); }}
                   placeholder="Optional: additional guidance (e.g. 'target homeowners', 'emphasize urgency')..."
                   rows={2}
                 />
-                <button
-                  className={styles.generateBtn}
-                  onClick={handleGenerateHeadlines}
-                  disabled={isGeneratingHeadlines}
-                >
-                  {isGeneratingHeadlines ? 'Generating...' : headlineSuggestions ? 'Regenerate' : 'Generate Headlines'}
-                </button>
+                <div className={styles.aiPromptActions}>
+                  <button
+                    className={styles.generateBtn}
+                    onClick={handleGenerateHeadlines}
+                    disabled={isGeneratingHeadlines}
+                  >
+                    {isGeneratingHeadlines ? 'Generating...' : headlineSuggestions ? 'Regenerate' : 'Generate Headlines'}
+                  </button>
+                  {headlinePrompt.trim() && (
+                    headlineInstructionSaved ? (
+                      <span className={styles.saveRuleSaved}>✓ Saved!</span>
+                    ) : headlineSaveMenuOpen ? (
+                      <div className={styles.saveRuleMenu}>
+                        {contentPiece.company_id && (
+                          <button
+                            className={styles.saveRuleMenuBtn}
+                            disabled={savingHeadlineInstruction}
+                            onClick={async () => {
+                              setSavingHeadlineInstruction(true);
+                              await saveAsInstruction('headlines', headlinePrompt, 'company');
+                              setSavingHeadlineInstruction(false);
+                              setHeadlineSaveMenuOpen(false);
+                              setHeadlineInstructionSaved(true);
+                            }}
+                          >
+                            {savingHeadlineInstruction ? 'Saving...' : 'For this company'}
+                          </button>
+                        )}
+                        <button
+                          className={styles.saveRuleMenuBtnGlobal}
+                          disabled={savingHeadlineInstruction}
+                          onClick={async () => {
+                            setSavingHeadlineInstruction(true);
+                            await saveAsInstruction('headlines', headlinePrompt, 'global');
+                            setSavingHeadlineInstruction(false);
+                            setHeadlineSaveMenuOpen(false);
+                            setHeadlineInstructionSaved(true);
+                          }}
+                        >
+                          {savingHeadlineInstruction ? 'Saving...' : 'For all companies'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className={styles.saveRuleBtn}
+                        onClick={() => setHeadlineSaveMenuOpen(true)}
+                      >
+                        + Save as standing rule
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
               {headlineError && <p className={styles.aiError}>{headlineError}</p>}
               {headlineSuggestions && (
@@ -908,17 +971,62 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                 <textarea
                   className={styles.aiPrompt}
                   value={draftPrompt}
-                  onChange={e => setDraftPrompt(e.target.value)}
+                  onChange={e => { setDraftPrompt(e.target.value); setDraftInstructionSaved(false); setDraftSaveMenuOpen(false); }}
                   placeholder="Optional: additional guidance (e.g. 'target commercial clients', 'mention our guarantee')..."
                   rows={2}
                 />
-                <button
-                  className={styles.generateBtn}
-                  onClick={handleGenerateDrafts}
-                  disabled={isGeneratingDraft}
-                >
-                  {isGeneratingDraft ? 'Generating...' : draftSuggestions ? 'Regenerate Drafts' : 'Generate Drafts'}
-                </button>
+                <div className={styles.aiPromptActions}>
+                  <button
+                    className={styles.generateBtn}
+                    onClick={handleGenerateDrafts}
+                    disabled={isGeneratingDraft}
+                  >
+                    {isGeneratingDraft ? 'Generating...' : draftSuggestions ? 'Regenerate Drafts' : 'Generate Drafts'}
+                  </button>
+                  {draftPrompt.trim() && (
+                    draftInstructionSaved ? (
+                      <span className={styles.saveRuleSaved}>✓ Saved!</span>
+                    ) : draftSaveMenuOpen ? (
+                      <div className={styles.saveRuleMenu}>
+                        {contentPiece.company_id && (
+                          <button
+                            className={styles.saveRuleMenuBtn}
+                            disabled={savingDraftInstruction}
+                            onClick={async () => {
+                              setSavingDraftInstruction(true);
+                              await saveAsInstruction('draft', draftPrompt, 'company');
+                              setSavingDraftInstruction(false);
+                              setDraftSaveMenuOpen(false);
+                              setDraftInstructionSaved(true);
+                            }}
+                          >
+                            {savingDraftInstruction ? 'Saving...' : 'For this company'}
+                          </button>
+                        )}
+                        <button
+                          className={styles.saveRuleMenuBtnGlobal}
+                          disabled={savingDraftInstruction}
+                          onClick={async () => {
+                            setSavingDraftInstruction(true);
+                            await saveAsInstruction('draft', draftPrompt, 'global');
+                            setSavingDraftInstruction(false);
+                            setDraftSaveMenuOpen(false);
+                            setDraftInstructionSaved(true);
+                          }}
+                        >
+                          {savingDraftInstruction ? 'Saving...' : 'For all companies'}
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        className={styles.saveRuleBtn}
+                        onClick={() => setDraftSaveMenuOpen(true)}
+                      >
+                        + Save as standing rule
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
               {draftError && <p className={styles.aiError}>{draftError}</p>}
               {draftSuggestions && (

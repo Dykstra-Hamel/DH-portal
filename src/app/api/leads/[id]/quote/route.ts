@@ -137,7 +137,8 @@ export async function GET(
       .from('quotes')
       .select(`
         *,
-        line_items:quote_line_items(*)
+        line_items:quote_line_items(*),
+        applied_discount:applied_discount_id(*)
       `)
       .eq('lead_id', id)
       .order('created_at', { ascending: false })
@@ -162,7 +163,8 @@ export async function GET(
               .from('quotes')
               .select(`
                 *,
-                line_items:quote_line_items(*)
+                line_items:quote_line_items(*),
+                applied_discount:applied_discount_id(*)
               `)
               .eq('id', result.quoteId)
               .single();
@@ -186,6 +188,12 @@ export async function GET(
       return NextResponse.json(
         { error: 'Failed to fetch quote' },
         { status: 500 }
+      );
+    }
+
+    if (quote?.line_items) {
+      quote.line_items = [...quote.line_items].sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
       );
     }
 

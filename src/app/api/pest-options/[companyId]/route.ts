@@ -30,7 +30,8 @@ export async function GET(
           id,
           name,
           slug,
-          description
+          description,
+          icon_svg
         )
       `)
       .eq('company_id', companyId)
@@ -52,6 +53,7 @@ export async function GET(
       slug: option.pest_types.slug,
       custom_label: option.custom_label || option.pest_types.name,
       description: option.pest_types.description,
+      icon_svg: option.pest_types.icon_svg ?? null,
       display_order: option.display_order,
     }));
 

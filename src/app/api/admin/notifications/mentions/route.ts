@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
       senderUserIds.size > 0
         ? await supabase
             .from('profiles')
-            .select('id, first_name, last_name, email, avatar_url')
+            .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
             .in('id', Array.from(senderUserIds))
         : { data: [], error: null };
 
@@ -464,7 +464,7 @@ export async function GET(request: NextRequest) {
         senderFirstName: senderProfile?.first_name || null,
         senderLastName: senderProfile?.last_name || null,
         senderEmail: senderProfile?.email || null,
-        senderAvatarUrl: senderProfile?.avatar_url || null,
+        senderAvatarUrl: senderProfile?.uploaded_avatar_url || senderProfile?.avatar_url || null,
         companyName,
         companyIconUrl,
         hasAttachments,

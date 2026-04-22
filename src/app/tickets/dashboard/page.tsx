@@ -1,6 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef, Suspense, useMemo } from 'react';
+import {
+  useEffect,
+  useState,
+  useCallback,
+  useRef,
+  Suspense,
+  useMemo,
+} from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -10,10 +17,7 @@ import {
   ticketTypeOptions,
 } from '@/types/ticket';
 import { Lead, leadSourceOptions, leadTypeOptions } from '@/types/lead';
-import {
-  SupportCase,
-  supportCaseIssueTypeOptions,
-} from '@/types/support-case';
+import { SupportCase, supportCaseIssueTypeOptions } from '@/types/support-case';
 import { Task } from '@/types/task';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -45,6 +49,7 @@ import {
 } from '@/components/Common/Modal/Modal';
 import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import TicketForm from '@/components/Tickets/TicketForm/TicketForm';
+import QuickQuoteModal from '@/components/QuickQuote/QuickQuoteModal';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { AnnouncementsModal } from '@/components/Common/AnnouncementsModal/AnnouncementsModal';
 import ActionsTasksQuickView from '@/components/Common/ActionsTasksQuickView/ActionsTasksQuickView';
@@ -92,7 +97,10 @@ const INSPIRATIONAL_QUOTES = [
   { text: 'Ideas are easy. Execution is everything.', author: 'John Doerr' },
   { text: 'What gets measured gets improved.', author: 'Peter Drucker' },
   { text: 'Culture eats strategy for breakfast.', author: 'Peter Drucker' },
-  { text: 'Innovation distinguishes a leader from a follower.', author: 'Steve Jobs' },
+  {
+    text: 'Innovation distinguishes a leader from a follower.',
+    author: 'Steve Jobs',
+  },
   { text: 'Quality is not an act, it is a habit.', author: 'Aristotle' },
   { text: 'The best marketing is a great product.', author: 'Steve Jobs' },
   { text: 'Time is the scarcest resource.', author: 'Peter Drucker' },
@@ -112,7 +120,9 @@ let dashboardQuoteIndex: number | null = null;
 
 const getDashboardQuote = () => {
   if (dashboardQuoteIndex === null) {
-    dashboardQuoteIndex = Math.floor(Math.random() * INSPIRATIONAL_QUOTES.length);
+    dashboardQuoteIndex = Math.floor(
+      Math.random() * INSPIRATIONAL_QUOTES.length
+    );
   }
   return INSPIRATIONAL_QUOTES[dashboardQuoteIndex];
 };
@@ -159,20 +169,28 @@ const formatAddressFromLocation = (location?: {
     return cityStateParts.join(', ');
   }
 
-  const street = normalizeAddressPart(location.street_address ?? location.address);
+  const street = normalizeAddressPart(
+    location.street_address ?? location.address
+  );
   return street || 'Unknown';
 };
 
 const getDashboardItemAddress = (item: DashboardItem): string => {
   if (item._type === 'ticket') {
     return formatAddressFromLocation(
-      item.service_address ?? item.customer?.primary_service_address ?? item.customer
+      item.service_address ??
+        item.customer?.primary_service_address ??
+        item.customer
     );
   }
   if (item._type === 'lead') {
-    return formatAddressFromLocation(item.primary_service_address ?? item.customer);
+    return formatAddressFromLocation(
+      item.primary_service_address ?? item.customer
+    );
   }
-  return formatAddressFromLocation(item.primary_service_address ?? item.customer);
+  return formatAddressFromLocation(
+    item.primary_service_address ?? item.customer
+  );
 };
 
 const getDashboardItemTypeLabel = (item: DashboardItem): string => {
@@ -211,31 +229,49 @@ const getDashboardItemFormatLabel = (item: DashboardItem): string => {
   if (item._type === 'support_case') {
     const ticketType = item.ticket?.type;
     if (ticketType) {
-      if (legacyTicketTypeToFormat[ticketType]) return legacyTicketTypeToFormat[ticketType];
-      return getOptionLabel(ticketType, ticketTypeOptions) || legacyTicketTypeToFormat[ticketType] || NA_FIELD_LABEL;
+      if (legacyTicketTypeToFormat[ticketType])
+        return legacyTicketTypeToFormat[ticketType];
+      return (
+        getOptionLabel(ticketType, ticketTypeOptions) ||
+        legacyTicketTypeToFormat[ticketType] ||
+        NA_FIELD_LABEL
+      );
     }
-    return getOptionLabel(item.issue_type, supportCaseIssueTypeOptions) || NA_FIELD_LABEL;
+    return (
+      getOptionLabel(item.issue_type, supportCaseIssueTypeOptions) ||
+      NA_FIELD_LABEL
+    );
   }
   // Ticket: use format field first, then fall back to legacy type map
   if (item.format) {
     return item.format.charAt(0).toUpperCase() + item.format.slice(1);
   }
-  if (legacyTicketTypeToFormat[item.type]) return legacyTicketTypeToFormat[item.type];
+  if (legacyTicketTypeToFormat[item.type])
+    return legacyTicketTypeToFormat[item.type];
   return getOptionLabel(item.type, ticketTypeOptions) || NA_FIELD_LABEL;
 };
 
 const getDashboardItemSourceLabel = (item: DashboardItem): string => {
   if (item._type === 'lead') {
-    return getOptionLabel(item.lead_source, leadSourceOptions) || NA_FIELD_LABEL;
+    return (
+      getOptionLabel(item.lead_source, leadSourceOptions) || NA_FIELD_LABEL
+    );
   }
   if (item._type === 'support_case') {
-    return getOptionLabel(item.ticket?.source, ticketSourceOptions) || NA_FIELD_LABEL;
+    return (
+      getOptionLabel(item.ticket?.source, ticketSourceOptions) || NA_FIELD_LABEL
+    );
   }
   return getOptionLabel(item.source, ticketSourceOptions) || NA_FIELD_LABEL;
 };
 
-const sortByCreatedAtAsc = <T extends { created_at: string }>(items: T[]): T[] =>
-  [...items].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+const sortByCreatedAtAsc = <T extends { created_at: string }>(
+  items: T[]
+): T[] =>
+  [...items].sort(
+    (a, b) =>
+      new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  );
 
 // Search filter helper - searches all string values in an object recursively
 const filterBySearch = <T extends object>(items: T[], query: string): T[] => {
@@ -246,7 +282,9 @@ const filterBySearch = <T extends object>(items: T[], query: string): T[] => {
     if (obj === null || obj === undefined) return false;
     if (Array.isArray(obj)) return obj.some(item => searchInObject(item));
     if (typeof obj === 'object') {
-      return Object.values(obj as Record<string, unknown>).some(value => searchInObject(value));
+      return Object.values(obj as Record<string, unknown>).some(value =>
+        searchInObject(value)
+      );
     }
     return String(obj).toLowerCase().includes(lowerQuery);
   };
@@ -302,7 +340,8 @@ function TicketsDashboardContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useUser();
-  const { setPageHeader, registerPageAction, unregisterPageAction } = usePageActions();
+  const { setPageHeader, registerPageAction, unregisterPageAction } =
+    usePageActions();
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   const { user } = useUser();
   const { newItemIndicators } = useRealtimeCounts();
@@ -360,10 +399,15 @@ function TicketsDashboardContent() {
 
   // Search states
   const [tableSearch, setTableSearch] = useState('');
-  const [tableVisibleCount, setTableVisibleCount] = useState(DASHBOARD_INITIAL_PAGE_SIZE);
+  const [tableVisibleCount, setTableVisibleCount] = useState(
+    DASHBOARD_INITIAL_PAGE_SIZE
+  );
 
   // Announcements modal state
   const [showAnnouncementsModal, setShowAnnouncementsModal] = useState(false);
+
+  // Quick Quote modal state
+  const [showQuickQuote, setShowQuickQuote] = useState(false);
 
   // Create ticket modal state
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -386,9 +430,18 @@ function TicketsDashboardContent() {
   const [isQualifying, setIsQualifying] = useState(false);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // Branch filter state
+  const [branches, setBranches] = useState<
+    Array<{ id: string; name: string; is_active: boolean }>
+  >([]);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const selectedBranchIdRef = useRef('');
+
   // Ref to track subscription state
   const subscriptionActiveRef = useRef(false);
-  const currentChannelRef = useRef<ReturnType<typeof createTicketChannel> | null>(null);
+  const currentChannelRef = useRef<ReturnType<
+    typeof createTicketChannel
+  > | null>(null);
   const isFetchingRef = useRef(false);
   const queueFullFetchEnabledRef = useRef(false);
   const pendingFullTicketFetchRef = useRef(false);
@@ -404,11 +457,37 @@ function TicketsDashboardContent() {
     selectedCompanyRef.current = selectedCompany;
   }, [selectedCompany]);
 
+  // Keep branch ref in sync
+  useEffect(() => {
+    selectedBranchIdRef.current = selectedBranchId;
+  }, [selectedBranchId]);
+
+  // Fetch branches when company changes
+  useEffect(() => {
+    if (!selectedCompany?.id) return;
+    setSelectedBranchId('');
+    selectedBranchIdRef.current = '';
+    fetch(`/api/branches?companyId=${selectedCompany.id}`)
+      .then(r => r.json())
+      .then(d =>
+        setBranches(
+          (d.branches ?? []).filter((b: { is_active: boolean }) => b.is_active)
+        )
+      )
+      .catch(() => setBranches([]));
+  }, [selectedCompany?.id]);
+
   // User ref for realtime updates
   const userIdRef = useRef(user?.id);
   useEffect(() => {
     userIdRef.current = user?.id;
   }, [user?.id]);
+
+  // Admin ref for realtime closures
+  const isAdminRef = useRef(profile?.role === 'admin');
+  useEffect(() => {
+    isAdminRef.current = profile?.role === 'admin';
+  }, [profile?.role]);
 
   // Register the 'add' action for the header button
   useEffect(() => {
@@ -427,6 +506,24 @@ function TicketsDashboardContent() {
     setPageHeader({
       title: `${firstName}'s Ticket Dashboard`,
       description: '',
+      customActions: (
+        <div className={styles.headerActions}>
+          <button
+            type="button"
+            className={styles.headerBtnGhost}
+            onClick={() => setShowCreateForm(true)}
+          >
+            New Ticket
+          </button>
+          <button
+            type="button"
+            className={styles.headerBtnPrimary}
+            onClick={() => setShowQuickQuote(true)}
+          >
+            Quick Quote
+          </button>
+        </div>
+      ),
     });
 
     return () => {
@@ -456,7 +553,7 @@ function TicketsDashboardContent() {
             reviewedByEmail: ticket.reviewed_by_profile?.email,
             reviewedByFirstName: ticket.reviewed_by_profile?.first_name,
             reviewedByLastName: ticket.reviewed_by_profile?.last_name,
-            reviewedByAvatarUrl: ticket.reviewed_by_profile?.avatar_url,
+            reviewedByAvatarUrl: ticket.reviewed_by_profile?.uploaded_avatar_url || ticket.reviewed_by_profile?.avatar_url,
             expiresAt: ticket.review_expires_at,
           };
 
@@ -466,11 +563,19 @@ function TicketsDashboardContent() {
             updated.set(ticket.id, {
               ...ticketProfileData,
               // Use existing profile data if ticket data is missing it
-              reviewedByName: ticketProfileData.reviewedByName || existing.reviewedByName,
-              reviewedByEmail: ticketProfileData.reviewedByEmail || existing.reviewedByEmail,
-              reviewedByFirstName: ticketProfileData.reviewedByFirstName || existing.reviewedByFirstName,
-              reviewedByLastName: ticketProfileData.reviewedByLastName || existing.reviewedByLastName,
-              reviewedByAvatarUrl: ticketProfileData.reviewedByAvatarUrl ?? existing.reviewedByAvatarUrl,
+              reviewedByName:
+                ticketProfileData.reviewedByName || existing.reviewedByName,
+              reviewedByEmail:
+                ticketProfileData.reviewedByEmail || existing.reviewedByEmail,
+              reviewedByFirstName:
+                ticketProfileData.reviewedByFirstName ||
+                existing.reviewedByFirstName,
+              reviewedByLastName:
+                ticketProfileData.reviewedByLastName ||
+                existing.reviewedByLastName,
+              reviewedByAvatarUrl:
+                ticketProfileData.reviewedByAvatarUrl ??
+                existing.reviewedByAvatarUrl,
               // Always use the latest expiry time
               expiresAt: ticket.review_expires_at,
             });
@@ -490,27 +595,30 @@ function TicketsDashboardContent() {
       const channel = createTicketReviewChannel();
       reviewChannelRef.current = channel;
 
-      subscribeToTicketReviewUpdates(channel, (payload: TicketReviewPayload) => {
-        setReviewStatuses(prev => {
-          const updated = new Map(prev);
+      subscribeToTicketReviewUpdates(
+        channel,
+        (payload: TicketReviewPayload) => {
+          setReviewStatuses(prev => {
+            const updated = new Map(prev);
 
-          if (payload.reviewed_by && payload.review_expires_at) {
-            updated.set(payload.ticket_id, {
-              reviewedBy: payload.reviewed_by,
-              reviewedByName: payload.reviewed_by_name,
-              reviewedByEmail: payload.reviewed_by_email,
-              reviewedByFirstName: payload.reviewed_by_first_name,
-              reviewedByLastName: payload.reviewed_by_last_name,
-              reviewedByAvatarUrl: payload.reviewed_by_avatar_url,
-              expiresAt: payload.review_expires_at,
-            });
-          } else {
-            updated.delete(payload.ticket_id);
-          }
+            if (payload.reviewed_by && payload.review_expires_at) {
+              updated.set(payload.ticket_id, {
+                reviewedBy: payload.reviewed_by,
+                reviewedByName: payload.reviewed_by_name,
+                reviewedByEmail: payload.reviewed_by_email,
+                reviewedByFirstName: payload.reviewed_by_first_name,
+                reviewedByLastName: payload.reviewed_by_last_name,
+                reviewedByAvatarUrl: payload.reviewed_by_avatar_url,
+                expiresAt: payload.review_expires_at,
+              });
+            } else {
+              updated.delete(payload.ticket_id);
+            }
 
-          return updated;
-        });
-      });
+            return updated;
+          });
+        }
+      );
     }
   }, [tickets]);
 
@@ -536,100 +644,112 @@ function TicketsDashboardContent() {
   }, []);
 
   // Fetch unassigned tickets AND live tickets (for LiveCallBar)
-  const fetchTickets = useCallback(async (
-    companyId: string,
-    options?: { showLoading?: boolean; fetchAllPages?: boolean }
-  ) => {
-    if (!companyId) return;
-    const fetchAllPages = options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
-    if (fetchAllPages) {
-      queueFullFetchEnabledRef.current = true;
-    }
-
-    if (isFetchingRef.current) {
+  const fetchTickets = useCallback(
+    async (
+      companyId: string,
+      options?: { showLoading?: boolean; fetchAllPages?: boolean }
+    ) => {
+      if (!companyId) return;
+      const fetchAllPages =
+        options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
       if (fetchAllPages) {
-        pendingFullTicketFetchRef.current = true;
+        queueFullFetchEnabledRef.current = true;
       }
-      return;
-    }
 
-    const showLoading = options?.showLoading ?? true;
-    isFetchingRef.current = true;
-    pendingFullTicketFetchRef.current = false;
-    if (showLoading) {
-      setLoading(true);
-    }
+      if (isFetchingRef.current) {
+        if (fetchAllPages) {
+          pendingFullTicketFetchRef.current = true;
+        }
+        return;
+      }
 
-    try {
-      const supabase = createClient();
+      const showLoading = options?.showLoading ?? true;
+      isFetchingRef.current = true;
+      pendingFullTicketFetchRef.current = false;
+      if (showLoading) {
+        setLoading(true);
+      }
 
-      // For initial load, use page 1 only. Once sorting is engaged, load
-      // all pages so client-side sorting works against the full queue.
-      let ticketsPageHasMore = false;
-      const regularTicketsPromise = (async () => {
-        if (!fetchAllPages) {
-          const response = await fetch(
-            `/api/tickets?${new URLSearchParams({
-              companyId,
-              includeArchived: 'false',
-              page: '1',
-              limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
-              sortBy: 'created_at',
-              sortOrder: 'asc',
-            })}`
-          );
+      try {
+        const supabase = createClient();
 
-          if (!response.ok) {
-            throw new Error('Failed to fetch tickets');
+        // For initial load, use page 1 only. Once sorting is engaged, load
+        // all pages so client-side sorting works against the full queue.
+        let ticketsPageHasMore = false;
+        const regularTicketsPromise = (async () => {
+          if (!fetchAllPages) {
+            const response = await fetch(
+              `/api/tickets?${new URLSearchParams({
+                companyId,
+                includeArchived: 'false',
+                page: '1',
+                limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+                sortBy: 'created_at',
+                sortOrder: 'asc',
+                ...(selectedBranchIdRef.current
+                  ? { branchId: selectedBranchIdRef.current }
+                  : {}),
+              })}`
+            );
+
+            if (!response.ok) {
+              throw new Error('Failed to fetch tickets');
+            }
+
+            const data = await response.json();
+            ticketsPageHasMore = Boolean(data?.pagination?.hasMore);
+            ticketsNextPageRef.current = 2;
+            return Array.isArray(data?.tickets) ? data.tickets : [];
           }
 
-          const data = await response.json();
-          ticketsPageHasMore = Boolean(data?.pagination?.hasMore);
-          ticketsNextPageRef.current = 2;
-          return Array.isArray(data?.tickets) ? data.tickets : [];
-        }
+          const allRegularTickets: Ticket[] = [];
+          let page = 1;
+          let hasMore = true;
 
-        const allRegularTickets: Ticket[] = [];
-        let page = 1;
-        let hasMore = true;
+          while (hasMore && page <= MAX_TICKET_FETCH_PAGES) {
+            const response = await fetch(
+              `/api/tickets?${new URLSearchParams({
+                companyId,
+                includeArchived: 'false',
+                page: page.toString(),
+                limit: TICKETS_FETCH_BATCH_SIZE.toString(),
+                sortBy: 'created_at',
+                sortOrder: 'asc',
+                ...(selectedBranchIdRef.current
+                  ? { branchId: selectedBranchIdRef.current }
+                  : {}),
+              })}`
+            );
 
-        while (hasMore && page <= MAX_TICKET_FETCH_PAGES) {
-          const response = await fetch(
-            `/api/tickets?${new URLSearchParams({
-              companyId,
-              includeArchived: 'false',
-              page: page.toString(),
-              limit: TICKETS_FETCH_BATCH_SIZE.toString(),
-              sortBy: 'created_at',
-              sortOrder: 'asc',
-            })}`
-          );
+            if (!response.ok) {
+              throw new Error('Failed to fetch tickets');
+            }
 
-          if (!response.ok) {
-            throw new Error('Failed to fetch tickets');
+            const data = await response.json();
+            const pageTickets = Array.isArray(data?.tickets)
+              ? data.tickets
+              : [];
+            allRegularTickets.push(...pageTickets);
+
+            hasMore =
+              Boolean(data?.pagination?.hasMore) && pageTickets.length > 0;
+            page += 1;
           }
 
-          const data = await response.json();
-          const pageTickets = Array.isArray(data?.tickets) ? data.tickets : [];
-          allRegularTickets.push(...pageTickets);
+          if (hasMore) {
+            console.warn(
+              '[TicketsDashboard] Reached ticket page fetch safety cap while loading queue.'
+            );
+          }
 
-          hasMore = Boolean(data?.pagination?.hasMore) && pageTickets.length > 0;
-          page += 1;
-        }
+          return allRegularTickets;
+        })();
 
-        if (hasMore) {
-          console.warn(
-            '[TicketsDashboard] Reached ticket page fetch safety cap while loading queue.'
-          );
-        }
-
-        return allRegularTickets;
-      })();
-
-      // Live tickets directly from Supabase (API excludes live status)
-      const liveTicketsPromise = supabase
-        .from('tickets')
-        .select(`
+        // Live tickets directly from Supabase (API excludes live status)
+        const liveTicketsPromise = supabase
+          .from('tickets')
+          .select(
+            `
           *,
           customer:customers!tickets_customer_id_fkey(
             id, first_name, last_name, email, phone, address, city, state, zip_code
@@ -641,349 +761,394 @@ function TicketsDashboardContent() {
             id, call_id, call_status, start_timestamp, end_timestamp,
             duration_seconds, phone_number, from_number
           )
-        `)
-        .eq('company_id', companyId)
-        .eq('status', 'live')
-        .order('created_at', { ascending: true })
-        .limit(50);
+        `
+          )
+          .eq('company_id', companyId)
+          .eq('status', 'live')
+          .order('created_at', { ascending: true })
+          .limit(50);
 
-      const [regularTickets, liveResult] = await Promise.all([
-        regularTicketsPromise,
-        liveTicketsPromise,
-      ]);
-      const liveTickets = !liveResult.error && liveResult.data ? liveResult.data : [];
+        const [regularTickets, liveResult] = await Promise.all([
+          regularTicketsPromise,
+          liveTicketsPromise,
+        ]);
+        const liveTickets =
+          !liveResult.error && liveResult.data ? liveResult.data : [];
 
-      setTickets(() => {
-        const mergedTickets = new Map<string, Ticket>();
-        regularTickets.forEach((ticket: Ticket) =>
-          mergedTickets.set(ticket.id, ticket)
-        );
-        const mergedRegular = Array.from(mergedTickets.values()).sort(
-          (a, b) =>
-            new Date(a.created_at).getTime() -
-            new Date(b.created_at).getTime()
-        );
-        const uniqueLiveTickets = Array.from(
-          new Map(liveTickets.map((ticket: Ticket) => [ticket.id, ticket]))
-            .values()
-        );
+        setTickets(() => {
+          const mergedTickets = new Map<string, Ticket>();
+          regularTickets.forEach((ticket: Ticket) =>
+            mergedTickets.set(ticket.id, ticket)
+          );
+          const mergedRegular = Array.from(mergedTickets.values()).sort(
+            (a, b) =>
+              new Date(a.created_at).getTime() -
+              new Date(b.created_at).getTime()
+          );
+          const uniqueLiveTickets = Array.from(
+            new Map(
+              liveTickets.map((ticket: Ticket) => [ticket.id, ticket])
+            ).values()
+          );
 
-        return [...uniqueLiveTickets, ...mergedRegular];
-      });
-      setTicketsHasMore(ticketsPageHasMore);
-    } catch (error) {
-      console.error('Error fetching tickets:', error);
-    } finally {
-      isFetchingRef.current = false;
-      if (showLoading) {
-        setLoading(false);
+          return [...uniqueLiveTickets, ...mergedRegular];
+        });
+        setTicketsHasMore(ticketsPageHasMore);
+      } catch (error) {
+        console.error('Error fetching tickets:', error);
+      } finally {
+        isFetchingRef.current = false;
+        if (showLoading) {
+          setLoading(false);
+        }
+
+        if (pendingFullTicketFetchRef.current) {
+          pendingFullTicketFetchRef.current = false;
+          void fetchTickets(companyId, {
+            showLoading: false,
+            fetchAllPages: true,
+          });
+        }
       }
-
-      if (pendingFullTicketFetchRef.current) {
-        pendingFullTicketFetchRef.current = false;
-        void fetchTickets(companyId, { showLoading: false, fetchAllPages: true });
-      }
-    }
-  }, []);
+    },
+    []
+  );
 
   // Fetch unassigned leads (sales + scheduling) - oldest first
-  const fetchLeads = useCallback(async (
-    companyId: string,
-    options?: { fetchAllPages?: boolean }
-  ) => {
-    if (!companyId) return;
-    const fetchAllPages = options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
+  const fetchLeads = useCallback(
+    async (companyId: string, options?: { fetchAllPages?: boolean }) => {
+      if (!companyId) return;
+      const fetchAllPages =
+        options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
 
-    setLoadingLeads(true);
-    try {
-      if (!fetchAllPages) {
-        const response = await fetch(
-          `/api/leads?${new URLSearchParams({
-            companyId,
-            unassigned: 'true',
-            status: 'new,in_process,quoted,scheduling',
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-            paginate: 'true',
-            page: '1',
-            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
-          })}`
-        );
+      setLoadingLeads(true);
+      try {
+        if (!fetchAllPages) {
+          const response = await fetch(
+            `/api/leads?${new URLSearchParams({
+              companyId,
+              unassigned: 'true',
+              status: 'new,in_process,quoted,scheduling',
+              sortBy: 'created_at',
+              sortOrder: 'asc',
+              paginate: 'true',
+              page: '1',
+              limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+              ...(selectedBranchIdRef.current
+                ? { branchId: selectedBranchIdRef.current }
+                : {}),
+            })}`
+          );
 
-        if (!response.ok) throw new Error('Failed to fetch leads');
-        const payload = await response.json();
+          if (!response.ok) throw new Error('Failed to fetch leads');
+          const payload = await response.json();
 
-        if (Array.isArray(payload)) {
-          setLeads(payload);
-          setLeadsHasMore(false);
+          if (Array.isArray(payload)) {
+            setLeads(payload);
+            setLeadsHasMore(false);
+            return;
+          }
+
+          setLeads(Array.isArray(payload?.leads) ? payload.leads : []);
+          leadsNextPageRef.current = 2;
+          setLeadsHasMore(Boolean(payload?.pagination?.hasMore));
           return;
         }
 
-        setLeads(Array.isArray(payload?.leads) ? payload.leads : []);
-        leadsNextPageRef.current = 2;
-        setLeadsHasMore(Boolean(payload?.pagination?.hasMore));
-        return;
-      }
+        const allLeads: Lead[] = [];
+        let page = 1;
+        let hasMore = true;
 
-      const allLeads: Lead[] = [];
-      let page = 1;
-      let hasMore = true;
+        while (hasMore && page <= MAX_LEAD_FETCH_PAGES) {
+          const response = await fetch(
+            `/api/leads?${new URLSearchParams({
+              companyId,
+              unassigned: 'true',
+              status: 'new,in_process,quoted,scheduling',
+              sortBy: 'created_at',
+              sortOrder: 'asc',
+              paginate: 'true',
+              page: page.toString(),
+              limit: LEADS_FETCH_BATCH_SIZE.toString(),
+              ...(selectedBranchIdRef.current
+                ? { branchId: selectedBranchIdRef.current }
+                : {}),
+            })}`
+          );
 
-      while (hasMore && page <= MAX_LEAD_FETCH_PAGES) {
-        const response = await fetch(
-          `/api/leads?${new URLSearchParams({
-            companyId,
-            unassigned: 'true',
-            status: 'new,in_process,quoted,scheduling',
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-            paginate: 'true',
-            page: page.toString(),
-            limit: LEADS_FETCH_BATCH_SIZE.toString(),
-          })}`
-        );
+          if (!response.ok) throw new Error('Failed to fetch leads');
+          const payload = await response.json();
 
-        if (!response.ok) throw new Error('Failed to fetch leads');
-        const payload = await response.json();
+          if (Array.isArray(payload)) {
+            allLeads.push(...payload);
+            hasMore = false;
+            break;
+          }
 
-        if (Array.isArray(payload)) {
-          allLeads.push(...payload);
-          hasMore = false;
-          break;
+          const pageLeads = Array.isArray(payload?.leads) ? payload.leads : [];
+          allLeads.push(...pageLeads);
+
+          hasMore =
+            Boolean(payload?.pagination?.hasMore) && pageLeads.length > 0;
+          page += 1;
         }
 
-        const pageLeads = Array.isArray(payload?.leads) ? payload.leads : [];
-        allLeads.push(...pageLeads);
+        if (hasMore) {
+          console.warn(
+            '[TicketsDashboard] Reached lead page fetch safety cap while loading queue.'
+          );
+        }
 
-        hasMore =
-          Boolean(payload?.pagination?.hasMore) && pageLeads.length > 0;
-        page += 1;
-      }
-
-      if (hasMore) {
-        console.warn(
-          '[TicketsDashboard] Reached lead page fetch safety cap while loading queue.'
+        const dedupedLeads = Array.from(
+          new Map(allLeads.map(lead => [lead.id, lead])).values()
         );
+        setLeads(dedupedLeads);
+        setLeadsHasMore(false);
+      } catch (error) {
+        console.error('Error fetching leads:', error);
+      } finally {
+        setLoadingLeads(false);
       }
-
-      const dedupedLeads = Array.from(
-        new Map(allLeads.map(lead => [lead.id, lead])).values()
-      );
-      setLeads(dedupedLeads);
-      setLeadsHasMore(false);
-    } catch (error) {
-      console.error('Error fetching leads:', error);
-    } finally {
-      setLoadingLeads(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Fetch unassigned support cases - oldest first
-  const fetchSupportCases = useCallback(async (
-    companyId: string,
-    options?: { fetchAllPages?: boolean }
-  ) => {
-    if (!companyId) return;
-    const fetchAllPages = options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
+  const fetchSupportCases = useCallback(
+    async (companyId: string, options?: { fetchAllPages?: boolean }) => {
+      if (!companyId) return;
+      const fetchAllPages =
+        options?.fetchAllPages ?? queueFullFetchEnabledRef.current;
 
-    setLoadingSupportCases(true);
-    try {
-      if (!fetchAllPages) {
-        const response = await fetch(
-          `/api/support-cases?${new URLSearchParams({
-            companyId,
-            unassigned: 'true',
-            includeArchived: 'false',
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-            paginate: 'true',
-            page: '1',
-            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
-          })}`
-        );
+      setLoadingSupportCases(true);
+      try {
+        if (!fetchAllPages) {
+          const response = await fetch(
+            `/api/support-cases?${new URLSearchParams({
+              companyId,
+              unassigned: 'true',
+              includeArchived: 'false',
+              sortBy: 'created_at',
+              sortOrder: 'asc',
+              paginate: 'true',
+              page: '1',
+              limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+            })}`
+          );
 
-        if (!response.ok) throw new Error('Failed to fetch support cases');
-        const payload = await response.json();
+          if (!response.ok) throw new Error('Failed to fetch support cases');
+          const payload = await response.json();
 
-        if (Array.isArray(payload)) {
-          setSupportCases(payload);
-          setSupportCasesHasMore(false);
+          if (Array.isArray(payload)) {
+            setSupportCases(payload);
+            setSupportCasesHasMore(false);
+            return;
+          }
+
+          setSupportCases(
+            Array.isArray(payload?.supportCases) ? payload.supportCases : []
+          );
+          supportCasesNextPageRef.current = 2;
+          setSupportCasesHasMore(Boolean(payload?.pagination?.hasMore));
           return;
         }
 
-        setSupportCases(
-          Array.isArray(payload?.supportCases) ? payload.supportCases : []
-        );
-        supportCasesNextPageRef.current = 2;
-        setSupportCasesHasMore(Boolean(payload?.pagination?.hasMore));
-        return;
-      }
+        const allSupportCases: SupportCase[] = [];
+        let page = 1;
+        let hasMore = true;
 
-      const allSupportCases: SupportCase[] = [];
-      let page = 1;
-      let hasMore = true;
+        while (hasMore && page <= MAX_SUPPORT_CASE_FETCH_PAGES) {
+          const response = await fetch(
+            `/api/support-cases?${new URLSearchParams({
+              companyId,
+              unassigned: 'true',
+              includeArchived: 'false',
+              sortBy: 'created_at',
+              sortOrder: 'asc',
+              paginate: 'true',
+              page: page.toString(),
+              limit: SUPPORT_CASES_FETCH_BATCH_SIZE.toString(),
+            })}`
+          );
 
-      while (hasMore && page <= MAX_SUPPORT_CASE_FETCH_PAGES) {
-        const response = await fetch(
-          `/api/support-cases?${new URLSearchParams({
-            companyId,
-            unassigned: 'true',
-            includeArchived: 'false',
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-            paginate: 'true',
-            page: page.toString(),
-            limit: SUPPORT_CASES_FETCH_BATCH_SIZE.toString(),
-          })}`
-        );
+          if (!response.ok) throw new Error('Failed to fetch support cases');
+          const payload = await response.json();
 
-        if (!response.ok) throw new Error('Failed to fetch support cases');
-        const payload = await response.json();
+          if (Array.isArray(payload)) {
+            allSupportCases.push(...payload);
+            hasMore = false;
+            break;
+          }
 
-        if (Array.isArray(payload)) {
-          allSupportCases.push(...payload);
-          hasMore = false;
-          break;
+          const pageSupportCases = Array.isArray(payload?.supportCases)
+            ? payload.supportCases
+            : [];
+          allSupportCases.push(...pageSupportCases);
+
+          hasMore =
+            Boolean(payload?.pagination?.hasMore) &&
+            pageSupportCases.length > 0;
+          page += 1;
         }
 
-        const pageSupportCases = Array.isArray(payload?.supportCases)
-          ? payload.supportCases
-          : [];
-        allSupportCases.push(...pageSupportCases);
+        if (hasMore) {
+          console.warn(
+            '[TicketsDashboard] Reached support case page fetch safety cap while loading queue.'
+          );
+        }
 
-        hasMore =
-          Boolean(payload?.pagination?.hasMore) &&
-          pageSupportCases.length > 0;
-        page += 1;
-      }
-
-      if (hasMore) {
-        console.warn(
-          '[TicketsDashboard] Reached support case page fetch safety cap while loading queue.'
+        const dedupedSupportCases = Array.from(
+          new Map(
+            allSupportCases.map(supportCase => [supportCase.id, supportCase])
+          ).values()
         );
+        setSupportCases(dedupedSupportCases);
+        setSupportCasesHasMore(false);
+      } catch (error) {
+        console.error('Error fetching support cases:', error);
+      } finally {
+        setLoadingSupportCases(false);
       }
-
-      const dedupedSupportCases = Array.from(
-        new Map(
-          allSupportCases.map(supportCase => [supportCase.id, supportCase])
-        ).values()
-      );
-      setSupportCases(dedupedSupportCases);
-      setSupportCasesHasMore(false);
-    } catch (error) {
-      console.error('Error fetching support cases:', error);
-    } finally {
-      setLoadingSupportCases(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Fetch next page of data and append to existing state
-  const fetchMoreData = useCallback(async (
-    companyId: string,
-    hasMoreTickets: boolean,
-    hasMoreLeads: boolean,
-    hasMoreSupportCases: boolean
-  ) => {
-    setLoadingMoreData(true);
-    try {
-      const fetches: Promise<void>[] = [];
+  const fetchMoreData = useCallback(
+    async (
+      companyId: string,
+      hasMoreTickets: boolean,
+      hasMoreLeads: boolean,
+      hasMoreSupportCases: boolean
+    ) => {
+      setLoadingMoreData(true);
+      try {
+        const fetches: Promise<void>[] = [];
 
-      if (hasMoreTickets) {
-        const page = ticketsNextPageRef.current;
-        fetches.push(
-          fetch(`/api/tickets?${new URLSearchParams({
-            companyId,
-            includeArchived: 'false',
-            page: page.toString(),
-            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-          })}`)
-            .then(r => r.json())
-            .then(data => {
-              const newTickets: Ticket[] = Array.isArray(data?.tickets) ? data.tickets : [];
-              ticketsNextPageRef.current = page + 1;
-              setTicketsHasMore(Boolean(data?.pagination?.hasMore));
-              setTickets(prev => {
-                const liveTickets = prev.filter(t => t.status === 'live');
-                const merged = new Map(prev.filter(t => t.status !== 'live').map(t => [t.id, t]));
-                newTickets.forEach(t => merged.set(t.id, t));
-                return [
-                  ...liveTickets,
-                  ...Array.from(merged.values()).sort(
-                    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                  ),
-                ];
-              });
-            })
-        );
+        if (hasMoreTickets) {
+          const page = ticketsNextPageRef.current;
+          fetches.push(
+            fetch(
+              `/api/tickets?${new URLSearchParams({
+                companyId,
+                includeArchived: 'false',
+                page: page.toString(),
+                limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+                sortBy: 'created_at',
+                sortOrder: 'asc',
+              })}`
+            )
+              .then(r => r.json())
+              .then(data => {
+                const newTickets: Ticket[] = Array.isArray(data?.tickets)
+                  ? data.tickets
+                  : [];
+                ticketsNextPageRef.current = page + 1;
+                setTicketsHasMore(Boolean(data?.pagination?.hasMore));
+                setTickets(prev => {
+                  const liveTickets = prev.filter(t => t.status === 'live');
+                  const merged = new Map(
+                    prev.filter(t => t.status !== 'live').map(t => [t.id, t])
+                  );
+                  newTickets.forEach(t => merged.set(t.id, t));
+                  return [
+                    ...liveTickets,
+                    ...Array.from(merged.values()).sort(
+                      (a, b) =>
+                        new Date(a.created_at).getTime() -
+                        new Date(b.created_at).getTime()
+                    ),
+                  ];
+                });
+              })
+          );
+        }
+
+        if (hasMoreLeads) {
+          const page = leadsNextPageRef.current;
+          fetches.push(
+            fetch(
+              `/api/leads?${new URLSearchParams({
+                companyId,
+                unassigned: 'true',
+                status: 'new,in_process,quoted,scheduling',
+                sortBy: 'created_at',
+                sortOrder: 'asc',
+                paginate: 'true',
+                page: page.toString(),
+                limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+              })}`
+            )
+              .then(r => r.json())
+              .then(payload => {
+                const newLeads: Lead[] = Array.isArray(payload?.leads)
+                  ? payload.leads
+                  : Array.isArray(payload)
+                    ? payload
+                    : [];
+                leadsNextPageRef.current = page + 1;
+                setLeadsHasMore(Boolean(payload?.pagination?.hasMore));
+                setLeads(prev => {
+                  const merged = new Map(prev.map(l => [l.id, l]));
+                  newLeads.forEach(l => merged.set(l.id, l));
+                  return Array.from(merged.values()).sort(
+                    (a, b) =>
+                      new Date(a.created_at).getTime() -
+                      new Date(b.created_at).getTime()
+                  );
+                });
+              })
+          );
+        }
+
+        if (hasMoreSupportCases) {
+          const page = supportCasesNextPageRef.current;
+          fetches.push(
+            fetch(
+              `/api/support-cases?${new URLSearchParams({
+                companyId,
+                unassigned: 'true',
+                includeArchived: 'false',
+                sortBy: 'created_at',
+                sortOrder: 'asc',
+                paginate: 'true',
+                page: page.toString(),
+                limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
+              })}`
+            )
+              .then(r => r.json())
+              .then(payload => {
+                const newCases: SupportCase[] = Array.isArray(
+                  payload?.supportCases
+                )
+                  ? payload.supportCases
+                  : Array.isArray(payload)
+                    ? payload
+                    : [];
+                supportCasesNextPageRef.current = page + 1;
+                setSupportCasesHasMore(Boolean(payload?.pagination?.hasMore));
+                setSupportCases(prev => {
+                  const merged = new Map(prev.map(c => [c.id, c]));
+                  newCases.forEach(c => merged.set(c.id, c));
+                  return Array.from(merged.values()).sort(
+                    (a, b) =>
+                      new Date(a.created_at).getTime() -
+                      new Date(b.created_at).getTime()
+                  );
+                });
+              })
+          );
+        }
+
+        await Promise.all(fetches);
+      } catch (error) {
+        console.error('Error fetching more data:', error);
+      } finally {
+        setLoadingMoreData(false);
       }
-
-      if (hasMoreLeads) {
-        const page = leadsNextPageRef.current;
-        fetches.push(
-          fetch(`/api/leads?${new URLSearchParams({
-            companyId,
-            unassigned: 'true',
-            status: 'new,in_process,quoted,scheduling',
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-            paginate: 'true',
-            page: page.toString(),
-            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
-          })}`)
-            .then(r => r.json())
-            .then(payload => {
-              const newLeads: Lead[] = Array.isArray(payload?.leads) ? payload.leads : (Array.isArray(payload) ? payload : []);
-              leadsNextPageRef.current = page + 1;
-              setLeadsHasMore(Boolean(payload?.pagination?.hasMore));
-              setLeads(prev => {
-                const merged = new Map(prev.map(l => [l.id, l]));
-                newLeads.forEach(l => merged.set(l.id, l));
-                return Array.from(merged.values()).sort(
-                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                );
-              });
-            })
-        );
-      }
-
-      if (hasMoreSupportCases) {
-        const page = supportCasesNextPageRef.current;
-        fetches.push(
-          fetch(`/api/support-cases?${new URLSearchParams({
-            companyId,
-            unassigned: 'true',
-            includeArchived: 'false',
-            sortBy: 'created_at',
-            sortOrder: 'asc',
-            paginate: 'true',
-            page: page.toString(),
-            limit: DASHBOARD_INITIAL_PAGE_SIZE.toString(),
-          })}`)
-            .then(r => r.json())
-            .then(payload => {
-              const newCases: SupportCase[] = Array.isArray(payload?.supportCases) ? payload.supportCases : (Array.isArray(payload) ? payload : []);
-              supportCasesNextPageRef.current = page + 1;
-              setSupportCasesHasMore(Boolean(payload?.pagination?.hasMore));
-              setSupportCases(prev => {
-                const merged = new Map(prev.map(c => [c.id, c]));
-                newCases.forEach(c => merged.set(c.id, c));
-                return Array.from(merged.values()).sort(
-                  (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-                );
-              });
-            })
-        );
-      }
-
-      await Promise.all(fetches);
-    } catch (error) {
-      console.error('Error fetching more data:', error);
-    } finally {
-      setLoadingMoreData(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   // Fetch user&apos;s assigned data - oldest first
   const fetchMyData = useCallback(async (companyId: string, userId: string) => {
@@ -992,9 +1157,15 @@ function TicketsDashboardContent() {
     setLoadingMyData(true);
     try {
       const [leadsRes, casesRes, tasksRes] = await Promise.all([
-        fetch(`/api/leads?companyId=${companyId}&assignedTo=${userId}&status=in_process,quoted,scheduling&sortBy=created_at&sortOrder=asc`),
-        fetch(`/api/support-cases?companyId=${companyId}&assignedTo=${userId}&includeArchived=false&sortBy=created_at&sortOrder=asc`),
-        fetch(`/api/tasks?companyId=${companyId}&assignedTo=${userId}&includeArchived=false&sortBy=created_at&sortOrder=asc`),
+        fetch(
+          `/api/leads?companyId=${companyId}&assignedTo=${userId}&status=in_process,quoted,scheduling&sortBy=created_at&sortOrder=asc`
+        ),
+        fetch(
+          `/api/support-cases?companyId=${companyId}&assignedTo=${userId}&includeArchived=false&sortBy=created_at&sortOrder=asc`
+        ),
+        fetch(
+          `/api/tasks?companyId=${companyId}&assignedTo=${userId}&includeArchived=false&sortBy=created_at&sortOrder=asc`
+        ),
       ]);
 
       if (leadsRes.ok) {
@@ -1011,8 +1182,12 @@ function TicketsDashboardContent() {
         const data = await tasksRes.json();
         const allTasks = data.tasks || [];
         // Separate actions (tasks with cadence_step_id) from regular tasks
-        const actions = allTasks.filter((t: Task) => t.cadence_step_id && t.status !== 'completed');
-        const tasks = allTasks.filter((t: Task) => !t.cadence_step_id && t.status !== 'completed');
+        const actions = allTasks.filter(
+          (t: Task) => t.cadence_step_id && t.status !== 'completed'
+        );
+        const tasks = allTasks.filter(
+          (t: Task) => !t.cadence_step_id && t.status !== 'completed'
+        );
         setMyActions(actions);
         setMyTasks(tasks);
       }
@@ -1042,107 +1217,145 @@ function TicketsDashboardContent() {
   }, []);
 
   // Fetch total counts for tabs (not affected by pagination)
-  const fetchTotalCounts = useCallback(async (companyId: string, userId?: string) => {
-    if (!companyId) return;
+  const fetchTotalCounts = useCallback(
+    async (companyId: string, userId?: string, isGlobalAdmin?: boolean) => {
+      if (!companyId) return;
 
-    try {
-      const supabase = createClient();
+      try {
+        const supabase = createClient();
 
-      // Fetch all counts in parallel
-      const [
-        unassignedTicketsResult,
-        unassignedLeadsResult,
-        unassignedSchedulingResult,
-        unassignedSupportCasesResult,
-        myLeadsResult,
-        mySupportCasesResult,
-        closedLeadsResult,
-        closedSupportCasesResult,
-      ] = await Promise.all([
-        // Unassigned tickets (excluding live and closed)
-        supabase
-          .from('tickets')
-          .select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId)
-          .neq('status', 'live')
-          .neq('status', 'closed')
-          .or('archived.is.null,archived.eq.false'),
-        // Unassigned leads (excluding scheduling status)
-        supabase
-          .from('leads')
-          .select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId)
-          .is('assigned_to', null)
-          .in('lead_status', ['new', 'in_process', 'quoted'])
-          .or('archived.is.null,archived.eq.false'),
-        // Unassigned scheduling (leads with scheduling status)
-        supabase
-          .from('leads')
-          .select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId)
-          .is('assigned_to', null)
-          .eq('lead_status', 'scheduling')
-          .or('archived.is.null,archived.eq.false'),
-        // Unassigned support cases
-        supabase
-          .from('support_cases')
-          .select('id', { count: 'exact', head: true })
-          .eq('company_id', companyId)
-          .is('assigned_to', null)
-          .or('archived.is.null,archived.eq.false'),
-        // My leads (assigned to user, active statuses)
-        userId
-          ? supabase
+        // Determine branch restriction for this user
+        let branchIds: string[] | null = null;
+        if (userId && !isGlobalAdmin) {
+          const { data: assignments } = await supabase
+            .from('user_branch_assignments')
+            .select('branch_id')
+            .eq('user_id', userId)
+            .eq('company_id', companyId);
+          if (assignments && assignments.length > 0) {
+            branchIds = assignments.map(
+              (a: { branch_id: string }) => a.branch_id
+            );
+          }
+        }
+
+        // Helper to apply branch filter to a query
+        const withBranch = (q: any) =>
+          branchIds ? q.in('branch_id', branchIds) : q;
+
+        // Fetch all counts in parallel
+        const [
+          unassignedTicketsResult,
+          unassignedLeadsResult,
+          unassignedSchedulingResult,
+          unassignedSupportCasesResult,
+          myLeadsResult,
+          mySupportCasesResult,
+          closedLeadsResult,
+          closedSupportCasesResult,
+        ] = await Promise.all([
+          // Unassigned tickets (excluding live and closed)
+          withBranch(
+            supabase
+              .from('tickets')
+              .select('id', { count: 'exact', head: true })
+              .eq('company_id', companyId)
+              .neq('status', 'live')
+              .neq('status', 'closed')
+              .or('archived.is.null,archived.eq.false')
+          ),
+          // Unassigned leads (excluding scheduling status)
+          withBranch(
+            supabase
               .from('leads')
               .select('id', { count: 'exact', head: true })
               .eq('company_id', companyId)
-              .eq('assigned_to', userId)
-              .in('lead_status', ['in_process', 'quoted', 'scheduling'])
+              .is('assigned_to', null)
+              .in('lead_status', ['new', 'in_process', 'quoted'])
               .or('archived.is.null,archived.eq.false')
-          : Promise.resolve({ count: 0 }),
-        // My support cases (assigned to user)
-        userId
-          ? supabase
-              .from('support_cases')
-              .select('id', { count: 'exact', head: true })
-              .eq('company_id', companyId)
-              .eq('assigned_to', userId)
-              .or('archived.is.null,archived.eq.false')
-          : Promise.resolve({ count: 0 }),
-        // Closed leads (won/lost)
-        userId
-          ? supabase
+          ),
+          // Unassigned scheduling (leads with scheduling status)
+          withBranch(
+            supabase
               .from('leads')
               .select('id', { count: 'exact', head: true })
               .eq('company_id', companyId)
-              .eq('assigned_to', userId)
-              .in('lead_status', ['won', 'lost'])
-          : Promise.resolve({ count: 0 }),
-        // Closed support cases (resolved/closed)
-        userId
-          ? supabase
+              .is('assigned_to', null)
+              .eq('lead_status', 'scheduling')
+              .or('archived.is.null,archived.eq.false')
+          ),
+          // Unassigned support cases
+          withBranch(
+            supabase
               .from('support_cases')
               .select('id', { count: 'exact', head: true })
               .eq('company_id', companyId)
-              .eq('assigned_to', userId)
-              .in('status', ['resolved', 'closed'])
-          : Promise.resolve({ count: 0 }),
-      ]);
+              .is('assigned_to', null)
+              .or('archived.is.null,archived.eq.false')
+          ),
+          // My leads (assigned to user, active statuses)
+          userId
+            ? withBranch(
+                supabase
+                  .from('leads')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('company_id', companyId)
+                  .eq('assigned_to', userId)
+                  .in('lead_status', ['in_process', 'quoted', 'scheduling'])
+                  .or('archived.is.null,archived.eq.false')
+              )
+            : Promise.resolve({ count: 0 }),
+          // My support cases (assigned to user)
+          userId
+            ? withBranch(
+                supabase
+                  .from('support_cases')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('company_id', companyId)
+                  .eq('assigned_to', userId)
+                  .or('archived.is.null,archived.eq.false')
+              )
+            : Promise.resolve({ count: 0 }),
+          // Closed leads (won/lost)
+          userId
+            ? withBranch(
+                supabase
+                  .from('leads')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('company_id', companyId)
+                  .eq('assigned_to', userId)
+                  .in('lead_status', ['won', 'lost'])
+              )
+            : Promise.resolve({ count: 0 }),
+          // Closed support cases (resolved/closed)
+          userId
+            ? withBranch(
+                supabase
+                  .from('support_cases')
+                  .select('id', { count: 'exact', head: true })
+                  .eq('company_id', companyId)
+                  .eq('assigned_to', userId)
+                  .in('status', ['resolved', 'closed'])
+              )
+            : Promise.resolve({ count: 0 }),
+        ]);
 
-      setTotalCounts({
-        unassignedTickets: unassignedTicketsResult.count || 0,
-        unassignedLeads: unassignedLeadsResult.count || 0,
-        unassignedScheduling: unassignedSchedulingResult.count || 0,
-        unassignedSupportCases: unassignedSupportCasesResult.count || 0,
-        myLeads: myLeadsResult.count || 0,
-        mySupportCases: mySupportCasesResult.count || 0,
-        closedLeads: closedLeadsResult.count || 0,
-        closedSupportCases: closedSupportCasesResult.count || 0,
-      });
-    } catch (error) {
-      console.error('Error fetching total counts:', error);
-    }
-  }, []);
+        setTotalCounts({
+          unassignedTickets: unassignedTicketsResult.count || 0,
+          unassignedLeads: unassignedLeadsResult.count || 0,
+          unassignedScheduling: unassignedSchedulingResult.count || 0,
+          unassignedSupportCases: unassignedSupportCasesResult.count || 0,
+          myLeads: myLeadsResult.count || 0,
+          mySupportCases: mySupportCasesResult.count || 0,
+          closedLeads: closedLeadsResult.count || 0,
+          closedSupportCases: closedSupportCasesResult.count || 0,
+        });
+      } catch (error) {
+        console.error('Error fetching total counts:', error);
+      }
+    },
+    []
+  );
 
   // Initial data fetch
   useEffect(() => {
@@ -1153,13 +1366,22 @@ function TicketsDashboardContent() {
       fetchLeads(selectedCompany.id, { fetchAllPages: false });
       fetchSupportCases(selectedCompany.id, { fetchAllPages: false });
       fetchAnnouncements(selectedCompany.id);
-      fetchTotalCounts(selectedCompany.id, user?.id);
+      fetchTotalCounts(selectedCompany.id, user?.id, profile?.role === 'admin');
 
       if (user?.id) {
         fetchMyData(selectedCompany.id, user.id);
       }
     }
-  }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchMyData, fetchAnnouncements, fetchTotalCounts]);
+  }, [
+    selectedCompany?.id,
+    user?.id,
+    fetchTickets,
+    fetchLeads,
+    fetchSupportCases,
+    fetchMyData,
+    fetchAnnouncements,
+    fetchTotalCounts,
+  ]);
 
   useEffect(() => {
     if (!selectedCompany?.id) {
@@ -1198,7 +1420,11 @@ function TicketsDashboardContent() {
       const { table, company_id, action, record_id, ticket_id } = payload;
 
       const currentCompany = selectedCompanyRef.current;
-      if (company_id && currentCompany?.id && company_id !== currentCompany.id) {
+      if (
+        company_id &&
+        currentCompany?.id &&
+        company_id !== currentCompany.id
+      ) {
         return;
       }
 
@@ -1217,7 +1443,8 @@ function TicketsDashboardContent() {
           try {
             const { data: fullTicket, error } = await supabase
               .from('tickets')
-              .select(`
+              .select(
+                `
                 *,
                 customer:customers!tickets_customer_id_fkey(
                   id, first_name, last_name, email, phone, address, city, state, zip_code
@@ -1230,9 +1457,10 @@ function TicketsDashboardContent() {
                   duration_seconds, phone_number, from_number
                 ),
                 reviewed_by_profile:profiles!reviewed_by(
-                  id, first_name, last_name, email, avatar_url
+                  id, first_name, last_name, email, avatar_url, uploaded_avatar_url
                 )
-              `)
+              `
+              )
               .eq('id', record_id)
               .single();
 
@@ -1240,9 +1468,16 @@ function TicketsDashboardContent() {
               setTickets(prev => {
                 const exists = prev.some(t => t.id === fullTicket.id);
                 if (!exists) {
-                  const liveTickets = prev.filter(ticket => ticket.status === 'live');
-                  const regularTickets = prev.filter(ticket => ticket.status !== 'live');
-                  const updatedRegularTickets = [...regularTickets, fullTicket].sort(
+                  const liveTickets = prev.filter(
+                    ticket => ticket.status === 'live'
+                  );
+                  const regularTickets = prev.filter(
+                    ticket => ticket.status !== 'live'
+                  );
+                  const updatedRegularTickets = [
+                    ...regularTickets,
+                    fullTicket,
+                  ].sort(
                     (a, b) =>
                       new Date(a.created_at).getTime() -
                       new Date(b.created_at).getTime()
@@ -1252,7 +1487,11 @@ function TicketsDashboardContent() {
                 return prev;
               });
               // Refresh counts for new ticket
-              fetchTotalCounts(currentCompanyId, userIdRef.current);
+              fetchTotalCounts(
+                currentCompanyId,
+                userIdRef.current,
+                isAdminRef.current
+              );
             }
           } catch (err) {
             console.error('Error fetching new ticket for realtime:', err);
@@ -1262,7 +1501,8 @@ function TicketsDashboardContent() {
           try {
             const { data: updatedTicket, error } = await supabase
               .from('tickets')
-              .select(`
+              .select(
+                `
                 *,
                 customer:customers!tickets_customer_id_fkey(
                   id, first_name, last_name, email, phone, address, city, state, zip_code
@@ -1275,9 +1515,10 @@ function TicketsDashboardContent() {
                   duration_seconds, phone_number, from_number
                 ),
                 reviewed_by_profile:profiles!reviewed_by(
-                  id, first_name, last_name, email, avatar_url
+                  id, first_name, last_name, email, avatar_url, uploaded_avatar_url
                 )
-              `)
+              `
+              )
               .eq('id', record_id)
               .single();
 
@@ -1290,17 +1531,30 @@ function TicketsDashboardContent() {
               ) {
                 setTickets(prev => prev.filter(t => t.id !== record_id));
                 // Refresh counts when ticket is removed
-                fetchTotalCounts(currentCompanyId, userIdRef.current);
+                fetchTotalCounts(
+                  currentCompanyId,
+                  userIdRef.current,
+                  isAdminRef.current
+                );
               } else {
                 // Update existing ticket or add if not present
                 setTickets(prev => {
                   const exists = prev.some(t => t.id === updatedTicket.id);
                   if (exists) {
-                    return prev.map(t => t.id === updatedTicket.id ? updatedTicket : t);
+                    return prev.map(t =>
+                      t.id === updatedTicket.id ? updatedTicket : t
+                    );
                   }
-                  const liveTickets = prev.filter(ticket => ticket.status === 'live');
-                  const regularTickets = prev.filter(ticket => ticket.status !== 'live');
-                  const updatedRegularTickets = [...regularTickets, updatedTicket].sort(
+                  const liveTickets = prev.filter(
+                    ticket => ticket.status === 'live'
+                  );
+                  const regularTickets = prev.filter(
+                    ticket => ticket.status !== 'live'
+                  );
+                  const updatedRegularTickets = [
+                    ...regularTickets,
+                    updatedTicket,
+                  ].sort(
                     (a, b) =>
                       new Date(a.created_at).getTime() -
                       new Date(b.created_at).getTime()
@@ -1315,11 +1569,19 @@ function TicketsDashboardContent() {
         } else if (action === 'DELETE' && record_id) {
           setTickets(prev => prev.filter(t => t.id !== record_id));
           // Refresh counts when ticket is deleted
-          fetchTotalCounts(currentCompanyId, userIdRef.current);
+          fetchTotalCounts(
+            currentCompanyId,
+            userIdRef.current,
+            isAdminRef.current
+          );
         } else {
           // Fallback: refetch for unknown actions
           fetchTickets(currentCompanyId, { showLoading: false });
-          fetchTotalCounts(currentCompanyId, userIdRef.current);
+          fetchTotalCounts(
+            currentCompanyId,
+            userIdRef.current,
+            isAdminRef.current
+          );
         }
       } else if (table === 'call_records') {
         // For call records, update the parent ticket
@@ -1328,7 +1590,8 @@ function TicketsDashboardContent() {
             const supabase = createClient();
             const { data: updatedTicket, error } = await supabase
               .from('tickets')
-              .select(`
+              .select(
+                `
                 *,
                 customer:customers!tickets_customer_id_fkey(
                   id, first_name, last_name, email, phone, address, city, state, zip_code
@@ -1341,14 +1604,17 @@ function TicketsDashboardContent() {
                   duration_seconds, phone_number, from_number
                 ),
                 reviewed_by_profile:profiles!reviewed_by(
-                  id, first_name, last_name, email, avatar_url
+                  id, first_name, last_name, email, avatar_url, uploaded_avatar_url
                 )
-              `)
+              `
+              )
               .eq('id', ticket_id)
               .single();
 
             if (!error && updatedTicket) {
-              setTickets(prev => prev.map(t => t.id === ticket_id ? updatedTicket : t));
+              setTickets(prev =>
+                prev.map(t => (t.id === ticket_id ? updatedTicket : t))
+              );
             }
           } catch (err) {
             console.error('Error updating ticket with call record:', err);
@@ -1358,10 +1624,18 @@ function TicketsDashboardContent() {
         }
       } else if (table === 'leads') {
         fetchLeads(currentCompanyId);
-        fetchTotalCounts(currentCompanyId, userIdRef.current);
+        fetchTotalCounts(
+          currentCompanyId,
+          userIdRef.current,
+          isAdminRef.current
+        );
       } else if (table === 'support_cases') {
         fetchSupportCases(currentCompanyId);
-        fetchTotalCounts(currentCompanyId, userIdRef.current);
+        fetchTotalCounts(
+          currentCompanyId,
+          userIdRef.current,
+          isAdminRef.current
+        );
       }
     });
 
@@ -1374,7 +1648,14 @@ function TicketsDashboardContent() {
         currentChannelRef.current = null;
       }
     };
-  }, [selectedCompany?.id, user?.id, fetchTickets, fetchLeads, fetchSupportCases, fetchTotalCounts]);
+  }, [
+    selectedCompany?.id,
+    user?.id,
+    fetchTickets,
+    fetchLeads,
+    fetchSupportCases,
+    fetchTotalCounts,
+  ]);
 
   // Realtime subscription for tasks assigned to the current user
   useEffect(() => {
@@ -1432,7 +1713,10 @@ function TicketsDashboardContent() {
             setMyTasks(prev => prev.filter(t => t.id !== record_id));
           }
         } catch (err) {
-          console.error('Error handling task realtime update on dashboard:', err);
+          console.error(
+            'Error handling task realtime update on dashboard:',
+            err
+          );
         }
       } else if (action === 'DELETE') {
         setMyActions(prev => prev.filter(t => t.id !== record_id));
@@ -1535,18 +1819,24 @@ function TicketsDashboardContent() {
   }, []);
 
   // Handle lead action
-  const handleLeadAction = useCallback((action: string, lead: Lead) => {
-    if (action === 'edit' || action === 'view') {
-      router.push(`/tickets/leads/${lead.id}`);
-    }
-  }, [router]);
+  const handleLeadAction = useCallback(
+    (action: string, lead: Lead) => {
+      if (action === 'edit' || action === 'view') {
+        router.push(`/tickets/leads/${lead.id}`);
+      }
+    },
+    [router]
+  );
 
   // Handle support case action
-  const handleSupportCaseAction = useCallback((action: string, supportCase: SupportCase) => {
-    if (action === 'view') {
-      router.push(`/tickets/customer-service/${supportCase.id}`);
-    }
-  }, [router]);
+  const handleSupportCaseAction = useCallback(
+    (action: string, supportCase: SupportCase) => {
+      if (action === 'view') {
+        router.push(`/tickets/customer-service/${supportCase.id}`);
+      }
+    },
+    [router]
+  );
 
   // Handle modal close
   const handleModalClose = useCallback(() => {
@@ -1560,14 +1850,16 @@ function TicketsDashboardContent() {
     if (!ticketId) return;
 
     fetch(`/api/tickets/${ticketId}`)
-      .then((res) => res.ok ? res.json() : null)
-      .then((data) => {
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
         if (data) {
           setSelectedTicket(data);
           setShowTicketModal(true);
         }
       })
-      .catch(() => {/* silently ignore — ticket may not exist or user lacks access */});
+      .catch(() => {
+        /* silently ignore — ticket may not exist or user lacks access */
+      });
   }, [searchParams]);
 
   // Handle ticket qualification
@@ -1616,24 +1908,30 @@ function TicketsDashboardContent() {
 
   // Navigate to tasks page
   const handleActionsClick = useCallback(() => {
-    router.push('/tickets/tasks?filter=actions');
+    router.push('/tickets/my-tasks');
   }, [router]);
 
   const handleTasksClick = useCallback(() => {
-    router.push('/tickets/tasks');
+    router.push('/tickets/my-tasks');
   }, [router]);
 
-  const handleActionItemClick = useCallback((task: Task) => {
-    if (task.related_entity_type === 'leads' && task.related_entity_id) {
-      router.push(`/tickets/leads/${task.related_entity_id}`);
-    } else {
-      router.push('/tickets/tasks?filter=actions');
-    }
-  }, [router]);
+  const handleActionItemClick = useCallback(
+    (task: Task) => {
+      if (task.related_entity_type === 'leads' && task.related_entity_id) {
+        router.push(`/tickets/leads/${task.related_entity_id}`);
+      } else {
+        router.push('/tickets/my-tasks');
+      }
+    },
+    [router]
+  );
 
-  const handleTaskItemClick = useCallback((task: Task) => {
-    router.push(`/tickets/tasks/${task.id}`);
-  }, [router]);
+  const handleTaskItemClick = useCallback(
+    (task: Task) => {
+      router.push(`/tickets/tasks/${task.id}`);
+    },
+    [router]
+  );
 
   const handleAnnouncementsOpen = useCallback(() => {
     setShowAnnouncementsModal(true);
@@ -1713,20 +2011,52 @@ function TicketsDashboardContent() {
           const label = getDashboardItemFormatLabel(item);
           const isCall =
             item._type === 'ticket' &&
-            (item.format === 'call' || (!item.format && ['phone_call', 'inbound_call', 'campaign_call'].includes(item.type)));
+            (item.format === 'call' ||
+              (!item.format &&
+                ['phone_call', 'inbound_call', 'campaign_call'].includes(
+                  item.type
+                )));
           const isForm =
             item._type === 'ticket' &&
-            (item.format === 'form' || (!item.format && ['web_form', 'website_form'].includes(item.type)));
+            (item.format === 'form' ||
+              (!item.format &&
+                ['web_form', 'website_form'].includes(item.type)));
           return (
             <div className={tableStyles.formatCell}>
               {isCall && (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="19" viewBox="0 0 18 19" fill="none" className={tableStyles.phoneIcon}>
-                  <path d="M10.374 13.0652C10.5289 13.1363 10.7034 13.1525 10.8688 13.1112C11.0341 13.0699 11.1805 12.9735 11.2838 12.8379L11.55 12.4892C11.6897 12.3029 11.8709 12.1517 12.0792 12.0475C12.2875 11.9434 12.5171 11.8892 12.75 11.8892H15C15.3978 11.8892 15.7794 12.0472 16.0607 12.3285C16.342 12.6098 16.5 12.9913 16.5 13.3892V15.6392C16.5 16.037 16.342 16.4185 16.0607 16.6998C15.7794 16.9811 15.3978 17.1392 15 17.1392C11.4196 17.1392 7.9858 15.7168 5.45406 13.1851C2.92232 10.6534 1.5 7.21958 1.5 3.63916C1.5 3.24134 1.65804 2.8598 1.93934 2.5785C2.22064 2.2972 2.60218 2.13916 3 2.13916H5.25C5.64782 2.13916 6.02936 2.2972 6.31066 2.5785C6.59196 2.8598 6.75 3.24134 6.75 3.63916V5.88916C6.75 6.12203 6.69578 6.3517 6.59164 6.55998C6.4875 6.76826 6.33629 6.94944 6.15 7.08916L5.799 7.35241C5.66131 7.45754 5.56426 7.6071 5.52434 7.77567C5.48442 7.94425 5.50409 8.12144 5.58 8.27716C6.60501 10.3591 8.29082 12.0428 10.374 13.0652Z" stroke="#0088CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="19"
+                  viewBox="0 0 18 19"
+                  fill="none"
+                  className={tableStyles.phoneIcon}
+                >
+                  <path
+                    d="M10.374 13.0652C10.5289 13.1363 10.7034 13.1525 10.8688 13.1112C11.0341 13.0699 11.1805 12.9735 11.2838 12.8379L11.55 12.4892C11.6897 12.3029 11.8709 12.1517 12.0792 12.0475C12.2875 11.9434 12.5171 11.8892 12.75 11.8892H15C15.3978 11.8892 15.7794 12.0472 16.0607 12.3285C16.342 12.6098 16.5 12.9913 16.5 13.3892V15.6392C16.5 16.037 16.342 16.4185 16.0607 16.6998C15.7794 16.9811 15.3978 17.1392 15 17.1392C11.4196 17.1392 7.9858 15.7168 5.45406 13.1851C2.92232 10.6534 1.5 7.21958 1.5 3.63916C1.5 3.24134 1.65804 2.8598 1.93934 2.5785C2.22064 2.2972 2.60218 2.13916 3 2.13916H5.25C5.64782 2.13916 6.02936 2.2972 6.31066 2.5785C6.59196 2.8598 6.75 3.24134 6.75 3.63916V5.88916C6.75 6.12203 6.69578 6.3517 6.59164 6.55998C6.4875 6.76826 6.33629 6.94944 6.15 7.08916L5.799 7.35241C5.66131 7.45754 5.56426 7.6071 5.52434 7.77567C5.48442 7.94425 5.50409 8.12144 5.58 8.27716C6.60501 10.3591 8.29082 12.0428 10.374 13.0652Z"
+                    stroke="#0088CC"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               )}
               {isForm && (
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="19" viewBox="0 0 18 19" fill="none" className={tableStyles.formIcon}>
-                  <path d="M9 15.6392H8.25C7.85218 15.6392 7.47064 15.4811 7.18934 15.1998C6.90804 14.9185 6.75 14.537 6.75 14.1392M6.75 14.1392C6.75 14.537 6.59196 14.9185 6.31066 15.1998C6.02936 15.4811 5.64782 15.6392 5.25 15.6392H4.5M6.75 14.1392V5.13916M9.75 6.63916H15C15.3978 6.63916 15.7794 6.7972 16.0607 7.0785C16.342 7.3598 16.5 7.74134 16.5 8.13916V11.1392C16.5 11.537 16.342 11.9185 16.0607 12.1998C15.7794 12.4811 15.3978 12.6392 15 12.6392H9.75M3.75 12.6392H3C2.60218 12.6392 2.22064 12.4811 1.93934 12.1998C1.65804 11.9185 1.5 11.537 1.5 11.1392V8.13916C1.5 7.74134 1.65804 7.3598 1.93934 7.0785C2.22064 6.7972 2.60218 6.63916 3 6.63916H3.75M4.5 3.63916H5.25C5.64782 3.63916 6.02936 3.7972 6.31066 4.0785C6.59196 4.3598 6.75 4.74134 6.75 5.13916M6.75 5.13916C6.75 4.74134 6.90804 4.3598 7.18934 4.0785C7.47064 3.7972 7.85218 3.63916 8.25 3.63916H9" stroke="#0088CC" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="18"
+                  height="19"
+                  viewBox="0 0 18 19"
+                  fill="none"
+                  className={tableStyles.formIcon}
+                >
+                  <path
+                    d="M9 15.6392H8.25C7.85218 15.6392 7.47064 15.4811 7.18934 15.1998C6.90804 14.9185 6.75 14.537 6.75 14.1392M6.75 14.1392C6.75 14.537 6.59196 14.9185 6.31066 15.1998C6.02936 15.4811 5.64782 15.6392 5.25 15.6392H4.5M6.75 14.1392V5.13916M9.75 6.63916H15C15.3978 6.63916 15.7794 6.7972 16.0607 7.0785C16.342 7.3598 16.5 7.74134 16.5 8.13916V11.1392C16.5 11.537 16.342 11.9185 16.0607 12.1998C15.7794 12.4811 15.3978 12.6392 15 12.6392H9.75M3.75 12.6392H3C2.60218 12.6392 2.22064 12.4811 1.93934 12.1998C1.65804 11.9185 1.5 11.537 1.5 11.1392V8.13916C1.5 7.74134 1.65804 7.3598 1.93934 7.0785C2.22064 6.7972 2.60218 6.63916 3 6.63916H3.75M4.5 3.63916H5.25C5.64782 3.63916 6.02936 3.7972 6.31066 4.0785C6.59196 4.3598 6.75 4.74134 6.75 5.13916M6.75 5.13916C6.75 4.74134 6.90804 4.3598 7.18934 4.0785C7.47064 3.7972 7.85218 3.63916 8.25 3.63916H9"
+                    stroke="#0088CC"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
                 </svg>
               )}
               {label}
@@ -1741,7 +2071,8 @@ function TicketsDashboardContent() {
         sortable: true,
         sortKey: '_sourceSortLabel',
         render: (item: DashboardItem) => {
-          const isTech = item._type === 'lead' && item.lead_source === 'technician';
+          const isTech =
+            item._type === 'lead' && item.lead_source === 'technician';
           const label = isTech ? 'Tech' : getDashboardItemSourceLabel(item);
           return (
             <div
@@ -1876,7 +2207,10 @@ function TicketsDashboardContent() {
 
       queueFullFetchEnabledRef.current = true;
       pendingFullTicketFetchRef.current = false;
-      fetchTickets(selectedCompany.id, { showLoading: false, fetchAllPages: true });
+      fetchTickets(selectedCompany.id, {
+        showLoading: false,
+        fetchAllPages: true,
+      });
       fetchLeads(selectedCompany.id, { fetchAllPages: true });
       fetchSupportCases(selectedCompany.id, { fetchAllPages: true });
     },
@@ -1902,12 +2236,14 @@ function TicketsDashboardContent() {
           _formatSortLabel:
             getOptionLabel(ticket.type, ticketTypeOptions) || NA_FIELD_LABEL,
           _sourceSortLabel:
-            getOptionLabel(ticket.source, ticketSourceOptions) || NA_FIELD_LABEL,
+            getOptionLabel(ticket.source, ticketSourceOptions) ||
+            NA_FIELD_LABEL,
         })),
       ...leads.map(lead => ({
         ...lead,
         _type: 'lead' as const,
-        _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+        _typeSortLabel:
+          lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
         _formatSortLabel:
           getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
         _sourceSortLabel:
@@ -1953,11 +2289,13 @@ function TicketsDashboardContent() {
           ...myLeads.map(lead => ({
             ...lead,
             _type: 'lead' as const,
-            _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+            _typeSortLabel:
+              lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
             _formatSortLabel:
               getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
             _sourceSortLabel:
-              getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
+              getOptionLabel(lead.lead_source, leadSourceOptions) ||
+              NA_FIELD_LABEL,
           })),
           ...mySupportCases.map(supportCase => ({
             ...supportCase,
@@ -1965,13 +2303,19 @@ function TicketsDashboardContent() {
             _typeSortLabel: 'Support',
             _formatSortLabel:
               getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
-              getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+              getOptionLabel(
+                supportCase.issue_type,
+                supportCaseIssueTypeOptions
+              ) ||
               NA_FIELD_LABEL,
             _sourceSortLabel:
               getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
               NA_FIELD_LABEL,
           })),
-        ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        ].sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
         return {
           data: filterBySearch(combinedData, tableSearch),
           columns: dashboardOverviewColumns,
@@ -1987,11 +2331,14 @@ function TicketsDashboardContent() {
             .map(lead => ({
               ...lead,
               _type: 'lead' as const,
-              _typeSortLabel: lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
+              _typeSortLabel:
+                lead.lead_status === 'scheduling' ? 'Scheduling' : 'Sales',
               _formatSortLabel:
-                getOptionLabel(lead.lead_type, leadTypeOptions) || NA_FIELD_LABEL,
+                getOptionLabel(lead.lead_type, leadTypeOptions) ||
+                NA_FIELD_LABEL,
               _sourceSortLabel:
-                getOptionLabel(lead.lead_source, leadSourceOptions) || NA_FIELD_LABEL,
+                getOptionLabel(lead.lead_source, leadSourceOptions) ||
+                NA_FIELD_LABEL,
             })),
           ...mySupportCases
             .filter(c => ['resolved', 'closed'].includes(c.status))
@@ -2001,13 +2348,21 @@ function TicketsDashboardContent() {
               _typeSortLabel: 'Support',
               _formatSortLabel:
                 getOptionLabel(supportCase.ticket?.type, ticketTypeOptions) ||
-                getOptionLabel(supportCase.issue_type, supportCaseIssueTypeOptions) ||
+                getOptionLabel(
+                  supportCase.issue_type,
+                  supportCaseIssueTypeOptions
+                ) ||
                 NA_FIELD_LABEL,
               _sourceSortLabel:
-                getOptionLabel(supportCase.ticket?.source, ticketSourceOptions) ||
-                NA_FIELD_LABEL,
+                getOptionLabel(
+                  supportCase.ticket?.source,
+                  ticketSourceOptions
+                ) || NA_FIELD_LABEL,
             })),
-        ].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+        ].sort(
+          (a, b) =>
+            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        );
         return {
           data: filterBySearch(combinedData, tableSearch),
           columns: dashboardOverviewColumns,
@@ -2025,9 +2380,19 @@ function TicketsDashboardContent() {
           customColumnWidths: DASHBOARD_OVERVIEW_COLUMN_WIDTHS,
         };
     }
-  }, [dashboardTab, sortedNewTabItems, tableSearch, dashboardOverviewColumns, loading,
-      loadingLeads, loadingSupportCases, loadingMoreData, myLeads, mySupportCases,
-      loadingMyData]);
+  }, [
+    dashboardTab,
+    sortedNewTabItems,
+    tableSearch,
+    dashboardOverviewColumns,
+    loading,
+    loadingLeads,
+    loadingSupportCases,
+    loadingMoreData,
+    myLeads,
+    mySupportCases,
+    loadingMyData,
+  ]);
   const tableData = (tableContent.data || []) as any[];
   const serverHasMore = ticketsHasMore || leadsHasMore || supportCasesHasMore;
   const tableHasMore =
@@ -2037,11 +2402,30 @@ function TicketsDashboardContent() {
     const nextVisibleCount = tableVisibleCount + DASHBOARD_INITIAL_PAGE_SIZE;
     setTableVisibleCount(nextVisibleCount);
 
-    if (!loadingMoreData && nextVisibleCount >= tableData.length && serverHasMore && selectedCompany?.id) {
-      fetchMoreData(selectedCompany.id, ticketsHasMore, leadsHasMore, supportCasesHasMore);
+    if (
+      !loadingMoreData &&
+      nextVisibleCount >= tableData.length &&
+      serverHasMore &&
+      selectedCompany?.id
+    ) {
+      fetchMoreData(
+        selectedCompany.id,
+        ticketsHasMore,
+        leadsHasMore,
+        supportCasesHasMore
+      );
     }
-  }, [tableVisibleCount, tableData.length, loadingMoreData, serverHasMore, selectedCompany?.id,
-      ticketsHasMore, leadsHasMore, supportCasesHasMore, fetchMoreData]);
+  }, [
+    tableVisibleCount,
+    tableData.length,
+    loadingMoreData,
+    serverHasMore,
+    selectedCompany?.id,
+    ticketsHasMore,
+    leadsHasMore,
+    supportCasesHasMore,
+    fetchMoreData,
+  ]);
 
   const tableEmptyStateMessage =
     dashboardTab === 'new'
@@ -2063,7 +2447,9 @@ function TicketsDashboardContent() {
       {/* Your Action & Tasks Section */}
       <section className={`${styles.section} ${styles.sectionNoGap}`}>
         <div className={styles.actionsTasksCard}>
-          <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Your Actions &amp; Tasks</h2>
+          <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>
+            Your Actions &amp; Tasks
+          </h2>
           <div className={styles.actionsTasksBoxes}>
             {/* My Actions Box */}
             <button className={styles.actionBox} onClick={handleActionsClick}>
@@ -2074,13 +2460,16 @@ function TicketsDashboardContent() {
                     <Loader2 size={14} className={styles.spinner} />
                   </span>
                 ) : (
-                  <span className={`${styles.badge} ${hasNewActions ? styles.badgeNew : ''}`}>
+                  <span
+                    className={`${styles.badge} ${hasNewActions ? styles.badgeNew : ''}`}
+                  >
                     {myActions.length}
                   </span>
                 )}
               </div>
               <p className={styles.boxDescription}>
-                Actions are part of any assigned cadence for sales, support or scheduling.
+                Actions are part of any assigned cadence for sales, support or
+                scheduling.
               </p>
             </button>
 
@@ -2093,13 +2482,16 @@ function TicketsDashboardContent() {
                     <Loader2 size={14} className={styles.spinner} />
                   </span>
                 ) : (
-                  <span className={`${styles.badge} ${hasNewTasks ? styles.badgeNew : ''}`}>
+                  <span
+                    className={`${styles.badge} ${hasNewTasks ? styles.badgeNew : ''}`}
+                  >
                     {myTasks.length}
                   </span>
                 )}
               </div>
               <p className={styles.boxDescription}>
-                Tasks that are personally assigned within a given customer account or personal task.
+                Tasks that are personally assigned within a given customer
+                account or personal task.
               </p>
             </button>
 
@@ -2116,7 +2508,9 @@ function TicketsDashboardContent() {
                     <Loader2 size={14} className={styles.spinner} />
                   </span>
                 ) : (
-                  <span className={`${styles.badge} ${hasNewAnnouncements ? styles.badgeNew : ''}`}>
+                  <span
+                    className={`${styles.badge} ${hasNewAnnouncements ? styles.badgeNew : ''}`}
+                  >
                     {announcements.length}
                   </span>
                 )}
@@ -2160,7 +2554,50 @@ function TicketsDashboardContent() {
 
       {/* Tickets Table Section */}
       <section className={`${styles.section} ${styles.sectionNoGap}`}>
-        <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>Tickets</h2>
+        <h2 className={`${styles.sectionTitle} ${styles.sectionTitleSpaced}`}>
+          Tickets
+        </h2>
+
+        {/* Branch filter */}
+        {selectedCompany && branches.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              marginBottom: 12,
+            }}
+          >
+            <label style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
+              Branch:
+            </label>
+            <select
+              value={selectedBranchId}
+              onChange={e => {
+                setSelectedBranchId(e.target.value);
+                selectedBranchIdRef.current = e.target.value;
+                if (selectedCompany?.id) {
+                  fetchTickets(selectedCompany.id, { showLoading: true });
+                  fetchLeads(selectedCompany.id);
+                }
+              }}
+              style={{
+                fontSize: 13,
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid #d1d5db',
+                background: '#fff',
+              }}
+            >
+              <option value="">All Branches</option>
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className={styles.tabsRow}>
@@ -2211,7 +2648,9 @@ function TicketsDashboardContent() {
               tabs={[]}
               onItemAction={handleDashboardItemAction as any}
               infiniteScrollEnabled={dashboardTab === 'new'}
-              visibleCount={dashboardTab === 'new' ? tableVisibleCount : undefined}
+              visibleCount={
+                dashboardTab === 'new' ? tableVisibleCount : undefined
+              }
               hasMore={tableHasMore}
               onLoadMore={handleTableLoadMore}
               loadingMore={loadingMoreData}
@@ -2234,7 +2673,9 @@ function TicketsDashboardContent() {
       )}
 
       {!selectedCompany && !companyLoading && (
-        <div style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}>
+        <div
+          style={{ textAlign: 'center', color: '#6b7280', marginTop: '40px' }}
+        >
           Please select a company to view tickets.
         </div>
       )}
@@ -2291,6 +2732,16 @@ function TicketsDashboardContent() {
           <Loader2 size={32} className={styles.redirectSpinner} />
           <span>Opening record&hellip;</span>
         </div>
+      )}
+
+      {/* Quick Quote Modal */}
+      {showQuickQuote && selectedCompany && user && (
+        <QuickQuoteModal
+          companyId={selectedCompany.id}
+          companyName={selectedCompany.name || ''}
+          userId={user.id}
+          onClose={() => setShowQuickQuote(false)}
+        />
       )}
     </div>
   );

@@ -1,0 +1,1034 @@
+.wizard {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background: var(--gray-25);
+}
+
+.geocodingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 100%;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.geocodingSpinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--gray-200);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: spinWizard 0.7s linear infinite;
+}
+
+@keyframes spinWizard {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 34px;
+  border-bottom: 1px solid var(--gray-200);
+  background: var(--gray-25);
+  flex-shrink: 0;
+}
+
+.headerGrid {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.backBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 4px;
+  border: none;
+  background: var(--error-600, #dc2626);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.headerInfo {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 40%;
+}
+
+.headerTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.headerSub {
+  font-size: 12px;
+  color: var(--gray-500);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stepTrack {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+.stepTrackItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.stepLabel {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  white-space: nowrap;
+  background: var(--gray-100);
+  color: var(--gray-400);
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+  border: none;
+  cursor: default;
+
+  &:is(button) {
+    cursor: pointer;
+
+    &:hover {
+      background: var(--green-100);
+    }
+  }
+}
+
+.stepLabelActive {
+  background: var(--blue-50, #eff6ff);
+  color: var(--blue-600, #2563eb);
+}
+
+.stepLabelDone {
+  background: var(--green-50, #f0fdf4);
+  color: var(--green-600, #16a34a);
+}
+
+.stepLabelViewing {
+  outline: 2px solid var(--green-400, #4ade80);
+  outline-offset: -1px;
+}
+
+.stepLine {
+  width: 20px;
+  height: 2px;
+  background: var(--gray-200);
+  border-radius: 1px;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.stepContent {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--gray-75);
+}
+
+.stepScrollable {
+  flex-grow: 1;
+  overflow-y: auto;
+  padding: 24px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.stepFull {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.value {
+  font-size: 15px;
+  color: var(--gray-800);
+}
+
+.textarea {
+  width: 100%;
+  min-height: 100px;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--gray-800);
+  font-family: var(--font-default);
+  resize: vertical;
+  box-sizing: border-box;
+  background: var(--white);
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+  }
+}
+
+.input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--gray-300);
+  border-radius: 10px;
+  padding: 0 12px;
+  font-size: 14px;
+  color: var(--gray-800);
+  font-family: var(--font-default);
+  box-sizing: border-box;
+  background: var(--white);
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+  }
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  font-family: var(--font-default);
+}
+
+.fieldHint {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-default);
+}
+
+.errorState {
+  text-align: center;
+  padding: 16px;
+  color: var(--error-700);
+  font-size: 14px;
+  background: var(--error-50);
+  border-radius: 10px;
+  margin: 0;
+  font-family: var(--font-default);
+}
+
+.mapAddressActions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.mapAddressBtn {
+  min-height: 42px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.mapAddressBtnPrimary {
+  @extend .mapAddressBtn;
+  background: var(--blue-500);
+  border-color: var(--blue-500);
+  color: var(--white);
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.mapAddressSelected {
+  border: 1px solid var(--blue-200);
+  border-radius: 10px;
+  background: var(--blue-50);
+  padding: 10px 12px;
+}
+
+.mapAddressSelectedLabel {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--blue-600);
+  font-family: var(--font-default);
+}
+
+.mapAddressSelectedValue {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--gray-800);
+  font-family: var(--font-default);
+}
+
+.planCard {
+  border: 1.5px solid var(--gray-200);
+  border-radius: 12px;
+  padding: 16px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+  background: var(--white);
+
+  &:active {
+    transform: scale(0.99);
+  }
+}
+
+.planCardSelected {
+  border-color: var(--blue-500);
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+}
+
+.planName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0 0 4px;
+}
+
+.planDesc {
+  font-size: 13px;
+  color: var(--gray-500);
+  margin: 0 0 10px;
+}
+
+.planPricing {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.planPrice {
+  font-size: 13px;
+  color: var(--gray-700);
+
+  strong {
+    color: var(--gray-900);
+  }
+}
+
+.priceRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.priceLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-600);
+  min-width: 120px;
+}
+
+.priceInput {
+  flex: 1;
+  height: 40px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  padding: 0 10px;
+  font-size: 14px;
+  color: var(--gray-800);
+  font-family: var(--font-default);
+  box-sizing: border-box;
+  background: var(--white);
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+  }
+}
+
+.readOnlyInput {
+  background: var(--gray-50);
+  color: var(--gray-700);
+  border-color: var(--gray-200);
+  cursor: default;
+
+  &:focus {
+    border-color: var(--gray-200);
+    box-shadow: none;
+  }
+}
+
+.customerNameHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.inlineEditBtn {
+  border: none;
+  background: transparent;
+  color: var(--blue-500);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  cursor: pointer;
+  padding: 0;
+}
+
+.reviewCard {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-100);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reviewRow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reviewLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.reviewValue {
+  font-size: 14px;
+  color: var(--gray-800);
+}
+
+.termsCard {
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  background: var(--white);
+  padding: 12px;
+}
+
+.termsText {
+  margin: 0;
+  font-size: 13px;
+  color: var(--gray-700);
+  line-height: 1.5;
+
+  p {
+    margin: 0 0 8px;
+  }
+
+  p:last-child {
+    margin-bottom: 0;
+  }
+
+  ul,
+  ol {
+    margin: 0 0 8px 18px;
+    padding: 0;
+  }
+
+  li {
+    margin: 0 0 4px;
+  }
+
+  li:last-child {
+    margin-bottom: 0;
+  }
+
+  a {
+    color: var(--action-500);
+    text-decoration: underline;
+  }
+}
+
+.signatureMetaBtn {
+  margin-top: 8px;
+  border: none;
+  background: transparent;
+  color: var(--gray-600);
+  font-size: 12px;
+  font-family: var(--font-default);
+  cursor: pointer;
+  text-align: left;
+  padding: 0;
+}
+
+.signatureDate {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-default);
+}
+
+.footer {
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--gray-25);
+
+  .nextBtn {
+    flex: 1;
+  }
+}
+
+.stepSaveError {
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+  color: var(--error-600, #dc2626);
+  background: var(--error-50, #fef2f2);
+  border: 1px solid var(--error-200, #fecaca);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-family: var(--font-default);
+}
+
+.nextBtn {
+  flex: none;
+  height: 48px;
+  padding: 0 24px;
+  min-width: 120px;
+  border-radius: 4px;
+  border: none;
+  background: var(--blue-600);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-default);
+  white-space: nowrap;
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+// ── MapAddressStep title / desc ──────────────────────────────────────────────
+
+.mapAddressStepTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-default);
+}
+
+.mapAddressStepDesc {
+  margin: 0;
+  font-size: 14px;
+  color: var(--gray-500);
+  font-family: var(--font-default);
+}
+
+// ── Customer info section (new inspections only) ─────────────────────────────
+
+.customerInfoSection {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.customerInfoTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--gray-800);
+  font-family: var(--font-default);
+}
+
+.customerSearchWrapper {
+  position: relative;
+}
+
+.customerSearchInput {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--font-default);
+  color: var(--gray-900);
+  background: var(--white);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.customerSearchSpinner {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--gray-300);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: translateY(-50%) rotate(360deg);
+  }
+}
+
+.customerSearchResults {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: var(--white);
+  border: 1.5px solid var(--gray-200);
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.customerSearchResultItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s ease;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
+.customerResultName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  font-family: var(--font-default);
+}
+
+.customerResultMeta {
+  font-size: 12px;
+  color: var(--gray-500);
+  font-family: var(--font-default);
+}
+
+.customerTextInput {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: var(--font-default);
+  color: var(--gray-900);
+  background: var(--white);
+  outline: none;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+
+  &:focus {
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.customerRequiredMark {
+  color: var(--error-500);
+  margin-left: 2px;
+}
+
+.prevBtn {
+  height: 48px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-300);
+  background: transparent;
+  color: var(--gray-700);
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 175px;
+  position: relative;
+
+  .prevArrow {
+    color: var(--gray-400);
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+}
+
+.actionBtns {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.quoteBtn {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  border: none;
+  background: var(--blue-500);
+  color: var(--white);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-default);
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+.scheduleBtn {
+  width: 100%;
+  height: 52px;
+  border-radius: 14px;
+  border: 1.5px solid var(--gray-300);
+  background: var(--white);
+  color: var(--gray-800);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: var(--font-default);
+  transition:
+    opacity 0.15s ease,
+    transform 0.1s ease;
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.98);
+  }
+}
+
+.successState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 40px 24px;
+  flex: 1;
+}
+
+.successIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--blue-50);
+  color: var(--blue-500);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.successTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.successSub {
+  font-size: 14px;
+  color: var(--gray-500);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.emptyPlans {
+  text-align: center;
+  padding: 32px 16px;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.loadingState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--blue-500);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.errorMsg {
+  font-size: 13px;
+  color: var(--error-600);
+  background: var(--error-50);
+  border: 1px solid var(--error-200);
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pestTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pestTag {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--white);
+  background: var(--blue-500);
+  border-radius: 6px;
+  padding: 3px 10px;
+}
+
+.mapPreviewActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.mapEditBtn {
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--gray-200);
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  padding: 0 12px;
+  cursor: pointer;
+
+  &:active {
+    background: var(--gray-100);
+  }
+}
+
+.planInlineHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planInlineEditor {
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--gray-200);
+}
+
+/* ── Exit confirmation modal ── */
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 24px;
+}
+
+.modalSheet {
+  width: 100%;
+  max-width: 360px;
+  background: var(--white);
+  border-radius: 20px;
+  padding: 28px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.modalTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-default);
+}
+
+.modalBody {
+  margin: 0 0 8px;
+  font-size: 14px;
+  color: var(--gray-500);
+  font-family: var(--font-default);
+  line-height: 1.5;
+}
+
+.modalActions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.modalConfirmBtn {
+  width: 100%;
+  height: 50px;
+  border-radius: 13px;
+  border: none;
+  background: var(--error-600, #dc2626);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.modalCancelBtn {
+  width: 100%;
+  height: 50px;
+  border-radius: 13px;
+  border: 1.5px solid var(--gray-200);
+  background: var(--white);
+  color: var(--gray-700);
+  font-size: 15px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:active {
+    background: var(--gray-50);
+  }
+}

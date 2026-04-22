@@ -1,0 +1,395 @@
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.scriptBanner {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 12px 24px;
+  background: var(--blue-25);
+  border-bottom: 1px solid var(--blue-100);
+  flex-shrink: 0;
+}
+
+.scriptBannerLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--blue-600);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.scriptBannerText {
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.5;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 0;
+  flex: 1;
+  overflow: hidden;
+}
+
+.leftColumn {
+  padding: 24px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-right: 1px solid var(--gray-200);
+}
+
+.rightColumn {
+  padding: 24px;
+  overflow-y: auto;
+  background: var(--gray-50);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+// Customer search
+.searchWrapper {
+  position: relative;
+}
+
+.searchInput {
+  width: 100%;
+  padding: 10px 14px 10px 40px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
+  font-size: 15px;
+  font-family: var(--font-default);
+  color: var(--gray-800);
+  background: var(--white);
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--blue-400);
+    box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+.searchIcon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--gray-400);
+  pointer-events: none;
+}
+
+.searchResults {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.searchResultItem {
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--gray-100);
+  cursor: pointer;
+  font-family: var(--font-default);
+  transition: background 0.1s;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+
+  &:last-child {
+    border-bottom: none;
+  }
+
+  &:hover {
+    background: var(--blue-25);
+  }
+}
+
+.resultName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.resultDetails {
+  font-size: 12px;
+  color: var(--gray-500);
+}
+
+.searchLoading {
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--gray-500);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+// Mode switcher
+.modeSwitcher {
+  display: flex;
+  gap: 8px;
+}
+
+.modeBtn {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--gray-600);
+  cursor: pointer;
+  font-family: var(--font-default);
+  transition: all 0.15s;
+
+  &.active {
+    border-color: var(--blue-400);
+    background: var(--blue-50);
+    color: var(--blue-600);
+  }
+}
+
+.selectedCustomer {
+  background: var(--blue-25);
+  border: 1px solid var(--blue-100);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.selectedCustomerInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.selectedCustomerName {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-800);
+}
+
+.selectedCustomerSub {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.clearBtn {
+  background: none;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  padding: 5px 10px;
+  font-size: 12px;
+  color: var(--gray-500);
+  cursor: pointer;
+  font-family: var(--font-default);
+  transition: all 0.15s;
+  white-space: nowrap;
+
+  &:hover {
+    border-color: var(--gray-400);
+    color: var(--gray-700);
+  }
+}
+
+// Form fields
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.formGroupFull {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.required {
+  color: var(--red-500, #ef4444);
+  margin-left: 2px;
+}
+
+.input {
+  padding: 9px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 7px;
+  font-size: 14px;
+  font-family: var(--font-default);
+  color: var(--gray-800);
+  background: var(--white);
+  outline: none;
+  transition: border-color 0.15s;
+
+  &:focus {
+    border-color: var(--blue-400);
+    box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.12);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
+}
+
+// Footer
+.footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--gray-200);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--white);
+  flex-shrink: 0;
+}
+
+.footerError {
+  font-size: 13px;
+  color: var(--red-600, #dc2626);
+}
+
+.continueBtn {
+  padding: 10px 24px;
+  background: var(--blue-500);
+  color: var(--white);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: var(--font-default);
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--blue-600);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+// Pest pressure panel
+.pressurePanel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.pressureTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--gray-700);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0;
+}
+
+.pressureStat {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pressureCount {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--blue-600);
+  line-height: 1;
+}
+
+.pressureLabel {
+  font-size: 13px;
+  color: var(--gray-500);
+}
+
+.pressureDescription {
+  font-size: 14px;
+  color: var(--gray-600);
+  line-height: 1.6;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.pressureDescTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-500);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.pestBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--blue-50);
+  border: 1px solid var(--blue-100);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blue-700);
+}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { Department, UserDepartment, DepartmentStats } from '@/types/user';
+import { getCached, setCached, clearCache, CACHE_KEYS } from '@/lib/cache-utils';
 
 interface UseUserDepartmentsReturn {
   departments: Department[];
@@ -20,17 +21,40 @@ export function useUserDepartments(
 ): UseUserDepartmentsReturn {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentDetails, setDepartmentDetails] = useState<UserDepartment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [fetchLoading, setFetchLoading] = useState(true);
+  const [fetchedKey, setFetchedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  const currentKey = userId && companyId ? `${userId}:${companyId}` : null;
+
+  // hasPartialParams: one param is set but the other isn't — more data is incoming, keep loading.
+  // This prevents a false-resolved window when userId arrives before selectedCompany (or vice versa).
+  const hasPartialParams = (!!userId && !companyId) || (!userId && !!companyId);
+
+  // Report loading whenever:
+  // 1. A fetch is in progress (fetchLoading), OR
+  // 2. One param is set but the other hasn't arrived yet (hasPartialParams), OR
+  // 3. Both params are set but we haven't fetched this combo yet (currentKey !== fetchedKey).
+  const isLoading = fetchLoading || hasPartialParams || (currentKey !== null && fetchedKey !== currentKey);
 
   const fetchDepartments = useCallback(async () => {
     if (!userId || !companyId) {
-      setIsLoading(false);
+      setFetchLoading(false);
+      return;
+    }
+
+    const cacheKey = CACHE_KEYS.USER_DEPARTMENTS(userId, companyId);
+    const cached = getCached<{ departments: Department[]; departmentDetails: UserDepartment[] }>(cacheKey);
+    if (cached) {
+      setDepartments(cached.departments);
+      setDepartmentDetails(cached.departmentDetails);
+      setFetchedKey(`${userId}:${companyId}`);
+      setFetchLoading(false);
       return;
     }
 
     try {
-      setIsLoading(true);
+      setFetchLoading(true);
       setError(null);
 
       const response = await fetch(
@@ -43,13 +67,17 @@ export function useUserDepartments(
       }
 
       const data = await response.json();
-      setDepartments(data.departments || []);
-      setDepartmentDetails(data.departmentDetails || []);
+      const deps: Department[] = data.departments || [];
+      const details: UserDepartment[] = data.departmentDetails || [];
+      setDepartments(deps);
+      setDepartmentDetails(details);
+      setCached(cacheKey, { departments: deps, departmentDetails: details });
+      setFetchedKey(`${userId}:${companyId}`);
     } catch (err) {
       console.error('Error fetching user departments:', err);
       setError(err instanceof Error ? err.message : 'Failed to fetch departments');
     } finally {
-      setIsLoading(false);
+      setFetchLoading(false);
     }
   }, [userId, companyId]);
 
@@ -76,6 +104,7 @@ export function useUserDepartments(
       }
 
       const data = await response.json();
+      clearCache(CACHE_KEYS.USER_DEPARTMENTS(userId, companyId));
       setDepartments(data.departments || []);
       setDepartmentDetails(data.departmentDetails || []);
       return true;
@@ -267,7 +296,7 @@ export function useDepartmentPermissions() {
 }
 
 // Page access types
-export type PageType = 'sales' | 'scheduling' | 'support';
+export type PageType = 'sales' | 'scheduling' | 'support' | 'technician';
 
 // Hook for page-level access control
 interface UsePageAccessReturn {
@@ -291,7 +320,8 @@ export function usePageAccess(
   const departmentMap: Record<PageType, Department> = {
     sales: 'sales',
     scheduling: 'scheduling',
-    support: 'support'
+    support: 'support',
+    technician: 'technician',
   };
 
   const requiredDepartment = departmentMap[pageType];
@@ -392,7 +422,8 @@ export function useCurrentUserPageAccess(pageType: PageType): UsePageAccessRetur
   const departmentMap: Record<PageType, Department> = {
     sales: 'sales',
     scheduling: 'scheduling',
-    support: 'support'
+    support: 'support',
+    technician: 'technician',
   };
 
   const requiredDepartment = departmentMap[pageType];

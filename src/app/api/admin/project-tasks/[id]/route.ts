@@ -26,14 +26,16 @@ export async function GET(
           first_name,
           last_name,
           email,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         ),
         created_by_profile:profiles!project_tasks_created_by_fkey(
           id,
           first_name,
           last_name,
           email,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         ),
         project:projects(
           id,
@@ -44,11 +46,11 @@ export async function GET(
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         comments:project_task_comments(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         activity:project_task_activity(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
         ),
         project_task_category_assignments(
           category_type,
@@ -83,14 +85,16 @@ export async function GET(
           first_name,
           last_name,
           email,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         ),
         created_by_profile:profiles!project_tasks_created_by_fkey(
           id,
           first_name,
           last_name,
           email,
-          avatar_url
+          avatar_url,
+          uploaded_avatar_url
         )
       `)
       .eq('parent_task_id', id)

@@ -42,7 +42,7 @@ export async function GET(
       .from('proof_feedback')
       .select(`
         *,
-        user_profile:profiles!proof_feedback_user_id_fkey(id, first_name, last_name, avatar_url)
+        user_profile:profiles!proof_feedback_user_id_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)
       `)
       .eq('proof_id', proofId)
       .eq('project_id', projectId)
@@ -129,7 +129,7 @@ export async function POST(
       })
       .select(`
         *,
-        user_profile:profiles!proof_feedback_user_id_fkey(id, first_name, last_name, avatar_url)
+        user_profile:profiles!proof_feedback_user_id_fkey(id, first_name, last_name, avatar_url, uploaded_avatar_url)
       `)
       .single();
 

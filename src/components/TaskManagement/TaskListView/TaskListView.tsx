@@ -2292,7 +2292,7 @@ export function TaskListView({
               lastName={assigneeProfile?.last_name}
               email={assigneeEmail}
               userId={task.assigned_to || assignee?.id}
-              avatarUrl={assigneeProfile?.avatar_url}
+              avatarUrl={assigneeProfile?.uploaded_avatar_url || assigneeProfile?.avatar_url}
               size="small"
             />
           </div>

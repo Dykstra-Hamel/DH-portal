@@ -46,6 +46,7 @@ interface MentionUser {
   last_name?: string | null;
   email?: string | null;
   avatar_url?: string | null;
+  uploaded_avatar_url?: string | null;
 }
 
 interface ProjectTaskDetailProps {
@@ -142,7 +143,7 @@ export default function ProjectTaskDetail({
     task?.assigned_to || ''
   );
   const [dueDateDraft, setDueDateDraft] = useState('');
-  const [startDateDraft, setStartDateDraft] = useState('');
+  const [, setStartDateDraft] = useState('');
   const [descriptionDraft, setDescriptionDraft] = useState(
     task?.description || ''
   );
@@ -312,7 +313,6 @@ export default function ProjectTaskDetail({
     setPriorityDraft(task.priority || 'medium');
     setAssignedToDraft(task.assigned_to || '');
     setDueDateDraft(formatDateInput(task.due_date));
-    setStartDateDraft(formatDateInput(task.start_date));
     setDescriptionDraft(task.description || '');
     setDepartmentDraft(task.department_id || '');
     setIsEditingDescription(false);
@@ -989,7 +989,7 @@ export default function ProjectTaskDetail({
   };
 
   const handleDateChange = async (
-    field: 'due_date' | 'start_date',
+    field: 'due_date',
     value: string
   ) => {
     if (field === 'due_date') {
@@ -1005,7 +1005,6 @@ export default function ProjectTaskDetail({
       console.error('Error updating date:', error);
       alert('Failed to update date. Please try again.');
       setDueDateDraft(formatDateInput(task.due_date));
-      setStartDateDraft(formatDateInput(task.start_date));
     }
   };
 
@@ -1577,18 +1576,6 @@ export default function ProjectTaskDetail({
                 />
               </div>
 
-              <div className={styles.detailItem}>
-                <div className={styles.detailLabel}>
-                  <Calendar size={14} />
-                  Start Date
-                </div>
-                <input
-                  type="date"
-                  className={styles.editInput}
-                  value={startDateDraft}
-                  onChange={e => handleDateChange('start_date', e.target.value)}
-                />
-              </div>
             </div>
           </div>
 
@@ -1914,7 +1901,7 @@ export default function ProjectTaskDetail({
                               comment.user_profile?.last_name || undefined
                             }
                             email={comment.user_profile?.email || ''}
-                            avatarUrl={comment.user_profile?.avatar_url || null}
+                            avatarUrl={comment.user_profile?.uploaded_avatar_url || comment.user_profile?.avatar_url || null}
                             size="small"
                             showTooltip={true}
                           />

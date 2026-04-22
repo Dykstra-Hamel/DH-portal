@@ -1,5 +1,27 @@
 import type { NextConfig } from 'next';
-import withPWA from 'next-pwa';
+import withPWA from '@ducanh2912/next-pwa';
+
+type RemotePattern = NonNullable<
+  NonNullable<NextConfig['images']>['remotePatterns']
+>[number];
+
+function supabaseUrlPattern(): RemotePattern | null {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return {
+      protocol: parsed.protocol.replace(':', '') as 'http' | 'https',
+      hostname: parsed.hostname,
+      port: parsed.port || undefined,
+      pathname: '/**',
+    };
+  } catch {
+    return null;
+  }
+}
+
+const extraSupabasePattern = supabaseUrlPattern();
 
 const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
@@ -26,6 +48,7 @@ const nextConfig: NextConfig = {
         hostname: 'localhost',
         pathname: '/**',
       },
+      ...(extraSupabasePattern ? [extraSupabasePattern] : []),
       {
         protocol: 'https',
         hostname: '*.supabase.co',
@@ -68,6 +91,4 @@ const nextConfig: NextConfig = {
 export default withPWA({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
-  register: true,
-  skipWaiting: true,
 })(nextConfig);

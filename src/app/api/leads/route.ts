@@ -10,6 +10,8 @@ import {
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { logCreation } from '@/lib/activity-logger';
+import { getUserBranchFilter } from '@/lib/branch-filter';
+import { startDefaultCadenceForStage } from '@/lib/cadence/start-default-cadence';
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,6 +33,7 @@ export async function GET(request: NextRequest) {
     const unassigned = searchParams.get('unassigned') === 'true';
     const unassignedScheduler = searchParams.get('unassignedScheduler') === 'true';
     const includeArchived = searchParams.get('includeArchived') === 'true';
+    const branchId = searchParams.get('branchId');
     const sortBy = searchParams.get('sortBy') || 'created_at';
     const sortOrder = searchParams.get('sortOrder') || 'desc';
     const paginate = searchParams.get('paginate') === 'true';
@@ -101,8 +104,10 @@ export async function GET(request: NextRequest) {
         furthest_completed_stage,
         scheduled_date,
         scheduled_time,
+        branch_id,
         created_at,
         updated_at,
+        branch:branches(id, name),
         customer:customers(
           id,
           first_name,
@@ -124,6 +129,14 @@ export async function GET(request: NextRequest) {
       query = query
         .in('lead_status', ['new', 'in_process', 'quoted', 'scheduling'])
         .or('archived.is.null,archived.eq.false');
+    }
+
+    // Apply branch filter: explicit branchId param OR user restriction
+    if (branchId) {
+      query = query.eq('branch_id', branchId);
+    } else {
+      const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
+      if (branchFilter) query = query.or(branchFilter);
     }
 
     // Apply additional filters
@@ -210,7 +223,7 @@ export async function GET(request: NextRequest) {
       const queryClient = createAdminClient();
       const { data: profilesData, error: profilesError } = await queryClient
         .from('profiles')
-        .select('id, first_name, last_name, email, avatar_url')
+        .select('id, first_name, last_name, email, avatar_url, uploaded_avatar_url')
         .in('id', Array.from(userIds));
 
 
@@ -348,19 +361,91 @@ export async function POST(request: NextRequest) {
       leadSource,
       leadFormat,
       leadType,
-      leadStatus,
+      leadStatus: _leadStatus,
       priority,
       estimatedValue,
       serviceType,
-      assignedTo,
+      assignedTo: _assignedTo,
       scheduledDate,
       scheduledTime,
+      requestedDate,
+      requestedTime,
       selectedPlanId,
       recommendedPlanName,
       photoUrls,
+      mapPlotData,
+      branchId,
+      routeStopId,
+      techDiscussed,
     } = body;
 
+    // Mutable assignment variables — may be updated by auto-assignment logic below
+    let assignedTo: string | null | undefined = _assignedTo;
+    const leadStatus: string | null | undefined = _leadStatus;
+
     const normalizedLeadNotes = typeof notes === 'string' ? notes.trim() : '';
+    const normalizedMapPlotData = (() => {
+      if (!mapPlotData || typeof mapPlotData !== 'object') {
+        return null;
+      }
+
+      const payload = mapPlotData as {
+        addressInput?: string;
+        addressComponents?: Record<string, unknown> | null;
+        centerLat?: number | null;
+        centerLng?: number | null;
+        zoom?: number;
+        heading?: number;
+        tilt?: number;
+        isViewSet?: boolean;
+        drawTool?: string;
+        selectedStampType?: string;
+        outlinePoints?: Array<Record<string, unknown>>;
+        stamps?: Array<Record<string, unknown>>;
+        updatedAt?: string | null;
+      };
+
+      const safeOutlinePoints = Array.isArray(payload.outlinePoints)
+        ? payload.outlinePoints
+            .slice(0, 500)
+            .map(point => ({
+              x: typeof point.x === 'number' ? Number(point.x.toFixed(5)) : null,
+              y: typeof point.y === 'number' ? Number(point.y.toFixed(5)) : null,
+            }))
+            .filter(point => point.x !== null && point.y !== null)
+        : [];
+
+      const safeStamps = Array.isArray(payload.stamps)
+        ? payload.stamps
+            .slice(0, 250)
+            .map(stamp => ({
+              id: typeof stamp.id === 'string' ? stamp.id : null,
+              type: typeof stamp.type === 'string' ? stamp.type : null,
+              x: typeof stamp.x === 'number' ? Number(stamp.x.toFixed(5)) : null,
+              y: typeof stamp.y === 'number' ? Number(stamp.y.toFixed(5)) : null,
+            }))
+            .filter(stamp => stamp.type && stamp.x !== null && stamp.y !== null)
+        : [];
+
+      return {
+        addressInput: typeof payload.addressInput === 'string' ? payload.addressInput : null,
+        addressComponents:
+          payload.addressComponents && typeof payload.addressComponents === 'object'
+            ? payload.addressComponents
+            : null,
+        centerLat: typeof payload.centerLat === 'number' ? Number(payload.centerLat.toFixed(6)) : null,
+        centerLng: typeof payload.centerLng === 'number' ? Number(payload.centerLng.toFixed(6)) : null,
+        zoom: typeof payload.zoom === 'number' ? payload.zoom : null,
+        heading: typeof payload.heading === 'number' ? payload.heading : null,
+        tilt: typeof payload.tilt === 'number' ? payload.tilt : null,
+        isViewSet: payload.isViewSet === true,
+        drawTool: payload.drawTool === 'outline' || payload.drawTool === 'stamp' ? payload.drawTool : null,
+        selectedStampType: typeof payload.selectedStampType === 'string' ? payload.selectedStampType : null,
+        outlinePoints: safeOutlinePoints,
+        stamps: safeStamps,
+        updatedAt: typeof payload.updatedAt === 'string' ? payload.updatedAt : null,
+      };
+    })();
 
     // Auto-set submitted_by to the authenticated user for technician leads
     const submittedBy = leadSource === 'technician' ? user.id : (body.submittedBy ?? null);
@@ -419,11 +504,15 @@ export async function POST(request: NextRequest) {
 
     // If no customerId provided, check for existing customer by email or phone
     if (!customerId && (email || phoneNumber)) {
+      const orClauses: string[] = [];
+      if (email) orClauses.push(`email.eq.${email}`);
+      if (phoneNumber) orClauses.push(`phone.eq.${phoneNumber}`);
       const { data: existingCustomer } = await supabase
         .from('customers')
         .select('id')
         .eq('company_id', companyId)
-        .or(email ? `email.eq.${email}` : `phone.eq.${phoneNumber}`)
+        .or(orClauses.join(','))
+        .limit(1)
         .maybeSingle();
 
       customerId = existingCustomer?.id || null;
@@ -520,6 +609,8 @@ export async function POST(request: NextRequest) {
           lead_status: leadStatus || (assignedTo ? 'in_process' : 'new'),
           scheduled_date: scheduledDate || null,
           scheduled_time: scheduledTime || null,
+          requested_date: requestedDate || null,
+          requested_time: requestedTime || null,
           selected_plan_id: selectedPlanId || null,
           recommended_plan_name: recommendedPlanName || null,
           photo_urls: Array.isArray(photoUrls) && photoUrls.length > 0 ? photoUrls : null,
@@ -530,6 +621,9 @@ export async function POST(request: NextRequest) {
           estimated_value: estimatedValue,
           assigned_to: assignedTo || null,
           submitted_by: submittedBy,
+          branch_id: branchId ?? null,
+          tech_discussed:
+            leadSource === 'technician' ? !!techDiscussed : null,
           created_at: new Date().toISOString(),
         },
       ])
@@ -544,6 +638,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Mark route stop as referred to sales when submitted from a technician's route
+    if (routeStopId) {
+      const adminSupabase = createAdminClient();
+      await adminSupabase
+        .from('route_stops')
+        .update({ referred_to_sales: true })
+        .eq('id', routeStopId)
+        .eq('company_id', companyId);
+    }
+
     // Log lead creation activity
     await logCreation({
       entityType: 'lead',
@@ -552,8 +656,54 @@ export async function POST(request: NextRequest) {
       userId: submittedBy ?? user.id,
     });
 
-    // Capture initial technician notes in the lead Notes activity feed
-    if (normalizedLeadNotes) {
+    // Detect if the DB trigger performed auto-assignment
+    const wasAutoAssigned = !!newLead.assigned_to && !assignedTo;
+    if (wasAutoAssigned) {
+      assignedTo = newLead.assigned_to;
+    }
+
+    // When auto-assignment fired via zip code group: start initial-contact cadence + send in-app notification
+    if (wasAutoAssigned && assignedTo) {
+      startDefaultCadenceForStage(
+        newLead.id,
+        companyId,
+        'default_initial_contact_cadence_id',
+        assignedTo
+      ).catch(err => {
+        console.error('[leads POST] initial-contact cadence start failed:', err);
+      });
+
+      try {
+        const { createAdminClient: getAdminForNotif } = await import('@/lib/supabase/server-admin');
+        const adminSupabaseForNotif = getAdminForNotif();
+        const { data: custData } = await adminSupabaseForNotif
+          .from('customers')
+          .select('first_name, last_name')
+          .eq('id', customerId)
+          .maybeSingle();
+        const custName =
+          `${custData?.first_name || ''} ${custData?.last_name || ''}`.trim() || 'Unknown Customer';
+        const srcLabel = leadSource
+          ? leadSource.replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
+          : 'Lead';
+        await adminSupabaseForNotif.rpc('create_notification', {
+          p_user_id: assignedTo,
+          p_company_id: companyId,
+          p_type: 'assignment',
+          p_title: 'New Lead Assigned To You',
+          p_message: `${custName} | ${srcLabel}`,
+          p_reference_id: newLead.id,
+          p_reference_type: 'lead',
+          p_assigned_to: assignedTo,
+        });
+      } catch (notifErr) {
+        console.error('[leads POST] auto-assign in-app notification failed:', notifErr);
+      }
+    }
+
+    // Capture initial technician notes and optional map/plot payload in the lead Notes activity feed
+    if (normalizedLeadNotes || normalizedMapPlotData) {
+      const noteText = normalizedLeadNotes || 'Map & Plot data captured from TechLeads wizard.';
       const { error: noteError } = await supabase
         .from('activity_log')
         .insert({
@@ -562,15 +712,28 @@ export async function POST(request: NextRequest) {
           entity_id: newLead.id,
           activity_type: 'note_added',
           user_id: user.id,
-          notes: normalizedLeadNotes,
+          notes: noteText,
           metadata: {
             source: 'techleads',
+            ...(normalizedMapPlotData ? { map_plot: normalizedMapPlotData } : {}),
           },
         });
 
       if (noteError) {
         console.error('Error creating initial lead note activity:', noteError);
       }
+    }
+
+    // Auto-enroll in quote follow-up cadence when lead is created with 'quoted' status
+    if (leadStatus === 'quoted' && assignedTo) {
+      startDefaultCadenceForStage(
+        newLead.id,
+        companyId,
+        'default_quote_followup_cadence_id',
+        assignedTo
+      ).catch(err => {
+        console.error('[leads POST] cadence enrollment failed:', err);
+      });
     }
 
     // Auto-link service address to quote if customer has one and lead doesn't

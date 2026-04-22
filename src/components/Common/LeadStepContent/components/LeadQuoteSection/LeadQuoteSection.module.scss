@@ -1598,3 +1598,31 @@
     cursor: not-allowed;
   }
 }
+
+.fieldMapServicesList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.fieldMapServiceRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--gray-50, #f9fafb);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.fieldMapServiceName {
+  font-weight: 500;
+  color: var(--gray-800, #1f2937);
+}
+
+.fieldMapServicePrice {
+  color: var(--gray-600, #4b5563);
+  white-space: nowrap;
+}

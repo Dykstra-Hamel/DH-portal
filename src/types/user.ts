@@ -1,4 +1,4 @@
-export type Department = 'sales' | 'support' | 'scheduling' | 'technician';
+export type Department = 'sales' | 'support' | 'scheduling' | 'technician' | 'inspector';
 
 export type ProfileRole = 'admin' | 'super_admin' | 'user' | 'customer' | 'project_manager';
 
@@ -20,6 +20,10 @@ export interface Profile {
   email: string;
   role?: ProfileRole;
   avatar_url?: string;
+  uploaded_avatar_url?: string;
+  title?: string;
+  phone?: string;
+  contact_email?: string;
   created_at: string;
   updated_at: string;
 }
@@ -55,6 +59,7 @@ export interface DepartmentStats {
   support: number;
   scheduling: number;
   technician: number;
+  inspector: number;
   total: number;
 }
 
@@ -83,6 +88,12 @@ export const DEPARTMENT_CONFIG = {
     description: 'Field technician for on-site service and upsell capture',
     color: '#6366f1', // indigo-500
     icon: '🔧'
+  },
+  inspector: {
+    label: 'Inspector',
+    description: 'Field property inspection and quoting',
+    color: '#8b5cf6', // violet-500
+    icon: '🔍'
   }
 } as const;
 
@@ -119,11 +130,7 @@ export const validateDepartments = (departments: Department[]): {
     errors.push('At least one department must be selected');
   }
 
-  if (departments.length > 3) {
-    errors.push('Cannot assign more than 3 departments');
-  }
-
-  const validDepartments: Department[] = ['sales', 'support', 'scheduling', 'technician'];
+const validDepartments: Department[] = ['sales', 'support', 'scheduling', 'technician', 'inspector'];
   const invalidDepartments = departments.filter(dept => !validDepartments.includes(dept));
 
   if (invalidDepartments.length > 0) {

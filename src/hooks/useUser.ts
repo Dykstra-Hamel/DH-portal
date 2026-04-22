@@ -53,7 +53,9 @@ export function useUser() {
   }, []);
 
   const getAvatarUrl = () => {
-    // Use Google avatar URL directly - Next.js Image will handle caching
+    // Uploaded avatar takes highest priority over OAuth provider images
+    if (profile?.uploaded_avatar_url) return profile.uploaded_avatar_url;
+
     if (!user?.user_metadata) return null;
 
     // Check different avatar field names from OAuth providers

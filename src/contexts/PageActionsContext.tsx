@@ -24,6 +24,12 @@ interface AssignedUser {
   avatar_url?: string | null;
 }
 
+interface BranchOption {
+  id: string;
+  name: string;
+  is_primary: boolean;
+}
+
 interface LeadAssignmentControls {
   leadType: string;
   leadStatus: string;
@@ -38,6 +44,9 @@ interface LeadAssignmentControls {
   onAssigneeChange: (id: string) => void;
   onSchedulerChange: (id: string) => void;
   onStatusChange: (status: string) => void;
+  currentBranchId?: string | null;
+  availableBranches?: BranchOption[];
+  onBranchChange?: (branchId: string | null) => void;
 }
 
 interface SupportCaseAssignmentControls {
@@ -48,6 +57,9 @@ interface SupportCaseAssignmentControls {
   currentUser: { id: string; name: string; email: string; avatar?: string };
   onAssigneeChange: (id: string) => void;
   onStatusChange: (status: string) => void;
+  currentBranchId?: string | null;
+  availableBranches?: BranchOption[];
+  onBranchChange?: (branchId: string | null) => void;
 }
 
 interface PageHeaderConfig {

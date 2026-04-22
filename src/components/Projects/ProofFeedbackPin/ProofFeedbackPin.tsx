@@ -98,7 +98,7 @@ export default function ProofFeedbackPin({
           <div className={styles.popoverHeader}>
             <MiniAvatar
               email=""
-              avatarUrl={pin.user_profile?.avatar_url ?? null}
+              avatarUrl={(pin.user_profile?.uploaded_avatar_url || pin.user_profile?.avatar_url) ?? null}
               firstName={pin.user_profile?.first_name ?? ''}
               lastName={pin.user_profile?.last_name ?? ''}
               size="small"

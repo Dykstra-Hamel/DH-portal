@@ -3,7 +3,7 @@
   align-items: center;
   justify-content: center;
   padding: 12px 24px;
-  background: var(--white);
+  background: var(--gray-25);
   border-bottom: 1px solid var(--drop-shadow);
   height: 60px;
   min-height: 60px;
@@ -51,8 +51,6 @@
   display: none;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
   padding: 0;
   background: transparent;
   border: none;
@@ -91,7 +89,15 @@
   font-size: 16px;
   font-weight: 600;
   color: var(--text-primary);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
+}
+
+.appShellTitle {
+  font-size: 14px;
+  line-height: 16px;
+  font-weight: 700;
+  color: var(--gray-900);
+  font-family: var(--font-default);
 }
 
 .rightSection {
@@ -147,5 +153,11 @@
 
   .rightSection {
     gap: 12px;
+  }
+}
+
+@media (max-width: 600px) {
+  .leftSection {
+    flex-shrink: 1;
   }
 }

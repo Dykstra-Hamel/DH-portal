@@ -6,12 +6,19 @@ import AddOnServiceEditor from '@/components/AddOnServices/AddOnServiceEditor/Ad
 import { AddOnService } from '@/types/addon-service';
 import styles from './AddOnServicesManager.module.scss';
 
+interface ServicePlanBasic {
+  id: string;
+  plan_name: string;
+}
+
 interface AddOnServicesManagerProps {
   companyId: string;
+  servicePlans?: ServicePlanBasic[];
 }
 
 export default function AddOnServicesManager({
   companyId,
+  servicePlans = [],
 }: AddOnServicesManagerProps) {
   const [showEditor, setShowEditor] = useState(false);
   const [editingAddon, setEditingAddon] = useState<AddOnService | null>(null);
@@ -55,17 +62,10 @@ export default function AddOnServicesManager({
 
   return (
     <div className={styles.manager}>
-      <div className={styles.header}>
-        <h2>Add-On Services</h2>
-        <p>
-          Manage add-on services that customers can purchase alongside base
-          service plans.
-        </p>
-      </div>
-
       <AddOnServicesList
         key={refreshKey}
         companyId={companyId}
+        servicePlans={servicePlans}
         onAdd={handleAdd}
         onEdit={handleEdit}
         onDelete={handleDelete}

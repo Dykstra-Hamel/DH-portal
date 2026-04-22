@@ -219,7 +219,9 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
                 firstName={lead.assigned_user.first_name}
                 lastName={lead.assigned_user.last_name}
                 email={lead.assigned_user.email}
+                userId={lead.assigned_user.id}
                 avatarUrl={lead.assigned_user.avatar_url}
+                uploadedAvatarUrl={lead.assigned_user.uploaded_avatar_url}
                 size="small"
               />
             )}
@@ -238,11 +240,18 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     sortable: true,
     sortKey: 'lead_source',
     render: (lead: Lead) => (
-      <div className={styles.formatCell}>
-        {getFormatIcon(lead)}
-        <span className={styles.sourceBadge}>
-          {getLeadSourceLabel(lead.lead_source)}
-        </span>
+      <div className={styles.formatCell} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {getFormatIcon(lead)}
+          <span className={styles.sourceBadge}>
+            {getLeadSourceLabel(lead.lead_source)}
+          </span>
+        </div>
+        {lead.branch?.name && (
+          <span style={{ fontSize: 11, padding: '1px 6px', background: '#eff6ff', color: '#1d4ed8', borderRadius: 10, fontWeight: 500, whiteSpace: 'nowrap' }}>
+            {lead.branch.name}
+          </span>
+        )}
       </div>
     ),
   },
