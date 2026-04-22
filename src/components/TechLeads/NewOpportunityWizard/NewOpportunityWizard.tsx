@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { UserPlus, TrendingUp, ChevronDown } from 'lucide-react';
+import { UserPlus, TrendingUp, ChevronDown, ArrowLeft } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -1321,7 +1321,7 @@ function StepSelectSite({
   const cachedStreet = useRef<string | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // On mount: geolocate → reverse geocode → search PestPac by street name
+  // On mount: geolocate reverse geocode search PestPac by street name
   // Re-runs when isPestPacEnabled resolves (settings fetch in parent may lag behind mount)
   useEffect(() => {
     if (!isPestPacEnabled) return;
@@ -2010,7 +2010,8 @@ export function NewOpportunityWizard() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const routeStopIdParam = searchParams.get('routeStopId');
-  const isFromRouteStop = searchParams.get('type') === 'upsell' && !!routeStopIdParam;
+  const isFromRouteStop =
+    searchParams.get('type') === 'upsell' && !!routeStopIdParam;
   const { selectedCompany } = useCompany();
   const { setWizardTitle, setBackInterceptor } = useWizard();
 
@@ -2207,8 +2208,7 @@ export function NewOpportunityWizard() {
         setSelectedCustomer(data.customer);
         addRecent(data.customer);
         const c = data.customer;
-        const addr =
-          c.primary_service_address?.[0]?.service_address ?? null;
+        const addr = c.primary_service_address?.[0]?.service_address ?? null;
         const street = addr?.street_address ?? c.address ?? '';
         const city = addr?.city ?? c.city ?? '';
         const state = addr?.state ?? c.state ?? '';
@@ -2251,7 +2251,8 @@ export function NewOpportunityWizard() {
 
   // Load customer from route stop once selectedCompany is available
   useEffect(() => {
-    if (!routeStopIdParam || !selectedCompany?.id || isSyncFired.current) return;
+    if (!routeStopIdParam || !selectedCompany?.id || isSyncFired.current)
+      return;
     isSyncFired.current = true;
     loadCustomerFromRouteStop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -2526,7 +2527,9 @@ export function NewOpportunityWizard() {
         .filter(Boolean)
         .join('\n');
 
-      const finalNotes = [combinedNotes, checkboxNotes].filter(Boolean).join('\n\n');
+      const finalNotes = [combinedNotes, checkboxNotes]
+        .filter(Boolean)
+        .join('\n\n');
 
       const body: Record<string, unknown> = {
         companyId,
@@ -2804,245 +2807,256 @@ export function NewOpportunityWizard() {
           <p>Loading customer…</p>
         </div>
       ) : (
-      <>
-      {/* Progress indicator — only show after type selection */}
-      {stepIndex > 0 && (
-        <div className={styles.progressSection}>
-          <p className={styles.progressLeadType}>
-            {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
-          </p>
-          <div className={styles.progressBar}>
-            {progressSteps.map((stepId, i) => (
-              <div
-                key={stepId}
-                className={`${styles.progressStep} ${i === progressIndex ? styles.progressStepActive : ''} ${i < progressIndex ? styles.progressStepDone : ''}`}
-              >
-                <div className={styles.progressDot}>
-                  {i < progressIndex ? '✓' : i + 1}
-                </div>
-                <span className={styles.progressLabel}>
-                  {STEP_ID_LABELS[stepId]}
-                </span>
+        <>
+          {/* Progress indicator — only show after type selection */}
+          {stepIndex > 0 && (
+            <div className={styles.progressSection}>
+              <p className={styles.progressLeadType}>
+                {leadType === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'}
+              </p>
+              <div className={styles.progressBar}>
+                {progressSteps.map((stepId, i) => (
+                  <div
+                    key={stepId}
+                    className={`${styles.progressStep} ${i === progressIndex ? styles.progressStepActive : ''} ${i < progressIndex ? styles.progressStepDone : ''}`}
+                  >
+                    <div className={styles.progressDot}>
+                      {i < progressIndex ? '✓' : i + 1}
+                    </div>
+                    <span className={styles.progressLabel}>
+                      {STEP_ID_LABELS[stepId]}
+                    </span>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-
-      {/* Step content */}
-      <div className={styles.stepWrapper}>
-        {currentStepId === 'type-select' && (
-          <StepTypeSelect
-            onSelect={type => {
-              setLeadType(type);
-              setWizardTitle(
-                type === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'
-              );
-              setStepIndex(1);
-            }}
-          />
-        )}
-
-        {currentStepId === 'photos' && (
-          <StepPhotos photos={photos} onPhotosChange={setPhotos} />
-        )}
-
-        {currentStepId === 'ai-review' && (
-          <>
-            {analyzeError && (
-              <p className={styles.analyzeError}>{analyzeError}</p>
-            )}
-            <StepAIReview
-              aiResult={aiResult}
-              notes={notes}
-              customerMentioned={customerMentioned}
-              isHighPriority={isHighPriority}
-              pestOptions={pestOptions}
-              selectedPestValue={selectedPestValue}
-              otherPestValue={otherPest}
-              isPestOptionsLoading={isPestOptionsLoading}
-              onAIResultChange={setAIResult}
-              onPestValueChange={value => {
-                setSelectedPestValue(value);
-                setHasManualPestSelection(true);
-                if (value !== OTHER_PEST_OPTION_VALUE) {
-                  setOtherPest('');
-                }
-              }}
-              onOtherPestChange={value => {
-                setOtherPest(value);
-                setHasManualPestSelection(true);
-              }}
-              onNotesChange={setNotes}
-              onCustomerMentionedChange={setCustomerMentioned}
-              onHighPriorityChange={setIsHighPriority}
-              techMentioned={techMentioned}
-              onTechMentionedChange={setTechMentioned}
-            />
-          </>
-        )}
-
-        {currentStepId === 'new-customer' && (
-          <StepNewCustomer
-            form={newCustomerForm}
-            onChange={setNewCustomerForm}
-            error={createCustomerError}
-          />
-        )}
-
-        {currentStepId === 'select-site' && (
-          <StepSelectSite
-            companyId={companyId}
-            selectedCustomer={selectedCustomer}
-            onSelectCustomer={setSelectedCustomer}
-            isPestPacEnabled={isPestPacEnabled}
-            selectedPestPacClient={selectedPestPacClient}
-            onSelectPestPacClient={setSelectedPestPacClient}
-            recentCustomers={recentCustomers}
-          />
-        )}
-
-        {currentStepId === 'service-plan-select' && (
-          <StepServicePlanSelect
-            companyId={companyId}
-            selectedPlan={selectedServicePlan}
-            onPlanSelect={setSelectedServicePlan}
-            suggestedPestType={aiResult.suggested_pest_type}
-            selectedPestValue={selectedPestValue}
-          />
-        )}
-
-        {currentStepId === 'service-details' && (
-          <StepServiceDetails
-            companyId={companyId}
-            locationId={
-              selectedPestPacClient?.clientId ??
-              selectedCustomer?.pestpac_client_id ??
-              null
-            }
-            suggestedPestType={aiResult.suggested_pest_type}
-            matchedPestOption={aiResult.matched_pest_option}
-            selectedPestValue={selectedPestValue}
-            selectedPlan={selectedServicePlan}
-            onPlanSelect={setSelectedServicePlan}
-          />
-        )}
-
-        {currentStepId === 'service-today-confirm' && (
-          <StepServiceTodayConfirm
-            selectedPlan={selectedServicePlan}
-            selectedCustomer={selectedCustomer}
-            techName={techName}
-            onSignatureChange={setSignatureData}
-          />
-        )}
-      </div>
-
-      {/* Bottom action bar */}
-      <div className={styles.actionBar}>
-        {syncError && (
-          <p className={styles.submitError}>
-            {syncError}
-            {isFromRouteStop && currentStepId === 'ai-review' && (
-              <button className={styles.retryLink} onClick={handleSyncRetry}> Retry</button>
-            )}
-          </p>
-        )}
-        {submitError && <p className={styles.submitError}>{submitError}</p>}
-        <div className={styles.actionBarButtons}>
-        {stepIndex > 0 ? (
-          <button className={styles.backBtn} onClick={handleBack}>
-            ← Back
-          </button>
-        ) : (
-          <button
-            className={styles.backBtn}
-            onClick={() => router.push('/field-sales/dashboard')}
-          >
-            ← Cancel
-          </button>
-        )}
-
-        {currentStepId === 'photos' && photos.length > 0 && (
-          <button
-            className={styles.analyzeBtn}
-            onClick={handleAnalyze}
-            disabled={isAnalyzing}
-          >
-            {isAnalyzing ? (
-              <>
-                <span className={styles.spinner} />
-                Analyzing…
-              </>
-            ) : (
-              <>Analyze Photo</>
-            )}
-          </button>
-        )}
-
-        {currentStepId === 'photos' && photos.length === 0 && (
-          <button className={styles.nextBtn} onClick={handleNext}>
-            Continue Without Photos →
-          </button>
-        )}
-
-        {currentStepId !== 'type-select' &&
-          currentStepId !== 'photos' &&
-          currentStepId !== 'ai-review' &&
-          currentStepId !== 'service-today-confirm' && (
-            <button
-              className={styles.nextBtn}
-              onClick={handleNext}
-              disabled={!canGoNext() || isNextLoading}
-            >
-              {isNextLoading ? (
-                <>
-                  <span className={styles.spinner} />
-                  {nextLoadingLabel}
-                </>
-              ) : (
-                'Next →'
-              )}
-            </button>
+            </div>
           )}
 
-        {currentStepId === 'ai-review' && (
-          <button
-            className={styles.scheduleBtn}
-            onClick={() => handleSubmit('default')}
-            disabled={!canGoNext() || isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <span className={styles.spinner} />
-                Submitting…
-              </>
-            ) : (
-              <>Refer To Sales</>
+          {/* Step content */}
+          <div className={styles.stepWrapper}>
+            {currentStepId === 'type-select' && (
+              <StepTypeSelect
+                onSelect={type => {
+                  setLeadType(type);
+                  setWizardTitle(
+                    type === 'new-lead' ? 'New Lead' : 'Upsell Opportunity'
+                  );
+                  setStepIndex(1);
+                }}
+              />
             )}
-          </button>
-        )}
 
-        {currentStepId === 'service-today-confirm' && (
-          <button
-            className={styles.submitBtn}
-            onClick={() => handleSubmit('service-today')}
-            disabled={isSubmitting || !signatureData}
-          >
-            {isSubmitting ? (
-              <>
-                <span className={styles.spinner} />
-                Submitting…
-              </>
-            ) : (
-              'Submit'
+            {currentStepId === 'photos' && (
+              <StepPhotos photos={photos} onPhotosChange={setPhotos} />
             )}
-          </button>
-        )}
-        </div>
-      </div>
-      </>
+
+            {currentStepId === 'ai-review' && (
+              <>
+                {analyzeError && (
+                  <p className={styles.analyzeError}>{analyzeError}</p>
+                )}
+                <StepAIReview
+                  aiResult={aiResult}
+                  notes={notes}
+                  customerMentioned={customerMentioned}
+                  isHighPriority={isHighPriority}
+                  pestOptions={pestOptions}
+                  selectedPestValue={selectedPestValue}
+                  otherPestValue={otherPest}
+                  isPestOptionsLoading={isPestOptionsLoading}
+                  onAIResultChange={setAIResult}
+                  onPestValueChange={value => {
+                    setSelectedPestValue(value);
+                    setHasManualPestSelection(true);
+                    if (value !== OTHER_PEST_OPTION_VALUE) {
+                      setOtherPest('');
+                    }
+                  }}
+                  onOtherPestChange={value => {
+                    setOtherPest(value);
+                    setHasManualPestSelection(true);
+                  }}
+                  onNotesChange={setNotes}
+                  onCustomerMentionedChange={setCustomerMentioned}
+                  onHighPriorityChange={setIsHighPriority}
+                  techMentioned={techMentioned}
+                  onTechMentionedChange={setTechMentioned}
+                />
+              </>
+            )}
+
+            {currentStepId === 'new-customer' && (
+              <StepNewCustomer
+                form={newCustomerForm}
+                onChange={setNewCustomerForm}
+                error={createCustomerError}
+              />
+            )}
+
+            {currentStepId === 'select-site' && (
+              <StepSelectSite
+                companyId={companyId}
+                selectedCustomer={selectedCustomer}
+                onSelectCustomer={setSelectedCustomer}
+                isPestPacEnabled={isPestPacEnabled}
+                selectedPestPacClient={selectedPestPacClient}
+                onSelectPestPacClient={setSelectedPestPacClient}
+                recentCustomers={recentCustomers}
+              />
+            )}
+
+            {currentStepId === 'service-plan-select' && (
+              <StepServicePlanSelect
+                companyId={companyId}
+                selectedPlan={selectedServicePlan}
+                onPlanSelect={setSelectedServicePlan}
+                suggestedPestType={aiResult.suggested_pest_type}
+                selectedPestValue={selectedPestValue}
+              />
+            )}
+
+            {currentStepId === 'service-details' && (
+              <StepServiceDetails
+                companyId={companyId}
+                locationId={
+                  selectedPestPacClient?.clientId ??
+                  selectedCustomer?.pestpac_client_id ??
+                  null
+                }
+                suggestedPestType={aiResult.suggested_pest_type}
+                matchedPestOption={aiResult.matched_pest_option}
+                selectedPestValue={selectedPestValue}
+                selectedPlan={selectedServicePlan}
+                onPlanSelect={setSelectedServicePlan}
+              />
+            )}
+
+            {currentStepId === 'service-today-confirm' && (
+              <StepServiceTodayConfirm
+                selectedPlan={selectedServicePlan}
+                selectedCustomer={selectedCustomer}
+                techName={techName}
+                onSignatureChange={setSignatureData}
+              />
+            )}
+          </div>
+
+          {/* Bottom action bar */}
+          <div className={styles.actionBar}>
+            {syncError && (
+              <p className={styles.submitError}>
+                {syncError}
+                {isFromRouteStop && currentStepId === 'ai-review' && (
+                  <button
+                    className={styles.retryLink}
+                    onClick={handleSyncRetry}
+                  >
+                    {' '}
+                    Retry
+                  </button>
+                )}
+              </p>
+            )}
+            {submitError && <p className={styles.submitError}>{submitError}</p>}
+            <div className={styles.actionBarButtons}>
+              {stepIndex > 0 ? (
+                <button
+                  type="button"
+                  className={styles.prevBtn}
+                  onClick={handleBack}
+                  aria-label="Previous step"
+                >
+                  <ArrowLeft size={18} className={styles.prevArrow} />
+                  Previous
+                </button>
+              ) : (
+                <button
+                  className={styles.prevBtn}
+                  onClick={() => router.push('/field-sales/dashboard')}
+                >
+                  <ArrowLeft size={18} className={styles.prevArrow} /> Cancel
+                </button>
+              )}
+
+              {currentStepId === 'photos' && photos.length > 0 && (
+                <button
+                  className={styles.analyzeBtn}
+                  onClick={handleAnalyze}
+                  disabled={isAnalyzing}
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <span className={styles.spinner} />
+                      Analyzing…
+                    </>
+                  ) : (
+                    <>Analyze Photo</>
+                  )}
+                </button>
+              )}
+
+              {currentStepId === 'photos' && photos.length === 0 && (
+                <button className={styles.nextBtn} onClick={handleNext}>
+                  Continue Without Photos
+                </button>
+              )}
+
+              {currentStepId !== 'type-select' &&
+                currentStepId !== 'photos' &&
+                currentStepId !== 'ai-review' &&
+                currentStepId !== 'service-today-confirm' && (
+                  <button
+                    className={styles.nextBtn}
+                    onClick={handleNext}
+                    disabled={!canGoNext() || isNextLoading}
+                  >
+                    {isNextLoading ? (
+                      <>
+                        <span className={styles.spinner} />
+                        {nextLoadingLabel}
+                      </>
+                    ) : (
+                      'Next →'
+                    )}
+                  </button>
+                )}
+
+              {currentStepId === 'ai-review' && (
+                <button
+                  className={styles.scheduleBtn}
+                  onClick={() => handleSubmit('default')}
+                  disabled={!canGoNext() || isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className={styles.spinner} />
+                      Submitting…
+                    </>
+                  ) : (
+                    <>Refer To Sales</>
+                  )}
+                </button>
+              )}
+
+              {currentStepId === 'service-today-confirm' && (
+                <button
+                  className={styles.submitBtn}
+                  onClick={() => handleSubmit('service-today')}
+                  disabled={isSubmitting || !signatureData}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <span className={styles.spinner} />
+                      Submitting…
+                    </>
+                  ) : (
+                    'Submit'
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       {/* Exit prompt modal */}
