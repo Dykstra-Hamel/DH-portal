@@ -132,7 +132,7 @@
   --drop-shadow: #e8e8ea;
   --drop-shadow-hover: #dbdbdd;
 
-  --border-color: #d2d2d7;
+  --border-color: var(--gray-300);
 
   --live-call-gradient: linear-gradient(90deg, #00529b 5.43%, #001c35 99.55%);
 

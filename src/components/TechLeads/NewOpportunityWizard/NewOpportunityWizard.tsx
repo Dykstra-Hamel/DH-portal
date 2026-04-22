@@ -3016,7 +3016,7 @@ export function NewOpportunityWizard() {
                         {nextLoadingLabel}
                       </>
                     ) : (
-                      'Next →'
+                      'Next'
                     )}
                   </button>
                 )}

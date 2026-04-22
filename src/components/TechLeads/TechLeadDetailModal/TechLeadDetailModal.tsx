@@ -111,7 +111,10 @@ interface TechLeadDetailModalProps {
   onClose: () => void;
 }
 
-export function TechLeadDetailModal({ lead, onClose }: TechLeadDetailModalProps) {
+export function TechLeadDetailModal({
+  lead,
+  onClose,
+}: TechLeadDetailModalProps) {
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const moreDetailsRef = useRef<HTMLDivElement>(null);
@@ -160,7 +163,22 @@ export function TechLeadDetailModal({ lead, onClose }: TechLeadDetailModalProps)
               onClick={onClose}
               aria-label="Close details modal"
             >
-              ×
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M13 1L1 13M1 1L13 13"
+                  stroke="white"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
             </button>
           </div>
 
@@ -251,7 +269,7 @@ export function TechLeadDetailModal({ lead, onClose }: TechLeadDetailModalProps)
             </div>
 
             <div className={styles.detailSection}>
-              <p className={styles.detailHeading}>Notes</p>
+              <p className={styles.detailHeading}>Note to Sales</p>
               {lead.submitted_notes.length > 0 ? (
                 <div className={styles.noteList}>
                   {lead.submitted_notes.map(note => (
@@ -275,7 +293,7 @@ export function TechLeadDetailModal({ lead, onClose }: TechLeadDetailModalProps)
               </div>
             </div>
 
-            <div className={styles.moreDetailsWrapper}>
+            {/* <div className={styles.moreDetailsWrapper}>
               <button
                 type="button"
                 className={styles.moreDetailsToggle}
@@ -361,7 +379,7 @@ export function TechLeadDetailModal({ lead, onClose }: TechLeadDetailModalProps)
                   </div>
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>

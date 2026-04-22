@@ -113,6 +113,10 @@
 .topSection,
 .upNextHeading {
   padding: 0 24px;
+
+  @media (max-width: 768px) {
+    padding: 0 16px;
+  }
 }
 
 // ─── Inline Street View (embedded mode) ───────────────────────────────────────
