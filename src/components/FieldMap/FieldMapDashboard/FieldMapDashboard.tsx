@@ -413,7 +413,9 @@ export function FieldMapDashboard({
         {/* Stop list */}
         {!loading && !needsSetup && !error && stops.length > 0 && (
           <>
-            <h2 className={styles.upNextHeading}>Up Next</h2>
+            {!isTechnicianOnly && (
+              <h2 className={styles.upNextHeading}>Up Next</h2>
+            )}
             <div className={styles.stopListContainer}>
               <div className={styles.stopList}>
                 {visibleStops.map(stop => (

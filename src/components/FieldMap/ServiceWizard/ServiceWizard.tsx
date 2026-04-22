@@ -160,13 +160,16 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           address: resolvedAddress,
         });
 
-        if (lead.map_plot_data) {
-          setMapPlotData({
-            ...DEFAULT_MAP_PLOT_DATA,
-            ...lead.map_plot_data,
-            addressInput: resolvedAddress || lead.map_plot_data.addressInput || '',
-          });
-        } else if (resolvedAddress) {
+        const savedPlot = lead.map_plot_data;
+        const savedLat =
+          typeof savedPlot?.centerLat === 'number' ? savedPlot.centerLat : null;
+        const savedLng =
+          typeof savedPlot?.centerLng === 'number' ? savedPlot.centerLng : null;
+        const needsGeocode =
+          (!savedPlot || savedLat === null || savedLng === null) &&
+          !!resolvedAddress;
+
+        if (needsGeocode) {
           setIsGeocoding(true);
           try {
             const geoRes = await fetch(
@@ -174,20 +177,33 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             );
             const geoData = await geoRes.json();
             if (geoData.success && geoData.coordinates) {
-              setMapPlotData(prev => ({
-                ...prev,
-                addressInput: resolvedAddress,
+              setMapPlotData({
+                ...DEFAULT_MAP_PLOT_DATA,
+                ...(savedPlot ?? {}),
+                addressInput: resolvedAddress || savedPlot?.addressInput || '',
                 centerLat: geoData.coordinates.latitude,
                 centerLng: geoData.coordinates.longitude,
-                zoom: 20,
-                heading: 0,
-                tilt: 0,
-                backgroundMode: 'satellite',
-              }));
+                zoom: savedPlot?.zoom ?? 20,
+                heading: savedPlot?.heading ?? 0,
+                tilt: savedPlot?.tilt ?? 0,
+                backgroundMode: savedPlot?.backgroundMode ?? 'satellite',
+              });
+            } else if (savedPlot) {
+              setMapPlotData({
+                ...DEFAULT_MAP_PLOT_DATA,
+                ...savedPlot,
+                addressInput: resolvedAddress || savedPlot.addressInput || '',
+              });
             }
           } finally {
             setIsGeocoding(false);
           }
+        } else if (savedPlot) {
+          setMapPlotData({
+            ...DEFAULT_MAP_PLOT_DATA,
+            ...savedPlot,
+            addressInput: resolvedAddress || savedPlot.addressInput || '',
+          });
         }
 
         const lineItems: any[] = quoteData?.data?.line_items ?? [];

@@ -11,6 +11,7 @@ export interface ToastProps {
   onUndo?: () => void
   undoText?: string
   undoLoading?: boolean
+  centered?: boolean
 }
 
 export function Toast({
@@ -22,7 +23,8 @@ export function Toast({
   showUndo = false,
   onUndo,
   undoText = 'Undo',
-  undoLoading = false
+  undoLoading = false,
+  centered = false
 }: ToastProps) {
   useEffect(() => {
     if (isVisible) {
@@ -37,7 +39,7 @@ export function Toast({
   if (!isVisible) return null
 
   return (
-    <div className={`${styles.toast} ${styles[type]}`}>
+    <div className={`${styles.toast} ${styles[type]} ${centered ? styles.centered : ''}`}>
       <div className={styles.iconContainer}>
         {type === 'success' ? (
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 26 27" fill="none" className={styles.icon}>

@@ -40,7 +40,7 @@ export default function CardItemRow<T>({
       role="button"
       tabIndex={0}
     >
-      <div className={styles.cardTopRow}>
+      <div className={styles.cardTopRow} data-card-section="top">
         {config.topFields.map(field => {
           const rendered = field.render(item);
           const content =
@@ -71,10 +71,13 @@ export default function CardItemRow<T>({
 
       {hasBottomRow && (
         <>
-          <div className={styles.cardSeparator} />
-          <div className={styles.cardBottomRow}>
+          <div className={styles.cardSeparator} data-card-section="separator" />
+          <div className={styles.cardBottomRow} data-card-section="bottom">
             {config.summary && (
-              <div className={styles.cardSummary}>
+              <div
+                className={styles.cardSummary}
+                data-card-section="summary"
+              >
                 {config.summary.label && (
                   <span className={styles.cardSummaryLabel}>
                     {config.summary.label}
@@ -86,7 +89,10 @@ export default function CardItemRow<T>({
               </div>
             )}
 
-            <div className={styles.cardMiddle}>
+            <div
+              className={styles.cardMiddle}
+              data-card-section="bottom-middle"
+            >
               {config.avatar && (
                 <div className={styles.cardAvatar}>{config.avatar(item)}</div>
               )}
@@ -98,6 +104,7 @@ export default function CardItemRow<T>({
             {config.primaryAction && (
               <div
                 className={styles.cardAction}
+                data-card-section="bottom-action"
                 onClick={e => e.stopPropagation()}
               >
                 {config.primaryAction(item)}

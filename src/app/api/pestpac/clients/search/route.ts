@@ -115,12 +115,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  // Log credential shapes to verify they're being read correctly
-  console.log('[PestPac] clientId length:', clientId?.length, '| starts:', clientId?.slice(0, 6));
-  console.log('[PestPac] clientSecret length:', clientSecret?.length);
-  console.log('[PestPac] wwUsername:', wwUsername);
-  console.log('[PestPac] tenantId:', tenantId);
-
   // Get OAuth token
   let accessToken: string;
   try {
@@ -139,7 +133,6 @@ export async function GET(request: NextRequest) {
 
   // Search locations — PestPac uses /Locations with a ?q= param
   const searchUrl = `${PESTPAC_BASE_URL}/Locations?${new URLSearchParams({ q, includeInactive: 'false' })}`;
-  console.log('[PestPac] Searching:', searchUrl);
 
   let searchRes: Response;
   try {
@@ -159,7 +152,6 @@ export async function GET(request: NextRequest) {
   }
 
   const locations: PestPacLocation[] = await searchRes.json();
-  console.log(`[PestPac] Found ${locations.length} locations`);
 
   const clients = locations
     .filter(l => l.Active !== false)
@@ -180,6 +172,8 @@ export async function GET(request: NextRequest) {
           city: l.City ?? '',
           state: l.State ?? '',
           zip: l.Zip ?? '',
+          latitude: typeof l.Latitude === 'number' ? l.Latitude : null,
+          longitude: typeof l.Longitude === 'number' ? l.Longitude : null,
         } : null,
       };
     });

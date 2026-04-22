@@ -51,7 +51,9 @@ function LayoutContent({ children }: LayoutWrapperProps) {
   const hideSecondarySidebar = isTechLeadsPage || isFieldMapPage;
   const isFieldMapWizardPage = Boolean(
     pathname.match(/^\/field-map\/service\/[^\/]+\/wizard$/) ||
-    pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/)
+    pathname.match(/^\/field-sales\/field-map\/service\/[^\/]+\/wizard$/) ||
+    pathname === '/field-map/new' ||
+    pathname === '/field-sales/field-map/new'
   );
   const isFieldSalesLeadDetail = Boolean(
     pathname.match(/^\/field-sales\/leads\/[^\/]+$/)

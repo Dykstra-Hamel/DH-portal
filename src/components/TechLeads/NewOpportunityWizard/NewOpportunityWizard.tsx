@@ -2167,15 +2167,11 @@ export function NewOpportunityWizard() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const [isDone, setIsDone] = useState(false);
-  const [submitMode, setSubmitMode] = useState<
-    'default' | 'schedule' | 'service-today'
-  >('default');
   const [showExitPrompt, setShowExitPrompt] = useState(false);
 
-  // Register a back interceptor when the wizard has progress; clear it when at step 0 or done
+  // Register a back interceptor when the wizard has progress; clear it when at step 0
   useEffect(() => {
-    if (stepIndex > 0 && !isDone) {
+    if (stepIndex > 0) {
       setBackInterceptor(() => setShowExitPrompt(true));
     } else {
       setBackInterceptor(null);
@@ -2183,7 +2179,7 @@ export function NewOpportunityWizard() {
     return () => {
       setBackInterceptor(null);
     };
-  }, [stepIndex, isDone, setBackInterceptor]);
+  }, [stepIndex, setBackInterceptor]);
   const [isSyncingCustomer, setIsSyncingCustomer] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
 
@@ -2262,7 +2258,7 @@ export function NewOpportunityWizard() {
       ];
     }
     // Upsell: stop at ai-review (Refer To Sales); fuller flow preserved below for later
-    return ['type-select', 'photos', 'ai-review'];
+    return ['type-select', 'new-customer', 'photos', 'ai-review'];
     // const steps: StepId[] = ['type-select', 'photos', 'ai-review'];
     // if (!isFromRouteStop) steps.push('select-site');
     // steps.push(isPestPacEnabled ? 'service-details' : 'service-plan-select');
@@ -2278,9 +2274,19 @@ export function NewOpportunityWizard() {
     setStepIndex(Math.max(0, wizardSteps.length - 1));
   }, [stepIndex, wizardSteps]);
 
-  // Restore draft from localStorage when companyId becomes available
+  // Restore draft from localStorage when companyId becomes available.
+  // Skip (and clear any existing draft) if the URL has ?fresh=1 — this signals
+  // the user explicitly started a new flow (e.g. from the + button).
   useEffect(() => {
     if (!draftKey || stepIndex > 0) return;
+    if (searchParams.get('fresh') === '1') {
+      try {
+        localStorage.removeItem(draftKey);
+      } catch {
+        // ignore
+      }
+      return;
+    }
     try {
       const saved = localStorage.getItem(draftKey);
       if (!saved) return;
@@ -2321,12 +2327,18 @@ export function NewOpportunityWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
-  // On mount: if URL has ?type=upsell, skip type-select
+  // On mount: if URL has ?type=upsell or ?type=new-lead, skip type-select
   useEffect(() => {
-    if (searchParams.get('type') !== 'upsell') return;
-    setLeadType('upsell');
-    setWizardTitle('Upsell Opportunity');
-    setStepIndex(1);
+    const typeParam = searchParams.get('type');
+    if (typeParam === 'upsell') {
+      setLeadType('upsell');
+      setWizardTitle('Upsell Opportunity');
+      setStepIndex(1);
+    } else if (typeParam === 'new-lead') {
+      setLeadType('new-lead');
+      setWizardTitle('New Lead');
+      setStepIndex(1);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -2343,6 +2355,29 @@ export function NewOpportunityWizard() {
       if (data.customer) {
         setSelectedCustomer(data.customer);
         addRecent(data.customer);
+        const c = data.customer;
+        const addr =
+          c.primary_service_address?.[0]?.service_address ?? null;
+        const street = addr?.street_address ?? c.address ?? '';
+        const city = addr?.city ?? c.city ?? '';
+        const state = addr?.state ?? c.state ?? '';
+        const zip = addr?.zip_code ?? c.zip_code ?? '';
+        const addressInput = [
+          street,
+          [city, state].filter(Boolean).join(', '),
+          zip,
+        ]
+          .filter(Boolean)
+          .join(', ')
+          .trim();
+        setNewCustomerForm(prev => ({
+          ...prev,
+          firstName: c.first_name ?? prev.firstName,
+          lastName: c.last_name ?? prev.lastName,
+          phone: c.phone ?? prev.phone,
+          email: c.email ?? prev.email,
+          addressInput: addressInput || prev.addressInput,
+        }));
       } else {
         throw new Error('No customer linked to this stop');
       }
@@ -2543,7 +2578,6 @@ export function NewOpportunityWizard() {
     setCreateCustomerError(null);
     setSubmitError(null);
     setSyncError(null);
-    setIsDone(false);
   };
 
   const handleAnalyze = async () => {
@@ -2763,106 +2797,13 @@ export function NewOpportunityWizard() {
       }
 
       clearDraft();
-      setSubmitMode(mode);
-      setIsDone(true);
+      router.push(`/field-sales/dashboard?submitted=${leadType}`);
     } catch (err: any) {
       setSubmitError(err.message ?? 'Failed to create lead. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
   };
-
-  // Thank You screen
-  if (isDone) {
-    const customerFirstName = selectedCustomer?.first_name ?? null;
-    const customerFullName =
-      [selectedCustomer?.first_name, selectedCustomer?.last_name]
-        .filter(Boolean)
-        .join(' ') || null;
-    const companyPhone = selectedCompany?.phone ?? null;
-    const isSchedule = submitMode === 'schedule';
-
-    return (
-      <div className={styles.thankYouScreen}>
-        <div className={styles.thankYouIcon}>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="72"
-            height="72"
-            viewBox="0 0 20 20"
-            fill="none"
-          >
-            <g clipPath="url(#clip0_thankyou_check)">
-              <path
-                d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <path
-                d="M7.5 9.16671L10 11.6667L18.3333 3.33337"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </g>
-            <defs>
-              <clipPath id="clip0_thankyou_check">
-                <rect width="20" height="20" fill="white" />
-              </clipPath>
-            </defs>
-          </svg>
-        </div>
-        <h2 className={styles.thankYouTitle}>
-          {isSchedule ? 'Time to Schedule!' : 'Opportunity Submitted!'}
-        </h2>
-        {isSchedule ? (
-          <div className={styles.scheduleCallout}>
-            <p className={styles.scheduleCalloutText}>
-              Let&apos;s get{customerFirstName ? ` ${customerFirstName}` : ''}{' '}
-              on the books.
-            </p>
-            {companyPhone ? (
-              <>
-                <a
-                  href={`tel:${companyPhone}`}
-                  className={styles.scheduleCallBtn}
-                >
-                  Call the office now
-                </a>
-                <p className={styles.schedulePhoneDisplay}>{companyPhone}</p>
-              </>
-            ) : (
-              <p className={styles.thankYouDesc}>
-                Call the office to get
-                {customerFullName
-                  ? ` ${customerFullName}`
-                  : ' this customer'}{' '}
-                scheduled.
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className={styles.thankYouDesc}>
-            The lead has been created successfully.
-          </p>
-        )}
-        <div className={styles.thankYouActions}>
-          <button className={styles.primaryBtn} onClick={resetWizard}>
-            Start Another
-          </button>
-          <button
-            className={styles.secondaryBtn}
-            onClick={() => router.push('/field-sales/dashboard')}
-          >
-            Go Home
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const canGoNext = (): boolean => {
     if (currentStepId === 'photos' && photos.length === 0) return false;
@@ -3174,6 +3115,16 @@ export function NewOpportunityWizard() {
 
       {/* Bottom action bar */}
       <div className={styles.actionBar}>
+        {syncError && (
+          <p className={styles.submitError}>
+            {syncError}
+            {isFromRouteStop && currentStepId === 'ai-review' && (
+              <button className={styles.retryLink} onClick={handleSyncRetry}> Retry</button>
+            )}
+          </p>
+        )}
+        {submitError && <p className={styles.submitError}>{submitError}</p>}
+        <div className={styles.actionBarButtons}>
         {stepIndex > 0 ? (
           <button className={styles.backBtn} onClick={handleBack}>
             ← Back
@@ -3309,17 +3260,8 @@ export function NewOpportunityWizard() {
             )}
           </button>
         )}
+        </div>
       </div>
-
-      {syncError && (
-        <p className={styles.submitError}>
-          {syncError}
-          {isFromRouteStop && currentStepId === 'ai-review' && (
-            <button className={styles.retryLink} onClick={handleSyncRetry}> Retry</button>
-          )}
-        </p>
-      )}
-      {submitError && <p className={styles.submitError}>{submitError}</p>}
 
       {/* Exit prompt modal */}
       {showExitPrompt && (

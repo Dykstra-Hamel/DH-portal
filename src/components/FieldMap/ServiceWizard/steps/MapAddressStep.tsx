@@ -17,6 +17,12 @@ interface CustomerResult {
   email: string | null;
   phone: string | null;
   address?: string | null;
+  street?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 interface MapAddressStepProps {
@@ -54,6 +60,8 @@ export function MapAddressStep({
   const [customerResults, setCustomerResults] = useState<CustomerResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showResults, setShowResults] = useState(false);
+  const [isResolvingCustomerAddress, setIsResolvingCustomerAddress] = useState(false);
+  const [customerAddressError, setCustomerAddressError] = useState<string | null>(null);
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -180,15 +188,29 @@ export function MapAddressStep({
 
       if (pestpacRes.ok) {
         const data = await pestpacRes.json();
-        const results: CustomerResult[] = (data.clients ?? []).map((c: any) => ({
-          id: c.clientId,
-          displayName: c.displayName,
-          email: c.email ?? null,
-          phone: c.phone ?? null,
-          address: c.primaryAddress
-            ? [c.primaryAddress.street, c.primaryAddress.city, c.primaryAddress.state].filter(Boolean).join(', ')
-            : null,
-        }));
+        const results: CustomerResult[] = (data.clients ?? []).map((c: any) => {
+          const addr = c.primaryAddress;
+          const street = addr?.street ?? null;
+          const city = addr?.city ?? null;
+          const state = addr?.state ?? null;
+          const zip = addr?.zip ?? null;
+          const display = addr
+            ? [street, city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ')
+            : null;
+          return {
+            id: c.clientId,
+            displayName: c.displayName,
+            email: c.email ?? null,
+            phone: c.phone ?? null,
+            address: display,
+            street,
+            city,
+            state,
+            zip,
+            latitude: typeof addr?.latitude === 'number' ? addr.latitude : null,
+            longitude: typeof addr?.longitude === 'number' ? addr.longitude : null,
+          };
+        });
         setCustomerResults(results);
         setShowResults(results.length > 0);
         return;
@@ -200,13 +222,28 @@ export function MapAddressStep({
       );
       if (dbRes.ok) {
         const data = await dbRes.json();
-        const results: CustomerResult[] = (data.customers ?? []).map((c: any) => ({
-          id: c.id,
-          displayName: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.email || 'Unknown',
-          email: c.email ?? null,
-          phone: c.phone ?? null,
-          address: c.address ?? null,
-        }));
+        const results: CustomerResult[] = (data.customers ?? []).map((c: any) => {
+          const street = c.address ?? null;
+          const city = c.city ?? null;
+          const state = c.state ?? null;
+          const zip = c.zip_code ?? null;
+          const display = [street, city, [state, zip].filter(Boolean).join(' ')]
+            .filter(Boolean)
+            .join(', ') || null;
+          return {
+            id: c.id,
+            displayName: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim() || c.email || 'Unknown',
+            email: c.email ?? null,
+            phone: c.phone ?? null,
+            address: display,
+            street,
+            city,
+            state,
+            zip,
+            latitude: null,
+            longitude: null,
+          };
+        });
         setCustomerResults(results);
         setShowResults(results.length > 0);
       }
@@ -223,12 +260,69 @@ export function MapAddressStep({
     searchDebounceRef.current = setTimeout(() => searchCustomers(value), 400);
   };
 
-  const selectCustomer = (result: CustomerResult) => {
+  const selectCustomer = async (result: CustomerResult) => {
     onClientNameChange?.(result.displayName);
     onClientEmailChange?.(result.email ?? '');
     onClientPhoneChange?.(result.phone ?? '');
     setCustomerQuery(result.displayName);
     setShowResults(false);
+    setCustomerAddressError(null);
+
+    const street = (result.street ?? '').trim();
+    const city = (result.city ?? '').trim();
+    const state = (result.state ?? '').trim();
+    const zip = (result.zip ?? '').trim();
+    const addressLine = [street, city, [state, zip].filter(Boolean).join(' ')]
+      .filter(Boolean)
+      .join(', ');
+
+    if (!addressLine) return;
+
+    const synthesizeAddressComponents = (lat: number, lng: number): AddressComponents => ({
+      formatted_address: addressLine,
+      route: street || undefined,
+      locality: city || undefined,
+      administrative_area_level_1: state || undefined,
+      postal_code: zip || undefined,
+      latitude: lat,
+      longitude: lng,
+    });
+
+    if (typeof result.latitude === 'number' && typeof result.longitude === 'number') {
+      applyAddressSelection(
+        synthesizeAddressComponents(result.latitude, result.longitude),
+        street || addressLine
+      );
+      setManualMode(false);
+      return;
+    }
+
+    setIsResolvingCustomerAddress(true);
+    try {
+      const res = await fetch(`/api/internal/geocode?address=${encodeURIComponent(addressLine)}`);
+      const data = await res.json();
+      if (data.success && data.coordinates) {
+        applyAddressSelection(
+          synthesizeAddressComponents(data.coordinates.latitude, data.coordinates.longitude),
+          street || addressLine
+        );
+        setManualMode(false);
+      } else {
+        setCustomerAddressError(
+          'Could not locate this customer on the map. Enter the address manually below.'
+        );
+        onChange({ ...mapPlotData, addressInput: addressLine });
+        setManualMode(true);
+      }
+    } catch {
+      setCustomerAddressError(
+        'Could not locate this customer on the map. Enter the address manually below.'
+      );
+      onChange({ ...mapPlotData, addressInput: addressLine });
+      setManualMode(true);
+    } finally {
+      setIsResolvingCustomerAddress(false);
+    }
   };
 
   return (
@@ -267,6 +361,13 @@ export function MapAddressStep({
             {selectedFormattedAddress}
           </p>
         </div>
+      )}
+
+      {isResolvingCustomerAddress && (
+        <p className={styles.fieldHint}>Looking up address&hellip;</p>
+      )}
+      {customerAddressError && (
+        <p className={styles.errorState}>{customerAddressError}</p>
       )}
 
       {manualMode && (
