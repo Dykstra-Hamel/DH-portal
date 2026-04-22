@@ -15,6 +15,8 @@ interface EnrichedStop {
   clientId: string | null;
   locationId: string | null;
   clientName: string | null;
+  phone: string | null;
+  email: string | null;
   addressStreet: string | null;
   addressCity: string | null;
   addressState: string | null;
@@ -53,17 +55,30 @@ async function resolveCustomer(
   adminSupabase: SupabaseClient,
   companyId: string,
   clientId: string,
-  clientName: string | null
+  clientName: string | null,
+  phone: string | null,
+  email: string | null
 ): Promise<string | null> {
   try {
     const { data: existing } = await adminSupabase
       .from('customers')
-      .select('id')
+      .select('id, phone, email')
       .eq('company_id', companyId)
       .eq('pestpac_client_id', clientId)
       .maybeSingle();
 
-    if (existing) return existing.id;
+    if (existing) {
+      const patch: { phone?: string; email?: string } = {};
+      if (!existing.phone && phone) patch.phone = phone;
+      if (!existing.email && email) patch.email = email;
+      if (Object.keys(patch).length > 0) {
+        await adminSupabase
+          .from('customers')
+          .update(patch)
+          .eq('id', existing.id);
+      }
+      return existing.id;
+    }
 
     if (!clientName) return null;
 
@@ -80,6 +95,8 @@ async function resolveCustomer(
         company_id: companyId,
         first_name: firstName,
         last_name: lastName,
+        phone: phone ?? null,
+        email: email ?? null,
         pestpac_client_id: clientId,
         customer_status: 'active',
       })
@@ -299,7 +316,14 @@ export async function syncPestPacRoute({
         let serviceAddressId: string | null = null;
 
         if (stop.clientId) {
-          customerId = await resolveCustomer(adminSupabase, companyId, stop.clientId, stop.clientName ?? null);
+          customerId = await resolveCustomer(
+            adminSupabase,
+            companyId,
+            stop.clientId,
+            stop.clientName ?? null,
+            stop.phone ?? null,
+            stop.email ?? null
+          );
         }
 
         if (stop.addressStreet && stop.addressCity && stop.addressState) {

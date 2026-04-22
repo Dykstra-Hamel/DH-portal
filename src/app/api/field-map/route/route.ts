@@ -319,6 +319,8 @@ interface EnrichedStop {
   clientId: string | null;
   locationId: string | null;
   clientName: string | null;
+  phone: string | null;
+  email: string | null;
   address: string;
   addressStreet: string | null;
   addressCity: string | null;
@@ -461,6 +463,8 @@ async function fetchAndSyncFromPestPac(
       let address = [addressStreet, addressCity, addressState, addressZip].filter(Boolean).join(', ');
       let lat = (stop.Latitude ?? stop.latitude ?? null) as number | null;
       let lng = (stop.Longitude ?? stop.longitude ?? null) as number | null;
+      let phone: string | null = stop.Phone ?? stop.phone ?? null;
+      let email: string | null = stop.Email ?? stop.email ?? null;
       let serviceNotes =
         stop.ServiceInstructions ?? stop.serviceInstructions ??
         stop.OrderInstructions ?? stop.orderInstructions ??
@@ -480,7 +484,7 @@ async function fetchAndSyncFromPestPac(
       }
 
       let loc: any;
-      if (locationId && (!address || lat == null || lng == null)) {
+      if (locationId) {
         const res = await fetch(`${PESTPAC_BASE_URL}/Locations/${encodeURIComponent(String(locationId))}`, { headers });
         if (res.ok) {
           loc = await res.json();
@@ -491,6 +495,12 @@ async function fetchAndSyncFromPestPac(
           address = address || [addressStreet, addressCity, addressState, addressZip].filter(Boolean).join(', ');
           lat = lat ?? (loc.Latitude ?? loc.latitude ?? null);
           lng = lng ?? (loc.Longitude ?? loc.longitude ?? null);
+          phone = phone ?? (loc.Phone ?? loc.phone ?? null);
+          email = email ?? (loc.Email ?? loc.email ?? null);
+          if (!clientName) {
+            const locName = `${loc.FirstName ?? loc.firstName ?? ''} ${loc.LastName ?? loc.lastName ?? ''}`.trim();
+            clientName = loc.Company ?? loc.company ?? locName;
+          }
           serviceNotes = serviceNotes || (loc.ServiceInstructions ?? loc.serviceInstructions ?? '');
           accessInstructions = accessInstructions || (loc.LocationInstructions ?? loc.locationInstructions ?? '');
         }
@@ -502,6 +512,8 @@ async function fetchAndSyncFromPestPac(
         clientId: stopClientId ? String(stopClientId) : null,
         locationId: locationId ? String(locationId) : null,
         clientName: clientName ? toTitleCase(clientName) : clientName,
+        phone: phone ? String(phone).trim() || null : null,
+        email: email ? String(email).trim() || null : null,
         address,
         addressStreet: addressStreet || null,
         addressCity: addressCity || null,
