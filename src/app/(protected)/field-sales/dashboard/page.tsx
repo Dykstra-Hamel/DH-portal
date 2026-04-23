@@ -5,12 +5,14 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
+import { useCompanyRole } from '@/hooks/useCompanyRole';
 import { useUser } from '@/hooks/useUser';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
 import { FieldMapDashboard } from '@/components/FieldMap/FieldMapDashboard/FieldMapDashboard';
 import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsDashboard/FieldSalesLeadsDashboard';
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
+import { FieldSalesAdminDashboard } from '@/components/FieldSalesAdminDashboard/FieldSalesAdminDashboard';
 import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
 import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
 import AdditionalTasksPanel from '@/components/Tasks/AdditionalTasksPanel/AdditionalTasksPanel';
@@ -36,6 +38,7 @@ function FieldSalesDashboardInner() {
     userId ?? '',
     selectedCompany?.id ?? ''
   );
+  const { isCompanyAdmin } = useCompanyRole(selectedCompany?.id);
   const { profile, user } = useUser();
   const { setPageHeader } = usePageActions();
   const { counts, newItemIndicators, clearNewItemIndicator } = useRealtimeCounts();
@@ -91,14 +94,16 @@ function FieldSalesDashboardInner() {
   useEffect(() => {
     if (!profile) return;
     const firstName = profile.first_name || 'Your';
-    const title = isTechnicianOnly
-      ? `${firstName}'s Tech Dashboard`
-      : `${firstName}'s Sales Dashboard`;
+    const title = isCompanyAdmin
+      ? `${firstName}'s Team Dashboard`
+      : isTechnicianOnly
+        ? `${firstName}'s Tech Dashboard`
+        : `${firstName}'s Sales Dashboard`;
     setPageHeader({ title, description: '' });
     return () => {
       setPageHeader(null);
     };
-  }, [profile, isTechnicianOnly, setPageHeader]);
+  }, [profile, isTechnicianOnly, isCompanyAdmin, setPageHeader]);
 
   // Fetch route stops count
   useEffect(() => {
@@ -201,6 +206,28 @@ function FieldSalesDashboardInner() {
       isNew: newItemIndicators.my_tasks,
     },
   };
+
+  // Company admin / manager / owner — aggregated team dashboard
+  if (isCompanyAdmin && selectedCompany?.id) {
+    return (
+      <div className={styles.wrapperInspector}>
+        <div className={styles.contentArea}>
+          <FieldSalesAdminDashboard
+            companyId={selectedCompany.id}
+            greetingName={profile?.first_name ?? undefined}
+          />
+        </div>
+        <FieldSalesNav />
+        <Toast
+          message={successToast ?? ''}
+          isVisible={!!successToast}
+          onClose={() => setSuccessToast(null)}
+          type="success"
+          centered
+        />
+      </div>
+    );
+  }
 
   // Inspector / Admin / Technician view (with tabs)
   if (isTechnicianOnly || isInspector) {
