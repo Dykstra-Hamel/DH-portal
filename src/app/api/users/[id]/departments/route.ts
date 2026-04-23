@@ -1,6 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { Department, validateDepartments } from '@/types/user';
+import { Department, DepartmentType, validateDepartments } from '@/types/user';
+
+const VALID_DEPARTMENT_TYPES: DepartmentType[] = ['residential', 'commercial', 'both'];
+
+async function getPropertyTypeSettings(
+  supabase: any,
+  companyId: string
+): Promise<{ technician: boolean; inspector: boolean }> {
+  const { data } = await supabase
+    .from('company_settings')
+    .select('setting_key, setting_value')
+    .eq('company_id', companyId)
+    .in('setting_key', ['technician_property_type_enabled', 'inspector_property_type_enabled']);
+
+  const result = { technician: false, inspector: false };
+  for (const row of data ?? []) {
+    const isTrue = row.setting_value === 'true';
+    if (row.setting_key === 'technician_property_type_enabled') result.technician = isTrue;
+    if (row.setting_key === 'inspector_property_type_enabled') result.inspector = isTrue;
+  }
+  return result;
+}
 
 // GET /api/users/[id]/departments?companyId=xxx
 export async function GET(
@@ -86,7 +107,15 @@ export async function POST(
 ) {
   try {
     const { id: userId } = await params;
-    const { companyId, departments }: { companyId: string; departments: Department[] } = await request.json();
+    const {
+      companyId,
+      departments,
+      departmentTypes,
+    }: {
+      companyId: string;
+      departments: Department[];
+      departmentTypes?: Partial<Record<Department, DepartmentType | null>>;
+    } = await request.json();
 
     if (!companyId || !departments) {
       return NextResponse.json(
@@ -102,6 +131,18 @@ export async function POST(
         { error: 'Invalid departments', details: validation.errors },
         { status: 400 }
       );
+    }
+
+    // Validate any provided department_type values
+    if (departmentTypes) {
+      for (const [key, value] of Object.entries(departmentTypes)) {
+        if (value != null && !VALID_DEPARTMENT_TYPES.includes(value as DepartmentType)) {
+          return NextResponse.json(
+            { error: `Invalid department_type for ${key}` },
+            { status: 400 }
+          );
+        }
+      }
     }
 
     const supabase = await createClient();
@@ -167,12 +208,24 @@ export async function POST(
       );
     }
 
-    // Insert new departments
+    // Insert new departments — server-side gate department_type by company settings
     if (departments.length > 0) {
+      const propertyTypeSettings = await getPropertyTypeSettings(supabase, companyId);
+      const typesInput = departmentTypes ?? {};
+      const resolveType = (dept: Department): DepartmentType | null => {
+        if (dept === 'technician' && propertyTypeSettings.technician) {
+          return (typesInput.technician as DepartmentType | undefined) ?? null;
+        }
+        if (dept === 'inspector' && propertyTypeSettings.inspector) {
+          return (typesInput.inspector as DepartmentType | undefined) ?? null;
+        }
+        return null;
+      };
       const departmentInserts = departments.map(department => ({
         user_id: userId,
         company_id: companyId,
-        department
+        department,
+        department_type: resolveType(department),
       }));
 
       const { data: newDepartments, error: insertError } = await supabase

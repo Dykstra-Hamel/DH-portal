@@ -377,7 +377,14 @@ export async function POST(request: NextRequest) {
       branchId,
       routeStopId,
       techDiscussed,
+      propertyType: _propertyType,
     } = body;
+
+    // Validate optional property_type
+    const propertyType: 'residential' | 'commercial' | null =
+      _propertyType === 'residential' || _propertyType === 'commercial'
+        ? _propertyType
+        : null;
 
     // Mutable assignment variables — may be updated by auto-assignment logic below
     let assignedTo: string | null | undefined = _assignedTo;
@@ -624,6 +631,7 @@ export async function POST(request: NextRequest) {
           branch_id: branchId ?? null,
           tech_discussed:
             leadSource === 'technician' ? !!techDiscussed : null,
+          property_type: propertyType,
           created_at: new Date().toISOString(),
         },
       ])

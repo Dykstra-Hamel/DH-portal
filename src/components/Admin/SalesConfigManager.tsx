@@ -49,6 +49,8 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
   const [quickQuoteStep3Script, setQuickQuoteStep3Script] = useState('');
   const [savingQuickQuote, setSavingQuickQuote] = useState(false);
   const [autoAssignCustomQuoteLeads, setAutoAssignCustomQuoteLeads] = useState(false);
+  const [technicianPropertyTypeEnabled, setTechnicianPropertyTypeEnabled] = useState(false);
+  const [inspectorPropertyTypeEnabled, setInspectorPropertyTypeEnabled] = useState(false);
   const [zipCodeGroups, setZipCodeGroups] = useState<ZipCodeGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [savingLeadAssignment, setSavingLeadAssignment] = useState(false);
@@ -75,6 +77,8 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
       setQuickQuoteStep2Script(settings?.quick_quote_step2_script?.value ?? '');
       setQuickQuoteStep3Script(settings?.quick_quote_step3_script?.value ?? '');
       setAutoAssignCustomQuoteLeads(settings?.auto_assign_custom_quote_leads?.value === 'true');
+      setTechnicianPropertyTypeEnabled(settings?.technician_property_type_enabled?.value === 'true');
+      setInspectorPropertyTypeEnabled(settings?.inspector_property_type_enabled?.value === 'true');
     } catch {
       // Non-critical — silently ignore
     }
@@ -106,6 +110,14 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
           settings: {
             auto_assign_custom_quote_leads: {
               value: autoAssignCustomQuoteLeads ? 'true' : 'false',
+              type: 'boolean',
+            },
+            technician_property_type_enabled: {
+              value: technicianPropertyTypeEnabled ? 'true' : 'false',
+              type: 'boolean',
+            },
+            inspector_property_type_enabled: {
+              value: inspectorPropertyTypeEnabled ? 'true' : 'false',
               type: 'boolean',
             },
           },
@@ -615,6 +627,45 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
                 </tbody>
               </table>
             )}
+          </div>
+
+          <div className={styles.propertyTypeSection}>
+            <div className={styles.leadAssignmentHeader}>
+              <h3>Property Type Categorization</h3>
+              <p>
+                When enabled, technicians and inspectors must be tagged as responsible for
+                residential properties, commercial properties, or both. Use this when you route
+                work differently based on property type.
+              </p>
+            </div>
+
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleLabel}>Require property type for Technicians</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={technicianPropertyTypeEnabled}
+                className={`${styles.toggleSwitch} ${technicianPropertyTypeEnabled ? styles.toggleOn : ''}`}
+                onClick={() => setTechnicianPropertyTypeEnabled((v) => !v)}
+                disabled={savingLeadAssignment}
+              >
+                <span className={styles.toggleThumb} />
+              </button>
+            </div>
+
+            <div className={styles.toggleRow}>
+              <span className={styles.toggleLabel}>Require property type for Inspectors</span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={inspectorPropertyTypeEnabled}
+                className={`${styles.toggleSwitch} ${inspectorPropertyTypeEnabled ? styles.toggleOn : ''}`}
+                onClick={() => setInspectorPropertyTypeEnabled((v) => !v)}
+                disabled={savingLeadAssignment}
+              >
+                <span className={styles.toggleThumb} />
+              </button>
+            </div>
           </div>
 
           <div className={styles.leadAssignmentFooter}>

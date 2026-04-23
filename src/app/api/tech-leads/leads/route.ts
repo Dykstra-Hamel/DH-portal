@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server-admin';
 import { getAuthenticatedUser } from '@/lib/api-utils';
 
 export async function GET(request: NextRequest) {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
       return authResult;
     }
 
-    const { user } = authResult;
+    const { user, isGlobalAdmin } = authResult;
 
     const { searchParams } = new URL(request.url);
     const companyId = searchParams.get('companyId');
@@ -21,7 +22,32 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient();
 
-    let query = supabase
+    // When a single leadId is requested, allow company admins/managers/owners
+    // (or global admins) to drill into leads submitted by other users on their
+    // team — this powers the admin dashboard's Recent Leads detail modal.
+    let allowCrossUser = false;
+    if (leadId) {
+      if (isGlobalAdmin) {
+        allowCrossUser = true;
+      } else {
+        const { data: membership } = await supabase
+          .from('user_companies')
+          .select('role')
+          .eq('user_id', user.id)
+          .eq('company_id', companyId)
+          .maybeSingle();
+        if (
+          membership?.role &&
+          ['owner', 'admin', 'manager'].includes(membership.role)
+        ) {
+          allowCrossUser = true;
+        }
+      }
+    }
+
+    const leadQueryClient = allowCrossUser ? createAdminClient() : supabase;
+
+    let query = leadQueryClient
       .from('leads')
       .select(
         `
@@ -54,8 +80,11 @@ export async function GET(request: NextRequest) {
         )
         `
       )
-      .eq('submitted_by', user.id)
       .eq('company_id', companyId);
+
+    if (!allowCrossUser) {
+      query = query.eq('submitted_by', user.id);
+    }
 
     if (leadId) {
       query = query.eq('id', leadId).limit(1);
@@ -77,7 +106,7 @@ export async function GET(request: NextRequest) {
     const notesByLead: Record<string, Array<{ id: string; notes: string | null; created_at: string }>> = {};
 
     if (leadIds.length > 0) {
-      const { data: noteRows, error: notesError } = await supabase
+      const { data: noteRows, error: notesError } = await leadQueryClient
         .from('activity_log')
         .select('id, entity_id, notes, created_at')
         .eq('entity_type', 'lead')

@@ -3,16 +3,71 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
-import { Department, UserDepartment, DepartmentStats } from '@/types/user';
+import { Department, DepartmentType, UserDepartment, DepartmentStats } from '@/types/user';
 import { getCached, setCached, clearCache, CACHE_KEYS } from '@/lib/cache-utils';
+
+type DepartmentTypesMap = Partial<Record<Department, DepartmentType | null>>;
 
 interface UseUserDepartmentsReturn {
   departments: Department[];
   departmentDetails: UserDepartment[];
+  departmentTypes: DepartmentTypesMap;
   isLoading: boolean;
   error: string | null;
-  updateDepartments: (departments: Department[]) => Promise<boolean>;
+  updateDepartments: (
+    departments: Department[],
+    departmentTypes?: DepartmentTypesMap
+  ) => Promise<boolean>;
   refetch: () => Promise<void>;
+}
+
+export interface PropertyTypeSettings {
+  technician: boolean;
+  inspector: boolean;
+}
+
+export function usePropertyTypeSettings(companyId: string | undefined | null): {
+  settings: PropertyTypeSettings;
+  isLoading: boolean;
+} {
+  const [settings, setSettings] = useState<PropertyTypeSettings>({
+    technician: false,
+    inspector: false,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    if (!companyId) {
+      setSettings({ technician: false, inspector: false });
+      return;
+    }
+    let cancelled = false;
+    const load = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/companies/${companyId}/settings`);
+        if (!response.ok) return;
+        const { settings: raw } = await response.json();
+        if (cancelled) return;
+        setSettings({
+          technician: raw?.technician_property_type_enabled?.value === true
+            || raw?.technician_property_type_enabled?.value === 'true',
+          inspector: raw?.inspector_property_type_enabled?.value === true
+            || raw?.inspector_property_type_enabled?.value === 'true',
+        });
+      } catch {
+        // Non-critical — default to false
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  return { settings, isLoading };
 }
 
 export function useUserDepartments(
@@ -21,6 +76,7 @@ export function useUserDepartments(
 ): UseUserDepartmentsReturn {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentDetails, setDepartmentDetails] = useState<UserDepartment[]>([]);
+  const [departmentTypes, setDepartmentTypes] = useState<DepartmentTypesMap>({});
   const [fetchLoading, setFetchLoading] = useState(true);
   const [fetchedKey, setFetchedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -44,10 +100,15 @@ export function useUserDepartments(
     }
 
     const cacheKey = CACHE_KEYS.USER_DEPARTMENTS(userId, companyId);
-    const cached = getCached<{ departments: Department[]; departmentDetails: UserDepartment[] }>(cacheKey);
+    const cached = getCached<{
+      departments: Department[];
+      departmentDetails: UserDepartment[];
+      departmentTypes: DepartmentTypesMap;
+    }>(cacheKey);
     if (cached) {
       setDepartments(cached.departments);
       setDepartmentDetails(cached.departmentDetails);
+      setDepartmentTypes(cached.departmentTypes ?? {});
       setFetchedKey(`${userId}:${companyId}`);
       setFetchLoading(false);
       return;
@@ -69,9 +130,18 @@ export function useUserDepartments(
       const data = await response.json();
       const deps: Department[] = data.departments || [];
       const details: UserDepartment[] = data.departmentDetails || [];
+      const types: DepartmentTypesMap = details.reduce<DepartmentTypesMap>((acc, detail) => {
+        acc[detail.department] = detail.department_type ?? null;
+        return acc;
+      }, {});
       setDepartments(deps);
       setDepartmentDetails(details);
-      setCached(cacheKey, { departments: deps, departmentDetails: details });
+      setDepartmentTypes(types);
+      setCached(cacheKey, {
+        departments: deps,
+        departmentDetails: details,
+        departmentTypes: types,
+      });
       setFetchedKey(`${userId}:${companyId}`);
     } catch (err) {
       console.error('Error fetching user departments:', err);
@@ -81,7 +151,10 @@ export function useUserDepartments(
     }
   }, [userId, companyId]);
 
-  const updateDepartments = useCallback(async (newDepartments: Department[]): Promise<boolean> => {
+  const updateDepartments = useCallback(async (
+    newDepartments: Department[],
+    newDepartmentTypes?: DepartmentTypesMap
+  ): Promise<boolean> => {
     if (!userId || !companyId) return false;
 
     try {
@@ -95,6 +168,7 @@ export function useUserDepartments(
         body: JSON.stringify({
           companyId,
           departments: newDepartments,
+          departmentTypes: newDepartmentTypes ?? {},
         }),
       });
 
@@ -105,8 +179,18 @@ export function useUserDepartments(
 
       const data = await response.json();
       clearCache(CACHE_KEYS.USER_DEPARTMENTS(userId, companyId));
-      setDepartments(data.departments || []);
-      setDepartmentDetails(data.departmentDetails || []);
+      const nextDeps: Department[] = data.departments || [];
+      const nextDetails: UserDepartment[] = data.departmentDetails || [];
+      const nextTypes: DepartmentTypesMap = nextDetails.reduce<DepartmentTypesMap>(
+        (acc, detail) => {
+          acc[detail.department] = detail.department_type ?? null;
+          return acc;
+        },
+        {}
+      );
+      setDepartments(nextDeps);
+      setDepartmentDetails(nextDetails);
+      setDepartmentTypes(nextTypes);
       return true;
     } catch (err) {
       console.error('Error updating user departments:', err);
@@ -122,6 +206,7 @@ export function useUserDepartments(
   return {
     departments,
     departmentDetails,
+    departmentTypes,
     isLoading,
     error,
     updateDepartments,
