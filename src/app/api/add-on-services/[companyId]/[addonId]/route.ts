@@ -96,6 +96,7 @@ export async function PUT(
         color_scheme: body.color_scheme || null,
         eligibility_mode: body.eligibility_mode,
         is_active: body.is_active !== undefined ? body.is_active : true,
+        tech_can_upsell: body.tech_can_upsell || false,
         requires_quote: body.requires_quote || false,
         pricing_type: body.pricing_type || 'flat',
         price_per_unit: body.price_per_unit ?? null,

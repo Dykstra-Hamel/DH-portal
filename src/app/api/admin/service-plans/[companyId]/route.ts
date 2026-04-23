@@ -18,6 +18,7 @@ interface ServicePlan {
   display_order: number;
   highlight_badge: string | null;
   color_scheme: any;
+  tech_can_upsell: boolean;
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
@@ -50,6 +51,7 @@ interface CreateServicePlanRequest {
   display_order?: number;
   highlight_badge?: string;
   color_scheme?: any;
+  tech_can_upsell?: boolean;
   requires_quote?: boolean;
   is_featured?: boolean;
   plan_image_url?: string;
