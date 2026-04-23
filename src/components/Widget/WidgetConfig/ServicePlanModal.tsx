@@ -360,6 +360,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_faqs: [{ question: '', answer: '' }],
     display_order: 1,
     highlight_badge: '',
+    tech_can_upsell: false,
     requires_quote: false,
     plan_image_url: '',
     plan_disclaimer: '',
@@ -432,6 +433,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_faqs: plan.plan_faqs.length > 0 ? plan.plan_faqs : [{ question: '', answer: '' }],
         display_order: plan.display_order,
         highlight_badge: plan.highlight_badge || '',
+        tech_can_upsell: (plan as any).tech_can_upsell ?? false,
         requires_quote: plan.requires_quote,
         plan_image_url: plan.plan_image_url || '',
         plan_disclaimer: plan.plan_disclaimer || '',
@@ -490,6 +492,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_faqs: [{ question: '', answer: '' }],
         display_order: 1,
         highlight_badge: '',
+        tech_can_upsell: false,
         requires_quote: false,
         plan_image_url: '',
         plan_disclaimer: '',
@@ -1175,6 +1178,17 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     onChange={(e) => handleInputChange('includes_inspection', e.target.checked)}
                   />
                   Includes initial inspection
+                </label>
+              </div>
+
+              <div className={styles.checkboxGroup}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.tech_can_upsell}
+                    onChange={(e) => handleInputChange('tech_can_upsell', e.target.checked)}
+                  />
+                  Tech can upsell
                 </label>
               </div>
 

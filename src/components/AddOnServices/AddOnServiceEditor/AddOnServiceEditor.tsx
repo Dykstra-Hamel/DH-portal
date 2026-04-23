@@ -36,6 +36,7 @@ export default function AddOnServiceEditor({
     eligibility_mode: 'all',
     eligible_plan_ids: [],
     is_active: true,
+    tech_can_upsell: false,
     requires_quote: false,
     pricing_type: 'flat',
     price_per_unit: null,
@@ -68,6 +69,7 @@ export default function AddOnServiceEditor({
           eligibility_mode: addon.eligibility_mode,
           eligible_plan_ids: addon.eligible_plan_ids || [],
           is_active: addon.is_active,
+          tech_can_upsell: (addon as any).tech_can_upsell ?? false,
           requires_quote: addon.requires_quote ?? false,
           pricing_type: addon.pricing_type ?? 'flat',
           price_per_unit: addon.price_per_unit ?? null,
@@ -92,6 +94,7 @@ export default function AddOnServiceEditor({
           eligibility_mode: 'all',
           eligible_plan_ids: [],
           is_active: true,
+          tech_can_upsell: false,
           requires_quote: false,
           pricing_type: 'flat',
           price_per_unit: null,
@@ -308,6 +311,19 @@ export default function AddOnServiceEditor({
                   <option value="annually">Annually</option>
                 </select>
               </div>
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.checkboxLabel}>
+                <input
+                  type="checkbox"
+                  checked={formData.tech_can_upsell}
+                  onChange={e =>
+                    setFormData({ ...formData, tech_can_upsell: e.target.checked })
+                  }
+                />
+                <span>Tech can upsell</span>
+              </label>
             </div>
 
             <div className={styles.formGroup}>
