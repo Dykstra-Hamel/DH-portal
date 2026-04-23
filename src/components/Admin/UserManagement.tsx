@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { adminAPI, authenticatedFetch } from '@/lib/api-client';
-import { useUserDepartments } from '@/hooks/useUserDepartments';
+import { useUserDepartments, usePropertyTypeSettings } from '@/hooks/useUserDepartments';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
-import { Department, canHaveDepartments } from '@/types/user';
+import { Department, DepartmentType, canHaveDepartments } from '@/types/user';
 import BranchSelector, { BranchSelectorHandle } from '@/components/Common/BranchSelector/BranchSelector';
 import { FilterPanel } from '@/components/Common/FilterPanel/FilterPanel';
 import styles from './UserManagement.module.scss';
@@ -64,9 +64,16 @@ export default function UserManagement() {
     company_id: '',
     role: 'member',
     departments: [] as Department[],
+    departmentTypes: {} as Partial<Record<Department, DepartmentType>>,
     sendEmail: true,
     password: '',
   });
+  const { settings: invitePropertyTypeSettings } = usePropertyTypeSettings(
+    inviteFormData.company_id || null
+  );
+  const [departmentTypeErrors, setDepartmentTypeErrors] = useState<
+    Partial<Record<Department, string>>
+  >({});
 
   useEffect(() => {
     loadData();
@@ -109,12 +116,35 @@ export default function UserManagement() {
       setError('Company is required');
       return;
     }
+    const typeErrors: Partial<Record<Department, string>> = {};
+    if (canHaveDepartments(inviteFormData.role as any)) {
+      if (
+        invitePropertyTypeSettings.technician
+        && inviteFormData.departments.includes('technician')
+        && !inviteFormData.departmentTypes.technician
+      ) {
+        typeErrors.technician = 'Select a property type for Technician';
+      }
+      if (
+        invitePropertyTypeSettings.inspector
+        && inviteFormData.departments.includes('inspector')
+        && !inviteFormData.departmentTypes.inspector
+      ) {
+        typeErrors.inspector = 'Select a property type for Inspector';
+      }
+    }
+    if (Object.keys(typeErrors).length > 0) {
+      setDepartmentTypeErrors(typeErrors);
+      setError('Please complete the required property type selections');
+      return;
+    }
+    setDepartmentTypeErrors({});
     // Departments are optional — users can have them assigned later
     try {
       setSubmitting(true);
       setError(null);
       await adminAPI.inviteUser(inviteFormData);
-      setInviteFormData({ email: '', first_name: '', last_name: '', company_id: '', role: 'member', departments: [], sendEmail: true, password: '' });
+      setInviteFormData({ email: '', first_name: '', last_name: '', company_id: '', role: 'member', departments: [], departmentTypes: {}, sendEmail: true, password: '' });
       setShowInviteForm(false);
       await loadData();
     } catch (err) {
@@ -268,8 +298,14 @@ export default function UserManagement() {
           submitting={submitting}
           formData={inviteFormData}
           setFormData={setInviteFormData}
+          propertyTypeSettings={invitePropertyTypeSettings}
+          departmentTypeErrors={departmentTypeErrors}
+          setDepartmentTypeErrors={setDepartmentTypeErrors}
           onSubmit={handleInviteUser}
-          onClose={() => setShowInviteForm(false)}
+          onClose={() => {
+            setShowInviteForm(false);
+            setDepartmentTypeErrors({});
+          }}
         />
       )}
 
@@ -823,6 +859,9 @@ function InviteUserModal({
   submitting,
   formData,
   setFormData,
+  propertyTypeSettings,
+  departmentTypeErrors,
+  setDepartmentTypeErrors,
   onSubmit,
   onClose,
 }: {
@@ -835,6 +874,7 @@ function InviteUserModal({
     company_id: string;
     role: string;
     departments: Department[];
+    departmentTypes: Partial<Record<Department, DepartmentType>>;
     sendEmail: boolean;
     password: string;
   };
@@ -845,9 +885,15 @@ function InviteUserModal({
     company_id: string;
     role: string;
     departments: Department[];
+    departmentTypes: Partial<Record<Department, DepartmentType>>;
     sendEmail: boolean;
     password: string;
   }>>;
+  propertyTypeSettings: { technician: boolean; inspector: boolean };
+  departmentTypeErrors: Partial<Record<Department, string>>;
+  setDepartmentTypeErrors: React.Dispatch<
+    React.SetStateAction<Partial<Record<Department, string>>>
+  >;
   onSubmit: (e: React.FormEvent) => void;
   onClose: () => void;
 }) {
@@ -953,6 +999,7 @@ function InviteUserModal({
                     ...p,
                     role,
                     departments: canHaveDepartments(role as any) ? p.departments : [],
+                    departmentTypes: canHaveDepartments(role as any) ? p.departmentTypes : {},
                   }));
                 }}
               >
@@ -967,7 +1014,26 @@ function InviteUserModal({
                 <label className={styles.label}>Departments <span className={styles.fieldOptional}>(optional)</span></label>
                 <DepartmentSelector
                   selectedDepartments={formData.departments}
-                  onDepartmentChange={departments => setFormData(p => ({ ...p, departments }))}
+                  onDepartmentChange={departments => setFormData(p => {
+                    const nextTypes = { ...p.departmentTypes };
+                    if (!departments.includes('technician')) delete nextTypes.technician;
+                    if (!departments.includes('inspector')) delete nextTypes.inspector;
+                    return { ...p, departments, departmentTypes: nextTypes };
+                  })}
+                  departmentTypes={formData.departmentTypes}
+                  onDepartmentTypeChange={(department, type) => {
+                    setFormData(p => ({
+                      ...p,
+                      departmentTypes: { ...p.departmentTypes, [department]: type },
+                    }));
+                    setDepartmentTypeErrors(prev => {
+                      const next = { ...prev };
+                      delete next[department];
+                      return next;
+                    });
+                  }}
+                  propertyTypeEnabled={propertyTypeSettings}
+                  departmentTypeErrors={departmentTypeErrors}
                   disabled={submitting}
                   layout="vertical"
                   size="medium"
@@ -1018,20 +1084,52 @@ function DepartmentManagementModal({
   companyName: string;
   onClose: () => void;
 }) {
-  const { departments, isLoading, error, updateDepartments } = useUserDepartments(
+  const { departments, departmentTypes, isLoading, error, updateDepartments } = useUserDepartments(
     userId,
     companyId
   );
+  const { settings: propertyTypeSettings } = usePropertyTypeSettings(companyId);
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  const [selectedDepartmentTypes, setSelectedDepartmentTypes] = useState<
+    Partial<Record<Department, DepartmentType | null>>
+  >({});
+  const [typeErrors, setTypeErrors] = useState<Partial<Record<Department, string>>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setSelectedDepartments(departments);
-  }, [departments]);
+    setSelectedDepartmentTypes(departmentTypes);
+  }, [departments, departmentTypes]);
 
   const handleSave = async () => {
+    const errs: Partial<Record<Department, string>> = {};
+    if (
+      propertyTypeSettings.technician
+      && selectedDepartments.includes('technician')
+      && !selectedDepartmentTypes.technician
+    ) {
+      errs.technician = 'Select a property type for Technician';
+    }
+    if (
+      propertyTypeSettings.inspector
+      && selectedDepartments.includes('inspector')
+      && !selectedDepartmentTypes.inspector
+    ) {
+      errs.inspector = 'Select a property type for Inspector';
+    }
+    if (Object.keys(errs).length > 0) {
+      setTypeErrors(errs);
+      setSaveError('Please complete the required property type selections');
+      return;
+    }
+    setTypeErrors({});
+    setSaveError(null);
     setSaving(true);
-    const success = await updateDepartments(selectedDepartments);
+    const success = await updateDepartments(
+      selectedDepartments,
+      selectedDepartmentTypes as Partial<Record<Department, DepartmentType>>
+    );
     if (success) onClose();
     setSaving(false);
   };
@@ -1052,9 +1150,28 @@ function DepartmentManagementModal({
           ) : (
             <DepartmentSelector
               selectedDepartments={selectedDepartments}
-              onDepartmentChange={setSelectedDepartments}
+              onDepartmentChange={(next) => {
+                setSelectedDepartments(next);
+                setSelectedDepartmentTypes((prev) => {
+                  const copy = { ...prev };
+                  if (!next.includes('technician')) delete copy.technician;
+                  if (!next.includes('inspector')) delete copy.inspector;
+                  return copy;
+                });
+              }}
+              departmentTypes={selectedDepartmentTypes}
+              onDepartmentTypeChange={(department, type) => {
+                setSelectedDepartmentTypes((prev) => ({ ...prev, [department]: type }));
+                setTypeErrors((prev) => {
+                  const next = { ...prev };
+                  delete next[department];
+                  return next;
+                });
+              }}
+              propertyTypeEnabled={propertyTypeSettings}
+              departmentTypeErrors={typeErrors}
               disabled={saving}
-              error={error || undefined}
+              error={error || saveError || undefined}
               layout="vertical"
               size="medium"
             />

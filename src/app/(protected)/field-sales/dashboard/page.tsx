@@ -12,6 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
+import { useCompanyRole } from '@/hooks/useCompanyRole';
 import { useUser } from '@/hooks/useUser';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
@@ -19,12 +20,19 @@ import { FieldMapDashboard } from '@/components/FieldMap/FieldMapDashboard/Field
 import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsDashboard/FieldSalesLeadsDashboard';
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
 import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
+import { TechDashboardHome } from '@/components/TechLeads/TechDashboardHome/TechDashboardHome';
 import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
 import AdditionalTasksPanel from '@/components/Tasks/AdditionalTasksPanel/AdditionalTasksPanel';
 import { Toast } from '@/components/Common/Toast';
 import styles from './dashboard.module.scss';
 
-type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions' | 'tasks';
+type DashboardTab =
+  | 'home'
+  | 'route'
+  | 'leads'
+  | 'opportunities'
+  | 'actions'
+  | 'tasks';
 
 export default function FieldSalesDashboard() {
   return (
@@ -39,16 +47,17 @@ function FieldSalesDashboardInner() {
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const { selectedCompany, isAdmin } = useCompany();
-  const { departments } = useUserDepartments(
+  const { departments, isLoading: isDepartmentsLoading } = useUserDepartments(
     userId ?? '',
     selectedCompany?.id ?? ''
   );
+  const { isCompanyAdmin } = useCompanyRole(selectedCompany?.id);
   const { profile, user } = useUser();
   const { setPageHeader } = usePageActions();
   const { counts, newItemIndicators, clearNewItemIndicator } =
     useRealtimeCounts();
 
-  const [activeTab, setActiveTab] = useState<DashboardTab>('route');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('home');
   const [routeStops, setRouteStops] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
   const [sliderStyle, setSliderStyle] = useState<{
@@ -93,21 +102,37 @@ function FieldSalesDashboardInner() {
   const TAB_ORDER = useMemo<DashboardTab[]>(
     () =>
       isTechnicianOnly
-        ? ['route', 'opportunities']
+        ? ['home', 'route', 'opportunities']
         : ['route', 'leads', 'actions', 'tasks'],
     [isTechnicianOnly]
   );
 
+  // If the current tab isn't valid for this user (e.g. 'home' default for a
+  // non-tech user), snap to the first tab in the current order. Wait for
+  // userId *and* the departments fetch to finish — TAB_ORDER depends on
+  // `isTechnicianOnly`, which is false while departments are still loading,
+  // so running earlier would bump technicians off the 'home' default.
+  useEffect(() => {
+    if (!userId || isDepartmentsLoading) return;
+    if (!TAB_ORDER.includes(activeTab)) {
+      setActiveTab(TAB_ORDER[0]);
+    }
+  }, [TAB_ORDER, activeTab, userId, isDepartmentsLoading]);
+
   // Set page header
   useEffect(() => {
     if (!profile) return;
-    const firstName = `${profile.first_name}'s` || 'Your';
-    const title = `${firstName} Dashboard`;
+    const firstName = profile.first_name || 'Your';
+    const title = isCompanyAdmin
+      ? `${firstName}'s Team Dashboard`
+      : isTechnicianOnly
+        ? `${firstName}'s Tech Dashboard`
+        : `${firstName}'s Sales Dashboard`;
     setPageHeader({ title, description: '' });
     return () => {
       setPageHeader(null);
     };
-  }, [profile, isTechnicianOnly, setPageHeader]);
+  }, [profile, isTechnicianOnly, isCompanyAdmin, setPageHeader]);
 
   // Fetch route stops count
   useEffect(() => {
@@ -191,6 +216,7 @@ function FieldSalesDashboardInner() {
     DashboardTab,
     { label: string; count: number; isNew?: boolean }
   > = {
+    home: { label: 'Dashboard', count: 0 },
     route: { label: 'My Route', count: routeStops },
     leads: {
       label: 'My Leads & Sales',
@@ -213,7 +239,10 @@ function FieldSalesDashboardInner() {
     },
   };
 
-  // Inspector / Admin / Technician view (with tabs)
+  // Inspector / Admin / Technician view (with tabs).
+  // The aggregated admin/manager reports dashboard is currently hidden —
+  // admins fall through to the inspector layout and reach TechLeads via
+  // the "+ New" button in FieldSalesNav.
   if (isTechnicianOnly || isInspector) {
     return (
       <div className={styles.wrapperInspector}>
@@ -226,6 +255,19 @@ function FieldSalesDashboardInner() {
                 className={styles.tabSlider}
                 style={{ left: sliderStyle.left, width: sliderStyle.width }}
               />
+            )}
+
+            {isTechnicianOnly && (
+              <button
+                ref={el => {
+                  tabRefs.current[TAB_ORDER.indexOf('home')] = el;
+                }}
+                type="button"
+                className={`${styles.tab} ${activeTab === 'home' ? styles.tabActive : ''}`}
+                onClick={() => handleTabClick('home')}
+              >
+                <span className={styles.tabLabel}>Dashboard</span>
+              </button>
             )}
 
             <button
@@ -321,11 +363,13 @@ function FieldSalesDashboardInner() {
               <span className={styles.tabLabel}>
                 {tabConfig[activeTab].label}
               </span>
-              <span
-                className={`${styles.tabCount} ${tabConfig[activeTab].isNew ? styles.tabCountNew : ''}`}
-              >
-                {tabConfig[activeTab].count}
-              </span>
+              {activeTab !== 'home' && (
+                <span
+                  className={`${styles.tabCount} ${tabConfig[activeTab].isNew ? styles.tabCountNew : ''}`}
+                >
+                  {tabConfig[activeTab].count}
+                </span>
+              )}
               <span
                 className={`${styles.mobileTabChevron} ${mobileDropdownOpen ? styles.mobileTabChevronOpen : ''}`}
                 aria-hidden="true"
@@ -362,11 +406,13 @@ function FieldSalesDashboardInner() {
                     <span className={styles.tabLabel}>
                       {tabConfig[tab].label}
                     </span>
-                    <span
-                      className={`${styles.tabCount} ${tabConfig[tab].isNew ? styles.tabCountNew : ''}`}
-                    >
-                      {tabConfig[tab].count}
-                    </span>
+                    {tab !== 'home' && (
+                      <span
+                        className={`${styles.tabCount} ${tabConfig[tab].isNew ? styles.tabCountNew : ''}`}
+                      >
+                        {tabConfig[tab].count}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -376,6 +422,10 @@ function FieldSalesDashboardInner() {
 
         {/* Main content area */}
         <div className={styles.contentArea}>
+          {activeTab === 'home' && isTechnicianOnly && (
+            <TechDashboardHome />
+          )}
+
           {activeTab === 'route' && (
             <FieldMapDashboard
               companyId={selectedCompany?.id ?? ''}

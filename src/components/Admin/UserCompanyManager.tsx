@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { adminAPI } from '@/lib/api-client';
-import { useCompanyDepartments, useUserDepartments } from '@/hooks/useUserDepartments';
+import { useCompanyDepartments, useUserDepartments, usePropertyTypeSettings } from '@/hooks/useUserDepartments';
 import { DepartmentSelector, DepartmentBadges } from '@/components/Common/DepartmentSelector';
-import { Department, canHaveDepartments } from '@/types/user';
+import { Department, DepartmentType, canHaveDepartments } from '@/types/user';
 import BranchSelector, { BranchSelectorHandle } from '@/components/Common/BranchSelector/BranchSelector';
 import styles from './AdminManager.module.scss';
 
@@ -584,21 +584,54 @@ function DepartmentManagementModal({
 }) {
   const {
     departments,
+    departmentTypes,
     isLoading,
     error,
     updateDepartments
   } = useUserDepartments(userId, companyId);
+  const { settings: propertyTypeSettings } = usePropertyTypeSettings(companyId);
 
   const [selectedDepartments, setSelectedDepartments] = useState<Department[]>([]);
+  const [selectedDepartmentTypes, setSelectedDepartmentTypes] = useState<
+    Partial<Record<Department, DepartmentType | null>>
+  >({});
+  const [typeErrors, setTypeErrors] = useState<Partial<Record<Department, string>>>({});
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setSelectedDepartments(departments);
-  }, [departments]);
+    setSelectedDepartmentTypes(departmentTypes);
+  }, [departments, departmentTypes]);
 
   const handleSave = async () => {
+    const errs: Partial<Record<Department, string>> = {};
+    if (
+      propertyTypeSettings.technician
+      && selectedDepartments.includes('technician')
+      && !selectedDepartmentTypes.technician
+    ) {
+      errs.technician = 'Select a property type for Technician';
+    }
+    if (
+      propertyTypeSettings.inspector
+      && selectedDepartments.includes('inspector')
+      && !selectedDepartmentTypes.inspector
+    ) {
+      errs.inspector = 'Select a property type for Inspector';
+    }
+    if (Object.keys(errs).length > 0) {
+      setTypeErrors(errs);
+      setSaveError('Please complete the required property type selections');
+      return;
+    }
+    setTypeErrors({});
+    setSaveError(null);
     setSaving(true);
-    const success = await updateDepartments(selectedDepartments);
+    const success = await updateDepartments(
+      selectedDepartments,
+      selectedDepartmentTypes as Partial<Record<Department, DepartmentType>>
+    );
     if (success) {
       onClose();
     }
@@ -624,9 +657,28 @@ function DepartmentManagementModal({
           <div className={styles.departmentSelection}>
             <DepartmentSelector
               selectedDepartments={selectedDepartments}
-              onDepartmentChange={setSelectedDepartments}
+              onDepartmentChange={(next) => {
+                setSelectedDepartments(next);
+                setSelectedDepartmentTypes((prev) => {
+                  const copy = { ...prev };
+                  if (!next.includes('technician')) delete copy.technician;
+                  if (!next.includes('inspector')) delete copy.inspector;
+                  return copy;
+                });
+              }}
+              departmentTypes={selectedDepartmentTypes}
+              onDepartmentTypeChange={(department, type) => {
+                setSelectedDepartmentTypes((prev) => ({ ...prev, [department]: type }));
+                setTypeErrors((prev) => {
+                  const next = { ...prev };
+                  delete next[department];
+                  return next;
+                });
+              }}
+              propertyTypeEnabled={propertyTypeSettings}
+              departmentTypeErrors={typeErrors}
               disabled={saving}
-              error={error || undefined}
+              error={error || saveError || undefined}
               layout="vertical"
               size="medium"
             />

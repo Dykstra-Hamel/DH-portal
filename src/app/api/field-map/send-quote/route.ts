@@ -34,7 +34,18 @@ export async function POST(request: NextRequest) {
       companyName: bodyCompanyName,
     } = body;
 
+    console.log('[send-quote] body', {
+      leadId,
+      quoteId,
+      companyId: bodyCompanyId,
+      sendEmail,
+      clientEmail,
+      clientName,
+      inspectorName,
+    });
+
     if (!leadId || !quoteId) {
+      console.warn('[send-quote] missing leadId or quoteId');
       return NextResponse.json({ error: 'leadId and quoteId are required' }, { status: 400 });
     }
 
@@ -79,6 +90,8 @@ export async function POST(request: NextRequest) {
     // ── Email ──────────────────────────────────────────────────────────────
     let emailSent = false;
 
+    console.log('[send-quote] email gate', { sendEmail, clientEmail });
+
     if (sendEmail && clientEmail) {
       const [templateSetting, company, fromEmail, tenantName, quoteRecord] = await Promise.all([
         adminClient
@@ -103,6 +116,16 @@ export async function POST(request: NextRequest) {
           .single()
           .then(r => r.data),
       ]);
+
+      console.log('[send-quote] prefetch', {
+        hasTemplateSetting: !!templateSetting?.setting_value,
+        templateId: templateSetting?.setting_value ?? null,
+        hasCompany: !!company,
+        fromEmail,
+        tenantName,
+        hasQuoteRecord: !!quoteRecord,
+        quoteLineItemCount: quoteRecord?.line_items?.length ?? 0,
+      });
 
       let htmlContent: string | null = null;
       let subjectLine = `Field Inspection Quote \u2014 ${clientName || 'Customer'}`;
@@ -265,17 +288,33 @@ export async function POST(request: NextRequest) {
       }
 
       if (htmlContent) {
-        await sendEmailRouted({
-          tenantName,
+        console.log('[send-quote] dispatching', {
+          to: QUOTE_RECIPIENT,
           from: fromEmail,
           fromName: company?.name || bodyCompanyName || 'FieldMap',
-          to: QUOTE_RECIPIENT, // TODO: switch to clientEmail when ready for production
           subject: subjectLine,
-          html: htmlContent,
           companyId,
-          source: 'field_map',
+          tenantName,
+          htmlLength: htmlContent.length,
         });
-        emailSent = true;
+        try {
+          const result = await sendEmailRouted({
+            tenantName,
+            from: fromEmail,
+            fromName: company?.name || bodyCompanyName || 'FieldMap',
+            to: QUOTE_RECIPIENT, // TODO: switch to clientEmail when ready for production
+            subject: subjectLine,
+            html: htmlContent,
+            companyId,
+            source: 'field_map',
+          });
+          console.log('[send-quote] sendEmailRouted result', result);
+          emailSent = true;
+        } catch (sendErr) {
+          console.error('[send-quote] sendEmailRouted threw', sendErr);
+        }
+      } else {
+        console.warn('[send-quote] no htmlContent built — skipping send');
       }
     }
 

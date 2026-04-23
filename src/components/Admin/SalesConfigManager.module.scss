@@ -484,6 +484,16 @@
       font-style: italic;
     }
 
+    .propertyTypeSection {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+
+      .leadAssignmentHeader {
+        margin-bottom: 8px;
+      }
+    }
+
     .leadAssignmentFooter {
       display: flex;
       justify-content: flex-end;

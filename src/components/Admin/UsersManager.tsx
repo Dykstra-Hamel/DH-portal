@@ -3,7 +3,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { adminAPI, authenticatedFetch } from '@/lib/api-client';
 import { DepartmentSelector } from '@/components/Common/DepartmentSelector';
-import { Department, canHaveDepartments } from '@/types/user';
+import { usePropertyTypeSettings } from '@/hooks/useUserDepartments';
+import { Department, DepartmentType, canHaveDepartments } from '@/types/user';
 import styles from './AdminManager.module.scss';
 
 interface Profile {
@@ -53,7 +54,14 @@ export default function UsersManager() {
     company_id: '',
     role: 'member',
     departments: [] as Department[],
+    departmentTypes: {} as Partial<Record<Department, DepartmentType>>,
   });
+  const { settings: propertyTypeSettings } = usePropertyTypeSettings(
+    formData.company_id || null
+  );
+  const [departmentTypeErrors, setDepartmentTypeErrors] = useState<
+    Partial<Record<Department, string>>
+  >({});
 
   useEffect(() => {
     loadData();
@@ -100,6 +108,30 @@ export default function UsersManager() {
       return;
     }
 
+    const typeErrors: Partial<Record<Department, string>> = {};
+    if (canHaveDepartments(formData.role as any)) {
+      if (
+        propertyTypeSettings.technician
+        && formData.departments.includes('technician')
+        && !formData.departmentTypes.technician
+      ) {
+        typeErrors.technician = 'Select a property type for Technician';
+      }
+      if (
+        propertyTypeSettings.inspector
+        && formData.departments.includes('inspector')
+        && !formData.departmentTypes.inspector
+      ) {
+        typeErrors.inspector = 'Select a property type for Inspector';
+      }
+    }
+    if (Object.keys(typeErrors).length > 0) {
+      setDepartmentTypeErrors(typeErrors);
+      setError('Please complete the required property type selections');
+      return;
+    }
+    setDepartmentTypeErrors({});
+
     try {
       setSubmitting(true);
       setError(null);
@@ -111,6 +143,7 @@ export default function UsersManager() {
         company_id: '',
         role: 'member',
         departments: [],
+        departmentTypes: {},
       });
       setShowCreateForm(false);
       loadUsers();
@@ -289,7 +322,8 @@ export default function UsersManager() {
                       ...formData,
                       role: newRole,
                       // Clear departments if role can't have departments
-                      departments: canHaveDepartments(newRole as any) ? formData.departments : []
+                      departments: canHaveDepartments(newRole as any) ? formData.departments : [],
+                      departmentTypes: canHaveDepartments(newRole as any) ? formData.departmentTypes : {},
                     });
                   }}
                 >
@@ -307,9 +341,26 @@ export default function UsersManager() {
                   <div className={styles.departmentSelection}>
                     <DepartmentSelector
                       selectedDepartments={formData.departments}
-                      onDepartmentChange={(departments) =>
-                        setFormData({ ...formData, departments })
-                      }
+                      onDepartmentChange={(departments) => {
+                        const nextTypes = { ...formData.departmentTypes };
+                        if (!departments.includes('technician')) delete nextTypes.technician;
+                        if (!departments.includes('inspector')) delete nextTypes.inspector;
+                        setFormData({ ...formData, departments, departmentTypes: nextTypes });
+                      }}
+                      departmentTypes={formData.departmentTypes}
+                      onDepartmentTypeChange={(department, type) => {
+                        setFormData((prev) => ({
+                          ...prev,
+                          departmentTypes: { ...prev.departmentTypes, [department]: type },
+                        }));
+                        setDepartmentTypeErrors((prev) => {
+                          const next = { ...prev };
+                          delete next[department];
+                          return next;
+                        });
+                      }}
+                      propertyTypeEnabled={propertyTypeSettings}
+                      departmentTypeErrors={departmentTypeErrors}
                       disabled={submitting}
                       layout="vertical"
                       size="medium"

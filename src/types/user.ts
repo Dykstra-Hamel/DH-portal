@@ -1,5 +1,7 @@
 export type Department = 'sales' | 'support' | 'scheduling' | 'technician' | 'inspector';
 
+export type DepartmentType = 'residential' | 'commercial' | 'both';
+
 export type ProfileRole = 'admin' | 'super_admin' | 'user' | 'customer' | 'project_manager';
 
 export type CompanyRole = 'admin' | 'manager' | 'owner' | 'member';
@@ -9,6 +11,7 @@ export interface UserDepartment {
   user_id: string;
   company_id: string;
   department: Department;
+  department_type: DepartmentType | null;
   created_at: string;
   updated_at: string;
 }
@@ -52,6 +55,7 @@ export interface UserDepartmentAssignment {
   userId: string;
   companyId: string;
   departments: Department[];
+  departmentTypes?: Partial<Record<Department, DepartmentType>>;
 }
 
 export interface DepartmentStats {

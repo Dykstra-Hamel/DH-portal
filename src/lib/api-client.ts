@@ -84,6 +84,7 @@ export const adminAPI = {
     company_id: string;
     role: string;
     departments?: string[];
+    departmentTypes?: Record<string, string>;
     sendEmail?: boolean;
     password?: string;
   }) {

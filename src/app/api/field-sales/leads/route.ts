@@ -79,38 +79,68 @@ export async function GET(request: NextRequest) {
 
   try {
     if (type === 'new') {
-      const { data, error } = await supabase
-        .from('leads')
-        .select(`
-          id, company_id, lead_status, lead_source, lead_type, service_type,
-          comments, assigned_to, created_at, updated_at,
-          customer:customers(
-            id, first_name, last_name, email, phone, city, state,
-            customer_service_addresses(
-              is_primary_address,
-              service_address:service_addresses(street_address, apartment_unit, city, state, zip_code)
+      const [leadsResult, companyRoleResult, inspectorDeptResult] = await Promise.all([
+        supabase
+          .from('leads')
+          .select(`
+            id, company_id, lead_status, lead_source, lead_type, service_type,
+            comments, assigned_to, created_at, updated_at, property_type,
+            customer:customers(
+              id, first_name, last_name, email, phone, city, state,
+              customer_service_addresses(
+                is_primary_address,
+                service_address:service_addresses(street_address, apartment_unit, city, state, zip_code)
+              )
+            ),
+            service_plan:service_plans(id, plan_name, requires_quote),
+            quotes(
+              id,
+              quote_line_items(
+                service_plan:service_plans(requires_quote)
+              )
             )
-          ),
-          service_plan:service_plans(id, plan_name, requires_quote),
-          quotes(
-            id,
-            quote_line_items(
-              service_plan:service_plans(requires_quote)
-            )
-          )
-        `)
-        .eq('company_id', companyId)
-        .eq('lead_status', 'new')
-        .is('assigned_to', null)
-        .order('created_at', { ascending: true });
+          `)
+          .eq('company_id', companyId)
+          .eq('lead_status', 'new')
+          .is('assigned_to', null)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('user_companies')
+          .select('role')
+          .eq('user_id', authResult.user.id)
+          .eq('company_id', companyId)
+          .maybeSingle(),
+        supabase
+          .from('user_departments')
+          .select('department_type')
+          .eq('user_id', authResult.user.id)
+          .eq('company_id', companyId)
+          .eq('department', 'inspector')
+          .maybeSingle(),
+      ]);
 
-      if (error) throw error;
+      if (leadsResult.error) throw leadsResult.error;
+
+      const isCompanyAdmin = companyRoleResult.data
+        ? ['admin', 'manager', 'owner'].includes(companyRoleResult.data.role)
+        : false;
+      const viewerDeptType = inspectorDeptResult.data?.department_type ?? null;
+      const restrictToPropertyType =
+        !authResult.isGlobalAdmin &&
+        !isCompanyAdmin &&
+        (viewerDeptType === 'residential' || viewerDeptType === 'commercial')
+          ? viewerDeptType
+          : null;
 
       // Keep the lead if its directly-selected plan requires a quote, OR any
       // plan on any of its quotes' line items requires a quote. The latter
       // covers leads where a rep built the quote and chose the custom-quote
       // plan there rather than on the lead itself.
-      const filtered = (data ?? []).filter((lead: any) => {
+      const filtered = (leadsResult.data ?? []).filter((lead: any) => {
+        if (restrictToPropertyType) {
+          const pt = lead.property_type;
+          if (pt !== null && pt !== restrictToPropertyType) return false;
+        }
         if (lead.service_plan?.requires_quote === true) return true;
         const quotes = Array.isArray(lead.quotes) ? lead.quotes : [];
         return quotes.some((q: any) =>
