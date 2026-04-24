@@ -20,11 +20,12 @@ import {
 } from './steps/MapPlotStep';
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem, AvailableDiscount } from './steps/QuoteBuildStep';
+import { SafetyChecklistStep } from './steps/SafetyChecklistStep';
+import type { SafetyChecklistResponse } from './steps/SafetyChecklistStep';
 import { ReviewStep } from './steps/ReviewStep';
 import styles from './ServiceWizard.module.scss';
 
-const STEP_LABELS = ['Address', 'Photos', 'Map', 'Quote', 'Review'];
-const STEP_COUNT = STEP_LABELS.length;
+const BASE_STEP_LABELS = ['Address', 'Photos', 'Map', 'Quote', 'Review'];
 
 interface ServiceWizardProps {
   stopId?: string;
@@ -72,6 +73,21 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   >(undefined);
 
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
+  const [safetyChecklistEnabled, setSafetyChecklistEnabled] = useState(false);
+  const [checklistResponses, setChecklistResponses] = useState<SafetyChecklistResponse[]>([]);
+
+  // Fetch safety checklist setting
+  useEffect(() => {
+    const companyId = selectedCompany?.id;
+    if (!companyId) return;
+    fetch(`/api/companies/${companyId}/settings`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: { settings?: Record<string, { value: string | boolean | number | null }> } | null) => {
+        if (!data?.settings) return;
+        setSafetyChecklistEnabled(data.settings?.safety_checklist_enabled?.value === true);
+      })
+      .catch(() => {});
+  }, [selectedCompany?.id]);
 
   // Fetch brand primary color for stamp icons
   useEffect(() => {
@@ -446,6 +462,16 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  // Dynamic step configuration based on safety checklist setting
+  const STEP_LABELS = safetyChecklistEnabled
+    ? ['Address', 'Photos', 'Map', 'Quote', 'Checklist', 'Review']
+    : BASE_STEP_LABELS;
+  const STEP_COUNT = STEP_LABELS.length;
+  // Step indices
+  const QUOTE_STEP = 3;
+  const CHECKLIST_STEP = safetyChecklistEnabled ? 4 : -1;
+  const REVIEW_STEP = safetyChecklistEnabled ? 5 : 4;
+
   const selectedAddressFromComponents =
     mapPlotData.addressComponents &&
     typeof mapPlotData.addressComponents.formatted_address === 'string'
@@ -553,9 +579,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         return mapPlotData.isViewSet;
       case 3:
         return true;
-      case 4:
-        return true;
       default:
+        if (currentStep === CHECKLIST_STEP) {
+          return (
+            checklistResponses.length > 0 &&
+            checklistResponses.every((r) => r.answer !== '')
+          );
+        }
+        if (currentStep === REVIEW_STEP) return true;
         return false;
     }
   }
@@ -662,7 +693,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       setIsSavingStep(false);
 
       if (returnToReviewAfterMapEdit) {
-        advanceStep(4);
+        advanceStep(REVIEW_STEP);
         setReturnToReviewAfterMapEdit(false);
         return;
       }
@@ -671,7 +702,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     }
 
     // After Quote step — save quote (creates/updates quote + line items)
-    if (currentStep === 3) {
+    if (currentStep === QUOTE_STEP) {
       if (!leadId) {
         setStepSaveError('No lead found. Please go back to the photos step.');
         return;
@@ -715,6 +746,36 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       return;
     }
 
+    // After Checklist step — save checklist responses to the quote
+    if (safetyChecklistEnabled && currentStep === CHECKLIST_STEP) {
+      if (quoteId) {
+        setIsSavingStep(true);
+        try {
+          await fetch('/api/field-map/save-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              leadId,
+              companyId: selectedCompany?.id ?? '',
+              quoteLineItems,
+              discountTarget: appliedDiscount?.applies_to_price ?? 'initial',
+              discountAmount: appliedDiscount?.discount_value ?? null,
+              discountType:
+                appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
+              discountId: appliedDiscount?.id ?? null,
+              checklistResponses,
+            }),
+          });
+        } catch {
+          // Non-critical — continue even if save fails
+        } finally {
+          setIsSavingStep(false);
+        }
+      }
+      advanceStep(currentStep + 1);
+      return;
+    }
+
     if (currentStep < STEP_COUNT - 1) advanceStep(currentStep + 1);
   }
 
@@ -724,7 +785,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   function handleBack() {
     if (currentStep === 2 && returnToReviewAfterMapEdit) {
-      setCurrentStep(4);
+      setCurrentStep(REVIEW_STEP);
       setReturnToReviewAfterMapEdit(false);
       return;
     }
@@ -803,35 +864,49 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             />
           </div>
         );
-      case 4:
-        return (
-          <ReviewStep
-            clientName={clientInfo.name}
-            clientEmail={clientInfo.email}
-            clientPhone={clientInfo.phone}
-            address={inspectionAddress}
-            pestTypes={pestTypes}
-            quoteLineItems={quoteLineItems}
-            notes={notes}
-            mapPlotData={mapPlotData}
-            inspectorName={inspectorName}
-            inspectorAvatarUrl={inspectorAvatarUrl}
-            inspectorTitle={inspectorTitle}
-            companyName={companyName}
-            companyId={selectedCompany?.id ?? ''}
-            leadId={leadId}
-            quoteId={quoteId}
-            pestIconMap={pestIconMap}
-            plottedPests={plottedPests}
-            appliedDiscount={appliedDiscount}
-            quoteSubtotalInitial={quoteSubtotalInitial}
-            quoteTotalInitial={quoteTotalInitial}
-            onBack={handleBack}
-            onAddLineItem={handleAddLineItem}
-          />
-        );
-      default:
+      default: {
+        if (safetyChecklistEnabled && currentStep === CHECKLIST_STEP) {
+          return (
+            <div className={styles.stepScrollable}>
+              <SafetyChecklistStep
+                companyId={selectedCompany?.id ?? ''}
+                responses={checklistResponses}
+                onChange={setChecklistResponses}
+              />
+            </div>
+          );
+        }
+        if (currentStep === REVIEW_STEP) {
+          return (
+            <ReviewStep
+              clientName={clientInfo.name}
+              clientEmail={clientInfo.email}
+              clientPhone={clientInfo.phone}
+              address={inspectionAddress}
+              pestTypes={pestTypes}
+              quoteLineItems={quoteLineItems}
+              notes={notes}
+              mapPlotData={mapPlotData}
+              inspectorName={inspectorName}
+              inspectorAvatarUrl={inspectorAvatarUrl}
+              inspectorTitle={inspectorTitle}
+              companyName={companyName}
+              companyId={selectedCompany?.id ?? ''}
+              leadId={leadId}
+              quoteId={quoteId}
+              pestIconMap={pestIconMap}
+              plottedPests={plottedPests}
+              appliedDiscount={appliedDiscount}
+              quoteSubtotalInitial={quoteSubtotalInitial}
+              quoteTotalInitial={quoteTotalInitial}
+              checklistResponses={checklistResponses}
+              onBack={handleBack}
+              onAddLineItem={handleAddLineItem}
+            />
+          );
+        }
         return null;
+      }
     }
   }
 
@@ -930,7 +1005,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               {currentStep === 0 && 'Saving address\u2026'}
               {currentStep === 1 && 'Saving photos\u2026'}
               {currentStep === 2 && 'Saving inspection\u2026'}
-              {currentStep === 3 && 'Saving quote\u2026'}
+              {currentStep === QUOTE_STEP && 'Saving quote\u2026'}
             </p>
           </div>
         ) : (

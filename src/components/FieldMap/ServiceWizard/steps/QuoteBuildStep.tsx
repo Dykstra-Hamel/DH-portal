@@ -1700,6 +1700,9 @@ export function QuoteBuildStep({
   const modalIsPerHour = modalSelectedService?.pricingType === 'per_hour';
   const modalIsPerRoom = modalSelectedService?.pricingType === 'per_room';
   const modalIsSpecialtyPlan = modalSelectedService?.planCategory === 'specialty';
+  const modalIsOneTime =
+    modalSelectedService?.planCategory === 'one-time' ||
+    modalSelectedService?.billingFrequency === 'one-time';
   const modalNeedsQty = modalIsPerUnit || modalIsPerHour || modalIsPerRoom;
 
   // true for flat/per_hour/per_room (not per-unit) AND for per_sqft plans
@@ -1756,13 +1759,18 @@ export function QuoteBuildStep({
     return PER_UNIT_LABEL_MODAL[modalSelectedService.pricingType] ?? 'Units';
   }
 
-  function handleModalQuantityChange(qty: number) {
+  function handleModalQuantityChange(qty: number, variantOverride?: { price_per_unit?: number; minimum_price?: number | null } | null) {
     if (!modalSelectedService) return;
     let computed = 0;
-    const min = modalSelectedService.minimumPrice;
+    const activeVariant = variantOverride !== undefined
+      ? variantOverride
+      : (modalVariantLabel
+          ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
+          : null);
+    const min = activeVariant?.minimum_price ?? modalSelectedService.minimumPrice;
 
     if (modalIsPerUnit) {
-      const rate = modalSelectedService.pricePerUnit ?? 0;
+      const rate = activeVariant?.price_per_unit ?? modalSelectedService.pricePerUnit ?? 0;
       computed = qty * rate;
     } else if (modalIsPerHour) {
       const rate = modalSelectedService.initialPrice ?? 0;
@@ -1778,7 +1786,10 @@ export function QuoteBuildStep({
     setModalInitialPrice(final);
   }
 
-  function computeModalPriceFromSqft(sqft: number) {
+  function computeModalPriceFromSqft(
+    sqft: number,
+    variantOverride?: { initial_price?: number | null; recurring_price?: number | null; minimum_price?: number | null } | null,
+  ) {
     setModalQuantity(sqft);
     if (!modalSelectedService || !pricingSettings) return;
 
@@ -1801,9 +1812,13 @@ export function QuoteBuildStep({
     const match = findSizeOptionByValue(sqft, options);
     if (!match) return;
 
-    const activeVariant = modalVariantLabel
-      ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
-      : null;
+    // Use explicit override when provided (e.g. from variant onChange to avoid stale state),
+    // otherwise fall back to the current modalVariantLabel from state.
+    const activeVariant = variantOverride !== undefined
+      ? variantOverride
+      : (modalVariantLabel
+          ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
+          : null);
     const baseInitial = activeVariant?.initial_price ?? modalSelectedService.initialPrice ?? 0;
     const baseRecurring = activeVariant?.recurring_price ?? modalSelectedService.recurringPrice ?? 0;
     const min = activeVariant?.minimum_price ?? modalSelectedService.minimumPrice;
@@ -2893,16 +2908,25 @@ export function QuoteBuildStep({
                           onChange={e => {
                             const label = e.target.value || null;
                             setModalVariantLabel(label);
-                            const variant = modalSelectedService.variants.find(v => v.label === label);
-                            if (variant) {
+                            const variant = modalSelectedService.variants.find(v => v.label === label) ?? null;
+                            // Recompute price using the new variant, passing it directly to avoid
+                            // reading stale modalVariantLabel state from the closure.
+                            if (modalQuantity && modalIsPerUnit) {
+                              handleModalQuantityChange(modalQuantity, variant);
+                            } else if (modalQuantity && (modalWantsSqFt || modalWantsLinFt)) {
+                              computeModalPriceFromSqft(modalQuantity, variant);
+                            } else if (variant) {
                               if (variant.initial_price !== undefined) setModalInitialPrice(variant.initial_price);
                               if (variant.recurring_price !== undefined) setModalRecurringPrice(variant.recurring_price);
-                              const freq = variant.treatment_frequency ?? variant.billing_frequency;
-                              if (freq) setModalFrequency(freq);
                             } else {
                               // Cleared — reset to plan defaults
                               setModalInitialPrice(modalSelectedService.initialPrice);
                               setModalRecurringPrice(modalSelectedService.recurringPrice);
+                            }
+                            if (variant) {
+                              const freq = variant.treatment_frequency ?? variant.billing_frequency;
+                              if (freq) setModalFrequency(freq);
+                            } else {
                               const isOneTime = modalSelectedService.planCategory === 'one-time' || modalSelectedService.billingFrequency === 'one-time';
                               setModalFrequency(
                                 isOneTime
@@ -3113,9 +3137,11 @@ export function QuoteBuildStep({
                         })}
                       </div>
                     ) : (
-                    <div className={styles.modalPricingRow}>
+                    <div className={`${styles.modalPricingRow}${modalIsOneTime ? ` ${styles.modalPricingRowSingle}` : ''}`}>
                       <div className={styles.modalPricingField}>
-                        <span className={styles.fieldLabel}>Initial Price</span>
+                        <span className={styles.fieldLabel}>
+                          {modalIsOneTime ? 'Service Fee' : 'Initial Price'}
+                        </span>
                         <div className={styles.currencyWrap}>
                           <span className={styles.currencySign}>$</span>
                           <input
@@ -3131,7 +3157,43 @@ export function QuoteBuildStep({
                             placeholder="0.00"
                           />
                         </div>
+                        {modalNeedsQty && modalQuantity != null && modalQuantity > 0 && modalInitialPrice != null && (() => {
+                          const activeVariant = modalVariantLabel
+                            ? modalSelectedService!.variants?.find(v => v.label === modalVariantLabel) ?? null
+                            : null;
+                          const min = activeVariant?.minimum_price ?? modalSelectedService!.minimumPrice;
+                          if (modalIsPerUnit) {
+                            const rate = activeVariant?.price_per_unit ?? modalSelectedService!.pricePerUnit ?? 0;
+                            const unitShort = modalWantsLinFt ? 'ln ft'
+                              : (modalSelectedService!.pricingUnit === 'acres' || modalSelectedService!.pricingType === 'per_acre') ? 'acre'
+                              : 'sq ft';
+                            const raw = modalQuantity * rate;
+                            return (
+                              <span className={styles.pricingHint}>
+                                @ {formatCurrency(rate)}/{unitShort} = {formatCurrency(modalInitialPrice)}
+                                {min != null && raw < min ? <> (min {formatCurrency(min)})</> : null}
+                              </span>
+                            );
+                          }
+                          if (modalIsPerHour) {
+                            const rate = modalSelectedService!.initialPrice ?? 0;
+                            return (
+                              <span className={styles.pricingHint}>
+                                @ {formatCurrency(rate)}/hr = {formatCurrency(modalInitialPrice)}
+                              </span>
+                            );
+                          }
+                          if (modalIsPerRoom) {
+                            return (
+                              <span className={styles.pricingHint}>
+                                = {formatCurrency(modalInitialPrice)} ({modalQuantity} {modalQuantity === 1 ? 'room' : 'rooms'})
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
                       </div>
+                      {!modalIsOneTime && (
                       <div className={styles.modalPricingField}>
                         <span className={styles.fieldLabel}>
                           Recurring Price
@@ -3152,23 +3214,7 @@ export function QuoteBuildStep({
                           />
                         </div>
                       </div>
-                      <div className={styles.modalPricingField}>
-                        <span className={styles.fieldLabel}>Frequency</span>
-                        <select
-                          className={styles.selectInput}
-                          value={modalFrequency ?? ''}
-                          onChange={e =>
-                            setModalFrequency(e.target.value || null)
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {FREQUENCY_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      )}
                     </div>
                     )}
                   </div>
@@ -3193,8 +3239,9 @@ export function QuoteBuildStep({
                               onClick={() => {
                                 setModalAddonIds(prev => {
                                   const next = new Set(prev);
-                                  if (next.has(addon.id)) next.delete(addon.id);
-                                  else next.add(addon.id);
+                                  // Recommended options are mutually exclusive — clear all others first
+                                  modalRecommendedAddons.forEach(a => next.delete(a.id));
+                                  if (!prev.has(addon.id)) next.add(addon.id);
                                   return next;
                                 });
                               }}

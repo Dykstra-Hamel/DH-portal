@@ -1097,9 +1097,13 @@
 
 .modalPricingRow {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr;
   gap: 14px;
   margin-top: 24px;
+
+  &.modalPricingRowSingle {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modalPricingField {
