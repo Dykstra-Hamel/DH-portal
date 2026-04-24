@@ -225,7 +225,7 @@ function StepMapPlot({
   // Fetch company-configured pest options to populate the dynamic picker
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/pest-options/${encodeURIComponent(companyId)}`)
+    fetch(`/api/pest-options/${encodeURIComponent(companyId)}?context=fieldmap`)
       .then(r => r.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) {
@@ -2867,7 +2867,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/pest-options/${companyId}`)
+    fetch(`/api/pest-options/${companyId}?context=fieldmap`)
       .then(r => r.ok ? r.json() : null)
       .then((d: { data?: Array<{ id: string; icon_svg?: string | null }> } | null) => {
         if (!d?.data) return;

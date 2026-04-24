@@ -100,7 +100,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   // Fetch pest icon map as soon as company is known
   useEffect(() => {
     if (!selectedCompany?.id) return;
-    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}`)
+    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}?context=fieldmap`)
       .then(r => r.json())
       .then(
         (data: {
