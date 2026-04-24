@@ -7,7 +7,7 @@ import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
 interface QuoteLineItem {
   id: string;
   type: 'plan-addon' | 'custom';
-  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product';
+  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product' | 'specialty-line';
   catalogItemId?: string;
   catalogItemName?: string;
   customName?: string;
@@ -193,7 +193,8 @@ export async function POST(request: NextRequest) {
         lineItems.map((item, idx) => {
           const planName = getLineItemLabel(item);
           const servicePlanId =
-            item.type === 'plan-addon' && item.catalogItemKind === 'plan'
+            item.type === 'plan-addon' &&
+            (item.catalogItemKind === 'plan' || item.catalogItemKind === 'specialty-line')
               ? (item.catalogItemId ?? null)
               : null;
           const addonServiceId =

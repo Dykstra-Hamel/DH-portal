@@ -190,7 +190,7 @@
 /* ── Type toggle ── */
 .typeToggle {
   display: flex;
-  border: 1px solid var(--gray-200);
+  border: 1px solid var(--gray-300);
   border-radius: 10px;
   overflow: hidden;
 }
@@ -210,7 +210,7 @@
     color 0.15s ease;
 
   & + & {
-    border-left: 1px solid var(--gray-200);
+    border-left: 1px solid var(--gray-300);
   }
 }
 
@@ -337,7 +337,7 @@
 .addonPickerPctLabel {
   font-size: 12px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   white-space: nowrap;
 }
 
@@ -414,6 +414,7 @@
   font-size: 12px;
   color: var(--gray-500);
   font-family: var(--font-default);
+  white-space: nowrap;
 }
 
 .addonQuantityRow {
@@ -435,30 +436,49 @@
   margin-left: 2px;
 }
 
-.nameInputWrap {
-  position: relative;
-}
-
-.nameInput {
+// ── Base input mixin — shared by all standalone inputs ──────────────────────
+@mixin inputBase {
   width: 100%;
-  padding: 9px 52px 9px 12px;
+  padding: 9px 12px;
   border: 1px solid var(--gray-200);
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 14px;
   font-family: var(--font-default);
   color: var(--gray-900);
   background: var(--gray-25);
-  outline: none;
   box-sizing: border-box;
+  outline: none;
   transition: border-color 0.15s ease;
-
-  &:focus {
-    border-color: var(--blue-400);
-  }
 
   &::placeholder {
     color: var(--gray-400);
   }
+
+  &:focus {
+    border-color: var(--blue-400);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
+  }
+}
+
+.nameInputWrap {
+  position: relative;
+}
+
+// Standard text/textarea input
+.textInput {
+  @include inputBase;
+}
+
+// Select — same as textInput, native arrow visible
+.selectInput {
+  @include inputBase;
+  appearance: auto;
+}
+
+// Name input — extra right pad reserved for the char-count badge
+.nameInput {
+  @include inputBase;
+  padding-right: 52px;
 }
 
 .charCount {
@@ -472,34 +492,13 @@
   font-family: var(--font-default);
 }
 
-.textInput {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--gray-200);
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: var(--font-default);
-  color: var(--gray-900);
-  background: var(--gray-25);
-  box-sizing: border-box;
-
-  &::placeholder {
-    color: var(--gray-400);
-  }
-
-  &:focus {
-    outline: none;
-    border-color: var(--blue-400);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
-  }
-}
-
 .pricingRow {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
+// Currency input wrapper — pairs with .currencySign + .numberInput
 .currencyWrap {
   display: flex;
   align-items: center;
@@ -523,6 +522,7 @@
   flex-shrink: 0;
 }
 
+// Borderless number input — always used inside .currencyWrap or .measurementInputWrap
 .numberInput {
   flex: 1;
   min-width: 0;
@@ -532,38 +532,16 @@
   font-size: 14px;
   font-family: var(--font-default);
   color: var(--gray-900);
+  outline: none;
 
   &::placeholder {
     color: var(--gray-400);
-  }
-
-  &:focus {
-    outline: none;
   }
 
   &::-webkit-inner-spin-button,
   &::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
-  }
-}
-
-.selectInput {
-  width: 100%;
-  padding: 9px 12px;
-  border: 1px solid var(--gray-200);
-  border-radius: 10px;
-  font-size: 14px;
-  font-family: var(--font-default);
-  color: var(--gray-900);
-  background: var(--gray-25);
-  appearance: auto;
-  box-sizing: border-box;
-
-  &:focus {
-    outline: none;
-    border-color: var(--blue-400);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.12);
   }
 }
 
@@ -608,7 +586,7 @@
   border: none;
   background: transparent;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-900);
 
   &::placeholder {
@@ -872,7 +850,7 @@
   text-align: center;
   font-size: 20px;
   font-weight: 700;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--blue-600);
   padding: 0 24px;
 }
@@ -882,7 +860,7 @@
   text-align: center;
   font-size: 14px;
   color: var(--gray-400);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   font-style: italic;
   padding: 12px 24px;
 }
@@ -1105,7 +1083,7 @@
   margin: 0;
   font-size: 14px;
   color: var(--gray-600);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   line-height: 1.6;
 }
 
@@ -1113,7 +1091,7 @@
   margin: 0;
   font-size: 13px;
   color: var(--gray-500);
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
 }
 
 .modalPricingRow {
@@ -1184,7 +1162,7 @@
   border: 1px solid var(--gray-300);
   border-radius: 4px;
   font-size: 14px;
-  font-family: var(--font-satoshi);
+  font-family: var(--font-default);
   color: var(--gray-600);
   text-align: center;
   background: var(--gray-25);
@@ -1499,3 +1477,32 @@
   transform: rotate(1.5deg) scale(1.02);
   opacity: 0.95;
 }
+
+/* ── Specialty Lines Modal Inputs ── */
+.specialtyLinesInput {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+
+  > p {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-700);
+    margin: 0 0 4px;
+  }
+}
+
+.specialtyLineInput {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  label {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--gray-800);
+    margin: 0;
+  }
+}
+

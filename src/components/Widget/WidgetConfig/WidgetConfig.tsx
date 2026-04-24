@@ -74,6 +74,7 @@ interface CompanyPestOption {
   how_we_do_it_text: string | null;
   subspecies: string[];
   plan_comparison_header_text: string | null;
+  settings: Record<string, unknown>;
 }
 
 interface ServicePlan {
@@ -724,6 +725,7 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
             how_we_do_it_text: option.how_we_do_it_text,
             subspecies: option.subspecies,
             plan_comparison_header_text: option.plan_comparison_header_text,
+            settings: option.settings ?? {},
           })),
         };
 
@@ -754,31 +756,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
     [companyDetails, setSaveStatus, setCompanyPestOptions]
   );
 
-  const addPestOption = (pestType: PestType) => {
-    const newOption: CompanyPestOption = {
-      id: `temp-${Date.now()}`,
-      pest_id: pestType.id,
-      name: pestType.name,
-      slug: pestType.slug,
-      description: pestType.description,
-      category: pestType.pest_categories?.name || 'Unknown',
-      icon_svg: pestType.icon_svg,
-      custom_label: null,
-      display_order: companyPestOptions.length + 1,
-      is_active: true,
-      how_we_do_it_text: null,
-      subspecies: [],
-      plan_comparison_header_text: null,
-    };
-    const updatedOptions = [...companyPestOptions, newOption];
-    setCompanyPestOptions(updatedOptions);
-    savePestOptions(updatedOptions);
-  };
-
-  const removePestOption = (optionId: string) => {
-    const updatedOptions = companyPestOptions.filter(
-      option => option.id !== optionId
-    );
+  const togglePestInWidget = (optionId: string) => {
+    const updatedOptions = companyPestOptions.map(option => {
+      if (option.id === optionId) {
+        const currentlyShown = option.settings?.show_in_widget !== false;
+        return {
+          ...option,
+          settings: { ...option.settings, show_in_widget: !currentlyShown },
+        };
+      }
+      return option;
+    });
     setCompanyPestOptions(updatedOptions);
     savePestOptions(updatedOptions);
   };
@@ -2768,16 +2756,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
               <div className={styles.pestOptionsManager}>
                 {/* Current Pest Options */}
                 <div className={styles.currentPestOptions}>
-                  <h4>Current Pest Options</h4>
+                  <h4>Pest Options</h4>
                   {companyPestOptions.length === 0 ? (
                     <p>
-                      No pest options configured. Add some from the available
-                      options below.
+                      No pest options configured. Add pests in Company Pest Management first.
                     </p>
                   ) : (
                     <div className={styles.pestOptionsList}>
-                      {companyPestOptions.map(option => (
-                        <div key={option.id} className={styles.pestOptionItem}>
+                      {companyPestOptions.map(option => {
+                        const shownInWidget = option.settings?.show_in_widget !== false;
+                        return (
+                        <div key={option.id} className={`${styles.pestOptionItem}${!shownInWidget ? ` ${styles.pestOptionHidden}` : ''}`}>
                           <div className={styles.pestOptionHeader}>
                             <div className={styles.pestOptionInfo}>
                               <span
@@ -2819,13 +2808,17 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                                 )
                               }
                             />
-                            <button
-                              type="button"
-                              onClick={() => removePestOption(option.id)}
-                              className={styles.removeButton}
-                            >
-                              Remove
-                            </button>
+                            <label className={styles.pestOptionToggle}>
+                              <input
+                                type="checkbox"
+                                className={styles.toggleInput}
+                                checked={shownInWidget}
+                                onChange={() => togglePestInWidget(option.id)}
+                              />
+                              <span className={styles.toggleLabel}>
+                                Show in widget
+                              </span>
+                            </label>
                             </div>
                           </div>
 
@@ -2917,57 +2910,9 @@ const WidgetConfig: React.FC<WidgetConfigProps> = ({
                             </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-
-                {/* Available Pest Types */}
-                <div className={styles.availablePestTypes}>
-                  <h4>Available Pest Types</h4>
-                  <div className={styles.pestTypesGrid}>
-                    {availablePestTypes
-                      .filter(
-                        type =>
-                          !companyPestOptions.some(
-                            option => option.pest_id === type.id
-                          )
-                      )
-                      .map(type => (
-                        <div key={type.id} className={styles.pestTypeCard}>
-                          <div className={styles.pestTypeInfo}>
-                            <span
-                              className={styles.pestIcon}
-                              dangerouslySetInnerHTML={{
-                                __html: type.icon_svg,
-                              }}
-                            ></span>
-                            <div className={styles.pestDetails}>
-                              <div className={styles.pestName}>{type.name}</div>
-                              <div className={styles.pestCategory}>
-                                {type.pest_categories?.name || type.category}
-                              </div>
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => addPestOption(type)}
-                            className={styles.addButton}
-                          >
-                            +
-                          </button>
-                        </div>
-                      ))}
-                  </div>
-                  {availablePestTypes.filter(
-                    type =>
-                      !companyPestOptions.some(
-                        option => option.pest_id === type.id
-                      )
-                  ).length === 0 && (
-                    <p>
-                      All available pest types are already added to your widget.
-                    </p>
                   )}
                 </div>
               </div>

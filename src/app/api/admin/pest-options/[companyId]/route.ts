@@ -15,6 +15,7 @@ interface PestOption {
   how_we_do_it_text: string | null;
   subspecies: string[];
   plan_comparison_header_text: string | null;
+  settings: Record<string, unknown>;
 }
 
 interface UpdatePestOptionsRequest {
@@ -26,6 +27,7 @@ interface UpdatePestOptionsRequest {
     how_we_do_it_text?: string;
     subspecies?: string[];
     plan_comparison_header_text?: string;
+    settings?: Record<string, unknown>;
   }[];
 }
 
@@ -58,6 +60,7 @@ export async function GET(
         how_we_do_it_text,
         subspecies,
         plan_comparison_header_text,
+        settings,
         pest_types (
           name,
           slug,
@@ -97,6 +100,7 @@ export async function GET(
       how_we_do_it_text: option.how_we_do_it_text,
       subspecies: option.subspecies || [],
       plan_comparison_header_text: option.plan_comparison_header_text,
+      settings: option.settings ?? {},
     }));
 
     // Also fetch all available pest types for admin interface
@@ -187,6 +191,7 @@ export async function POST(
         how_we_do_it_text: option.how_we_do_it_text || null,
         subspecies: option.subspecies || [],
         plan_comparison_header_text: option.plan_comparison_header_text || null,
+        settings: option.settings ?? {},
       }));
 
       const { error: insertError } = await supabase
