@@ -193,9 +193,10 @@ export async function POST(request: NextRequest) {
         lineItems.map((item, idx) => {
           const planName = getLineItemLabel(item);
           const servicePlanId =
-            item.type === 'plan-addon' &&
-            (item.catalogItemKind === 'plan' || item.catalogItemKind === 'specialty-line')
+            item.type === 'plan-addon' && item.catalogItemKind === 'plan'
               ? (item.catalogItemId ?? null)
+              : item.type === 'plan-addon' && item.catalogItemKind === 'specialty-line'
+              ? (lineItems.find(p => p.id === item.parentLineItemId)?.catalogItemId ?? null)
               : null;
           const addonServiceId =
             item.type === 'plan-addon' && item.catalogItemKind === 'addon'
