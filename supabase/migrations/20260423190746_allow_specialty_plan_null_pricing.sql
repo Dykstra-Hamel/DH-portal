@@ -7,6 +7,7 @@ ALTER TABLE service_plans
 ADD CONSTRAINT service_plans_subscription_recurring_price_check
 CHECK (
   plan_category IN ('one-time', 'specialty')
+  OR linear_feet_pricing IS NOT NULL
   OR (recurring_price IS NOT NULL AND recurring_price > 0)
 );
 
