@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       discountType,
       discountId,
       quoteStatus,
+      checklistResponses,
     } = body;
 
     if (!leadId) {
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
           total_recurring_price: adjustedRecurring,
           applied_discount_id: discountId ?? null,
           ...(quoteStatus != null ? { quote_status: quoteStatus } : {}),
+          ...(checklistResponses !== undefined ? { safety_checklist_responses: checklistResponses } : {}),
         })
         .eq('id', existingQuote.id);
 
@@ -165,6 +167,7 @@ export async function POST(request: NextRequest) {
           applied_discount_id: discountId ?? null,
           quote_status: quoteStatus ?? 'draft',
           quote_token: quoteToken,
+          safety_checklist_responses: checklistResponses ?? [],
         })
         .select('id')
         .single();

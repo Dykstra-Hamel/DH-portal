@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { QuoteSummaryCard } from '@/components/Common/QuoteSummaryCard/QuoteSummaryCard';
 import { NotesSection } from '@/components/Common/NotesSection/NotesSection';
@@ -174,6 +175,58 @@ export function LeadSchedulingSection({
             readOnly
           />
         </div>
+
+        {Array.isArray(quote?.safety_checklist_responses) && quote.safety_checklist_responses.length > 0 && (() => {
+          type ChecklistResponse = {
+            questionId: string;
+            questionText: string;
+            answerType: string;
+            answer: string;
+            parentQuestionId?: string;
+            conditionalQuestion?: string;
+            conditionalAnswer?: string;
+          };
+          const responses: ChecklistResponse[] = quote.safety_checklist_responses;
+          const rootResponses = responses.filter((r) => !r.parentQuestionId);
+          const childrenOf = (id: string) => responses.filter((r) => r.parentQuestionId === id);
+
+          const renderAnswer = (r: ChecklistResponse, isChild = false): React.ReactNode => (
+            <div key={r.questionId} className={isChild ? styles.checklistConditional : undefined}>
+              <div className={styles.checklistRow}>
+                {isChild && <span className={styles.checklistArrow}>&#8627;</span>}
+                <span className={styles.checklistQuestion}>{r.questionText}</span>
+                {r.answerType === 'yes_no' ? (
+                  <span className={`${styles.checklistBadge} ${r.answer === 'yes' ? styles.badgeYes : styles.badgeNo}`}>
+                    {r.answer === 'yes' ? 'Yes' : 'No'}
+                  </span>
+                ) : (
+                  <span className={styles.checklistAnswer}>{r.answer}</span>
+                )}
+              </div>
+              {r.conditionalQuestion && r.answer === 'yes' && r.conditionalAnswer && (
+                <div className={styles.checklistConditional}>
+                  <div className={styles.checklistRow}>
+                    <span className={styles.checklistArrow}>&#8627;</span>
+                    <span className={styles.checklistQuestion}>{r.conditionalQuestion}</span>
+                    <span className={styles.checklistAnswer}>{r.conditionalAnswer}</span>
+                  </div>
+                </div>
+              )}
+              {childrenOf(r.questionId).map((child) => renderAnswer(child, true))}
+            </div>
+          );
+
+          return (
+            <div className={styles.section}>
+              <h4 className={cardStyles.defaultText}>Safety Checklist</h4>
+              <div className={styles.checklistList}>
+                {rootResponses.map((r, i) => (
+                  <div key={r.questionId ?? i}>{renderAnswer(r)}</div>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </InfoCard>
     </div>
