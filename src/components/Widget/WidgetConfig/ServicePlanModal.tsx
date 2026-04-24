@@ -8,6 +8,7 @@ import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { calculateIntervalCount, getIntervalLabel } from '@/lib/pricing-calculations';
 import ProductModal from '@/components/Admin/ProductModal';
 import type { SpecialtyPlanLine } from '@/types/pricing';
+import ServicePlanImagePicker from './ServicePlanImagePicker/ServicePlanImagePicker';
 
 interface ServicePlan {
   id: string;
@@ -33,6 +34,7 @@ interface ServicePlan {
   pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
   price_per_unit: number | null;
   minimum_price: number | null;
+  default_variant_label: string | null;
   is_active: boolean;
   variants?: Array<{
     label: string;
@@ -373,6 +375,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     pricing_unit: null as 'sqft' | 'linear_feet' | 'acres' | null,
     price_per_unit: null as number | null,
     minimum_price: null as number | null,
+    default_variant_label: null as string | null,
     variants: [] as Array<{
       label: string;
       initial_price?: number;
@@ -447,6 +450,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         pricing_unit: (plan as any).pricing_unit ?? null,
         price_per_unit: (plan as any).price_per_unit ?? null,
         minimum_price: (plan as any).minimum_price ?? null,
+        default_variant_label: (plan as any).default_variant_label ?? null,
         variants: (plan as any).variants ?? [],
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
@@ -535,6 +539,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         yard_sqft_pricing_enabled: false,
         linear_feet_pricing: null,
         specialty_lines: [],
+        default_variant_label: null,
       });
     }
   }, [plan]);
@@ -679,7 +684,10 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    await handleImageUploadFile(file);
+  };
 
+  const handleImageUploadFile = async (file: File) => {
     setIsUploadingImage(true);
 
     try {
@@ -691,12 +699,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       const url = await uploadFile(file, 'brand-assets', 'service-plans');
       if (url) {
         handleInputChange('plan_image_url', url);
-        // Clear the input so the same file can be selected again if needed
-        event.target.value = '';
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      // Could add error state handling here if needed
     } finally {
       setIsUploadingImage(false);
     }
@@ -1080,47 +1085,12 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
               <div className={styles.formGroup}>
                 <label>Plan Image</label>
-                <div className={styles.fileUploadSection}>
-                  <div className={styles.fileUploadInfo}>
-                    <small>
-                      Upload an image to display with this plan. Images are stored in{' '}
-                      <code>
-                        /brand-assets/service-plans/
-                      </code>
-                    </small>
-                  </div>
-                  
-                  {isUploadingImage ? (
-                    <div className={styles.uploadingIndicator}>
-                      <div className={styles.spinner}></div>
-                      <span>Uploading image...</span>
-                    </div>
-                  ) : (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className={styles.fileInput}
-                    />
-                  )}
-                  
-                  {formData.plan_image_url && formData.plan_image_url.trim() && (
-                    <div className={`${styles.imagePreview} ${isUploadingImage ? styles.uploading : ''}`}>
-                      <Image
-                        src={formData.plan_image_url}
-                        alt="Plan Image"
-                        width={200}
-                        height={120}
-                        style={{ objectFit: 'cover', borderRadius: '8px' }}
-                      />
-                      {isUploadingImage && (
-                        <div className={styles.imageOverlay}>
-                          <div className={styles.overlaySpinner}></div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ServicePlanImagePicker
+                  value={formData.plan_image_url || null}
+                  onChange={(url) => handleInputChange('plan_image_url', url ?? '')}
+                  isUploading={isUploadingImage}
+                  onUpload={handleImageUploadFile}
+                />
               </div>
 
               <div className={styles.formGroup}>
@@ -1948,6 +1918,21 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
               <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
                 Variants let sales reps choose a named option (e.g. &quot;Bi-Monthly&quot;, &quot;Quarterly&quot;) with different pricing or frequency when building a quote. Leave any field blank to inherit the plan&apos;s default.
               </p>
+
+              {formData.variants.length > 0 && (
+                <div className={styles.formGroup} style={{ marginBottom: '20px' }}>
+                  <label>Default Option Label</label>
+                  <input
+                    type="text"
+                    value={formData.default_variant_label ?? ''}
+                    onChange={(e) => handleInputChange('default_variant_label', e.target.value || null)}
+                    placeholder="e.g. Under 3k sq ft"
+                  />
+                  <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    Names the base plan option in the dropdown (shown as &quot;— Plan Default —&quot; if left blank).
+                  </small>
+                </div>
+              )}
 
               {formData.variants.map((variant, index) => (
                 <div key={index} className={styles.pricingSection} style={{ position: 'relative', paddingTop: '16px' }}>

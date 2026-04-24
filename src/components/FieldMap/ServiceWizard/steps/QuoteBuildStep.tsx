@@ -111,6 +111,7 @@ interface CatalogItem {
   pricingUnit: 'sqft' | 'linear_feet' | 'acres' | null;
   additionalUnitPrice: number | null;
   variants: CatalogVariant[];
+  defaultVariantLabel: string | null;
   percentagePricing: CatalogPercentagePricing | null;
   homeSizePricing: ServicePlanPricing['home_size_pricing'] | null;
   yardSqftPricing: ServicePlanPricing['yard_sqft_pricing'] | null;
@@ -123,6 +124,7 @@ interface CatalogItem {
 interface Product {
   id: string;
   product_name: string;
+  product_description: string | null;
   unit_price: number;
   recurring_price: number;
   unit_type: string;
@@ -1222,6 +1224,7 @@ export function QuoteBuildStep({
           pricingUnit: p.pricing_unit ?? null,
           additionalUnitPrice: null,
           variants: Array.isArray(p.variants) ? p.variants : [],
+          defaultVariantLabel: p.default_variant_label ?? null,
           percentagePricing: null,
           homeSizePricing: p.home_size_pricing ?? null,
           yardSqftPricing: p.yard_sqft_pricing ?? null,
@@ -1255,6 +1258,7 @@ export function QuoteBuildStep({
           pricingUnit: null,
           additionalUnitPrice: a.additional_unit_price ?? null,
           variants: Array.isArray(a.variants) ? a.variants : [],
+          defaultVariantLabel: null,
           percentagePricing: a.percentage_pricing ?? null,
           homeSizePricing: null,
           yardSqftPricing: null,
@@ -1299,6 +1303,7 @@ export function QuoteBuildStep({
             pricingUnit: null,
             additionalUnitPrice: null,
             variants: [],
+            defaultVariantLabel: null,
             percentagePricing: null,
             homeSizePricing: null,
             yardSqftPricing: null,
@@ -1906,7 +1911,13 @@ export function QuoteBuildStep({
     setModalFrequency(primary.frequency);
     setModalQuantity(primary.quantity ?? null);
     setModalVariantLabel(primary.selectedVariantLabel ?? null);
-    setPestModal({ id: '__all__', label: 'Edit Service' });
+    const pestIds = catalogServiceForEdit?.pestCoverageIds ?? [];
+    const pestNames = catalogServiceForEdit?.pestCoverageNames ?? [];
+    if (pestIds.length === 1 && pestNames.length === 1) {
+      setPestModal({ id: pestIds[0], label: pestNames[0] });
+    } else {
+      setPestModal({ id: '__all__', label: 'Edit Service' });
+    }
   }
 
   function handleModalSave() {
@@ -2688,7 +2699,7 @@ export function QuoteBuildStep({
                   <p className={styles.modalNoServices}>
                     No services configured for this pest yet.
                   </p>
-                ) : pestModal?.id === '__all__' ? (
+                ) : pestModal?.id === '__all__' && !editingItemId ? (
                   /* Searchable dropdown for "Add Additional Service" */
                   <div className={styles.serviceDropdownWrapper} ref={serviceDropdownRef}>
                     <div
@@ -2867,7 +2878,7 @@ export function QuoteBuildStep({
                             }
                           }}
                         >
-                          <option value="">— Plan Default —</option>
+                          <option value="">{modalSelectedService.defaultVariantLabel ?? '— Plan Default —'}</option>
                           {modalSelectedService.variants.map(v => (
                             <option key={v.label} value={v.label}>{v.label}</option>
                           ))}
@@ -3401,25 +3412,30 @@ export function QuoteBuildStep({
                                 key={product.id}
                                 className={styles.modalProductRow}
                               >
-                                <span
+                                <div
                                   className={`${styles.modalProductName}${qty > 0 ? ` ${styles.modalProductNameActive}` : ''}`}
                                 >
-                                  {product.product_name}
-                                </span>
+                                  <span className={styles.modalProductNameText}>{product.product_name}</span>
+                                  {product.product_description && (
+                                    <span className={styles.modalProductDescription}>{product.product_description}</span>
+                                  )}
+                                </div>
                                 <input
                                   type="number"
                                   inputMode="decimal"
                                   min="0"
+                                  max={product.max_quantity ?? undefined}
                                   step="1"
                                   className={`${styles.modalProductQtyInput}${qty > 0 ? ` ${styles.modalProductQtyInputActive}` : ''}`}
                                   value={qty === 0 ? '' : qty}
                                   onChange={e => {
                                     const v = parseInt(e.target.value, 10);
-                                    setModalProductQtys(prev => ({
-                                      ...prev,
-                                      [product.id]:
-                                        Number.isFinite(v) && v >= 0 ? v : 0,
-                                    }));
+                                    if (!Number.isFinite(v) || v < 0) {
+                                      setModalProductQtys(prev => ({ ...prev, [product.id]: 0 }));
+                                      return;
+                                    }
+                                    const clamped = product.max_quantity != null ? Math.min(v, product.max_quantity) : v;
+                                    setModalProductQtys(prev => ({ ...prev, [product.id]: clamped }));
                                   }}
                                   placeholder="0"
                                 />
