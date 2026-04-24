@@ -360,22 +360,26 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             if (lineItems.length > 0) {
               setQuoteLineItems(
                 lineItems.map((item: any): QuoteLineItem => {
+                  const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+                    item.service_plan_id && !item.parent_line_item_id
+                      ? 'plan'
+                      : item.service_plan_id && item.parent_line_item_id
+                        ? 'specialty-line'
+                        : item.addon_service_id
+                          ? 'addon'
+                          : item.bundle_plan_id
+                            ? 'bundle'
+                            : item.product_id
+                              ? 'product'
+                              : item.parent_line_item_id
+                                ? 'specialty-line'
+                                : undefined;
                   const catalogItemId =
                     item.service_plan_id ??
                     item.addon_service_id ??
                     item.bundle_plan_id ??
                     item.product_id ??
                     undefined;
-                  const catalogItemKind: QuoteLineItem['catalogItemKind'] =
-                    item.service_plan_id
-                      ? 'plan'
-                      : item.addon_service_id
-                        ? 'addon'
-                        : item.bundle_plan_id
-                          ? 'bundle'
-                          : item.product_id
-                            ? 'product'
-                            : undefined;
                   return {
                     id: item.id,
                     type: catalogItemId ? 'plan-addon' : 'custom',
@@ -714,6 +718,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     if (currentStep < STEP_COUNT - 1) advanceStep(currentStep + 1);
   }
 
+  function handleAddLineItem(item: QuoteLineItem) {
+    setQuoteLineItems(prev => [...prev, item]);
+  }
+
   function handleBack() {
     if (currentStep === 2 && returnToReviewAfterMapEdit) {
       setCurrentStep(4);
@@ -819,6 +827,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             quoteSubtotalInitial={quoteSubtotalInitial}
             quoteTotalInitial={quoteTotalInitial}
             onBack={handleBack}
+            onAddLineItem={handleAddLineItem}
           />
         );
       default:

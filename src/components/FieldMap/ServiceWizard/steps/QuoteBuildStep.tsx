@@ -15,6 +15,7 @@ import styles from './QuoteBuildStep.module.scss';
 import type {
   CompanyPricingSettings,
   ServicePlanPricing,
+  SpecialtyPlanLine,
 } from '@/types/pricing';
 import {
   generateHomeSizeOptions,
@@ -29,7 +30,7 @@ export interface QuoteLineItem {
   id: string;
   type: 'plan-addon' | 'custom';
   // Catalog item (plan-addon type)
-  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product';
+  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product' | 'specialty-line';
   catalogItemId?: string;
   catalogItemName?: string;
   // Custom type
@@ -56,6 +57,10 @@ export interface QuoteLineItem {
   isRecommended?: boolean;
   // DB-persisted selection state; undefined for freshly-built in-memory items
   isSelected?: boolean;
+  // Specialty line fields
+  specialtyLinePricingType?: 'per_linear_foot' | 'flat' | 'per_hour';
+  specialtyLinePricePerUnit?: number;
+  specialtyLineMinimumPrice?: number | null;
 }
 
 export interface PlottedPest {
@@ -112,6 +117,7 @@ interface CatalogItem {
   eligibilityMode: 'all' | 'specific';
   eligiblePlanIds: string[];
   recommendedAddonIds: string[];
+  specialtyLines: SpecialtyPlanLine[];
 }
 
 interface Product {
@@ -1067,6 +1073,7 @@ export function QuoteBuildStep({
   const [modalFrequency, setModalFrequency] = useState<string | null>(null);
   const [modalQuantity, setModalQuantity] = useState<number | null>(null);
   const [modalVariantLabel, setModalVariantLabel] = useState<string | null>(null);
+  const [modalSpecialtyQtys, setModalSpecialtyQtys] = useState<Record<string, number>>({});
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const modalBodyRef = useRef<HTMLDivElement>(null);
@@ -1093,6 +1100,7 @@ export function QuoteBuildStep({
     setModalFrequency(null);
     setModalQuantity(null);
     setModalVariantLabel(null);
+    setModalSpecialtyQtys({});
     setServiceSearch('');
     setServiceDropdownOpen(false);
   }, [pestModal, editingItemId]);
@@ -1220,6 +1228,7 @@ export function QuoteBuildStep({
           eligibilityMode: 'all' as const,
           eligiblePlanIds: [],
           recommendedAddonIds: p.recommended_addon_ids ?? [],
+          specialtyLines: Array.isArray(p.specialty_lines) ? p.specialty_lines : [],
         }));
 
         // Add-ons don't have a pest_coverage table — coverage is always empty
@@ -1252,6 +1261,7 @@ export function QuoteBuildStep({
           eligibilityMode: (a.eligibility_mode ?? 'all') as 'all' | 'specific',
           eligiblePlanIds: a.eligible_plan_ids ?? [],
           recommendedAddonIds: [],
+          specialtyLines: [],
         }));
 
         // Bundles reference plan IDs in bundled_service_plans JSONB — resolve coverage
@@ -1295,6 +1305,7 @@ export function QuoteBuildStep({
             eligibilityMode: 'all' as const,
             eligiblePlanIds: [],
             recommendedAddonIds: [],
+            specialtyLines: [],
           };
         });
 
@@ -1683,6 +1694,7 @@ export function QuoteBuildStep({
 
   const modalIsPerHour = modalSelectedService?.pricingType === 'per_hour';
   const modalIsPerRoom = modalSelectedService?.pricingType === 'per_room';
+  const modalIsSpecialtyPlan = modalSelectedService?.planCategory === 'specialty';
   const modalNeedsQty = modalIsPerUnit || modalIsPerHour || modalIsPerRoom;
 
   // true for flat/per_hour/per_room (not per-unit) AND for per_sqft plans
@@ -1867,11 +1879,28 @@ export function QuoteBuildStep({
       }
     }
 
+    const catalogServiceForEdit = catalog.find(s => s.id === primary.catalogItemId);
+    const specialtyQtys: Record<string, number> = {};
+    for (const child of lineItems.filter(
+      i => i.catalogItemKind === 'specialty-line' && i.parentLineItemId === primaryItemId
+    )) {
+      if (child.quantity == null) continue;
+      const sLineId =
+        child.catalogItemId ??
+        catalogServiceForEdit?.specialtyLines?.find(
+          (sl: SpecialtyPlanLine) => sl.line_name === child.catalogItemName
+        )?.id;
+      if (sLineId) {
+        specialtyQtys[sLineId] = child.quantity;
+      }
+    }
+
     setEditingItemId(primaryItemId);
     setModalServiceId(primary.catalogItemId ?? null);
     setModalAddonIds(addonIds);
     setModalAddonQuantities(addonQtys);
     setModalProductQtys(productQtys);
+    setModalSpecialtyQtys(specialtyQtys);
     setModalInitialPrice(primary.initialCost);
     setModalRecurringPrice(primary.recurringCost);
     setModalFrequency(primary.frequency);
@@ -1927,6 +1956,35 @@ export function QuoteBuildStep({
       custom_initial_price: null,
     };
     newItems.push(primaryItem);
+
+    // Specialty line items — generate child items for specialty plans
+    const modalIsSpecialty = service.planCategory === 'specialty';
+    if (modalIsSpecialty && service.specialtyLines.length > 0) {
+      for (const sLine of service.specialtyLines) {
+        const qty = modalSpecialtyQtys[sLine.id] ?? 0;
+        const raw = sLine.pricing_type === 'flat' ? sLine.price_per_unit : qty * sLine.price_per_unit;
+        const computed = sLine.minimum_price != null ? Math.max(raw, sLine.minimum_price) : raw;
+        newItems.push({
+          id: crypto.randomUUID(),
+          type: 'plan-addon',
+          catalogItemKind: 'specialty-line',
+          catalogItemId: sLine.id,
+          catalogItemName: sLine.line_name,
+          isPrimary: false,
+          coveredPestIds: service.pestCoverageIds,
+          coveredPestLabels: [],
+          initialCost: qty > 0 || sLine.pricing_type === 'flat' ? computed : null,
+          recurringCost: null,
+          frequency: null,
+          quantity: sLine.pricing_type !== 'flat' ? qty : null,
+          parentLineItemId: primaryItem.id,
+          isSelected: true,
+          specialtyLinePricingType: sLine.pricing_type,
+          specialtyLinePricePerUnit: sLine.price_per_unit,
+          specialtyLineMinimumPrice: sLine.minimum_price,
+        });
+      }
+    }
 
     // Recommended add-on line items — add ALL of them, flagging which ones the inspector selected
     const recommendedIdSet = new Set(service.recommendedAddonIds);
@@ -2102,6 +2160,7 @@ export function QuoteBuildStep({
     setModalAddonIds(new Set());
     setModalAddonQuantities({});
     setModalProductQtys({});
+    setModalSpecialtyQtys({});
     setModalInitialPrice(null);
     setModalRecurringPrice(null);
     setModalFrequency(null);
@@ -2112,7 +2171,7 @@ export function QuoteBuildStep({
   // Only render plan/bundle/custom items as compact summary cards; addons and products
   // are managed through the modal and should not appear at the top level.
   const serviceCards = lineItems.filter(
-    i => i.catalogItemKind !== 'addon' && i.catalogItemKind !== 'product'
+    i => i.catalogItemKind !== 'addon' && i.catalogItemKind !== 'product' && i.catalogItemKind !== 'specialty-line'
   );
 
   // ── Drag-to-reorder (pointer events — works on touch + mouse) ────────────
@@ -2816,8 +2875,8 @@ export function QuoteBuildStep({
                       </div>
                     )}
 
-                    {/* Two-column measurement row — shown for all non-per-hour, non-per-room plans */}
-                    {!modalIsPerHour && !modalIsPerRoom && (
+                    {/* Two-column measurement row — shown for all non-per-hour, non-per-room, non-specialty plans */}
+                    {!modalIsPerHour && !modalIsPerRoom && !modalIsSpecialtyPlan && (
                       <div className={styles.measurementRow}>
                         {/* Square Feet column */}
                         <div
@@ -2943,7 +3002,7 @@ export function QuoteBuildStep({
                     )}
 
                     {/* Per-hour / per-room single input */}
-                    {(modalIsPerHour || modalIsPerRoom) && (
+                    {(modalIsPerHour || modalIsPerRoom) && !modalIsSpecialtyPlan && (
                       <div className={styles.fieldGroup}>
                         <label className={styles.fieldLabel}>
                           {modalIsPerRoom ? 'Rooms' : 'Hours'}
@@ -2966,6 +3025,49 @@ export function QuoteBuildStep({
                     )}
 
                     {/* Pricing row */}
+                    {modalIsSpecialtyPlan && modalSelectedService.specialtyLines.length > 0 ? (
+                      <div className={styles.specialtyLinesInput}>
+                        <p className={styles.fieldLabel}>Enter Measurements</p>
+                        {modalSelectedService.specialtyLines.map(sLine => {
+                          const qty = modalSpecialtyQtys[sLine.id] ?? 0;
+                          const raw = sLine.pricing_type === 'flat' ? sLine.price_per_unit : qty * sLine.price_per_unit;
+                          const computed = sLine.minimum_price != null ? Math.max(raw, sLine.minimum_price) : raw;
+                          return (
+                            <div key={sLine.id} className={styles.specialtyLineInput}>
+                              <label className={styles.fieldLabel}>{sLine.line_name}</label>
+                              {sLine.pricing_type !== 'flat' && (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  className={styles.textInput}
+                                  value={modalSpecialtyQtys[sLine.id] ?? ''}
+                                  onChange={e => {
+                                    const v = parseFloat(e.target.value);
+                                    setModalSpecialtyQtys(prev => ({
+                                      ...prev,
+                                      [sLine.id]: Number.isFinite(v) && v >= 0 ? v : 0,
+                                    }));
+                                  }}
+                                  placeholder={sLine.pricing_type === 'per_linear_foot' ? 'Linear feet' : 'Hours'}
+                                />
+                              )}
+                              <span className={styles.pricingHint}>
+                                {sLine.pricing_type !== 'flat' && (
+                                  <>@ {formatCurrency(sLine.price_per_unit)}/{sLine.pricing_type === 'per_linear_foot' ? 'ln ft' : 'hr'}&nbsp;&nbsp;</>
+                                )}
+                                {sLine.pricing_type === 'flat'
+                                  ? formatCurrency(qty === 0 ? raw : computed)
+                                  : `= ${formatCurrency(qty === 0 ? raw : computed)}`}
+                                {sLine.minimum_price != null && raw < sLine.minimum_price && (
+                                  <> (min {formatCurrency(sLine.minimum_price)})</>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
                     <div className={styles.modalPricingRow}>
                       <div className={styles.modalPricingField}>
                         <span className={styles.fieldLabel}>Initial Price</span>
@@ -3023,6 +3125,7 @@ export function QuoteBuildStep({
                         </select>
                       </div>
                     </div>
+                    )}
                   </div>
 
                   {/* Add-on chips — Recommended Options */}

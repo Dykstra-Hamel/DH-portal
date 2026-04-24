@@ -42,7 +42,8 @@ export async function GET(
         ),
         service_plan_recommended_addons (
           addon_id
-        )
+        ),
+        specialty_plan_lines ( id, line_name, pricing_type, price_per_unit, minimum_price, display_order )
       `)
       .eq('company_id', companyId)
       .eq('is_active', true)
@@ -66,9 +67,11 @@ export async function GET(
       })),
       plan_product_ids: (plan.service_plan_products ?? []).map((r: any) => r.product_id as string),
       recommended_addon_ids: (plan.service_plan_recommended_addons ?? []).map((r: any) => r.addon_id as string),
+      specialty_lines: (plan.specialty_plan_lines ?? []).sort((a: any, b: any) => a.display_order - b.display_order),
       plan_pest_coverage: undefined,
       service_plan_products: undefined,
       service_plan_recommended_addons: undefined,
+      specialty_plan_lines: undefined,
     }));
 
     return NextResponse.json({

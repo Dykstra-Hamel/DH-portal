@@ -20,6 +20,7 @@ interface PestType {
 
 interface CompanyPestOption {
   pest_id: string;
+  settings: Record<string, unknown>;
 }
 
 interface CompanyPestSelectorProps {
@@ -33,6 +34,7 @@ export default function CompanyPestSelector({
   const [selectedPestIds, setSelectedPestIds] = useState<Set<string>>(
     new Set()
   );
+  const [pestSettings, setPestSettings] = useState<Record<string, Record<string, unknown>>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,9 +55,15 @@ export default function CompanyPestSelector({
         const { availablePestTypes: types, companyPestOptions: options } =
           json.data;
         setAvailablePestTypes(types || []);
-        setSelectedPestIds(
-          new Set((options as CompanyPestOption[]).map(o => o.pest_id))
-        );
+
+        const opts = options as CompanyPestOption[];
+        setSelectedPestIds(new Set(opts.map(o => o.pest_id)));
+
+        const settingsMap: Record<string, Record<string, unknown>> = {};
+        opts.forEach(o => {
+          settingsMap[o.pest_id] = o.settings ?? {};
+        });
+        setPestSettings(settingsMap);
       } catch {
         setError('Failed to load pest data');
       } finally {
@@ -79,6 +87,14 @@ export default function CompanyPestSelector({
     setSuccess(null);
   };
 
+  const handleSettingToggle = (pestId: string, key: string, value: unknown) => {
+    setPestSettings(prev => ({
+      ...prev,
+      [pestId]: { ...(prev[pestId] ?? {}), [key]: value },
+    }));
+    setSuccess(null);
+  };
+
   const handleSave = async () => {
     setSaving(true);
     setError(null);
@@ -88,6 +104,7 @@ export default function CompanyPestSelector({
       pest_id,
       display_order: index,
       is_active: true,
+      settings: pestSettings[pest_id] ?? {},
     }));
 
     try {
@@ -138,23 +155,40 @@ export default function CompanyPestSelector({
         <div key={category} className={styles.categoryGroup}>
           <h4 className={styles.categoryHeading}>{category}</h4>
           <div className={styles.pestList}>
-            {pests.map(pest => (
-              <label key={pest.id} className={styles.pestItem}>
-                <input
-                  type="checkbox"
-                  checked={selectedPestIds.has(pest.id)}
-                  onChange={() => handleToggle(pest.id)}
-                  className={styles.checkbox}
-                />
-                {pest.icon_svg && (
-                  <span
-                    className={styles.pestIcon}
-                    dangerouslySetInnerHTML={{ __html: pest.icon_svg }}
-                  />
-                )}
-                <span className={styles.pestName}>{pest.name}</span>
-              </label>
-            ))}
+            {pests.map(pest => {
+              const isSelected = selectedPestIds.has(pest.id);
+              const showInMap = pestSettings[pest.id]?.show_in_mapping_tool !== false;
+              return (
+                <div key={pest.id} className={styles.pestItemRow}>
+                  <label className={styles.pestItem}>
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleToggle(pest.id)}
+                      className={styles.checkbox}
+                    />
+                    {pest.icon_svg && (
+                      <span
+                        className={styles.pestIcon}
+                        dangerouslySetInnerHTML={{ __html: pest.icon_svg }}
+                      />
+                    )}
+                    <span className={styles.pestName}>{pest.name}</span>
+                  </label>
+                  {isSelected && (
+                    <label className={styles.pestSettingToggle}>
+                      <input
+                        type="checkbox"
+                        checked={showInMap}
+                        onChange={e => handleSettingToggle(pest.id, 'show_in_mapping_tool', e.target.checked)}
+                        className={styles.toggleInput}
+                      />
+                      <span className={styles.toggleLabel}>Show in map</span>
+                    </label>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       ))}

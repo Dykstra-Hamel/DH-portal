@@ -26,6 +26,7 @@ export async function GET(
         pest_id,
         custom_label,
         display_order,
+        settings,
         pest_types (
           id,
           name,
@@ -46,16 +47,18 @@ export async function GET(
       );
     }
 
-    // Transform the data for the frontend
-    const transformedOptions = (pestOptions || []).map((option: any) => ({
-      id: option.pest_id,
-      name: option.pest_types.name,
-      slug: option.pest_types.slug,
-      custom_label: option.custom_label || option.pest_types.name,
-      description: option.pest_types.description,
-      icon_svg: option.pest_types.icon_svg ?? null,
-      display_order: option.display_order,
-    }));
+    // Transform the data for the frontend, filtering out pests hidden from the widget
+    const transformedOptions = (pestOptions || [])
+      .filter((option: any) => (option.settings as Record<string, unknown>)?.show_in_widget !== false)
+      .map((option: any) => ({
+        id: option.pest_id,
+        name: option.pest_types.name,
+        slug: option.pest_types.slug,
+        custom_label: option.custom_label || option.pest_types.name,
+        description: option.pest_types.description,
+        icon_svg: option.pest_types.icon_svg ?? null,
+        display_order: option.display_order,
+      }));
 
     return NextResponse.json({
       success: true,

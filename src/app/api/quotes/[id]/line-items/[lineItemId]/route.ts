@@ -20,6 +20,15 @@ export async function PATCH(
       );
     }
 
+    const {
+      is_selected,
+      discount_type: bodyDiscountType,
+      discount_value: bodyDiscountValue,
+      applies_to_price: bodyAppliesToPrice,
+      recurring_discount_type: bodyRecurringDiscountType,
+      recurring_discount_value: bodyRecurringDiscountValue,
+    } = body;
+
     const supabase = createAdminClient();
 
     const { data: lineItem } = await supabase
@@ -35,7 +44,7 @@ export async function PATCH(
 
     await supabase
       .from('quote_line_items')
-      .update({ is_selected: body.is_selected })
+      .update({ is_selected })
       .eq('id', lineItemId);
 
     // Recalculate totals from selected items only
@@ -54,37 +63,57 @@ export async function PATCH(
       0
     );
 
-    // Fetch the quote's applied discount to compute exact totals
-    const { data: quote } = await supabase
-      .from('quotes')
-      .select('applied_discount_id')
-      .eq('id', quoteId)
-      .single();
-
     let totalInitialPrice = subtotalInitialPrice;
     let totalRecurringPrice = subtotalRecurringPrice;
 
-    if (quote?.applied_discount_id) {
-      const { data: discount } = await supabase
-        .from('discounts')
-        .select('discount_type, discount_value, applies_to_price, recurring_discount_type, recurring_discount_value')
-        .eq('id', quote.applied_discount_id)
-        .single();
-
-      if (discount) {
-        if (discount.applies_to_price === 'initial' || discount.applies_to_price === 'both') {
-          const dollarOff = discount.discount_type === 'percentage'
-            ? (subtotalInitialPrice * discount.discount_value) / 100
-            : discount.discount_value;
-          totalInitialPrice = Math.max(0, subtotalInitialPrice - dollarOff);
-        }
-        if (discount.applies_to_price === 'recurring' || discount.applies_to_price === 'both') {
-          const recurringType = discount.recurring_discount_type ?? discount.discount_type;
-          const recurringValue = discount.recurring_discount_value ?? discount.discount_value;
-          const dollarOff = recurringType === 'percentage'
+    if (bodyDiscountType && bodyDiscountValue != null) {
+      // Prefer discount passed in request body — always accurate, no extra DB lookup needed
+      if (bodyAppliesToPrice === 'initial' || bodyAppliesToPrice === 'both') {
+        const dollarOff =
+          bodyDiscountType === 'percentage'
+            ? (subtotalInitialPrice * bodyDiscountValue) / 100
+            : bodyDiscountValue;
+        totalInitialPrice = Math.max(0, subtotalInitialPrice - dollarOff);
+      }
+      if (bodyAppliesToPrice === 'recurring' || bodyAppliesToPrice === 'both') {
+        const recurringType = bodyRecurringDiscountType ?? bodyDiscountType;
+        const recurringValue = bodyRecurringDiscountValue ?? bodyDiscountValue;
+        const dollarOff =
+          recurringType === 'percentage'
             ? (subtotalRecurringPrice * recurringValue) / 100
             : recurringValue;
-          totalRecurringPrice = Math.max(0, subtotalRecurringPrice - dollarOff);
+        totalRecurringPrice = Math.max(0, subtotalRecurringPrice - dollarOff);
+      }
+    } else {
+      // Fall back: look up discount from DB via applied_discount_id
+      const { data: quote } = await supabase
+        .from('quotes')
+        .select('applied_discount_id')
+        .eq('id', quoteId)
+        .single();
+
+      if (quote?.applied_discount_id) {
+        const { data: discount } = await supabase
+          .from('discounts')
+          .select('discount_type, discount_value, applies_to_price, recurring_discount_type, recurring_discount_value')
+          .eq('id', quote.applied_discount_id)
+          .single();
+
+        if (discount) {
+          if (discount.applies_to_price === 'initial' || discount.applies_to_price === 'both') {
+            const dollarOff = discount.discount_type === 'percentage'
+              ? (subtotalInitialPrice * discount.discount_value) / 100
+              : discount.discount_value;
+            totalInitialPrice = Math.max(0, subtotalInitialPrice - dollarOff);
+          }
+          if (discount.applies_to_price === 'recurring' || discount.applies_to_price === 'both') {
+            const recurringType = discount.recurring_discount_type ?? discount.discount_type;
+            const recurringValue = discount.recurring_discount_value ?? discount.discount_value;
+            const dollarOff = recurringType === 'percentage'
+              ? (subtotalRecurringPrice * recurringValue) / 100
+              : recurringValue;
+            totalRecurringPrice = Math.max(0, subtotalRecurringPrice - dollarOff);
+          }
         }
       }
     }
