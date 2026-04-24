@@ -375,7 +375,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                                 ? 'specialty-line'
                                 : undefined;
                   const catalogItemId =
-                    item.service_plan_id ??
+                    (item.service_plan_id && !item.parent_line_item_id ? item.service_plan_id : null) ??
                     item.addon_service_id ??
                     item.bundle_plan_id ??
                     item.product_id ??

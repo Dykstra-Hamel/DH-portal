@@ -1973,6 +1973,7 @@ export function QuoteBuildStep({
     if (modalIsSpecialty && service.specialtyLines.length > 0) {
       for (const sLine of service.specialtyLines) {
         const qty = modalSpecialtyQtys[sLine.id] ?? 0;
+        if (qty === 0 && sLine.pricing_type !== 'flat') continue;
         const raw = sLine.pricing_type === 'flat' ? sLine.price_per_unit : qty * sLine.price_per_unit;
         const computed = sLine.minimum_price != null ? Math.max(raw, sLine.minimum_price) : raw;
         newItems.push({
@@ -1997,6 +1998,39 @@ export function QuoteBuildStep({
       }
     }
 
+    // Calculate effective initial cost for percentage-based add-on pricing.
+    // Includes: primary plan cost + specialty lines + products + flat/per-unit addons.
+    const specialtyTotal = newItems
+      .filter(i => i.catalogItemKind === 'specialty-line' && i.parentLineItemId === primaryItem.id)
+      .reduce((sum, i) => sum + (i.initialCost ?? 0), 0);
+
+    const productTotal = Object.entries(modalProductQtys).reduce((sum, [productId, qty]) => {
+      if (qty <= 0) return sum;
+      const product = products.find(p => p.id === productId);
+      return sum + (product ? qty * product.unit_price : 0);
+    }, 0);
+
+    const allAddonIds = [...new Set([...service.recommendedAddonIds, ...Array.from(modalAddonIds)])];
+    const addonSubtotal = allAddonIds.reduce((sum, addonId) => {
+      const addon = addonCatalog.find(a => a.id === addonId);
+      if (!addon || addon.percentagePricing) return sum; // exclude %-based addons (circular)
+      const qty = modalAddonQuantities[addonId] ?? null;
+      let cost = addon.initialPrice ?? 0;
+      if (qty != null && addon.pricingType !== 'flat') {
+        if (addon.pricingType === 'per_room') {
+          const raw = qty <= 0 ? 0 : (addon.initialPrice ?? 0) + Math.max(0, qty - 1) * (addon.additionalUnitPrice ?? 0);
+          cost = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        } else {
+          const raw = qty * (addon.pricePerUnit ?? 0);
+          cost = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        }
+      }
+      return sum + cost;
+    }, 0);
+
+    const effectivePrimaryInitialCost =
+      (primaryItem.initialCost ?? 0) + specialtyTotal + productTotal + addonSubtotal;
+
     // Recommended add-on line items — add ALL of them, flagging which ones the inspector selected
     const recommendedIdSet = new Set(service.recommendedAddonIds);
     for (const addonId of service.recommendedAddonIds) {
@@ -2012,9 +2046,9 @@ export function QuoteBuildStep({
       let addonIsCustomPriced = false;
       let addonCustomInitialPrice: number | null = null;
 
-      if (addon.percentagePricing && (primaryItem.initialCost ?? 0) > 0) {
+      if (addon.percentagePricing && effectivePrimaryInitialCost > 0) {
         const { percentage, years = 1, minimum = 0 } = addon.percentagePricing;
-        const jobCost = primaryItem.initialCost!;
+        const jobCost = effectivePrimaryInitialCost;
         const computed = Math.max((percentage / 100) * jobCost * years, minimum);
         resolvedInitial = computed;
         addonPercentageJobCost = jobCost;
@@ -2078,9 +2112,9 @@ export function QuoteBuildStep({
       let addonIsCustomPriced = false;
       let addonCustomInitialPrice: number | null = null;
 
-      if (addon.percentagePricing && (primaryItem.initialCost ?? 0) > 0) {
+      if (addon.percentagePricing && effectivePrimaryInitialCost > 0) {
         const { percentage, years = 1, minimum = 0 } = addon.percentagePricing;
-        const jobCost = primaryItem.initialCost!;
+        const jobCost = effectivePrimaryInitialCost;
         const computed = Math.max((percentage / 100) * jobCost * years, minimum);
         resolvedInitial = computed;
         addonPercentageJobCost = jobCost;
