@@ -1340,6 +1340,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                           }}
                         >
                           <option value="per_linear_foot">Per Linear Foot</option>
+                          <option value="per_sq_ft">Per Sq Ft</option>
                           <option value="flat">Flat Rate</option>
                           <option value="per_hour">Per Hour</option>
                         </select>
