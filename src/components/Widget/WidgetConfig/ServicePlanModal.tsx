@@ -95,6 +95,7 @@ interface ServicePlanModalProps {
   onSave: (planData: Partial<ServicePlan>) => void;
   availablePestTypes: PestType[];
   companyId: string;
+  companySlug?: string;
 }
 
 // Custom Interval Pricing Input Component
@@ -348,6 +349,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   onSave,
   availablePestTypes,
   companyId,
+  companySlug,
 }) => {
   const [formData, setFormData] = useState({
     plan_name: '',
@@ -696,7 +698,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         await deleteFileFromStorage(formData.plan_image_url);
       }
 
-      const url = await uploadFile(file, 'brand-assets', 'service-plans');
+      const url = await uploadFile(file, 'brand-assets', `${companySlug ?? companyId}/service-plans`);
       if (url) {
         handleInputChange('plan_image_url', url);
       }
@@ -727,7 +729,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       if (formData.plan_video_url) {
         await deleteFileFromStorage(formData.plan_video_url);
       }
-      const url = await uploadFile(file, 'brand-assets', 'service-plans');
+      const url = await uploadFile(file, 'brand-assets', `${companySlug ?? companyId}/service-plans`);
       if (url) {
         handleInputChange('plan_video_url', url);
         event.target.value = '';
@@ -1090,6 +1092,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   onChange={(url) => handleInputChange('plan_image_url', url ?? '')}
                   isUploading={isUploadingImage}
                   onUpload={handleImageUploadFile}
+                  companyId={companyId}
                 />
               </div>
 
@@ -1098,8 +1101,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 <div className={styles.fileUploadSection}>
                   <div className={styles.fileUploadInfo}>
                     <small>
-                      Upload a video to display with this plan. Videos are stored in{' '}
-                      <code>/brand-assets/service-plans/</code>
+                      Upload a video to display with this plan. Videos are stored in your company&apos;s service-plans folder.
                     </small>
                   </div>
                   {isUploadingVideo ? (

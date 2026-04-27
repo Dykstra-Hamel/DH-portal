@@ -266,6 +266,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (quoteData?.data?.applied_discount) {
           setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
         }
+        if (
+          Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+          quoteData.data.safety_checklist_responses.length > 0
+        ) {
+          setChecklistResponses(quoteData.data.safety_checklist_responses);
+        }
         setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
         setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
         setLeadId(directLeadId);
@@ -372,6 +378,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             }
             setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
             setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
+
+            if (
+              Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+              quoteData.data.safety_checklist_responses.length > 0
+            ) {
+              setChecklistResponses(quoteData.data.safety_checklist_responses);
+            }
 
             if (lineItems.length > 0) {
               setQuoteLineItems(
