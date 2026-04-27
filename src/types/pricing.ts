@@ -82,7 +82,7 @@ export interface SpecialtyPlanLine {
   id: string;
   plan_id: string;
   line_name: string;
-  pricing_type: 'per_linear_foot' | 'flat' | 'per_hour';
+  pricing_type: 'per_linear_foot' | 'per_sq_ft' | 'flat' | 'per_hour';
   price_per_unit: number;
   minimum_price: number | null;
   display_order: number;

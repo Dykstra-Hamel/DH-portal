@@ -58,7 +58,7 @@ export interface QuoteLineItem {
   // DB-persisted selection state; undefined for freshly-built in-memory items
   isSelected?: boolean;
   // Specialty line fields
-  specialtyLinePricingType?: 'per_linear_foot' | 'flat' | 'per_hour';
+  specialtyLinePricingType?: 'per_linear_foot' | 'per_sq_ft' | 'flat' | 'per_hour';
   specialtyLinePricePerUnit?: number;
   specialtyLineMinimumPrice?: number | null;
 }
@@ -3118,12 +3118,16 @@ export function QuoteBuildStep({
                                       [sLine.id]: Number.isFinite(v) && v >= 0 ? v : 0,
                                     }));
                                   }}
-                                  placeholder={sLine.pricing_type === 'per_linear_foot' ? 'Linear feet' : 'Hours'}
+                                  placeholder={
+                                    sLine.pricing_type === 'per_linear_foot' ? 'Linear feet' :
+                                    sLine.pricing_type === 'per_sq_ft' ? 'Square feet' :
+                                    'Hours'
+                                  }
                                 />
                               )}
                               <span className={styles.pricingHint}>
                                 {sLine.pricing_type !== 'flat' && (
-                                  <>@ {formatCurrency(sLine.price_per_unit)}/{sLine.pricing_type === 'per_linear_foot' ? 'ln ft' : 'hr'}&nbsp;&nbsp;</>
+                                  <>@ {formatCurrency(sLine.price_per_unit)}/{sLine.pricing_type === 'per_linear_foot' ? 'ln ft' : sLine.pricing_type === 'per_sq_ft' ? 'sq ft' : 'hr'}&nbsp;&nbsp;</>
                                 )}
                                 {sLine.pricing_type === 'flat'
                                   ? formatCurrency(qty === 0 ? raw : computed)
