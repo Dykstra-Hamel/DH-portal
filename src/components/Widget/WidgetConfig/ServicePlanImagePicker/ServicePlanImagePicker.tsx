@@ -10,6 +10,7 @@ interface ServicePlanImagePickerProps {
   onChange: (url: string | null) => void;
   isUploading: boolean;
   onUpload: (file: File) => void;
+  companyId: string;
 }
 
 interface StoredImage {
@@ -22,6 +23,7 @@ export default function ServicePlanImagePicker({
   onChange,
   isUploading,
   onUpload,
+  companyId,
 }: ServicePlanImagePickerProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [existingImages, setExistingImages] = useState<StoredImage[]>([]);
@@ -33,7 +35,7 @@ export default function ServicePlanImagePicker({
     setLoadingImages(true);
     setFetchError(null);
     try {
-      const res = await fetch('/api/admin/service-plans/images');
+      const res = await fetch(`/api/admin/service-plans/images?companyId=${companyId}`);
       if (!res.ok) throw new Error('Failed to load images');
       const data = await res.json();
       setExistingImages(data.images ?? []);
@@ -93,8 +95,7 @@ export default function ServicePlanImagePicker({
       </div>
 
       <small className={styles.hint}>
-        Upload a new image or browse previously uploaded images in{' '}
-        <code>/brand-assets/service-plans/</code>
+        Upload a new image or browse previously uploaded images in your company&apos;s service-plans folder.
       </small>
 
       {value && value.trim() && (

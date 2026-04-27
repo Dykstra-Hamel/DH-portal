@@ -704,7 +704,7 @@ export default function CompanyManagement({
           )}
           {activeSection === 'pest-management' && <CompanyPestSelector companyId={companyId} />}
           {activeSection === 'service-plans' && (
-            <ServicePlansManager companyId={companyId} />
+            <ServicePlansManager companyId={companyId} companySlug={company?.slug ?? ''} />
           )}
           {activeSection === 'service-areas' && (
             <ServiceAreasManager companyId={companyId} />
