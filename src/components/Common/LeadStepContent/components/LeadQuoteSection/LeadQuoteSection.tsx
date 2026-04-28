@@ -70,6 +70,7 @@ export function LeadQuoteSection({
   startExpanded = true,
   forceCollapse = false,
   timeOptions,
+  unwrapped,
 }: LeadQuoteSectionProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   // Refs
@@ -1350,23 +1351,12 @@ export function LeadQuoteSection({
     ]);
   };
 
-  return (
-    <div
-      className={`${styles.sectionWrapper} ${activeSection === 'quote' ? styles.active : ''}`}
-      onClick={() => setActiveSection('quote')}
-    >
-      <InfoCard
-        title="Program Quoting"
-        icon={<ScrollText size={20} />}
-        isCollapsible={true}
-        startExpanded={startExpanded}
-        forceCollapse={forceCollapse}
-        isActive={activeSection === 'quote'}
+  const body = (
+    <>
+      <div
+        className={styles.cardContent}
+        data-sidebar-expanded={isSidebarExpanded}
       >
-        <div
-          className={styles.cardContent}
-          data-sidebar-expanded={isSidebarExpanded}
-        >
           {/* Quote Locked Banner */}
           {isQuoteLocked && (
             <div className={styles.lockedBanner}>
@@ -3767,6 +3757,25 @@ export function LeadQuoteSection({
             </div>
           </div>
         )}
+    </>
+  );
+
+  if (unwrapped) return body;
+
+  return (
+    <div
+      className={`${styles.sectionWrapper} ${activeSection === 'quote' ? styles.active : ''}`}
+      onClick={() => setActiveSection('quote')}
+    >
+      <InfoCard
+        title="Program Quoting"
+        icon={<ScrollText size={20} />}
+        isCollapsible={true}
+        startExpanded={startExpanded}
+        forceCollapse={forceCollapse}
+        isActive={activeSection === 'quote'}
+      >
+        {body}
       </InfoCard>
     </div>
   );

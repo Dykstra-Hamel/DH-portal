@@ -36,12 +36,13 @@
 .formField {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
 
   label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--gray-500);
+    font-size: 14px;
+    font-weight: 550;
+    color: var(--gray-900);
+    margin-bottom: 4px;
   }
 }
 
@@ -53,28 +54,24 @@
 
 .autoSaveInput {
   flex: 1;
-  padding: 8px 40px 8px 12px;
-  border: 1px solid #e5e7eb;
-  border-radius: var(--border-radius);
+  padding: 10px 40px 10px 16px;
+  border: 1px solid var(--gray-300);
+  border-radius: 8px;
   font-size: 14px;
-  font-weight: 500;
-  color: var(--gray-800);
+  font-weight: 450;
+  line-height: 20px;
+  color: var(--gray-900);
   background: #fff;
   transition: all 0.2s ease;
 
   &:focus {
     outline: none;
-    border-color: var(--blue-600);
-    box-shadow: 0 0 0 3px rgba(0, 107, 194, 0.1);
-  }
-
-  &:hover {
-    border-color: #d1d5db;
+    border-color: var(--blue-500);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
   }
 
   &::placeholder {
-    color: #9ca3af;
-    font-weight: 400;
+    color: var(--gray-400);
   }
 
   &.hasError {

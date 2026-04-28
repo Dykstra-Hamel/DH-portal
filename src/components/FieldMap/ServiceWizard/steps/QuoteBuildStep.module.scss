@@ -13,6 +13,32 @@
   padding: 0;
 }
 
+.editPestsRow {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.editPestsBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-700);
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  &:hover {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+    color: var(--gray-900);
+  }
+}
+
 .sectionLabel {
   font-size: 13px;
   font-weight: 600;
@@ -124,15 +150,18 @@
 /* ── Empty state ── */
 .emptyState {
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
+  gap: 8px;
   flex-grow: 1;
+  padding: 32px 16px;
 }
 
 .emptyTitle {
-  margin: 20px 0;
-  font-size: 24px;
+  margin: 0;
+  font-size: 20px;
   font-weight: 700;
   color: var(--gray-800);
 }
@@ -140,6 +169,7 @@
 .emptyHint {
   margin: 0;
   font-size: 13px;
+  color: var(--gray-600);
   font-family: var(--font-default);
 }
 
@@ -778,6 +808,15 @@
   padding: 16px;
 }
 
+/* When opened from inside the lead detail (with both sidebars visible at >1600px),
+   pad the overlay on the left so the centered modal content sits within the working
+   space — the backdrop still covers the navs. */
+.modalOverlayWorkspaceOffset {
+  @media (min-width: 1601px) {
+    padding-left: calc(16px + 336px);
+  }
+}
+
 .modalSheetWrapper {
   position: relative;
   width: 100%;
@@ -1110,6 +1149,19 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.readOnlyValue {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--border-radius);
 }
 
 .modalAddonChips {

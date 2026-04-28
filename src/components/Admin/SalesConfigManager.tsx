@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, ChevronDown, ChevronUp, GripVertical, X } from 'lucide-react';
+import {
+  Plus,
+  Edit2,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  X,
+} from 'lucide-react';
 import {
   SalesCadenceWithSteps,
   ACTION_TYPE_LABELS,
@@ -125,14 +133,23 @@ export default function SalesConfigManager({
       setInspectorPropertyTypeEnabled(
         settings?.inspector_property_type_enabled?.value === true
       );
+      setAutoAssignCustomQuoteLeads(
+        settings?.auto_assign_custom_quote_leads?.value === true
+      );
+      setTechnicianPropertyTypeEnabled(
+        settings?.technician_property_type_enabled?.value === true
+      );
+      setInspectorPropertyTypeEnabled(
+        settings?.inspector_property_type_enabled?.value === true
+      );
       setSafetyChecklistEnabled(
         settings?.safety_checklist_enabled?.value === true
       );
       const rawQuestions = settings?.safety_checklist_questions?.value;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const parsedRaw: any[] = rawQuestions ? JSON.parse(rawQuestions) : [];
       // Migrate old format (conditionalQuestion on parent → parentId on child)
-      const migratedQuestions: SafetyChecklistQuestion[] = parsedRaw.map((q) => {
+      const migratedQuestions: SafetyChecklistQuestion[] = parsedRaw.map(q => {
         const { conditionalQuestion, ...rest } = q;
         const parent = parsedRaw.find(
           (p: { conditionalQuestion?: { questionId?: string } }) =>
@@ -215,9 +232,9 @@ export default function SalesConfigManager({
   };
 
   const handleDeleteQuestion = (id: string) => {
-    setSafetyChecklistQuestions((prev) =>
+    setSafetyChecklistQuestions(prev =>
       prev
-        .filter((q) => q.id !== id)
+        .filter(q => q.id !== id)
         .map((q, idx) => ({
           ...q,
           order: idx,
@@ -228,8 +245,8 @@ export default function SalesConfigManager({
   };
 
   const handleUnNest = (id: string) => {
-    setSafetyChecklistQuestions((prev) =>
-      prev.map((q) => (q.id === id ? { ...q, parentId: undefined } : q))
+    setSafetyChecklistQuestions(prev =>
+      prev.map(q => (q.id === id ? { ...q, parentId: undefined } : q))
     );
   };
 
@@ -243,19 +260,26 @@ export default function SalesConfigManager({
     e.preventDefault();
     e.stopPropagation();
     if (!draggingId) return;
-    setSafetyChecklistQuestions((prev) => {
-      const dragging = prev.find((q) => q.id === draggingId);
+    setSafetyChecklistQuestions(prev => {
+      const dragging = prev.find(q => q.id === draggingId);
       if (!dragging) return prev;
-      const withoutDragging = prev.filter((q) => q.id !== draggingId);
+      const withoutDragging = prev.filter(q => q.id !== draggingId);
       const cleared = { ...dragging, parentId: undefined };
       if (beforeId === null) {
-        return [...withoutDragging, cleared].map((q, i) => ({ ...q, order: i }));
+        return [...withoutDragging, cleared].map((q, i) => ({
+          ...q,
+          order: i,
+        }));
       }
-      const idx = withoutDragging.findIndex((q) => q.id === beforeId);
+      const idx = withoutDragging.findIndex(q => q.id === beforeId);
       const result =
         idx === -1
           ? [...withoutDragging, cleared]
-          : [...withoutDragging.slice(0, idx), cleared, ...withoutDragging.slice(idx)];
+          : [
+              ...withoutDragging.slice(0, idx),
+              cleared,
+              ...withoutDragging.slice(idx),
+            ];
       return result.map((q, i) => ({ ...q, order: i }));
     });
     handleDragEnd();
@@ -265,22 +289,22 @@ export default function SalesConfigManager({
     e.preventDefault();
     e.stopPropagation();
     if (!draggingId || draggingId === parentId) return;
-    setSafetyChecklistQuestions((prev) =>
-      prev.map((q) => (q.id === draggingId ? { ...q, parentId } : q))
+    setSafetyChecklistQuestions(prev =>
+      prev.map(q => (q.id === draggingId ? { ...q, parentId } : q))
     );
     handleDragEnd();
   };
 
   const handleMoveQuestion = (id: string, direction: 'up' | 'down') => {
-    setSafetyChecklistQuestions((prev) => {
-      const rootIds = prev.filter((q) => !q.parentId).map((q) => q.id);
+    setSafetyChecklistQuestions(prev => {
+      const rootIds = prev.filter(q => !q.parentId).map(q => q.id);
       const rootIdx = rootIds.indexOf(id);
       if (rootIdx < 0) return prev;
       const swapRootIdx = direction === 'up' ? rootIdx - 1 : rootIdx + 1;
       if (swapRootIdx < 0 || swapRootIdx >= rootIds.length) return prev;
       const swapId = rootIds[swapRootIdx];
-      const idxA = prev.findIndex((q) => q.id === id);
-      const idxB = prev.findIndex((q) => q.id === swapId);
+      const idxA = prev.findIndex(q => q.id === id);
+      const idxB = prev.findIndex(q => q.id === swapId);
       const next = [...prev];
       [next[idxA], next[idxB]] = [next[idxB], next[idxA]];
       return next.map((q, i) => ({ ...q, order: i }));
@@ -301,8 +325,8 @@ export default function SalesConfigManager({
 
   const handleSaveEdit = () => {
     if (!editingQuestionId || !editText.trim()) return;
-    setSafetyChecklistQuestions((prev) =>
-      prev.map((q) =>
+    setSafetyChecklistQuestions(prev =>
+      prev.map(q =>
         q.id === editingQuestionId
           ? { ...q, text: editText.trim(), answerType: editAnswerType }
           : q
@@ -1025,12 +1049,14 @@ export default function SalesConfigManager({
             <p className={styles.questionsSectionTitle}>Questions</p>
 
             {(() => {
-              const rootQuestions = safetyChecklistQuestions.filter((q) => !q.parentId);
+              const rootQuestions = safetyChecklistQuestions.filter(
+                q => !q.parentId
+              );
               return (
                 <div
                   className={styles.questionsList}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => handleDropOnRoot(e, null)}
+                  onDragOver={e => e.preventDefault()}
+                  onDrop={e => handleDropOnRoot(e, null)}
                 >
                   {rootQuestions.length === 0 && (
                     <p className={styles.questionsEmpty}>
@@ -1040,11 +1066,14 @@ export default function SalesConfigManager({
 
                   {rootQuestions.map((q, idx) => {
                     const children = safetyChecklistQuestions.filter(
-                      (q2) => q2.parentId === q.id
+                      q2 => q2.parentId === q.id
                     );
                     const isEditing = editingQuestionId === q.id;
                     const isDraggingThis = draggingId === q.id;
-                    const isDropTarget = dropBeforeId === q.id && draggingId && draggingId !== q.id;
+                    const isDropTarget =
+                      dropBeforeId === q.id &&
+                      draggingId &&
+                      draggingId !== q.id;
                     const isConditionalTarget = dropParentId === q.id;
 
                     return (
@@ -1056,7 +1085,7 @@ export default function SalesConfigManager({
                         <div
                           className={`${styles.questionGroup} ${isDraggingThis ? styles.dragging : ''}`}
                           draggable={!isEditing}
-                          onDragStart={(e) => {
+                          onDragStart={e => {
                             e.dataTransfer.effectAllowed = 'move';
                             setDraggingId(q.id);
                           }}
@@ -1071,18 +1100,21 @@ export default function SalesConfigManager({
                                     type="text"
                                     className={styles.addQuestionInput}
                                     value={editText}
-                                    onChange={(e) => setEditText(e.target.value)}
+                                    onChange={e => setEditText(e.target.value)}
                                     autoFocus
-                                    onKeyDown={(e) => {
+                                    onKeyDown={e => {
                                       if (e.key === 'Enter') handleSaveEdit();
-                                      if (e.key === 'Escape') handleCancelEdit();
+                                      if (e.key === 'Escape')
+                                        handleCancelEdit();
                                     }}
                                   />
                                   <select
                                     className={styles.addQuestionSelect}
                                     value={editAnswerType}
-                                    onChange={(e) =>
-                                      setEditAnswerType(e.target.value as 'yes_no' | 'text')
+                                    onChange={e =>
+                                      setEditAnswerType(
+                                        e.target.value as 'yes_no' | 'text'
+                                      )
                                     }
                                   >
                                     <option value="yes_no">Yes / No</option>
@@ -1112,7 +1144,7 @@ export default function SalesConfigManager({
                             // ── View mode ──────────────────────────────────
                             <div
                               className={styles.questionRow}
-                              onDragOver={(e) => {
+                              onDragOver={e => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 if (draggingId && draggingId !== q.id) {
@@ -1120,13 +1152,22 @@ export default function SalesConfigManager({
                                   setDropParentId(null);
                                 }
                               }}
-                              onDrop={(e) => handleDropOnRoot(e, q.id)}
+                              onDrop={e => handleDropOnRoot(e, q.id)}
                             >
-                              <GripVertical size={16} className={styles.dragHandle} />
-                              <span className={styles.questionRowIndex}>{idx + 1}.</span>
-                              <span className={styles.questionRowLabel}>{q.text}</span>
+                              <GripVertical
+                                size={16}
+                                className={styles.dragHandle}
+                              />
+                              <span className={styles.questionRowIndex}>
+                                {idx + 1}.
+                              </span>
+                              <span className={styles.questionRowLabel}>
+                                {q.text}
+                              </span>
                               <span className={styles.questionTypeBadge}>
-                                {q.answerType === 'yes_no' ? 'Yes / No' : 'Text'}
+                                {q.answerType === 'yes_no'
+                                  ? 'Yes / No'
+                                  : 'Text'}
                               </span>
                               <div className={styles.questionRowActions}>
                                 <button
@@ -1150,8 +1191,13 @@ export default function SalesConfigManager({
                                 <button
                                   type="button"
                                   className={styles.iconButton}
-                                  onClick={() => handleMoveQuestion(q.id, 'down')}
-                                  disabled={idx === rootQuestions.length - 1 || savingSafetyChecklist}
+                                  onClick={() =>
+                                    handleMoveQuestion(q.id, 'down')
+                                  }
+                                  disabled={
+                                    idx === rootQuestions.length - 1 ||
+                                    savingSafetyChecklist
+                                  }
                                   title="Move down"
                                 >
                                   <ChevronDown size={14} />
@@ -1173,7 +1219,7 @@ export default function SalesConfigManager({
                           {q.answerType === 'yes_no' && (
                             <div
                               className={`${styles.conditionalZone} ${isConditionalTarget ? styles.conditionalZoneActive : ''}`}
-                              onDragOver={(e) => {
+                              onDragOver={e => {
                                 e.preventDefault();
                                 e.stopPropagation();
                                 if (draggingId && draggingId !== q.id) {
@@ -1181,25 +1227,30 @@ export default function SalesConfigManager({
                                   setDropBeforeId(null);
                                 }
                               }}
-                              onDragLeave={(e) => {
-                                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                              onDragLeave={e => {
+                                if (
+                                  !e.currentTarget.contains(
+                                    e.relatedTarget as Node
+                                  )
+                                ) {
                                   setDropParentId(null);
                                 }
                               }}
-                              onDrop={(e) => handleDropOnConditional(e, q.id)}
+                              onDrop={e => handleDropOnConditional(e, q.id)}
                             >
                               <p className={styles.conditionalZoneLabel}>
                                 &#8627; If Yes, ask:
                               </p>
 
-                              {children.map((child) => {
-                                const isEditingChild = editingQuestionId === child.id;
+                              {children.map(child => {
+                                const isEditingChild =
+                                  editingQuestionId === child.id;
                                 return (
                                   <div
                                     key={child.id}
                                     className={`${styles.nestedQuestionRow} ${draggingId === child.id ? styles.dragging : ''}`}
                                     draggable={!isEditingChild}
-                                    onDragStart={(e) => {
+                                    onDragStart={e => {
                                       e.stopPropagation();
                                       e.dataTransfer.effectAllowed = 'move';
                                       setDraggingId(child.id);
@@ -1212,21 +1263,31 @@ export default function SalesConfigManager({
                                           type="text"
                                           className={styles.addQuestionInput}
                                           value={editText}
-                                          onChange={(e) => setEditText(e.target.value)}
+                                          onChange={e =>
+                                            setEditText(e.target.value)
+                                          }
                                           autoFocus
-                                          onKeyDown={(e) => {
-                                            if (e.key === 'Enter') handleSaveEdit();
-                                            if (e.key === 'Escape') handleCancelEdit();
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter')
+                                              handleSaveEdit();
+                                            if (e.key === 'Escape')
+                                              handleCancelEdit();
                                           }}
                                         />
                                         <select
                                           className={styles.addQuestionSelect}
                                           value={editAnswerType}
-                                          onChange={(e) =>
-                                            setEditAnswerType(e.target.value as 'yes_no' | 'text')
+                                          onChange={e =>
+                                            setEditAnswerType(
+                                              e.target.value as
+                                                | 'yes_no'
+                                                | 'text'
+                                            )
                                           }
                                         >
-                                          <option value="yes_no">Yes / No</option>
+                                          <option value="yes_no">
+                                            Yes / No
+                                          </option>
                                           <option value="text">Text</option>
                                         </select>
                                         <button
@@ -1247,18 +1308,33 @@ export default function SalesConfigManager({
                                       </div>
                                     ) : (
                                       <>
-                                        <GripVertical size={14} className={styles.dragHandle} />
-                                        <span className={styles.nestedQuestionText}>
+                                        <GripVertical
+                                          size={14}
+                                          className={styles.dragHandle}
+                                        />
+                                        <span
+                                          className={styles.nestedQuestionText}
+                                        >
                                           {child.text}
                                         </span>
-                                        <span className={styles.questionTypeBadge}>
-                                          {child.answerType === 'yes_no' ? 'Yes / No' : 'Text'}
+                                        <span
+                                          className={styles.questionTypeBadge}
+                                        >
+                                          {child.answerType === 'yes_no'
+                                            ? 'Yes / No'
+                                            : 'Text'}
                                         </span>
-                                        <div className={styles.nestedQuestionActions}>
+                                        <div
+                                          className={
+                                            styles.nestedQuestionActions
+                                          }
+                                        >
                                           <button
                                             type="button"
                                             className={styles.iconButton}
-                                            onClick={() => handleStartEdit(child)}
+                                            onClick={() =>
+                                              handleStartEdit(child)
+                                            }
                                             title="Edit question"
                                           >
                                             <Edit2 size={12} />
@@ -1266,7 +1342,9 @@ export default function SalesConfigManager({
                                           <button
                                             type="button"
                                             className={styles.iconButton}
-                                            onClick={() => handleUnNest(child.id)}
+                                            onClick={() =>
+                                              handleUnNest(child.id)
+                                            }
                                             title="Remove from conditional"
                                           >
                                             <X size={12} />
@@ -1274,7 +1352,9 @@ export default function SalesConfigManager({
                                           <button
                                             type="button"
                                             className={styles.iconButton}
-                                            onClick={() => handleDeleteQuestion(child.id)}
+                                            onClick={() =>
+                                              handleDeleteQuestion(child.id)
+                                            }
                                             title="Delete question"
                                           >
                                             <Trash2 size={12} />
@@ -1287,7 +1367,8 @@ export default function SalesConfigManager({
                               })}
 
                               <p className={styles.conditionalDropHint}>
-                                Drag questions here to ask when &ldquo;Yes&rdquo;
+                                Drag questions here to ask when
+                                &ldquo;Yes&rdquo;
                               </p>
                             </div>
                           )}

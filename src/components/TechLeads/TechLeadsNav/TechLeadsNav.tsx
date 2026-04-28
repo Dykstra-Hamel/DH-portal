@@ -1,7 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { UserPlus, TrendingUp } from 'lucide-react';
 import styles from './TechLeadsNav.module.scss';
 
 interface TechLeadsNavProps {
@@ -10,6 +12,8 @@ interface TechLeadsNavProps {
 
 export function TechLeadsNav({ basePath = '/tech-leads' }: TechLeadsNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const isActive = (href: string) => {
     if (href === basePath) {
@@ -18,8 +22,57 @@ export function TechLeadsNav({ basePath = '/tech-leads' }: TechLeadsNavProps) {
     return pathname.startsWith(href);
   };
 
+  const goToNew = (type: 'new-lead' | 'upsell') => {
+    setPickerOpen(false);
+    router.push(`${basePath}/new?type=${type}`);
+  };
+
   return (
     <nav className={styles.nav}>
+      {pickerOpen && (
+        <div
+          className={styles.overlay}
+          onClick={() => setPickerOpen(false)}
+        >
+          <div className={styles.sheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.sheetTitle}>What would you like to create?</p>
+            <button
+              type="button"
+              className={styles.sheetOption}
+              onClick={() => goToNew('new-lead')}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <UserPlus size={22} />
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>New Lead</strong>
+                <span>Capture a brand-new opportunity</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.sheetOption}
+              onClick={() => goToNew('upsell')}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <TrendingUp size={22} />
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>Upsell Opportunity</strong>
+                <span>Add to an existing customer&apos;s service</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.sheetCancel}
+              onClick={() => setPickerOpen(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className={styles.navInner}>
         {/* Home */}
         <Link
@@ -46,7 +99,11 @@ export function TechLeadsNav({ basePath = '/tech-leads' }: TechLeadsNavProps) {
         </Link>
 
         {/* New — raised center button */}
-        <Link href={`${basePath}/new`} className={styles.newItem}>
+        <button
+          type="button"
+          className={styles.newItem}
+          onClick={() => setPickerOpen(true)}
+        >
           <div className={styles.newBtn}>
             <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
               <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
@@ -55,7 +112,7 @@ export function TechLeadsNav({ basePath = '/tech-leads' }: TechLeadsNavProps) {
             </svg>
           </div>
           <span className={styles.newLabel}>New</span>
-        </Link>
+        </button>
 
         {/* My Opps */}
         <Link

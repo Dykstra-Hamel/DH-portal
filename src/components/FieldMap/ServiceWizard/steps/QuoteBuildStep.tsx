@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import {
   MAP_ELEMENT_STAMP_OPTIONS,
   MAP_PEST_STAMP_OPTIONS,
@@ -267,6 +267,9 @@ interface QuoteBuildStepProps {
   pestIconMap?: Record<string, string>;
   selectedDiscount?: AvailableDiscount | null;
   onDiscountChange?: (discount: AvailableDiscount | null) => void;
+  onEditPests?: () => void;
+  pricingReadOnly?: boolean;
+  onReady?: () => void;
 }
 
 // ── Line item card ─────────────────────────────────────────────────────────
@@ -1051,8 +1054,16 @@ export function QuoteBuildStep({
   pestIconMap = {},
   selectedDiscount,
   onDiscountChange,
+  onEditPests,
+  pricingReadOnly = false,
+  onReady,
 }: QuoteBuildStepProps) {
   const baseId = useId();
+  const onReadyRef = useRef(onReady);
+  const hasFiredReadyRef = useRef(false);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  });
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [pricingSettings, setPricingSettings] =
@@ -1316,7 +1327,13 @@ export function QuoteBuildStep({
 
         setCatalog([...plans, ...addons, ...bundles]);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!hasFiredReadyRef.current) {
+          hasFiredReadyRef.current = true;
+          onReadyRef.current?.();
+        }
+      });
   }, [companyId]);
 
   const [availableDiscounts, setAvailableDiscounts] = useState<
@@ -1333,22 +1350,27 @@ export function QuoteBuildStep({
       .catch(() => {});
   }, [companyId]);
 
-  // Reconcile coveredPestIds for line items loaded from DB (they come back with [])
+  // Reconcile coveredPestIds for line items loaded from DB (they come back with []).
+  // Runs whenever catalog or lineItems change so it works regardless of which
+  // arrives first. The predicate skips items whose catalog has no coverage
+  // (addons), preventing an infinite loop on those.
   useEffect(() => {
     if (catalog.length === 0) return;
-    const needsReconcile = lineItems.some(
-      i => i.catalogItemId && i.coveredPestIds.length === 0
-    );
+    const needsReconcile = lineItems.some(i => {
+      if (!i.catalogItemId || i.coveredPestIds.length > 0) return false;
+      const ci = catalog.find(c => c.id === i.catalogItemId);
+      return ci != null && ci.pestCoverageIds.length > 0;
+    });
     if (!needsReconcile) return;
     const updated = lineItems.map(item => {
       if (!item.catalogItemId || item.coveredPestIds.length > 0) return item;
       const ci = catalog.find(c => c.id === item.catalogItemId);
-      if (!ci) return item;
+      if (!ci || ci.pestCoverageIds.length === 0) return item;
       return { ...item, coveredPestIds: ci.pestCoverageIds };
     });
     onChange(updated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog]); // Intentionally omit lineItems/onChange — only runs when catalog first loads
+  }, [catalog, lineItems]);
 
   // All covered pest IDs: plan-addon items carry the plan's pest_coverage IDs
   // (written at selection time), custom items carry manually-checked IDs.
@@ -1660,16 +1682,7 @@ export function QuoteBuildStep({
 
   const modalServiceChips = useMemo(() => {
     if (!pestModal) return [];
-    // When editing, only show the single selected plan as a chip
-    if (editingItemId) {
-      const editingItem = lineItems.find(i => i.id === editingItemId);
-      if (editingItem?.catalogItemId) {
-        const ci = catalog.find(c => c.id === editingItem.catalogItemId);
-        return ci ? [ci] : [];
-      }
-      return [];
-    }
-    // "Add Additional Service" — show all plans/bundles with no pest filter
+    // "Edit Service" / "Add Additional Service" — show all plans/bundles
     if (pestModal.id === '__all__') {
       return catalog.filter(c => c.kind === 'plan' || c.kind === 'bundle');
     }
@@ -1678,7 +1691,7 @@ export function QuoteBuildStep({
         (c.kind === 'plan' || c.kind === 'bundle') &&
         c.pestCoverageIds.includes(pestModal.id)
     );
-  }, [catalog, pestModal, editingItemId, lineItems]);
+  }, [catalog, pestModal]);
 
   const filteredServiceChips = useMemo(() => {
     if (!serviceSearch.trim()) return modalServiceChips;
@@ -2339,8 +2352,23 @@ export function QuoteBuildStep({
   return (
     <div className={styles.root}>
       {/* ── Pest Concern Coverage (top) ── */}
-      {plottedPests.length > 0 && (
+      {(plottedPests.length > 0 || onEditPests) && (
         <div className={styles.coverageSection}>
+          {onEditPests && (
+            <div className={styles.editPestsRow}>
+              <button
+                type="button"
+                className={styles.editPestsBtn}
+                onClick={onEditPests}
+              >
+                <Pencil size={14} />
+                {plottedPests.length > 0
+                  ? 'Edit pest issues'
+                  : 'Add pest issues'}
+              </button>
+            </div>
+          )}
+          {plottedPests.length > 0 && (
           <div className={styles.pestIconRow}>
             {plottedPests.map(pest => {
               const covered = coveredPestIds.has(pest.id);
@@ -2399,6 +2427,7 @@ export function QuoteBuildStep({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -2411,9 +2440,13 @@ export function QuoteBuildStep({
             </p>
           ) : (
             <>
-              <p className={styles.emptyTitle}>No line items yet</p>
+              <p className={styles.emptyTitle}>
+                No pest issues added to this lead yet
+              </p>
               <p className={styles.emptyHint}>
-                Add a line item to start building the quote.
+                {onEditPests
+                  ? 'Click Edit pest issues above to add the customer\u2019s pest concerns.'
+                  : 'Add the customer\u2019s pest concerns to start building the quote.'}
               </p>
             </>
           )}
@@ -2685,7 +2718,10 @@ export function QuoteBuildStep({
 
       {/* ── Pest Service Selection Modal ── */}
       {pestModal && (
-        <div className={styles.modalOverlay} onClick={closeModal}>
+        <div
+          className={`${styles.modalOverlay} ${pricingReadOnly ? styles.modalOverlayWorkspaceOffset : ''}`}
+          onClick={closeModal}
+        >
           <div className={styles.modalSheetWrapper}>
             {/* Pest icon circle — overlaps top edge of the sheet */}
             <div className={styles.modalPestCircleWrapper}>
@@ -3143,81 +3179,56 @@ export function QuoteBuildStep({
                     ) : (
                     <div className={`${styles.modalPricingRow}${modalIsOneTime ? ` ${styles.modalPricingRowSingle}` : ''}`}>
                       <div className={styles.modalPricingField}>
-                        <span className={styles.fieldLabel}>
-                          {modalIsOneTime ? 'Service Fee' : 'Initial Price'}
-                        </span>
-                        <div className={styles.currencyWrap}>
-                          <span className={styles.currencySign}>$</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            className={styles.numberInput}
-                            value={modalInitialPrice ?? ''}
-                            onChange={e =>
-                              setModalInitialPrice(parseCost(e.target.value))
-                            }
-                            placeholder="0.00"
-                          />
-                        </div>
-                        {modalNeedsQty && modalQuantity != null && modalQuantity > 0 && modalInitialPrice != null && (() => {
-                          const activeVariant = modalVariantLabel
-                            ? modalSelectedService!.variants?.find(v => v.label === modalVariantLabel) ?? null
-                            : null;
-                          const min = activeVariant?.minimum_price ?? modalSelectedService!.minimumPrice;
-                          if (modalIsPerUnit) {
-                            const rate = activeVariant?.price_per_unit ?? modalSelectedService!.pricePerUnit ?? 0;
-                            const unitShort = modalWantsLinFt ? 'ln ft'
-                              : (modalSelectedService!.pricingUnit === 'acres' || modalSelectedService!.pricingType === 'per_acre') ? 'acre'
-                              : 'sq ft';
-                            const raw = modalQuantity * rate;
-                            return (
-                              <span className={styles.pricingHint}>
-                                @ {formatCurrency(rate)}/{unitShort} = {formatCurrency(modalInitialPrice)}
-                                {min != null && raw < min ? <> (min {formatCurrency(min)})</> : null}
-                              </span>
-                            );
-                          }
-                          if (modalIsPerHour) {
-                            const rate = modalSelectedService!.initialPrice ?? 0;
-                            return (
-                              <span className={styles.pricingHint}>
-                                @ {formatCurrency(rate)}/hr = {formatCurrency(modalInitialPrice)}
-                              </span>
-                            );
-                          }
-                          if (modalIsPerRoom) {
-                            return (
-                              <span className={styles.pricingHint}>
-                                = {formatCurrency(modalInitialPrice)} ({modalQuantity} {modalQuantity === 1 ? 'room' : 'rooms'})
-                              </span>
-                            );
-                          }
-                          return null;
-                        })()}
+                        <span className={styles.fieldLabel}>Initial Price</span>
+                        {pricingReadOnly ? (
+                          <span className={styles.readOnlyValue}>
+                            {formatCurrency(modalInitialPrice ?? 0)}
+                          </span>
+                        ) : (
+                          <div className={styles.currencyWrap}>
+                            <span className={styles.currencySign}>$</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              className={styles.numberInput}
+                              value={modalInitialPrice ?? ''}
+                              onChange={e =>
+                                setModalInitialPrice(parseCost(e.target.value))
+                              }
+                              placeholder="0.00"
+                            />
+                          </div>
+                        )}
                       </div>
                       {!modalIsOneTime && (
-                      <div className={styles.modalPricingField}>
-                        <span className={styles.fieldLabel}>
-                          Recurring Price
-                        </span>
-                        <div className={styles.currencyWrap}>
-                          <span className={styles.currencySign}>$</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            className={styles.numberInput}
-                            value={modalRecurringPrice ?? ''}
-                            onChange={e =>
-                              setModalRecurringPrice(parseCost(e.target.value))
-                            }
-                            placeholder="0.00"
-                          />
+                        <div className={styles.modalPricingField}>
+                          <span className={styles.fieldLabel}>
+                            Recurring Price
+                          </span>
+                          {pricingReadOnly ? (
+                            <span className={styles.readOnlyValue}>
+                              {formatCurrency(modalRecurringPrice ?? 0)}
+                            </span>
+                          ) : (
+                            <div className={styles.currencyWrap}>
+                              <span className={styles.currencySign}>$</span>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.01"
+                                className={styles.numberInput}
+                                value={modalRecurringPrice ?? ''}
+                                onChange={e =>
+                                  setModalRecurringPrice(parseCost(e.target.value))
+                                }
+                                placeholder="0.00"
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
                       )}
                     </div>
                     )}

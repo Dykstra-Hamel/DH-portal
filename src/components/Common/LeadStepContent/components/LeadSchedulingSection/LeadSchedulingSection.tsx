@@ -37,6 +37,7 @@ export function LeadSchedulingSection({
   onEmailQuote,
   isSidebarExpanded,
   timeOptions,
+  unwrapped,
 }: LeadSchedulingSectionProps) {
   const { activeSection, setActiveSection } = useActiveSection();
   const { user } = useUser();
@@ -46,22 +47,11 @@ export function LeadSchedulingSection({
   const lineItems = quote?.line_items ?? [];
   const hasMultipleItems = lineItems.length >= 2;
 
-  return (
+  const body = (
     <div
-      className={`${styles.sectionWrapper} ${activeSection === 'scheduling' ? styles.active : ''}`}
-      onClick={() => setActiveSection('scheduling')}
+      className={styles.cardContent}
+      data-sidebar-expanded={isSidebarExpanded}
     >
-      <InfoCard
-        title="Scheduling"
-        icon={<CalendarCheck size={20} />}
-        isCollapsible={true}
-        startExpanded={true}
-        isActive={activeSection === 'scheduling'}
-      >
-      <div
-        className={styles.cardContent}
-        data-sidebar-expanded={isSidebarExpanded}
-      >
         {/* Service Confirmation Section */}
         <div className={styles.section}>
           <h4 className={cardStyles.defaultText}>Service Confirmation</h4>
@@ -228,7 +218,24 @@ export function LeadSchedulingSection({
           );
         })()}
       </div>
-    </InfoCard>
+  );
+
+  if (unwrapped) return body;
+
+  return (
+    <div
+      className={`${styles.sectionWrapper} ${activeSection === 'scheduling' ? styles.active : ''}`}
+      onClick={() => setActiveSection('scheduling')}
+    >
+      <InfoCard
+        title="Scheduling"
+        icon={<CalendarCheck size={20} />}
+        isCollapsible={true}
+        startExpanded={true}
+        isActive={activeSection === 'scheduling'}
+      >
+        {body}
+      </InfoCard>
     </div>
   );
 }

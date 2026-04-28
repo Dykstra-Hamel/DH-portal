@@ -335,7 +335,10 @@ export async function POST(
     }
 
     if (body.requested_date) {
-      commentLines.push(`Preferred Service Date: ${new Date(body.requested_date).toLocaleDateString()}`);
+      const day =
+        body.requested_date.charAt(0).toUpperCase() +
+        body.requested_date.slice(1).toLowerCase();
+      commentLines.push(`Preferred Service Day: ${day}`);
     }
 
     if (body.requested_time) {
