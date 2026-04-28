@@ -184,7 +184,7 @@
 .lineItemCard {
   background: var(--gray-25);
   border: 1px solid var(--gray-200);
-  border-radius: 14px;
+  border-radius: 8px;
   padding: 14px;
   display: flex;
   flex-direction: column;
@@ -222,7 +222,7 @@
 .typeToggle {
   display: flex;
   border: 1px solid var(--gray-300);
-  border-radius: 10px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -285,7 +285,7 @@
   gap: 8px;
   padding: 10px 12px;
   border: 1px solid var(--gray-200);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--gray-50);
 }
 
@@ -472,7 +472,7 @@
   width: 100%;
   padding: 9px 12px;
   border: 1px solid var(--gray-200);
-  border-radius: 10px;
+  border-radius: 4px;
   font-size: 14px;
   font-family: var(--font-default);
   color: var(--gray-900);
@@ -534,7 +534,7 @@
   display: flex;
   align-items: center;
   border: 1px solid var(--gray-200);
-  border-radius: 10px;
+  border-radius: 4px;
   overflow: hidden;
   background: var(--gray-25);
 
@@ -600,7 +600,7 @@
   display: flex;
   align-items: center;
   border: 1px solid var(--gray-200);
-  border-radius: 10px;
+  border-radius: 4px;
   background: var(--gray-25);
   overflow: hidden;
 
@@ -1375,7 +1375,7 @@
   padding: 14px 16px;
   background: var(--white);
   border: 1px solid var(--gray-200);
-  border-radius: 14px;
+  border-radius: 8px;
   transition:
     opacity 0.15s,
     box-shadow 0.15s,
@@ -1541,7 +1541,7 @@
   padding: 14px 16px;
   background: var(--white);
   border: 1px solid var(--blue-400);
-  border-radius: 14px;
+  border-radius: 8px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   transform: rotate(1.5deg) scale(1.02);
   opacity: 0.95;

@@ -562,8 +562,7 @@
 .planHeaderInitial {
   font-size: 24px;
   font-weight: 700;
-  color: var(--color-text-gray);
-  opacity: 0.4;
+  color: var(--gray-700);
 
   sup {
     font-size: 16px;
@@ -1121,7 +1120,7 @@
 .totalPricing {
   padding: 25px 30px 20px;
   margin-bottom: 32px;
-  border-radius: 16px;
+  border-radius: 8px;
   border: 1px solid var(--gray-300);
   font-family: var(--font-default);
   background: #fff;

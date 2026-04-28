@@ -1203,7 +1203,7 @@ export function ReviewStep({
                       c.parentLineItemId === item.id
                   );
                   const isExpandable =
-                    hasContent || hasRecommended || hasSpecialtyLines;
+                    hasContent || hasRecommended;
                   const isExpanded = expandedItemId === item.id;
                   const isSelected = selectedItemIds.has(item.id);
                   const isOnly =
@@ -1417,11 +1417,13 @@ export function ReviewStep({
                               <span className={qcStyles.planHeaderInitial}>
                                 <sup>$</sup>
                                 {aggInitial.toFixed(0)}
-                                <span className={qcStyles.initialText}>
-                                  {item.frequency === 'one-time'
-                                    ? ' One Time'
-                                    : ' Initial'}
-                                </span>
+                                {aggRecurring > 0 && (
+                                  <span className={qcStyles.initialText}>
+                                    {item.frequency === 'one-time'
+                                      ? ' One Time'
+                                      : ' Initial'}
+                                  </span>
+                                )}
                               </span>
                             )}
                           </div>
@@ -1752,87 +1754,6 @@ export function ReviewStep({
                               </div>
                             );
                           })()}
-                          {/* ── Specialty line items for this plan ── */}
-                          {(() => {
-                            const specialtyLines = quoteLineItems.filter(
-                              c =>
-                                c.catalogItemKind === 'specialty-line' &&
-                                c.parentLineItemId === item.id
-                            );
-                            if (specialtyLines.length === 0) return null;
-                            return (
-                              <div className={styles.planCardAddons}>
-                                <div className={styles.planCardAddonBtnGroup}>
-                                  {specialtyLines.map(line => {
-                                    const isChecked = selectedItemIds.has(
-                                      line.id
-                                    );
-                                    const priceLabel =
-                                      (line.initialCost ?? 0) > 0
-                                        ? `$${(line.initialCost ?? 0).toFixed(0)}`
-                                        : '';
-                                    return (
-                                      <div
-                                        key={line.id}
-                                        className={styles.planCardAddonBtnWrap}
-                                      >
-                                        <button
-                                          type="button"
-                                          className={`${styles.planCardAddonBtn}${isChecked && isSelected ? ` ${styles.planCardAddonBtnSelected}` : ''}`}
-                                          onClick={
-                                            isSelected
-                                              ? () =>
-                                                  toggleItemSelected(line.id)
-                                              : undefined
-                                          }
-                                          disabled={!isSelected}
-                                        >
-                                          {isChecked && isSelected && (
-                                            <span
-                                              className={
-                                                styles.planCardAddonBtnCheck
-                                              }
-                                            >
-                                              <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="27"
-                                                height="27"
-                                                viewBox="0 0 27 27"
-                                                fill="none"
-                                              >
-                                                <circle
-                                                  cx="13.5"
-                                                  cy="13.5"
-                                                  r="13.5"
-                                                />
-                                                <path d="M13.75 4C11.8216 4 9.93657 4.57183 8.33319 5.64317C6.72982 6.71451 5.48013 8.23726 4.74218 10.0188C4.00422 11.8004 3.81114 13.7608 4.18735 15.6521C4.56355 17.5434 5.49215 19.2807 6.85571 20.6443C8.21928 22.0079 9.95656 22.9365 11.8479 23.3127C13.7392 23.6889 15.6996 23.4958 17.4812 22.7578C19.2627 22.0199 20.7855 20.7702 21.8568 19.1668C22.9282 17.5634 23.5 15.6784 23.5 13.75C23.4973 11.165 22.4692 8.68661 20.6413 6.85872C18.8134 5.03084 16.335 4.00273 13.75 4ZM18.0306 12.0306L12.7806 17.2806C12.711 17.3504 12.6283 17.4057 12.5372 17.4434C12.4462 17.4812 12.3486 17.5006 12.25 17.5006C12.1514 17.5006 12.0538 17.4812 11.9628 17.4434C11.8718 17.4057 11.789 17.3504 11.7194 17.2806L9.46938 15.0306C9.32865 14.8899 9.24959 14.699 9.24959 14.5C9.24959 14.301 9.32865 14.1101 9.46938 13.9694C9.61011 13.8286 9.80098 13.7496 10 13.7496C10.199 13.7496 10.3899 13.8286 10.5306 13.9694L12.25 15.6897L16.9694 10.9694C17.0391 10.8997 17.1218 10.8444 17.2128 10.8067C17.3039 10.769 17.4015 10.7496 17.5 10.7496C17.5986 10.7496 17.6961 10.769 17.7872 10.8067C17.8782 10.8444 17.9609 10.8997 18.0306 10.9694C18.1003 11.0391 18.1556 11.1218 18.1933 11.2128C18.231 11.3039 18.2504 11.4015 18.2504 11.5C18.2504 11.5985 18.231 11.6961 18.1933 11.7872C18.1556 11.8782 18.1003 11.9609 18.0306 12.0306Z" />
-                                              </svg>
-                                            </span>
-                                          )}
-                                          <span
-                                            className={
-                                              styles.planCardAddonBtnLabel
-                                            }
-                                          >
-                                            {line.catalogItemName ?? ''}
-                                          </span>
-                                        </button>
-                                        {priceLabel && (
-                                          <span
-                                            className={
-                                              styles.planCardAddonBtnPrice
-                                            }
-                                          >
-                                            {priceLabel}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
                         </div>
                       )}
                     </div>
@@ -1893,10 +1814,12 @@ export function ReviewStep({
                                 <span className={qcStyles.planHeaderInitial}>
                                   <sup>$</sup>
                                   {(addon.initialCost ?? 0).toFixed(0)}
-                                  <span className={qcStyles.initialText}>
-                                    {' '}
-                                    Initial
-                                  </span>
+                                  {(addon.recurringCost ?? 0) > 0 && (
+                                    <span className={qcStyles.initialText}>
+                                      {' '}
+                                      Initial
+                                    </span>
+                                  )}
                                 </span>
                               )}
                             </div>
@@ -2384,47 +2307,6 @@ export function ReviewStep({
                               </>
                             </span>
                           </div>
-                          {totalSpecialtyLineChildren.map(line => {
-                            const lineSelected =
-                              isSelected && selectedItemIds.has(line.id);
-                            return (
-                              <div
-                                key={line.id}
-                                className={`${qcStyles.totalItem} ${styles.totalAddonItem} ${!lineSelected ? qcStyles.totalItemUnselected : ''}`}
-                              >
-                                <span className={qcStyles.totalItemLeft}>
-                                  <label
-                                    className={`${qcStyles.addonCheckbox} ${styles.totalAddonCheckbox}`}
-                                  >
-                                    <input
-                                      type="checkbox"
-                                      checked={lineSelected}
-                                      onChange={
-                                        isSelected
-                                          ? () => toggleItemSelected(line.id)
-                                          : undefined
-                                      }
-                                      disabled={!isSelected}
-                                    />
-                                    <span
-                                      className={qcStyles.addonCheckboxCustom}
-                                    />
-                                  </label>
-                                  {line.catalogItemName ??
-                                    formatLineItemLabel(line)}
-                                </span>
-                                <span className={qcStyles.totalItemPrice}>
-                                  {(line.initialCost ?? 0) > 0 && (
-                                    <span
-                                      className={qcStyles.totalItemPriceAmount}
-                                    >
-                                      ${(line.initialCost ?? 0).toFixed(0)}
-                                    </span>
-                                  )}
-                                </span>
-                              </div>
-                            );
-                          })}
                           {childAddons.map(addon => {
                             const addonSelected = selectedItemIds.has(addon.id);
                             const addonOnly =
