@@ -119,6 +119,7 @@
 
 .contentAreaInner {
   max-width: 750px;
+  width: 100%;
   margin: 0 auto;
 }
 
@@ -269,6 +270,8 @@
   @media (max-width: 768px) {
     order: 1;
     margin-top: 16px;
+    width: 100%;
+    position: relative;
   }
 }
 
@@ -279,13 +282,15 @@
   overflow: hidden;
   background: var(--gray-50);
   position: relative;
+  aspect-ratio: 4 / 3;
 
   @media (max-width: 768px) {
     width: 100%;
-    min-height: 250px;
+    height: auto;
+    min-height: 0;
     border-radius: 8px;
     overflow: hidden;
-    background: var(--gray-50);
+    background: var(--gray-25);
     position: relative;
   }
 }
