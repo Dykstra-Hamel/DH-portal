@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { logActivity } from '@/lib/activity-logger';
 import { generateQuoteUrl, generateQuoteToken, getFullQuoteUrl } from '@/lib/quote-utils';
 import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
+import { formatPreferredDay } from '@/lib/date-utils';
 
 export async function POST(
   request: NextRequest,
@@ -251,7 +252,7 @@ export async function POST(
       zipCode: lead.primary_service_address?.zip_code || '',
 
       // Scheduling info
-      requestedDate: lead.requested_date ? new Date(lead.requested_date).toLocaleDateString() : 'Not specified',
+      requestedDate: formatPreferredDay(lead.requested_date, 'Not specified'),
       requestedTime: lead.requested_time || 'Not specified',
 
       // Brand colors

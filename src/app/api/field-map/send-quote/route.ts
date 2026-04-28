@@ -7,9 +7,6 @@ import { getFullQuoteUrl } from '@/lib/quote-utils';
 import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
 import { generateFieldMapQuoteEmailTemplate } from '@/lib/email/templates/field-map-quote';
 
-// TODO: switch to customerEmail when ready for production
-const QUOTE_RECIPIENT = 'jason@dykstrahamel.com';
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -288,8 +285,10 @@ export async function POST(request: NextRequest) {
       }
 
       if (htmlContent) {
+        // TODO: switch to clientEmail when ready for production
+        const recipient = user.email!;
         console.log('[send-quote] dispatching', {
-          to: QUOTE_RECIPIENT,
+          to: recipient,
           from: fromEmail,
           fromName: company?.name || bodyCompanyName || 'FieldMap',
           subject: subjectLine,
@@ -302,7 +301,7 @@ export async function POST(request: NextRequest) {
             tenantName,
             from: fromEmail,
             fromName: company?.name || bodyCompanyName || 'FieldMap',
-            to: QUOTE_RECIPIENT, // TODO: switch to clientEmail when ready for production
+            to: recipient,
             subject: subjectLine,
             html: htmlContent,
             companyId,

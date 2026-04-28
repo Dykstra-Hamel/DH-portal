@@ -1,0 +1,26 @@
+.panel {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 24px;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sectionHeading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+}

@@ -76,9 +76,9 @@ export default function SalesConfigManager({ companyId }: SalesConfigManagerProp
       setQuickQuoteStep1Tips(settings?.quick_quote_step1_tips?.value ?? '');
       setQuickQuoteStep2Script(settings?.quick_quote_step2_script?.value ?? '');
       setQuickQuoteStep3Script(settings?.quick_quote_step3_script?.value ?? '');
-      setAutoAssignCustomQuoteLeads(settings?.auto_assign_custom_quote_leads?.value === 'true');
-      setTechnicianPropertyTypeEnabled(settings?.technician_property_type_enabled?.value === 'true');
-      setInspectorPropertyTypeEnabled(settings?.inspector_property_type_enabled?.value === 'true');
+      setAutoAssignCustomQuoteLeads(settings?.auto_assign_custom_quote_leads?.value === true);
+      setTechnicianPropertyTypeEnabled(settings?.technician_property_type_enabled?.value === true);
+      setInspectorPropertyTypeEnabled(settings?.inspector_property_type_enabled?.value === true);
     } catch {
       // Non-critical — silently ignore
     }

@@ -1,3 +1,35 @@
+// Two-column summary layout
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 24px;
+  padding: 20px 16px;
+}
+
+.summaryCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+
+  .cardContent {
+    padding: 0;
+  }
+
+  // First top-level section in a column should not show its top divider
+  > .recordingSection:first-child,
+  > .transcriptSection:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: none;
+  }
+}
+
+@media (max-width: 768px) {
+  .summaryGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 // Call Information Card Styles
 .cardContent {
   padding: 20px 16px;

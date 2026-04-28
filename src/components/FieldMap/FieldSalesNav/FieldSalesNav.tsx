@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { UserPlus, TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
@@ -14,6 +15,7 @@ export function FieldSalesNav() {
   const { selectedCompany, isAdmin } = useCompany();
   const [userId, setUserId] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState(false);
+  const [showLeadTypePicker, setShowLeadTypePicker] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -30,6 +32,10 @@ export function FieldSalesNav() {
   const isTechnician = departments.includes('technician');
   const isInspector = departments.includes('inspector');
   const showBothOptions = isAdmin || (isTechnician && isInspector);
+  // Dashboard keeps the existing inspection-vs-lead picker. Every other page
+  // (Routes, My Opportunities, Reports, etc.) needs the lead-type picker
+  // (New Lead vs Upsell Opportunity) instead.
+  const isDashboard = pathname === '/field-sales/dashboard';
 
   const isActive = (href: string) => {
     if (href === '/field-sales/dashboard') {
@@ -39,13 +45,28 @@ export function FieldSalesNav() {
   };
 
   const handleNewPress = () => {
+    // Off-dashboard pages always go through the lead-type picker so techs can
+    // pick New Lead vs Upsell from anywhere in the app.
+    if (!isDashboard) {
+      setShowLeadTypePicker(true);
+      return;
+    }
+    // On the dashboard, dual-role users (admin or inspector+technician) still
+    // see the inspection-vs-lead picker first. Pure inspectors jump straight
+    // to a new inspection. Pure technicians get the lead-type picker so they
+    // can choose New Lead or Upsell instead of being forced into New Lead.
     if (showBothOptions) {
       setShowPopup(true);
     } else if (isInspector) {
       router.push('/field-sales/field-map/new');
     } else {
-      router.push('/field-sales/tech-leads/new?type=new-lead');
+      setShowLeadTypePicker(true);
     }
+  };
+
+  const goToNewLeadType = (type: 'new-lead' | 'upsell') => {
+    setShowLeadTypePicker(false);
+    router.push(`/field-sales/tech-leads/new?type=${type}`);
   };
 
   const thirdHref = '/field-sales/reports';
@@ -53,6 +74,50 @@ export function FieldSalesNav() {
 
   return (
     <>
+      {showLeadTypePicker && (
+        <div
+          className={styles.overlay}
+          onClick={() => setShowLeadTypePicker(false)}
+        >
+          <div className={styles.sheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.sheetTitle}>What would you like to create?</p>
+            <button
+              type="button"
+              className={styles.sheetOption}
+              onClick={() => goToNewLeadType('new-lead')}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <UserPlus size={22} />
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>New Lead</strong>
+                <span>Capture a brand-new opportunity</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.sheetOption}
+              onClick={() => goToNewLeadType('upsell')}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <TrendingUp size={22} />
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>Upsell Opportunity</strong>
+                <span>Add to an existing customer&apos;s service</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.sheetCancel}
+              onClick={() => setShowLeadTypePicker(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {showPopup && (
         <div className={styles.overlay} onClick={() => setShowPopup(false)}>
           <div className={styles.sheet} onClick={e => e.stopPropagation()}>

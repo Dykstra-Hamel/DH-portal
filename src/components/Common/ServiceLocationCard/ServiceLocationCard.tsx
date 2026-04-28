@@ -47,6 +47,7 @@ interface ServiceLocationCardProps {
   forceCollapse?: boolean;
   isCompact?: boolean;
   inSidebar?: boolean;
+  unwrapped?: boolean;
 }
 
 export function ServiceLocationCard({
@@ -71,6 +72,7 @@ export function ServiceLocationCard({
   forceCollapse = false,
   isCompact = false,
   inSidebar = false,
+  unwrapped = false,
 }: ServiceLocationCardProps) {
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
   const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
@@ -207,17 +209,7 @@ export function ServiceLocationCard({
 
   // Render read-only mode (original behavior)
   if (!editable) {
-    return (
-      <InfoCard
-        title="Service Location"
-        icon={<MapPinned size={20} />}
-        startExpanded={startExpanded}
-        onExpand={onExpand}
-        onCollapse={onCollapse}
-        forceCollapse={forceCollapse}
-        isCompact={isCompact}
-        inSidebar={inSidebar}
-      >
+    const readOnlyBody = (
         <div className={styles.cardContent}>
           {serviceAddress ? (
             <div className={styles.callInsightsGrid}>
@@ -298,22 +290,28 @@ export function ServiceLocationCard({
             </div>
           )}
         </div>
+    );
+
+    if (unwrapped) return readOnlyBody;
+
+    return (
+      <InfoCard
+        title="Service Location"
+        icon={<MapPinned size={20} />}
+        startExpanded={startExpanded}
+        onExpand={onExpand}
+        onCollapse={onCollapse}
+        forceCollapse={forceCollapse}
+        isCompact={isCompact}
+        inSidebar={inSidebar}
+      >
+        {readOnlyBody}
       </InfoCard>
     );
   }
 
   // Render editable mode
-  return (
-    <InfoCard
-      title="Service Location"
-      icon={<MapPinned size={20} />}
-      startExpanded={startExpanded}
-      onExpand={onExpand}
-      onCollapse={onCollapse}
-      forceCollapse={forceCollapse}
-      isCompact={isCompact}
-      inSidebar={inSidebar}
-    >
+  const editableBody = (
       <div className={styles.cardContent}>
         <div className={styles.serviceLocationGrid}>
           {/* Row 1: City, State, Zip (3 columns) */}
@@ -462,6 +460,22 @@ export function ServiceLocationCard({
           </div>
         )}
       </div>
+  );
+
+  if (unwrapped) return editableBody;
+
+  return (
+    <InfoCard
+      title="Service Location"
+      icon={<MapPinned size={20} />}
+      startExpanded={startExpanded}
+      onExpand={onExpand}
+      onCollapse={onCollapse}
+      forceCollapse={forceCollapse}
+      isCompact={isCompact}
+      inSidebar={inSidebar}
+    >
+      {editableBody}
     </InfoCard>
   );
 }

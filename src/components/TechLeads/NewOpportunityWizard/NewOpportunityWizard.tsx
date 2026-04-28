@@ -2308,6 +2308,8 @@ function StepServiceTodayConfirm({
   onRequestedTimeChange,
   companyQuoteTerms,
   timeOptions,
+  termsAccepted,
+  onTermsAcceptedChange,
 }: {
   selectedPlan: ServicePlan | null;
   upsellSelection: UpsellSelection | null;
@@ -2322,8 +2324,14 @@ function StepServiceTodayConfirm({
   onRequestedTimeChange: (value: string) => void;
   companyQuoteTerms: string | null;
   timeOptions: TimeOption[];
+  termsAccepted: boolean;
+  onTermsAcceptedChange: (value: boolean) => void;
 }) {
   const signatureRef = useRef<SignatureCanvas>(null);
+  const termsModalBodyRef = useRef<HTMLDivElement>(null);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsViewed, setTermsViewed] = useState(false);
+  const [termsNudge, setTermsNudge] = useState(false);
   const addr = selectedCustomer ? getPrimaryAddress(selectedCustomer) : null;
 
   // Prefer an upsell pick (plan or addon) over the legacy selectedPlan.
@@ -2364,6 +2372,27 @@ function StepServiceTodayConfirm({
     signatureRef.current?.clear();
     onSignatureChange(null);
   };
+
+  const hasTermsContent = !!(companyQuoteTerms || planTermsHtml || disclaimerHtml);
+
+  // Mark terms as viewed when modal opens: immediately if content fits without
+  // scrolling, otherwise only after the user scrolls to the bottom.
+  useEffect(() => {
+    if (!termsModalOpen) return;
+    const el = termsModalBodyRef.current;
+    if (!el) return;
+    if (el.scrollHeight <= el.clientHeight) {
+      setTermsViewed(true);
+      return;
+    }
+    const handleScroll = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {
+        setTermsViewed(true);
+      }
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [termsModalOpen]);
 
   return (
     <div className={styles.stepContent}>
@@ -2475,35 +2504,70 @@ function StepServiceTodayConfirm({
       )}
 
       {/* Terms & Disclaimer */}
-      {(companyQuoteTerms || planTermsHtml || disclaimerHtml) && (
+      {hasTermsContent && (
         <div className={styles.confirmSection}>
-          <h3 className={styles.confirmSectionTitle}>Terms & Agreement</h3>
-          {companyQuoteTerms && (
-            <div
-              className={styles.confirmTerms}
-              dangerouslySetInnerHTML={{ __html: companyQuoteTerms }}
+          <h3 className={styles.confirmSectionTitle}>
+            Terms & Agreement
+            <span className={styles.requiredMark} aria-hidden="true">*</span>
+          </h3>
+          <div className={styles.viewTermsRow}>
+            <button
+              type="button"
+              className={`${styles.viewTermsButton} ${termsNudge ? styles.viewTermsNudge : ''}`}
+              onClick={() => {
+                setTermsModalOpen(true);
+                setTermsNudge(false);
+              }}
+            >
+              View Terms and Conditions
+            </button>
+            {termsViewed && (
+              <span className={styles.viewedBadge}>&#10003; Viewed</span>
+            )}
+          </div>
+          <label
+            className={styles.termsCheckboxRow}
+            onClick={e => {
+              if (!termsViewed) {
+                e.preventDefault();
+                setTermsNudge(true);
+                setTimeout(() => setTermsNudge(false), 2000);
+              }
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={e => {
+                if (!termsViewed) {
+                  setTermsNudge(true);
+                  setTimeout(() => setTermsNudge(false), 2000);
+                  return;
+                }
+                onTermsAcceptedChange(e.target.checked);
+              }}
             />
-          )}
-          {planTermsHtml && (
-            <div
-              className={styles.confirmTerms}
-              dangerouslySetInnerHTML={{ __html: planTermsHtml }}
-            />
-          )}
-          {disclaimerHtml && (
-            <div
-              className={styles.confirmDisclaimer}
-              dangerouslySetInnerHTML={{ __html: disclaimerHtml }}
-            />
-          )}
+            <span className={styles.termsCheckboxLabel}>
+              I have read and accept the terms and conditions
+              {!termsViewed && termsNudge && (
+                <span className={styles.termsHint}>
+                  {' '}— You must view the terms first
+                </span>
+              )}
+            </span>
+          </label>
         </div>
       )}
 
       {/* Completed today toggle */}
       <div className={styles.confirmSection}>
-        <h3 className={styles.confirmSectionTitle}>Completed Today?</h3>
+        <h3 className={styles.confirmSectionTitle}>
+          Completed Today?
+          <span className={styles.requiredMark} aria-hidden="true">*</span>
+        </h3>
         <p className={styles.confirmValueMuted}>
           Did you perform this service today?
+          <span className={styles.requiredMark} aria-hidden="true">*</span>
         </p>
         <div className={styles.pillGroup} role="radiogroup">
           <button
@@ -2566,12 +2630,18 @@ function StepServiceTodayConfirm({
         </div>
       )}
 
-      {/* Signature — only required when completed today */}
-      {completedToday === true && (
+      {/* Signature — required for both branches. For "No" it sits below the
+          preferred-schedule picker. */}
+      {completedToday !== null && (
         <div className={styles.confirmSection}>
-          <h3 className={styles.confirmSectionTitle}>Customer Signature</h3>
+          <h3 className={styles.confirmSectionTitle}>
+            Customer Signature
+            <span className={styles.requiredMark} aria-hidden="true">*</span>
+          </h3>
           <p className={styles.confirmValueMuted}>
-            Please sign below to acknowledge service completed today
+            {completedToday === true
+              ? 'Please sign below to acknowledge service completed today'
+              : 'Please sign below to accept the agreement for the scheduled service'}
           </p>
           <div className={styles.signatureWrapper}>
             <SignatureCanvas
@@ -2592,6 +2662,52 @@ function StepServiceTodayConfirm({
           >
             Clear Signature
           </button>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {termsModalOpen && (
+        <div className={styles.termsModal}>
+          <div className={styles.termsModalContent}>
+            <div className={styles.termsModalHeader}>
+              <h3>Terms and Conditions</h3>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className={styles.termsModalClose}
+                aria-label="Close"
+              >
+                &#215;
+              </button>
+            </div>
+            <div className={styles.termsModalBody} ref={termsModalBodyRef}>
+              {companyQuoteTerms && (
+                <div dangerouslySetInnerHTML={{ __html: companyQuoteTerms }} />
+              )}
+              {planTermsHtml && (
+                <div
+                  className={styles.specificTermsBlock}
+                  dangerouslySetInnerHTML={{ __html: planTermsHtml }}
+                />
+              )}
+              {disclaimerHtml && (
+                <div
+                  className={styles.confirmDisclaimer}
+                  dangerouslySetInnerHTML={{ __html: disclaimerHtml }}
+                />
+              )}
+            </div>
+            <div className={styles.termsModalFooter}>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className={styles.termsModalCloseBtn}
+                disabled={!termsViewed}
+              >
+                {termsViewed ? 'Close' : 'Scroll to bottom to continue'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -2714,6 +2830,8 @@ export function NewOpportunityWizard() {
 
   // Signature data for service-today confirmation
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  // Customer must explicitly accept terms after viewing the modal
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   // Sell It Now branch state (Phase 4).
   // completedToday: tri-state Yes/No/unset on the service-today-confirm step.
@@ -3227,6 +3345,7 @@ export function NewOpportunityWizard() {
     setSelectedPestPacClient(null);
     setSelectedServicePlan(null);
     setSignatureData(null);
+    setTermsAccepted(false);
     setNewCustomerForm({
       firstName: '',
       lastName: '',
@@ -3566,9 +3685,10 @@ export function NewOpportunityWizard() {
         });
       }
 
-      // Sell It Now (today) — persist the captured signature + T&C snapshot.
+      // Sell It Now — persist the captured signature + T&C snapshot for both
+      // "performed today" and "scheduled for later" branches.
       if (
-        mode === 'sell-it-now-today' &&
+        (mode === 'sell-it-now-today' || mode === 'sell-it-now-scheduled') &&
         leadId &&
         quoteId &&
         signatureData
@@ -3651,8 +3771,13 @@ export function NewOpportunityWizard() {
     if (currentStepId === 'upsell-catalog') return upsellSelection !== null;
     if (currentStepId === 'service-today-confirm') {
       if (completedToday === null) return false;
-      if (completedToday === true) return signatureData !== null;
-      return !!requestedDay && !!requestedTime;
+      // Signature + terms acceptance are required regardless of whether the
+      // service was performed today.
+      if (!signatureData || !termsAccepted) return false;
+      if (completedToday === false) {
+        return !!requestedDay && !!requestedTime;
+      }
+      return true;
     }
     return true;
   };
@@ -3685,7 +3810,12 @@ export function NewOpportunityWizard() {
         const data = await res.json();
         const synced = data.customer;
         setSelectedCustomer(synced);
-        setCustomerSource('existing');
+        // Only flip source when coming from select-site. On new-customer,
+        // flipping would drop that step from wizardSteps and the i+1 advance
+        // below would skip 'photos' and land on 'ai-review'.
+        if (currentStepId === 'select-site') {
+          setCustomerSource('existing');
+        }
         // Save to recent customers
         const addr =
           synced.primary_service_address?.[0]?.service_address ?? null;
@@ -3754,11 +3884,18 @@ export function NewOpportunityWizard() {
     ? 'Creating customer…'
     : 'Syncing customer…';
 
-  // Steps visible in progress bar
+  // Steps visible in progress bar. service-today-confirm is hidden from the
+  // bar because it's a sub-step of the Sell It Now flow — instead, keep the
+  // upsell-catalog ("Service") step highlighted as active while the tech is
+  // confirming, so the bar doesn't reset to all-gray.
   const progressSteps: StepId[] = wizardSteps.filter(
     s => s !== 'type-select' && s !== 'service-today-confirm'
   ) as StepId[];
-  const progressIndex = progressSteps.indexOf(currentStepId);
+  const effectiveStepId: StepId =
+    currentStepId === 'service-today-confirm'
+      ? 'upsell-catalog'
+      : currentStepId;
+  const progressIndex = progressSteps.indexOf(effectiveStepId);
 
   const showRouteStopLoader = isFromRouteStop && isSyncingCustomer;
 
@@ -3971,6 +4108,8 @@ export function NewOpportunityWizard() {
                 onRequestedTimeChange={setRequestedTime}
                 companyQuoteTerms={companyQuoteTerms}
                 timeOptions={companyTimeOptions}
+                termsAccepted={termsAccepted}
+                onTermsAcceptedChange={setTermsAccepted}
               />
             )}
           </div>
