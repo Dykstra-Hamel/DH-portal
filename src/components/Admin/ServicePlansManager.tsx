@@ -29,6 +29,7 @@ interface ServicePlan {
   plan_image_url: string | null;
   plan_disclaimer: string | null;
   plan_terms: string | null;
+  default_variant_label: string | null;
   pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
   price_per_unit: number | null;
   minimum_price: number | null;
@@ -61,9 +62,10 @@ interface PestType {
 
 interface ServicePlansManagerProps {
   companyId: string;
+  companySlug: string;
 }
 
-export default function ServicePlansManager({ companyId }: ServicePlansManagerProps) {
+export default function ServicePlansManager({ companyId, companySlug }: ServicePlansManagerProps) {
   const [servicePlans, setServicePlans] = useState<ServicePlan[]>([]);
   const [availablePestTypes, setAvailablePestTypes] = useState<PestType[]>([]);
   const [loading, setLoading] = useState(false);
@@ -365,6 +367,7 @@ export default function ServicePlansManager({ companyId }: ServicePlansManagerPr
           onSave={handleSavePlan}
           availablePestTypes={availablePestTypes}
           companyId={companyId}
+          companySlug={companySlug}
         />
       )}
 

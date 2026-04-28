@@ -10,6 +10,7 @@ import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPl
 import { MapStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import VideoLightbox from '@/components/Quote/QuoteContent/VideoLightbox';
 import type { QuoteLineItem, AvailableDiscount } from './QuoteBuildStep';
+import type { SafetyChecklistResponse } from './SafetyChecklistStep';
 import {
   formatCurrency,
   formatLineItemLabel,
@@ -150,6 +151,7 @@ interface ReviewStepProps {
   appliedDiscount?: AvailableDiscount | null;
   quoteSubtotalInitial?: number | null;
   quoteTotalInitial?: number | null;
+  checklistResponses?: SafetyChecklistResponse[];
   onBack: () => void;
   onAddLineItem?: (item: QuoteLineItem) => void;
 }
@@ -183,6 +185,7 @@ export function ReviewStep({
   appliedDiscount,
   quoteSubtotalInitial,
   quoteTotalInitial,
+  checklistResponses,
   onBack,
   onAddLineItem,
 }: ReviewStepProps) {
@@ -431,6 +434,29 @@ export function ReviewStep({
       persistLineItemSelection(id, false);
       const next = new Set(prev);
       next.delete(id);
+      return next;
+    });
+  }
+
+  // Mutually exclusive version for recommended addon groups — selecting one deselects the others.
+  function toggleRecommendedAddon(id: string, siblingIds: string[]) {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      // Deselect all siblings
+      siblingIds.forEach(sibId => {
+        if (sibId !== id && next.has(sibId)) {
+          persistLineItemSelection(sibId, false);
+          next.delete(sibId);
+        }
+      });
+      // Toggle the clicked one
+      if (prev.has(id)) {
+        persistLineItemSelection(id, false);
+        next.delete(id);
+      } else {
+        persistLineItemSelection(id, true);
+        next.add(id);
+      }
       return next;
     });
   }
@@ -1677,7 +1703,7 @@ export function ReviewStep({
                                           type="button"
                                           className={`${styles.planCardAddonBtn}${isChecked ? ` ${styles.planCardAddonBtnSelected}` : ''}`}
                                           onClick={() =>
-                                            toggleItemSelected(addon.id)
+                                            toggleRecommendedAddon(addon.id, ordered.map(a => a.id))
                                           }
                                         >
                                           {isChecked && (
@@ -2405,6 +2431,10 @@ export function ReviewStep({
                               multipleItems &&
                               selectedItemIds.size === 1 &&
                               addonSelected;
+                            const isRecommendedAddon = addon.isRecommended !== undefined;
+                            const recommendedSiblingIds = isRecommendedAddon
+                              ? childAddons.filter(a => a.isRecommended !== undefined).map(a => a.id)
+                              : [];
                             return (
                               <div
                                 key={addon.id}
@@ -2418,7 +2448,9 @@ export function ReviewStep({
                                       type="checkbox"
                                       checked={addonSelected}
                                       onChange={() =>
-                                        toggleItemSelected(addon.id)
+                                        isRecommendedAddon
+                                          ? toggleRecommendedAddon(addon.id, recommendedSiblingIds)
+                                          : toggleItemSelected(addon.id)
                                       }
                                       disabled={addonOnly}
                                     />
