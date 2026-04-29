@@ -1682,6 +1682,10 @@ export function QuoteBuildStep({
 
   const modalServiceChips = useMemo(() => {
     if (!pestModal) return [];
+    // When editing an existing item, only show the plan that's currently selected
+    if (editingItemId && modalServiceId) {
+      return catalog.filter(c => c.id === modalServiceId);
+    }
     // "Edit Service" / "Add Additional Service" — show all plans/bundles
     if (pestModal.id === '__all__') {
       return catalog.filter(c => c.kind === 'plan' || c.kind === 'bundle');
@@ -1691,7 +1695,7 @@ export function QuoteBuildStep({
         (c.kind === 'plan' || c.kind === 'bundle') &&
         c.pestCoverageIds.includes(pestModal.id)
     );
-  }, [catalog, pestModal]);
+  }, [catalog, pestModal, editingItemId, modalServiceId]);
 
   const filteredServiceChips = useMemo(() => {
     if (!serviceSearch.trim()) return modalServiceChips;
@@ -2244,7 +2248,11 @@ export function QuoteBuildStep({
   // Only render plan/bundle/custom items as compact summary cards; addons and products
   // are managed through the modal and should not appear at the top level.
   const serviceCards = lineItems.filter(
-    i => i.catalogItemKind !== 'addon' && i.catalogItemKind !== 'product' && i.catalogItemKind !== 'specialty-line'
+    i =>
+      i.catalogItemKind !== 'addon' &&
+      i.catalogItemKind !== 'product' &&
+      i.catalogItemKind !== 'specialty-line' &&
+      !i.parentLineItemId
   );
 
   // ── Drag-to-reorder (pointer events — works on touch + mouse) ────────────

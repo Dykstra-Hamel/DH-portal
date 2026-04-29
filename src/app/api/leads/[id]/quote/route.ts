@@ -210,6 +210,33 @@ export async function GET(
   }
 }
 
+// PATCH: Partially update quote fields (e.g. inspector notes)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: leadId } = await params;
+    const body = await request.json();
+    const { notes } = body;
+
+    const supabase = createAdminClient();
+
+    const { error } = await supabase
+      .from('quotes')
+      .update({ customer_comments: notes ?? null })
+      .eq('lead_id', leadId);
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to update notes' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // POST: Create or update quote for a lead
 export async function POST(
   request: NextRequest,

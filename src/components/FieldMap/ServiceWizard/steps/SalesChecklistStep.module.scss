@@ -21,11 +21,28 @@
   }
 }
 
-.loading {
-  padding: 40px;
-  text-align: center;
-  color: var(--gray-500);
+.emptyMessage {
   font-size: 14px;
+  color: var(--gray-500);
+  text-align: center;
+  padding: 40px 0;
+}
+
+.checklistSection {
+  margin-bottom: 32px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.checklistName {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--gray-700);
+  margin: 0 0 14px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid var(--gray-200);
 }
 
 .questionList {
@@ -129,5 +146,13 @@
   &:focus {
     outline: none;
     border-color: var(--blue-600);
+  }
+}
+
+.conditionalQuestion {
+  margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
   }
 }

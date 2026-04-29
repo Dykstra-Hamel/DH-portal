@@ -3,8 +3,12 @@
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--gray-50);
+  background: var(--gray-25);
   padding-bottom: 64px; // reserve space for fixed FieldMapNav
+
+  @media (width > 1600px) {
+    padding-bottom: 0;
+  }
 }
 
 // ─── Scrollable content area ──────────────────────────────────────────────────
@@ -309,6 +313,12 @@
   gap: 16px;
   justify-content: center;
   align-items: center;
+
+  @media (width > 1600px) {
+    position: relative;
+    left: auto;
+    transform: none;
+  }
 }
 
 .prevBtn {

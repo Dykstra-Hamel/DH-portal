@@ -661,11 +661,7 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         customColumnWidths={columnWidths}
         cardView={cardViewConfig}
         searchEnabled={false}
-        onItemAction={
-          activeTab === 'new'
-            ? (_action, lead) => markViewed(lead.id)
-            : undefined
-        }
+
         emptyStateMessage={
           activeTab === 'new'
             ? 'No new leads in the queue.'

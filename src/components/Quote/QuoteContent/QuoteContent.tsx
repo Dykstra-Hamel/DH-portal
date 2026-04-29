@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
 import SignatureCanvas from 'react-signature-canvas';
 import { getClientDeviceData } from '@/lib/device-utils';
@@ -8,9 +8,13 @@ import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/display-utils';
 import HeaderSection from './HeaderSection';
 import styles from './quotecontent.module.scss';
 import HeroSection from './HeroSection';
-import PlanDetails from './PlanDetails';
 import FooterSection from './FooterSection';
-import QuoteTotalPricing from './QuoteTotalPricing';
+import QuoteServicePanel from '@/components/Quote/QuoteServicePanel/QuoteServicePanel';
+import type { PlanContent } from '@/components/Quote/QuoteServicePanel/QuoteServicePanel';
+import type { QuoteLineItem } from '@/components/FieldMap/ServiceWizard/steps/QuoteBuildStep';
+import { getPestStampType, formatLineItemLabel } from '@/components/FieldMap/ServiceWizard/steps/QuoteBuildStep';
+import { getPlottedPests } from '@/components/FieldMap/ServiceWizard/steps/MapPlotStep';
+import { MapStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import Link from 'next/link';
 import { TimeOption, DEFAULT_TIME_OPTIONS, getEnabledTimeOptions } from '@/lib/time-options';
 
@@ -56,8 +60,7 @@ interface Quote {
   additional_pests: string[];
   total_initial_price: number;
   total_recurring_price: number;
-  line_items: any[];
-  available_addons?: any[];
+  line_items: QuoteLineItem[];
   signed_at: string | null;
   home_size_range: string | null;
   yard_size_range: string | null;
@@ -84,7 +87,18 @@ interface Quote {
     comments: string;
     requested_date: string | null;
     requested_time: string | null;
+    map_plot_data?: any;
   };
+  featured_plans?: Array<{
+    id: string;
+    plan_name: string;
+    billing_frequency: string | null;
+    initial_price: number | null;
+    recurring_price: number | null;
+    plan_description: string | null;
+    plan_features: string[];
+    plan_image_url: string | null;
+  }>;
 }
 
 interface QuoteStepsProps {
@@ -100,7 +114,9 @@ export default function QuoteContent({
   quote,
   token,
 }: QuoteStepsProps) {
-  const [currentStep, setCurrentStep] = useState(1);
+  const [showThankYou, setShowThankYou] = useState(!!quote.signed_at);
+  const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
+
   const [preferredDate, setPreferredDate] = useState(
     quote.lead.requested_date || ''
   );
@@ -109,7 +125,6 @@ export default function QuoteContent({
   );
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
-  const [termsModalOpen, setTermsModalOpen] = useState(false);
   const [termsViewed, setTermsViewed] = useState(false);
   const [termsNudge, setTermsNudge] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -117,21 +132,212 @@ export default function QuoteContent({
   const [heroImageUrl, setHeroImageUrl] = useState<string>(
     '/images/quote-hero-placeholder.svg'
   );
-  const [expandedPlanIndexes, setExpandedPlanIndexes] = useState<number[]>([0]);
-  const [interestedInFinancing, setInterestedInFinancing] = useState(false);
-  const [isCommentModalOpen, setIsCommentModalOpen] = useState(false);
-  const [customerComment, setCustomerComment] = useState(
-    quote.customer_comments || ''
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
+  const [additionalLineItems, setAdditionalLineItems] = useState<QuoteLineItem[]>([]);
+  const [featuredPlans, setFeaturedPlans] = useState(quote.featured_plans ?? []);
+  const [expandedFeaturedId, setExpandedFeaturedId] = useState<string | null>(null);
+
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
+    () => new Set(quote.line_items.filter(i => i.isSelected !== false).map(i => i.id))
   );
+
+  const effectiveLineItems = [...quote.line_items, ...additionalLineItems];
+
+  const multipleItems = effectiveLineItems.filter(
+    i => i.catalogItemKind !== 'addon'
+  ).length > 1;
+
+  const getContent = (item: QuoteLineItem): PlanContent | null =>
+    (item as any).planContent ?? null;
+
+  const toggleItem = (id: string) => {
+    setSelectedItemIds(prev => {
+      const item = effectiveLineItems.find(i => i.id === id);
+      if (prev.has(id)) {
+        if (item?.catalogItemKind !== 'addon') {
+          const planCount = [...prev].filter(sid =>
+            effectiveLineItems.find(
+              i => i.id === sid && i.catalogItemKind !== 'addon'
+            )
+          ).length;
+          if (planCount <= 1) return prev;
+        }
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      }
+      return new Set([...prev, id]);
+    });
+  };
+
+  const toggleRecommendedAddon = (id: string, siblingIds: string[]) => {
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      siblingIds.forEach(sibId => {
+        if (sibId !== id) next.delete(sibId);
+      });
+      if (prev.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  async function handleAddFeaturedPlan(plan: typeof featuredPlans[number]) {
+    const tempId = crypto.randomUUID();
+    const newItem: QuoteLineItem = {
+      id: tempId,
+      type: 'plan-addon',
+      catalogItemKind: 'plan',
+      catalogItemId: plan.id,
+      catalogItemName: plan.plan_name,
+      coveredPestIds: [],
+      coveredPestLabels: [],
+      initialCost: plan.initial_price ?? 0,
+      recurringCost: plan.recurring_price ?? 0,
+      frequency: plan.billing_frequency ?? 'monthly',
+      isPrimary: true,
+      isSelected: true,
+    };
+
+    setAdditionalLineItems(prev => [...prev, newItem]);
+    setSelectedItemIds(prev => new Set([...prev, tempId]));
+    setFeaturedPlans(prev => prev.filter(p => p.id !== plan.id));
+
+    try {
+      const res = await fetch(`/api/quotes/${quote.id}/line-items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_plan_id: plan.id,
+          plan_name: plan.plan_name,
+          initial_price: plan.initial_price ?? 0,
+          recurring_price: plan.recurring_price ?? 0,
+          billing_frequency: plan.billing_frequency ?? 'monthly',
+          display_order: quote.line_items.length + additionalLineItems.length,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to add plan');
+
+      const data = await res.json();
+      const realId: string = data?.id ?? data?.data?.id ?? tempId;
+
+      setAdditionalLineItems(prev =>
+        prev.map(i => i.id === tempId ? { ...i, id: realId } : i)
+      );
+      setSelectedItemIds(prev => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        next.add(realId);
+        return next;
+      });
+    } catch {
+      setAdditionalLineItems(prev => prev.filter(i => i.id !== tempId));
+      setSelectedItemIds(prev => {
+        const next = new Set(prev);
+        next.delete(tempId);
+        return next;
+      });
+      setFeaturedPlans(prev => [...prev, plan]);
+    }
+  }
+
+  function renderRecommendedAddonsForItem(item: QuoteLineItem): React.ReactNode {
+    const addonItems = quote.line_items.filter(i => i.catalogItemKind === 'addon');
+    const recommendedAddons = addonItems.filter(
+      a => a.parentLineItemId === item.id && a.isRecommended !== undefined
+    );
+    if (recommendedAddons.length === 0) return null;
+
+    return (
+      <div className={styles.planCardAddons}>
+        <div className={styles.planCardAddonBtnGroup}>
+          {recommendedAddons.map(addon => {
+            const isChecked = selectedItemIds.has(addon.id);
+            const recurringCost = addon.recurringCost ?? 0;
+            const initialCost = addon.initialCost ?? 0;
+            const freqAbbr: Record<string, string> = {
+              monthly: 'mo', quarterly: 'qtr',
+              'semi-annually': 'semi', 'semi-annual': 'semi',
+              annually: 'yr', annual: 'yr',
+              'bi-monthly': '2mo', 'bi-annually': '6mo',
+              'one-time': 'once',
+            };
+            const freq = addon.frequency
+              ? (freqAbbr[addon.frequency.toLowerCase()] ?? addon.frequency)
+              : 'mo';
+            const priceLabel =
+              recurringCost > 0
+                ? `$${recurringCost.toFixed(0)}/${freq}`
+                : initialCost > 0
+                  ? `$${initialCost.toFixed(0)}`
+                  : '';
+            return (
+              <div key={addon.id} className={styles.planCardAddonBtnWrap}>
+                {addon.isRecommended === true && (
+                  <span className={styles.planCardAddonRecommendedLabel}>
+                    Recommended
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={`${styles.planCardAddonBtn}${isChecked ? ` ${styles.planCardAddonBtnSelected}` : ''}`}
+                  onClick={() =>
+                    toggleRecommendedAddon(addon.id, recommendedAddons.map(a => a.id))
+                  }
+                >
+                  {isChecked && (
+                    <span className={styles.planCardAddonBtnCheck}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="27" height="27" viewBox="0 0 27 27" fill="none">
+                        <circle cx="13.5" cy="13.5" r="13.5" />
+                        <path d="M13.75 4C11.8216 4 9.93657 4.57183 8.33319 5.64317C6.72982 6.71451 5.48013 8.23726 4.74218 10.0188C4.00422 11.8004 3.81114 13.7608 4.18735 15.6521C4.56355 17.5434 5.49215 19.2807 6.85571 20.6443C8.21928 22.0079 9.95656 22.9365 11.8479 23.3127C13.7392 23.6889 15.6996 23.4958 17.4812 22.7578C19.2627 22.0199 20.7855 20.7702 21.8568 19.1668C22.9282 17.5634 23.5 15.6784 23.5 13.75C23.4973 11.165 22.4692 8.68661 20.6413 6.85872C18.8134 5.03084 16.335 4.00273 13.75 4ZM18.0306 12.0306L12.7806 17.2806C12.711 17.3504 12.6283 17.4057 12.5372 17.4434C12.4462 17.4812 12.3486 17.5006 12.25 17.5006C12.1514 17.5006 12.0538 17.4812 11.9628 17.4434C11.8718 17.4057 11.789 17.3504 11.7194 17.2806L9.46938 15.0306C9.32865 14.8899 9.24959 14.699 9.24959 14.5C9.24959 14.301 9.32865 14.1101 9.46938 13.9694C9.61011 13.8286 9.80098 13.7496 10 13.7496C10.199 13.7496 10.3899 13.8286 10.5306 13.9694L12.25 15.6897L16.9694 10.9694C17.0391 10.8997 17.1218 10.8444 17.2128 10.8067C17.3039 10.769 17.4015 10.7496 17.5 10.7496C17.5986 10.7496 17.6961 10.769 17.7872 10.8067C17.8782 10.8444 17.9609 10.8997 18.0306 10.9694C18.1003 11.0391 18.1556 11.1218 18.1933 11.2128C18.231 11.3039 18.2504 11.4015 18.2504 11.5C18.2504 11.5985 18.231 11.6961 18.1933 11.7872C18.1556 11.8782 18.1003 11.9609 18.0306 12.0306Z" />
+                      </svg>
+                    </span>
+                  )}
+                  <span className={styles.planCardAddonBtnLabel}>
+                    {formatLineItemLabel(addon)}
+                  </span>
+                </button>
+                {priceLabel && (
+                  <span className={styles.planCardAddonBtnPrice}>{priceLabel}</span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  const [interestedInFinancing, setInterestedInFinancing] = useState(false);
+  const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetch(`/api/pest-options/${encodeURIComponent(company.id)}?context=fieldmap`)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: any) => {
+        if (data?.success && Array.isArray(data.data)) {
+          const iconMap: Record<string, string> = {};
+          for (const opt of data.data) {
+            if (opt.id && opt.icon_svg) iconMap[opt.id] = opt.icon_svg;
+          }
+          setPestIconMap(iconMap);
+        }
+      })
+      .catch(() => {});
+  }, [company.id]);
 
   const signatureRef = useRef<SignatureCanvas>(null);
   const termsModalBodyRef = useRef<HTMLDivElement>(null);
 
-  // Mark terms as viewed when modal opens:
+  // Mark terms as viewed when schedule modal opens:
   // - immediately if content doesn't overflow (no scrolling needed)
   // - only after scrolling to the bottom if it does overflow
   useEffect(() => {
-    if (!termsModalOpen) return;
+    if (!scheduleModalOpen) return;
 
     const el = termsModalBodyRef.current;
     if (!el) return;
@@ -149,11 +355,62 @@ export default function QuoteContent({
 
     el.addEventListener('scroll', handleScroll);
     return () => el.removeEventListener('scroll', handleScroll);
-  }, [termsModalOpen]);
+  }, [scheduleModalOpen]);
+
+  const mapPlotData = quote.lead?.map_plot_data ?? null;
+  const plottedPests = mapPlotData ? getPlottedPests(mapPlotData) : [];
+
+  function renderPlanHeaderPestIcon(item: QuoteLineItem): React.ReactNode {
+    const content = getContent(item) as any;
+    const pestCoverage: Array<{ pest_id: string }> = content?.pest_coverage ?? [];
+    const catalogCoveredIds = pestCoverage.map((c: any) => c.pest_id);
+    if (catalogCoveredIds.length === 0) return null;
+
+    const coveredPlotted = plottedPests.filter(p => catalogCoveredIds.includes(p.id));
+    if (coveredPlotted.length === 0) return null;
+
+    const singlePest = coveredPlotted.length === 1 ? coveredPlotted[0] : null;
+
+    if (!singlePest && coveredPlotted.length > 1) {
+      return (
+        <div className={styles.planHeaderPestIcon}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="26" viewBox="0 0 34 36" fill="none" className={styles.planHeaderShieldIcon}>
+            <path d="M31.1667 0H2.83333C2.08189 0 1.36122 0.303427 0.829864 0.84353C0.298511 1.38363 0 2.11617 0 2.87999V12.96C0 22.4495 4.51917 28.2005 8.31052 31.3541C12.3941 34.7489 16.4564 35.9009 16.6334 35.9495C16.8769 36.0168 17.1337 36.0168 17.3772 35.9495C17.5543 35.9009 21.6112 34.7489 25.7001 31.3541C29.4808 28.2005 34 22.4495 34 12.96V2.87999C34 2.11617 33.7015 1.38363 33.1701 0.84353C32.6388 0.303427 31.9181 0 31.1667 0Z" fill="#2478F5" />
+          </svg>
+        </div>
+      );
+    }
+
+    if (coveredPlotted.length === 0) return null;
+    const pestId = singlePest?.id ?? null;
+    if (!pestId) return null;
+    const iconSvg = pestIconMap[pestId] ?? null;
+    const stampType = singlePest?.stampType ?? getPestStampType(pestId);
+
+    return (
+      <div className={styles.planHeaderPestIcon}>
+        {iconSvg ? (
+          <span className={styles.planHeaderPestIconSvg} dangerouslySetInnerHTML={{ __html: iconSvg }} />
+        ) : (
+          <MapStampGlyph type={stampType} size={24} />
+        )}
+      </div>
+    );
+  }
+
+  function abbreviateFreq(frequency: string | null): string {
+    const abbr: Record<string, string> = {
+      monthly: 'mo', quarterly: 'qtr', 'semi-annually': 'semi',
+      annually: 'yr', annual: 'yr', 'one-time': 'once',
+    };
+    return frequency ? (abbr[frequency.toLowerCase()] ?? frequency) : 'mo';
+  }
 
   const heroContent = {
     title: `Your Custom Pest Protection Plan Is Ready, ${quote.customer.first_name}`,
-    subtitle: `Protect your home and family at <strong>${quote.service_address?.street_address} in ${quote.service_address?.city}</strong> from a local company trusted for over 50 years.`,
+    subtitle: quote.service_address?.street_address && quote.service_address?.city
+      ? `Protect your home and family at <strong>${quote.service_address.street_address} in ${quote.service_address.city}</strong> from a local company trusted for over 50 years.`
+      : `Protect your home and family from a local company trusted for over 50 years.`,
     buttonText: 'Review & Activate Your Plan',
     imageUrl: branding?.primary_hero_image_url ?? null,
   };
@@ -170,29 +427,17 @@ export default function QuoteContent({
     email: company.email,
   };
 
-  // If quote is already signed, redirect to thank you step
-  useEffect(() => {
-    if (quote.signed_at) {
-      setCurrentStep(4);
-    }
-  }, [quote.signed_at]);
-
   // Update lead scheduling when date/time changes
   const updateLeadSchedule = async (
     field: 'requested_date' | 'requested_time',
     value: string
   ) => {
-    if (!token) {
-      console.error('Cannot update schedule: missing token');
-      return;
-    }
+    if (!token) return;
 
     try {
       const response = await fetch(`/api/leads/${quote.lead.id}/schedule`, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           [field]: value || null,
           quote_id: quote.id,
@@ -203,58 +448,43 @@ export default function QuoteContent({
       if (!response.ok) {
         console.error('Failed to update lead schedule');
       }
-    } catch (error) {
-      console.error('Error updating lead schedule:', error);
+    } catch (err) {
+      console.error('Error updating lead schedule:', err);
     }
   };
 
   // Generate Street View or Satellite image URL for hero section
   useEffect(() => {
     const generateHeroImage = async () => {
-      // If no service address, keep placeholder
-      if (!quote.service_address) {
-        return;
-      }
+      if (!quote.service_address) return;
 
       try {
-        // Fetch API key from endpoint
         const apiKeyResponse = await fetch('/api/google-places-key');
-        if (!apiKeyResponse.ok) {
-          return;
-        }
+        if (!apiKeyResponse.ok) return;
         const apiKeyData = await apiKeyResponse.json();
         const apiKey = apiKeyData.apiKey;
+        if (!apiKey) return;
 
-        if (!apiKey) {
-          return;
-        }
-
-        // Prioritize using lat/lng coordinates if available, otherwise use address string
         let locationParam: string;
         if (quote.service_address.latitude && quote.service_address.longitude) {
-          // Use precise coordinates for more accurate location
           locationParam = `${quote.service_address.latitude},${quote.service_address.longitude}`;
         } else {
-          // Fall back to address string
           const addressString = `${quote.service_address.street_address}, ${quote.service_address.city}, ${quote.service_address.state} ${quote.service_address.zip_code}`;
           locationParam = encodeURIComponent(addressString);
         }
 
-        // Check Street View availability
         const metadataUrl = `https://maps.googleapis.com/maps/api/streetview/metadata?location=${locationParam}&key=${apiKey}`;
         const metadataResponse = await fetch(metadataUrl);
         const metadata = await metadataResponse.json();
 
         if (metadata.status === 'OK') {
-          // Street View is available
           const streetViewUrl = `https://maps.googleapis.com/maps/api/streetview?size=420x600&location=${locationParam}&key=${apiKey}`;
           setHeroImageUrl(streetViewUrl);
         } else {
-          // Fallback to satellite view
           const satelliteUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${locationParam}&zoom=18&size=420x600&maptype=satellite&key=${apiKey}`;
           setHeroImageUrl(satelliteUrl);
         }
-      } catch (err) {
+      } catch {
         // Keep default placeholder on error
       }
     };
@@ -266,49 +496,6 @@ export default function QuoteContent({
     quote.service_address?.street_address,
   ]);
 
-  // Sort line items: regular plans first, add-ons last
-  const sortedLineItems = [...quote.line_items].sort((a, b) => {
-    const aIsAddon = Boolean(a.addon_service_id);
-    const bIsAddon = Boolean(b.addon_service_id);
-
-    // If one is addon and other isn't, addon goes last
-    if (aIsAddon && !bIsAddon) return 1;
-    if (!aIsAddon && bIsAddon) return -1;
-    return 0; // Keep original order if both same type
-  });
-
-  const regularLineItems = sortedLineItems.filter(item => !item.addon_service_id);
-  const primaryLineItems = regularLineItems.filter(item => item.is_primary !== false);
-  const secondaryLineItems = regularLineItems.filter(item => item.is_primary === false);
-  const availableAddons = quote.available_addons || [];
-
-  // Pre-select any addons already saved as line items on the quote
-  const preSelectedAddonIds = sortedLineItems
-    .filter(item => item.addon_service_id)
-    .map(item => item.addon_service_id)
-    .filter((id: string) => availableAddons.some((a: any) => a.id === id));
-
-  const [selectedAddonIds, setSelectedAddonIds] = useState<string[]>(preSelectedAddonIds);
-  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>(
-    regularLineItems.map(item => item.id)
-  );
-  const [expandedAddonIndexes, setExpandedAddonIndexes] = useState<number[]>([]);
-
-  const toggleAddon = (id: string) =>
-    setSelectedAddonIds(prev =>
-      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
-    );
-
-  const togglePlan = (id: string) =>
-    setSelectedPlanIds(prev => {
-      if (prev.includes(id)) {
-        // Enforce at least one plan must remain selected
-        if (prev.length <= 1) return prev;
-        return prev.filter(x => x !== id);
-      }
-      return [...prev, id];
-    });
-
   // Apply branding colors and font via CSS variables
   const isReversed = company.quote_accent_color_preference === 'secondary';
   const brandingStyle = {
@@ -319,21 +506,6 @@ export default function QuoteContent({
     '--primary-font': branding?.font_primary_name,
     '--secondary-font': branding?.font_secondary_name || branding?.font_primary_name,
   } as React.CSSProperties;
-
-  // Handle step navigation
-  const handleNext = () => {
-    if (currentStep < 4) {
-      setCurrentStep(currentStep + 1);
-      window.scrollTo(0, 0);
-    }
-  };
-
-  const handleBack = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-      window.scrollTo(0, 0);
-    }
-  };
 
   // Handle form submission
   const handleSubmit = async () => {
@@ -361,17 +533,19 @@ export default function QuoteContent({
 
       const response = await fetch(`/api/quotes/${quote.id}/accept`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           signature_data: signatureData,
           terms_accepted: termsAccepted,
           token: token,
           preferred_date: preferredDate,
           preferred_time: preferredTime,
-          selected_addon_ids: selectedAddonIds,
-          selected_plan_ids: selectedPlanIds,
+          selected_addon_ids: quote.line_items
+            .filter(i => selectedItemIds.has(i.id) && i.catalogItemKind === 'addon' && i.catalogItemId)
+            .map(i => i.catalogItemId as string),
+          selected_plan_ids: effectiveLineItems
+            .filter(i => selectedItemIds.has(i.id) && i.catalogItemKind !== 'addon')
+            .map(i => i.id),
           interested_in_financing: interestedInFinancing,
           client_device_data: clientDeviceData,
         }),
@@ -382,8 +556,9 @@ export default function QuoteContent({
         throw new Error(errorData.error || 'Failed to accept quote');
       }
 
-      // Move to completion step
-      handleNext();
+      setScheduleModalOpen(false);
+      setShowThankYou(true);
+      window.scrollTo(0, 0);
     } catch (err: any) {
       setError(err.message || 'Failed to submit quote. Please try again.');
     } finally {
@@ -391,7 +566,6 @@ export default function QuoteContent({
     }
   };
 
-  // Clear signature
   const clearSignature = () => {
     if (signatureRef.current) {
       signatureRef.current.clear();
@@ -399,34 +573,131 @@ export default function QuoteContent({
     }
   };
 
-  // Handle saving customer comment
-  const handleSaveComment = async () => {
-    if (!token) {
-      console.error('Cannot save comment: missing token');
-      return;
-    }
+  const featuredPlansSection = featuredPlans.length > 0 ? (
+    <section className={styles.additionalServicesSection}>
+      <div className={styles.plansContainer} style={{ marginBottom: 0 }}>
+        <h2>Additional Services We Offer</h2>
+        {featuredPlans.map(plan => {
+          const isExpanded = expandedFeaturedId === plan.id;
+          const isOneTime = plan.billing_frequency === 'one-time' || !plan.recurring_price;
+          const features: string[] = plan.plan_features ?? [];
+          const imageUrl = plan.plan_image_url ?? null;
+          const description = plan.plan_description ?? null;
+          const recurringPrice = plan.recurring_price ?? 0;
+          const initialPrice = plan.initial_price ?? 0;
+          const hasContent = !!(description || features.length > 0 || imageUrl);
 
-    try {
-      const response = await fetch(`/api/quotes/${quote.id}/comment`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          customer_comments: customerComment,
-          token: token,
-        }),
-      });
+          return (
+            <div
+              key={plan.id}
+              className={`${styles.planCard} ${styles.collapsible}${isExpanded ? ` ${styles.expanded}` : ''}`}
+            >
+              <div
+                className={styles.planHeader}
+                onClick={hasContent ? () => setExpandedFeaturedId(prev => prev === plan.id ? null : plan.id) : undefined}
+                style={{ cursor: hasContent ? 'pointer' : 'default' }}
+              >
+                <label className={styles.addonCheckbox} onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" checked={false} onChange={() => handleAddFeaturedPlan(plan)} />
+                  <span className={styles.addonCheckboxCustom} />
+                </label>
 
-      if (!response.ok) {
-        console.error('Failed to save comment');
-      } else {
-        setIsCommentModalOpen(false);
-      }
-    } catch (error) {
-      console.error('Error saving comment:', error);
-    }
-  };
+                <div>
+                  <h3 className={styles.planHeaderTitle}>{plan.plan_name}</h3>
+                </div>
+
+                <div className={styles.addonHeaderRight}>
+                  {isOneTime && initialPrice ? (
+                    <span className={styles.additionalServicePrice}>
+                      From <sup>$</sup>
+                      <span className={styles.additionalServicePriceNumber}>{initialPrice.toFixed(0)}</span>
+                    </span>
+                  ) : recurringPrice ? (
+                    <span className={styles.additionalServicePrice}>
+                      From <sup>$</sup>
+                      <span className={styles.additionalServicePriceNumber}>{recurringPrice.toFixed(0)}</span>
+                      /{abbreviateFreq(plan.billing_frequency)}
+                    </span>
+                  ) : null}
+                  {hasContent && (
+                    <span className={styles.planHeaderIcon}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32" fill="none">
+                        <circle cx="16" cy="16" r="16" fill="#000" />
+                        <path d="M10 14L16 20L22 14" stroke="white" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {hasContent && (
+                <div className={styles.planContentWrapper} style={{ maxHeight: isExpanded ? '3000px' : '0' }}>
+                  <div className={styles.planContent}>
+                    {description && <p className={styles.planDescription}>{description}</p>}
+                    <div className={styles.planContentGrid}>
+                      <div className={styles.planContentLeft}>
+                        {features.length > 0 && (
+                          <div className={styles.planIncluded}>
+                            <h4>What&apos;s Included:</h4>
+                            <ul className={styles.featuresList}>
+                              {features.map((f, fi) => (
+                                <li key={fi} className={styles.feature}>
+                                  <span className={styles.featureCheckmark}>
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                      <g clipPath="url(#clip-fp)">
+                                        <path d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                        <path d="M7.5 9.16659L10 11.6666L18.3333 3.33325" stroke="#000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                      </g>
+                                      <defs><clipPath id="clip-fp"><rect width="20" height="20" fill="white" /></clipPath></defs>
+                                    </svg>
+                                  </span>
+                                  {f}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        <div className={styles.pricingSection}>
+                          <div className={styles.priceContainer}>
+                            {!isOneTime && recurringPrice > 0 && (
+                              <div className={styles.priceLeft}>
+                                <div className={styles.priceRecurring}>
+                                  <sup>$</sup>{recurringPrice.toFixed(0)}
+                                  <sup className={styles.priceAsterisk}>*</sup>
+                                  <span className={styles.priceFrequency}>/{abbreviateFreq(plan.billing_frequency)}</span>
+                                </div>
+                              </div>
+                            )}
+                            {initialPrice > 0 && (
+                              <div className={isOneTime ? styles.priceLeft : styles.priceRight}>
+                                <div className={styles.priceRecurring}>
+                                  <sup>$</sup>{initialPrice.toFixed(0)}
+                                  {!isOneTime && recurringPrice > 0 && (
+                                    <span className={styles.priceFrequency}>/Initial</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      {imageUrl && (
+                        <div className={styles.planContentRight}>
+                          <div className={styles.planImageWrapper}>
+                            <Image src={imageUrl} alt={plan.plan_name} fill className={styles.planImage} />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  ) : null;
 
   return (
     <div className={styles.quoteContainer} style={brandingStyle}>
@@ -435,447 +706,49 @@ export default function QuoteContent({
         companyName={company.name}
         buttonText={company.phone}
         phoneNumber={company.phone}
-        removeBackground={currentStep === 1 ? false : true}
+        removeBackground={false}
       />
-      {/* Step 1: Plan Comparison */}
-      {currentStep === 1 && (
+
+      {/* Single-page quote view */}
+      {!showThankYou && (
         <>
-          <HeroSection hero={heroContent} companyId={company.id} />
+          <HeroSection
+            hero={heroContent}
+            companyId={company.id}
+            mapPlotData={mapPlotData}
+            brandPrimary={branding?.primary_color ?? null}
+          />
           <div className={styles.quoteStep}>
             <div className={styles.contentArea}>
-              <PlanDetails
-                expandedPlanIndexes={expandedPlanIndexes}
-                setExpandedPlanIndexes={setExpandedPlanIndexes}
-                onContinue={handleNext}
-                primaryLineItems={primaryLineItems}
-                secondaryLineItems={secondaryLineItems}
-                availableAddons={availableAddons}
-                expandedAddonIndexes={expandedAddonIndexes}
-                setExpandedAddonIndexes={setExpandedAddonIndexes}
-                selectedAddonIds={selectedAddonIds}
-                onToggleAddon={toggleAddon}
-                selectedPlanIds={selectedPlanIds}
-                onTogglePlan={togglePlan}
+              <QuoteServicePanel
+                quoteLineItems={effectiveLineItems}
+                selectedItemIds={selectedItemIds}
+                onToggleItem={toggleItem}
+                expandedItemId={expandedItemId}
+                onSetExpandedItem={id =>
+                  setExpandedItemId(prev => (prev === id ? null : id))
+                }
+                getContent={getContent}
+                multipleItems={multipleItems}
+                showTotals={true}
+                showFaqs={true}
+                renderPlanHeaderExtra={renderPlanHeaderPestIcon}
+                onToggleRecommendedAddon={toggleRecommendedAddon}
+                renderRecommendedAddons={renderRecommendedAddonsForItem}
+                renderAfterItems={featuredPlansSection}
               />
+              <div className={styles.continueButtonWrapper}>
+                <button className={styles.ctaButton} onClick={() => setScheduleModalOpen(true)}>
+                  Schedule Service
+                </button>
+              </div>
             </div>
           </div>
         </>
       )}
 
-      {/* Step 2: Contact & Scheduling */}
-      {currentStep === 2 && (
-        <div className={styles.quoteStep}>
-          <div className={styles.quoteStepContent}>
-            <div className={styles.contentArea}>
-              <div className={styles.twoColumnGridContent}>
-                <div className={styles.leftColumnContent}>
-                  <h2 className={styles.stepHeading}>
-                    Great! When would you like us to get started?
-                  </h2>
-
-                  <div className={styles.schedulingSection}>
-                    <div className={styles.formGroupRow}>
-                      <div className={styles.formGroup}>
-                        <label htmlFor="start-date">
-                          Preferred Day:
-                        </label>
-                        <select
-                          id="start-date"
-                          value={preferredDate}
-                          onChange={e => {
-                            const newValue = e.target.value;
-                            setPreferredDate(newValue);
-                            updateLeadSchedule('requested_date', newValue);
-                          }}
-                          className={styles.select}
-                        >
-                          <option value="">No preference</option>
-                          <option value="monday">Monday</option>
-                          <option value="tuesday">Tuesday</option>
-                          <option value="wednesday">Wednesday</option>
-                          <option value="thursday">Thursday</option>
-                          <option value="friday">Friday</option>
-                        </select>
-                      </div>
-
-                      <div className={styles.formGroup}>
-                        <label htmlFor="arrival-time">
-                          Preferred Arrival Time:
-                        </label>
-                        <select
-                          id="arrival-time"
-                          value={preferredTime}
-                          onChange={e => {
-                            const newValue = e.target.value;
-                            setPreferredTime(newValue);
-                            updateLeadSchedule('requested_time', newValue);
-                          }}
-                          className={styles.select}
-                        >
-                          <option value="">Select a time...</option>
-                          {getEnabledTimeOptions(company.time_options || DEFAULT_TIME_OPTIONS).map(opt => (
-                            <option key={opt.value} value={opt.value}>{opt.label}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className={styles.infoSection}>
-                    <div className={styles.infoSectionRow}>
-                      <div className={styles.infoColumn}>
-                        <div className={styles.contactDetailsHeader}>
-                          <h3>Contact Details</h3>
-                          <button
-                            type="button"
-                            onClick={() => setIsCommentModalOpen(true)}
-                            className={styles.addCommentLink}
-                          >
-                            Add Comment
-                          </button>
-                        </div>
-                        <div className={styles.infoContent}>
-                          <p>
-                            <span>Name: </span>
-                            {quote.customer.first_name}{' '}
-                            {quote.customer.last_name}
-                          </p>
-                          <p>
-                            <span>Email: </span>
-                            {quote.customer.email}
-                          </p>
-                          <p>
-                            <span>Phone: </span>
-                            {quote.customer.phone}
-                          </p>
-                          {quote.service_address && (
-                            <>
-                              <p>
-                                <span>Address: </span>
-                                {quote.service_address.street_address},{' '}
-                                {quote.service_address.apartment_unit && (
-                                  <>{quote.service_address.apartment_unit}</>
-                                )}
-                                <br />
-                                {quote.service_address.city},{' '}
-                                {quote.service_address.state}{' '}
-                                {quote.service_address.zip_code}
-                              </p>
-                            </>
-                          )}
-                          <p>
-                            <span>Home Size: </span>
-                            {formatHomeSizeRange(quote.home_size_range)}
-                          </p>
-                          <p>
-                            <span>Yard Size: </span>
-                            {formatYardSizeRange(quote.yard_size_range)}
-                          </p>
-                          {customerComment && (
-                            <div className={styles.customerCommentSection}>
-                              <p>
-                                <span>Customer Comment:</span>
-                              </p>
-                              <p className={styles.customerCommentText}>
-                                {customerComment}
-                              </p>
-                            </div>
-                          )}
-                        </div>
-                        <div className={styles.contactSectionImageWrapper}>
-                          <Image
-                            className={styles.contactSectionImage}
-                            src={heroImageUrl}
-                            alt=""
-                            fill={true}
-                            priority={true}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className={styles.rightColumnContent}>
-                  <div className={styles.contactSectionImageWrapper}>
-                    <Image
-                      className={styles.contactSectionImage}
-                      src={heroImageUrl}
-                      alt=""
-                      fill={true}
-                      priority={true}
-                    />
-                  </div>
-                </div>
-              </div>
-              {company.wisetack_enabled && company.wisetack_url && (
-                <div className={styles.wisetackSection}>
-                  <div className={styles.wisetackBody}>
-                    <div>
-                      <h3 className={styles.wisetackTitle}>We Offer Financing</h3>
-                      <p className={styles.wisetackText}>
-                        Prefer to pay over time rather than all at once? We have the perfect solution.{' '}
-                        <a
-                          href={company.wisetack_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={styles.wisetackLink}
-                        >
-                          Pre-Qualify By Clicking Here.
-                        </a>
-                      </p>
-                      <label className={styles.wisetackCheckboxLabel}>
-                        <span className={`${styles.wisetackCheckboxCustom} ${interestedInFinancing ? styles.wisetackCheckboxChecked : ''}`} />
-                        <input
-                          type="checkbox"
-                          checked={interestedInFinancing}
-                          onChange={e => setInterestedInFinancing(e.target.checked)}
-                          className={styles.wisetackCheckboxInput}
-                        />
-                        I am interested in Financing
-                      </label>
-                    </div>
-                    <div className={styles.wisetackLogoWrapper}>
-                      <Image
-                        src="/wisetack-financing-logo-white.png"
-                        alt="Wisetack"
-                        width={140}
-                        height={32}
-                        style={{ objectFit: 'contain' }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div className={styles.bottomButtonsWrapper}>
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className={styles.backButton}
-                  aria-label="Go back to previous step"
-                >
-                  Go Back
-                </button>
-                <button className={styles.primaryButton} onClick={handleNext}>
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 3: Terms & Signature */}
-      {currentStep === 3 && (
-        <div className={styles.quoteStep}>
-          <div className={styles.quoteStepContent}>
-            <div className={styles.contentArea}>
-              <h2 className={styles.stepHeading}>Review and Sign Agreement</h2>
-              <QuoteTotalPricing
-                primaryLineItems={primaryLineItems}
-                secondaryLineItems={secondaryLineItems}
-                availableAddons={availableAddons}
-                selectedAddonIds={selectedAddonIds}
-                onToggleAddon={toggleAddon}
-                selectedPlanIds={selectedPlanIds}
-                onTogglePlan={togglePlan}
-              />
-
-              <div className={styles.reviewInfoSection}>
-                <div className={styles.reviewInfoContent}>
-                  <h3>Contact Details</h3>
-                  <div className={styles.reviewDetailsRow}>
-                    <div className={styles.infoColumn}>
-                      <div className={styles.infoContent}>
-                        <p>
-                          <span>Name: </span>
-                          {quote.customer.first_name} {quote.customer.last_name}
-                        </p>
-                        <p>
-                          <span>Email: </span>
-                          {quote.customer.email}
-                        </p>
-                        <p>
-                          <span>Phone: </span>
-                          {quote.customer.phone}
-                        </p>
-                      </div>
-                    </div>
-                    <div className={styles.infoColumn}>
-                      <div className={styles.infoContent}>
-                        {quote.service_address && (
-                          <>
-                            <p>
-                              <span>Address: </span>
-                              {quote.service_address.street_address},{' '}
-                              {quote.service_address.apartment_unit && (
-                                <>{quote.service_address.apartment_unit}</>
-                              )}
-                              {quote.service_address.city},{' '}
-                              {quote.service_address.state}{' '}
-                              {quote.service_address.zip_code}
-                            </p>
-                          </>
-                        )}
-                        <p>
-                          <span>Home Size: </span>
-                          {formatHomeSizeRange(quote.home_size_range)}
-                        </p>
-                        <p>
-                          <span>Yard Size: </span>
-                          {formatYardSizeRange(quote.yard_size_range)}
-                        </p>
-                      </div>
-                    </div>
-                    {customerComment && (
-                      <div className={styles.customerCommentSection}>
-                        <p>
-                          <span>Customer Comment:</span>
-                        </p>
-                        <p className={styles.customerCommentText}>
-                          {customerComment}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.contactSectionImageWrapper}>
-                  <Image
-                    className={styles.contactSectionImage}
-                    src={heroImageUrl}
-                    alt=""
-                    fill={true}
-                    priority={true}
-                  />
-                </div>
-              </div>
-
-              {company.wisetack_enabled && (
-                <div className={styles.wisetackFinancingRow}>
-                  <label className={styles.wisetackFinancingLabel}>
-                    <span className={`${styles.wisetackFinancingCheckbox} ${interestedInFinancing ? styles.wisetackFinancingCheckboxChecked : ''}`} />
-                    <input
-                      type="checkbox"
-                      checked={interestedInFinancing}
-                      onChange={e => setInterestedInFinancing(e.target.checked)}
-                      className={styles.wisetackCheckboxInput}
-                    />
-                    I&apos;m Interested In Financing
-                  </label>
-                  <Image
-                    src="/wisetack-financing-logo.png"
-                    alt="Wisetack"
-                    width={130}
-                    height={30}
-                    style={{ objectFit: 'contain' }}
-                  />
-                </div>
-              )}
-
-              <div className={styles.termsSection}>
-                <h3>Terms and Conditions</h3>
-                <p className={styles.termsIntro}>
-                  Please review the full terms and conditions before signing.
-                </p>
-
-                <div className={styles.viewTermsRow}>
-                  <button
-                    type="button"
-                    className={`${styles.viewTermsButton} ${termsNudge ? styles.viewTermsNudge : ''}`}
-                    onClick={() => { setTermsModalOpen(true); setTermsNudge(false); }}
-                  >
-                    View Terms and Conditions
-                  </button>
-                  {termsViewed && (
-                    <span className={styles.viewedBadge}>&#10003; Viewed</span>
-                  )}
-                </div>
-
-                <div
-                  className={styles.checkboxGroup}
-                  onClick={() => {
-                    if (!termsViewed) {
-                      setTermsNudge(true);
-                      setTimeout(() => setTermsNudge(false), 2000);
-                    }
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    id="terms-checkbox"
-                    checked={termsAccepted}
-                    onChange={e => {
-                      if (!termsViewed) {
-                        setTermsNudge(true);
-                        setTimeout(() => setTermsNudge(false), 2000);
-                        return;
-                      }
-                      setTermsAccepted(e.target.checked);
-                    }}
-                  />
-                  <label htmlFor="terms-checkbox" className={styles.termsLabel}>
-                    I have read and accept the terms and conditions
-                    {!termsViewed && termsNudge && (
-                      <span className={styles.termsHint}> &mdash; You must view the terms first</span>
-                    )}
-                  </label>
-                </div>
-
-                <div className={styles.signatureSection}>
-                  <h4>Signature</h4>
-                  <p className={styles.signatureInstruction}>
-                    Please sign in the box below using your mouse or finger
-                  </p>
-                  <div className={styles.signatureCanvas}>
-                    <SignatureCanvas
-                      ref={signatureRef}
-                      canvasProps={{
-                        className: styles.signaturePad,
-                      }}
-                      onEnd={() => setHasSignature(true)}
-                    />
-                  </div>
-                  <div className={styles.signatureActions}>
-                    <p className={styles.signingDate}>
-                      Signing on {new Date().toLocaleDateString()}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={clearSignature}
-                      className={styles.secondaryButton}
-                    >
-                      Clear Signature
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {error && <div className={styles.error}>{error}</div>}
-
-              <div className={styles.bottomButtonsWrapper}>
-                <button
-                  type="button"
-                  onClick={handleBack}
-                  className={styles.backButton}
-                  aria-label="Go back to previous step"
-                >
-                  Go Back
-                </button>
-                <button
-                  className={`${styles.primaryButton} ${styles.submitButton}`}
-                  onClick={handleSubmit}
-                  disabled={isSubmitting || !termsAccepted || !hasSignature}
-                >
-                  {isSubmitting ? 'Submitting...' : 'Submit Agreement'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Step 4: Completion */}
-      {currentStep === 4 && (
+      {/* Thank You */}
+      {showThankYou && (
         <div className={styles.quoteStep}>
           <div className={styles.quoteStepContent}>
             <div className={styles.contentArea}>
@@ -883,7 +756,6 @@ export default function QuoteContent({
                 <h2>Thank You, {quote.customer.first_name}!</h2>
               </div>
 
-              {/* What's Next */}
               <div className={styles.summaryItem}>
                 <div
                   className={styles.summaryContent}
@@ -902,93 +774,170 @@ export default function QuoteContent({
         </div>
       )}
 
-      {/* Terms and Conditions Modal */}
-      {termsModalOpen && (
-        <div className={styles.termsModal}>
-          <div className={styles.termsModalContent}>
-            <div className={styles.termsModalHeader}>
-              <h3>Terms and Conditions</h3>
+      {/* Schedule Service Modal */}
+      {scheduleModalOpen && (
+        <div className={styles.modalBackdrop} onClick={() => setScheduleModalOpen(false)}>
+          <div className={styles.scheduleModal} onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className={styles.scheduleModalHeader}>
+              <h3>Schedule Service</h3>
+              <button type="button" onClick={() => setScheduleModalOpen(false)}>&#215;</button>
+            </div>
+
+            {/* Scrollable body */}
+            <div className={styles.scheduleModalBody}>
+              {/* Preferred Day & Time */}
+              <div className={styles.scheduleModalSection}>
+                <p className={styles.scheduleModalSectionLabel}>Preferred Day &amp; Time</p>
+                <div className={styles.scheduleDateRow}>
+                  <select
+                    value={preferredDate}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setPreferredDate(val);
+                      updateLeadSchedule('requested_date', val);
+                    }}
+                  >
+                    <option value="">No preference</option>
+                    <option value="monday">Monday</option>
+                    <option value="tuesday">Tuesday</option>
+                    <option value="wednesday">Wednesday</option>
+                    <option value="thursday">Thursday</option>
+                    <option value="friday">Friday</option>
+                  </select>
+                  <select
+                    value={preferredTime}
+                    onChange={e => {
+                      const val = e.target.value;
+                      setPreferredTime(val);
+                      updateLeadSchedule('requested_time', val);
+                    }}
+                  >
+                    <option value="">Select a time...</option>
+                    {getEnabledTimeOptions(company.time_options || DEFAULT_TIME_OPTIONS).map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Wisetack financing */}
+              {company.wisetack_enabled && (
+                <div className={styles.scheduleModalSection}>
+                  <label className={styles.wisetackFinancingLabel}>
+                    <span className={`${styles.wisetackFinancingCheckbox} ${interestedInFinancing ? styles.wisetackFinancingCheckboxChecked : ''}`} />
+                    <input
+                      type="checkbox"
+                      checked={interestedInFinancing}
+                      onChange={e => setInterestedInFinancing(e.target.checked)}
+                      className={styles.wisetackCheckboxInput}
+                    />
+                    I&apos;m Interested In Financing
+                  </label>
+                </div>
+              )}
+
+              {/* Terms & Conditions */}
+              <div className={styles.scheduleModalSection}>
+                <p className={styles.scheduleModalSectionLabel}>
+                  Terms &amp; Conditions
+                  {termsViewed && (
+                    <span className={styles.viewedBadge} style={{ marginLeft: 12 }}>&#10003; Viewed</span>
+                  )}
+                </p>
+                <div className={styles.scheduleModalTermsBody} ref={termsModalBodyRef}>
+                  <div dangerouslySetInnerHTML={{ __html: company.quote_terms }} />
+                  {quote.line_items
+                    .filter(item => (item as any).planContent?.plan_terms)
+                    .map((item, i) => (
+                      <div key={`plan-terms-${i}`} className={styles.specificTermsBlock}>
+                        <h4>{(item as any).planContent.plan_name} &mdash; Terms and Conditions</h4>
+                        <div dangerouslySetInnerHTML={{ __html: (item as any).planContent.plan_terms }} />
+                      </div>
+                    ))
+                  }
+                  {quote.line_items
+                    .filter(item => selectedItemIds.has(item.id) && (item as any).planContent?.addon_terms)
+                    .map((item, i) => (
+                      <div key={`addon-terms-${i}`} className={styles.specificTermsBlock}>
+                        <h4>{(item as any).planContent.plan_name} &mdash; Terms and Conditions</h4>
+                        <div dangerouslySetInnerHTML={{ __html: (item as any).planContent.addon_terms }} />
+                      </div>
+                    ))
+                  }
+                </div>
+                <div
+                  className={styles.checkboxGroup}
+                  onClick={() => {
+                    if (!termsViewed) {
+                      setTermsNudge(true);
+                      setTimeout(() => setTermsNudge(false), 2000);
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    id="schedule-terms-checkbox"
+                    checked={termsAccepted}
+                    onChange={e => {
+                      if (!termsViewed) {
+                        setTermsNudge(true);
+                        setTimeout(() => setTermsNudge(false), 2000);
+                        return;
+                      }
+                      setTermsAccepted(e.target.checked);
+                    }}
+                  />
+                  <label htmlFor="schedule-terms-checkbox" className={`${styles.termsLabel} ${termsNudge ? styles.viewTermsNudge : ''}`}>
+                    I have read and accept the terms and conditions
+                    {!termsViewed && termsNudge && (
+                      <span className={styles.termsHint}> &mdash; You must scroll through the terms first</span>
+                    )}
+                  </label>
+                </div>
+              </div>
+
+              {/* Signature */}
+              <div className={styles.scheduleModalSection}>
+                <p className={styles.scheduleModalSectionLabel}>Signature</p>
+                <p className={styles.signatureInstruction}>Please sign in the box below using your mouse or finger</p>
+                <div className={styles.sigCanvasWrap}>
+                  <SignatureCanvas
+                    ref={signatureRef}
+                    canvasProps={{ className: styles.signaturePad }}
+                    onEnd={() => setHasSignature(true)}
+                  />
+                </div>
+                <div className={styles.signatureActions}>
+                  <p className={styles.signingDate}>Signing on {new Date().toLocaleDateString()}</p>
+                  <button
+                    type="button"
+                    onClick={clearSignature}
+                    className={styles.secondaryButton}
+                  >
+                    Clear Signature
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className={styles.scheduleModalFooter}>
+              {error && <div className={styles.error} style={{ flex: 1, marginBottom: 0 }}>{error}</div>}
               <button
                 type="button"
-                onClick={() => setTermsModalOpen(false)}
-                className={styles.termsModalClose}
-              >
-                &#215;
-              </button>
-            </div>
-            <div className={styles.termsModalBody} ref={termsModalBodyRef}>
-              <div dangerouslySetInnerHTML={{ __html: company.quote_terms }} />
-
-              {quote.line_items
-                .filter((item: any) => item.service_plan?.plan_terms)
-                .map((item: any, i: number) => (
-                  <div key={`plan-terms-${i}`} className={styles.specificTermsBlock}>
-                    <h4>{item.service_plan.plan_name} &mdash; Terms and Conditions</h4>
-                    <div dangerouslySetInnerHTML={{ __html: item.service_plan.plan_terms }} />
-                  </div>
-                ))
-              }
-
-              {availableAddons
-                .filter(addon => selectedAddonIds.includes(addon.id) && addon.addon_terms)
-                .map((addon: any, i: number) => (
-                  <div key={`addon-terms-${i}`} className={styles.specificTermsBlock}>
-                    <h4>{addon.addon_name} &mdash; Terms and Conditions</h4>
-                    <div dangerouslySetInnerHTML={{ __html: addon.addon_terms }} />
-                  </div>
-                ))
-              }
-            </div>
-            <div className={styles.termsModalFooter}>
-              <button
-                type="button"
-                onClick={() => setTermsModalOpen(false)}
-                className={styles.termsModalCloseBtn}
-                disabled={!termsViewed}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Comment Modal */}
-      {isCommentModalOpen && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setIsCommentModalOpen(false)}
-        >
-          <div
-            className={styles.modalContainer}
-            onClick={e => e.stopPropagation()}
-          >
-            <h3>Add a Comment</h3>
-            <p className={styles.modalDescription}>
-              Please let us know if any contact information needs to be updated
-              or if you have any concerns.
-            </p>
-            <textarea
-              className={styles.commentTextarea}
-              value={customerComment}
-              onChange={e => setCustomerComment(e.target.value)}
-              placeholder="Enter your comment here..."
-              rows={5}
-            />
-            <div className={styles.modalActions}>
-              <button
-                type="button"
-                onClick={() => setIsCommentModalOpen(false)}
+                onClick={() => setScheduleModalOpen(false)}
                 className={styles.modalCancelButton}
               >
                 Cancel
               </button>
               <button
                 type="button"
-                onClick={handleSaveComment}
-                className={styles.modalSaveButton}
+                className={`${styles.primaryButton} ${styles.submitButton}`}
+                onClick={handleSubmit}
+                disabled={isSubmitting || !termsAccepted || !hasSignature}
               >
-                Save Comment
+                {isSubmitting ? 'Submitting...' : 'Submit Agreement'}
               </button>
             </div>
           </div>

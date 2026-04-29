@@ -111,7 +111,8 @@
   border-radius: 8px;
   background: #f4f5f8;
   padding: 20px 34px;
-  margin-top: 8px;
+  margin: 8px auto;
+  max-width: 530px;
 
   @media (max-width: 768px) {
     justify-content: center;
@@ -682,6 +683,30 @@
   margin: 0;
   white-space: pre-wrap;
   font-family: var(--secondary-font, var(--primary-font));
+}
+
+.notesTextarea {
+  width: 100%;
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.6;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  resize: vertical;
+  font-family: var(--secondary-font, var(--primary-font));
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
 }
 
 /* ── Spacer for sticky bar ── */

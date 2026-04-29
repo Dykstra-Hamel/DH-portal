@@ -30,6 +30,7 @@ export async function POST(request: NextRequest) {
       clientEmail,
       clientPhone,
       address,
+      serviceAddressId: providedServiceAddressId,
       pestTypes,
       mapPlotData,
       companyId: bodyCompanyId,
@@ -126,24 +127,26 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Service address find / upsert ─────────────────────────────────────
-    let serviceAddressId: string | null = null;
+    let serviceAddressId: string | null = providedServiceAddressId ?? null;
 
-    const { data: existingAddress } = await adminClient
-      .from('service_addresses')
-      .select('id')
-      .eq('company_id', companyId)
-      .ilike('street_address', address)
-      .maybeSingle();
-
-    if (existingAddress?.id) {
-      serviceAddressId = existingAddress.id;
-    } else {
-      const { data: newAddress } = await adminClient
+    if (!serviceAddressId) {
+      const { data: existingAddress } = await adminClient
         .from('service_addresses')
-        .insert({ company_id: companyId, street_address: address })
         .select('id')
-        .single();
-      serviceAddressId = newAddress?.id ?? null;
+        .eq('company_id', companyId)
+        .ilike('street_address', address)
+        .maybeSingle();
+
+      if (existingAddress?.id) {
+        serviceAddressId = existingAddress.id;
+      } else {
+        const { data: newAddress } = await adminClient
+          .from('service_addresses')
+          .insert({ company_id: companyId, street_address: address })
+          .select('id')
+          .single();
+        serviceAddressId = newAddress?.id ?? null;
+      }
     }
 
     // ── Resolve lead ID — check route_stops to avoid duplicates ──────────
@@ -229,6 +232,7 @@ export async function POST(request: NextRequest) {
           pestpac_stop_id: stopId ? String(stopId) : null,
           estimated_value: null,
           submitted_by: user.id,
+          assigned_to: user.id,
           priority: 'medium',
         })
         .select('id')
