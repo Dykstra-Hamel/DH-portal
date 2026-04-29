@@ -1530,7 +1530,7 @@
   width: 100% !important;
   height: 200px !important;
   border: 1px solid var(--gray-300);
-  border-radius: 8px;
+  border-radius: 4px;
   background: white;
   cursor: crosshair;
   touch-action: none;
@@ -1963,7 +1963,7 @@
 
 .heroSection {
   background: var(--gray-25);
-  padding: 80px 0;
+  padding: 40px 0;
   position: relative;
   overflow-x: hidden;
 
@@ -1994,13 +1994,13 @@
   max-width: 1215px;
   width: 100%;
   margin: 0 auto;
-  padding: 40px 0;
+  padding: 0 0 40px;
   display: grid;
   position: relative;
   z-index: 1;
   grid-template-columns: 1fr;
   max-width: 750px;
-  gap: 80px;
+  gap: 40px;
   align-items: center;
 
   @media (max-width: 992px) {
@@ -2206,6 +2206,7 @@
   align-items: center;
   justify-content: center;
   width: 100%;
+  margin-top: 40px;
 }
 
 .heroImageDisplay {
@@ -3357,8 +3358,12 @@
   justify-content: center;
 
   svg {
-    circle { fill: var(--gray-25); }
-    path { fill: var(--brand-secondary); }
+    circle {
+      fill: var(--gray-25);
+    }
+    path {
+      fill: var(--brand-secondary);
+    }
   }
 }
 
@@ -3373,9 +3378,9 @@
 
 // ── Schedule Service Modal ──
 .scheduleModal {
-  background: white;
+  background: var(--gray-25, #fff);
   border-radius: 16px;
-  max-width: 600px;
+  max-width: 680px;
   width: 100%;
   max-height: 90vh;
   display: flex;
@@ -3388,99 +3393,174 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid var(--gray-200);
+  padding: 20px 20px 0;
   flex-shrink: 0;
+  gap: 12px;
 
   h3 {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--gray-800);
+    font-size: 18px;
+    font-weight: 800;
+    color: var(--gray-700, #374151);
     margin: 0;
+    font-family: var(--primary-font);
   }
+}
 
-  button {
-    background: none;
-    border: none;
-    font-size: 22px;
-    cursor: pointer;
-    color: var(--gray-500);
-    line-height: 1;
-    padding: 4px;
+.scheduleModalCloseBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--gray-100, #f3f4f6);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--gray-500, #6b7280);
+  cursor: pointer;
+  flex-shrink: 0;
+  line-height: 1;
+
+  &:hover {
+    background: var(--gray-200, #e5e7eb);
   }
 }
 
 .scheduleModalBody {
   overflow-y: auto;
   flex: 1;
-  padding: 0 24px;
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .scheduleModalSection {
-  padding: 20px 0;
-  border-bottom: 1px solid var(--gray-100);
-
-  &:last-child {
-    border-bottom: none;
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .scheduleModalSectionLabel {
-  font-size: 13px;
-  font-weight: 600;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--gray-500);
-  margin: 0 0 12px;
+  letter-spacing: 0.06em;
+  color: var(--gray-500, #6b7280);
+  font-family: var(--secondary-font, var(--primary-font));
   display: flex;
   align-items: center;
+  gap: 8px;
 }
 
 .scheduleDateRow {
-  display: flex;
-  gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 
   select {
-    flex: 1;
-    padding: 10px 14px;
-    border: 1px solid var(--gray-300);
-    border-radius: 8px;
+    width: 100%;
+    padding: 10px 12px;
+    border: 1.5px solid var(--gray-300, #d1d5db);
+    border-radius: 4px;
     font-size: 14px;
-    color: var(--gray-800);
-    background: white;
+    font-family: var(--secondary-font, var(--primary-font));
+    color: var(--gray-700, #374151);
+    background: var(--gray-25, #fff);
+    outline: none;
+    box-sizing: border-box;
     cursor: pointer;
-    font-family: inherit;
+
+    &:focus {
+      border-color: var(--brand-primary);
+    }
   }
 }
 
 .sigCanvasWrap {
-  border: 1px solid var(--gray-300);
-  border-radius: 8px;
+  border-radius: 4px;
   overflow: hidden;
-  background: white;
-  margin-bottom: 8px;
+  background: var(--gray-25, #fff);
 }
 
 .scheduleModalTermsBody {
-  max-height: 180px;
+  max-height: 200px;
   overflow-y: auto;
-  border: 1px solid var(--gray-200);
-  border-radius: 8px;
-  padding: 12px 16px;
+  border: 1.5px solid var(--gray-300, #d1d5db);
+  border-radius: 4px;
+  padding: 12px;
+  background: var(--gray-25, #fff);
   font-size: 13px;
-  color: var(--gray-600);
+  color: var(--gray-700, #374151);
   line-height: 1.6;
-  margin-bottom: 12px;
+  font-family: var(--secondary-font, var(--primary-font));
+  overscroll-behavior: contain;
 }
 
 .scheduleModalFooter {
-  padding: 16px 24px;
-  border-top: 1px solid var(--gray-200);
+  padding: 16px 20px;
+  border-top: 1px solid var(--gray-200, #e5e7eb);
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 12px;
+  gap: 10px;
   flex-shrink: 0;
+
+  .modalCancelButton {
+    padding: 11px 20px;
+    border-radius: 4px;
+    border-width: 1.5px;
+    font-weight: 600;
+    font-family: var(--secondary-font, var(--primary-font));
+  }
+
+  .submitButton {
+    padding: 11px 24px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-family: var(--secondary-font, var(--primary-font));
+  }
+}
+
+// Signature section overrides inside the schedule modal
+.scheduleModal {
+  .signatureInstruction {
+    margin: 0;
+    font-size: 13px;
+    color: var(--gray-500, #6b7280);
+    font-family: var(--secondary-font, var(--primary-font));
+  }
+
+  .secondaryButton {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--gray-600, #4b5563);
+    cursor: pointer;
+    font-family: var(--secondary-font, var(--primary-font));
+    text-align: left;
+  }
+
+  .signingDate {
+    font-size: 12px;
+    font-style: normal;
+    color: var(--gray-400, #9ca3af);
+    margin: 0;
+  }
+
+  .checkboxGroup {
+    font-size: 13px;
+    color: var(--gray-700, #374151);
+    font-family: var(--secondary-font, var(--primary-font));
+
+    input[type='checkbox'] {
+      width: 18px;
+      height: 18px;
+    }
+  }
 }
 
 // Terms & Conditions block inside expanded addon card
@@ -3501,4 +3581,208 @@
     line-height: 1.6;
     color: var(--color-text-gray);
   }
+}
+
+// ── Inspection Summary (Pests + Inspector) ──
+.inspectionSummary {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px 34px;
+
+  @media (max-width: 480px) {
+    padding: 24px 20px 0;
+  }
+}
+
+.heroPests {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.heroPestsLabel {
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--gray-700, #374151);
+  margin: 0 0 16px;
+}
+
+.heroPestIconRow {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 24px;
+}
+
+.heroPestIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--brand-secondary);
+  width: 100px;
+}
+
+.heroPestIconCircle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--gray-25);
+  border: 2px solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.heroPestIconSvg {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+
+  svg path {
+    fill: currentColor;
+  }
+}
+
+.heroPestIconLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: currentColor;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.inspectorCard {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  border-radius: 8px;
+  background: #f4f5f8;
+  padding: 20px 34px;
+  width: 100%;
+  max-width: 530px;
+
+  @media (max-width: 768px) {
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 16px 20px;
+    text-align: center;
+  }
+}
+
+.inspectorInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.inspectorAvatar {
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  object-fit: cover;
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+}
+
+.inspectorAvatarFallback {
+  width: 57px;
+  height: 57px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  color: var(--gray-25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.inspectorText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inspectorName {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 22px;
+  color: var(--color-text);
+  font-family: var(--primary-font);
+}
+
+.inspectorTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--color-text-gray);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.inspectorSeparator {
+  width: 1px;
+  align-self: stretch;
+  background: var(--color-border-gray);
+  flex-shrink: 0;
+
+  @media (max-width: 768px) {
+    display: none;
+  }
+}
+
+.inspectorAddress {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  gap: 4px;
+
+  @media (max-width: 768px) {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    gap: 16px;
+  }
+}
+
+.inspectorAddressSeparator {
+  display: none;
+
+  @media (max-width: 768px) {
+    display: block;
+    width: 1px;
+    align-self: stretch;
+    background: var(--color-border-gray);
+    flex-shrink: 0;
+  }
+}
+
+.inspectorAddressLabel {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 20px;
+  color: var(--color-text-gray);
+}
+
+.inspectorAddressValue {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 20px;
+  color: var(--color-text);
 }

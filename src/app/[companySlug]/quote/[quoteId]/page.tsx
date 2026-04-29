@@ -85,7 +85,9 @@ interface Quote {
     comments: string;
     requested_date: string | null;
     requested_time: string | null;
+    map_plot_data?: any;
   };
+  inspector?: { name: string; title: string | null; avatar_url: string | null } | null;
   company: Company;
 }
 

@@ -99,6 +99,7 @@ interface Quote {
     plan_features: string[];
     plan_image_url: string | null;
   }>;
+  inspector?: { name: string; title: string | null; avatar_url: string | null } | null;
 }
 
 interface QuoteStepsProps {
@@ -359,6 +360,14 @@ export default function QuoteContent({
 
   const mapPlotData = quote.lead?.map_plot_data ?? null;
   const plottedPests = mapPlotData ? getPlottedPests(mapPlotData) : [];
+
+  const inspectionAddress = quote.service_address
+    ? [
+        quote.service_address.street_address,
+        [quote.service_address.city, quote.service_address.state, quote.service_address.zip_code]
+          .filter(Boolean).join(', '),
+      ].filter(Boolean).join(', ')
+    : (mapPlotData as any)?.addressInput ?? null;
 
   function renderPlanHeaderPestIcon(item: QuoteLineItem): React.ReactNode {
     const content = getContent(item) as any;
@@ -717,7 +726,71 @@ export default function QuoteContent({
             companyId={company.id}
             mapPlotData={mapPlotData}
             brandPrimary={branding?.primary_color ?? null}
-          />
+          >
+            {/* Pests Identified + Inspector Card (shown when inspection data exists) */}
+            {(plottedPests.length > 0 || quote.inspector) && (
+              <div className={styles.inspectionSummary}>
+                {plottedPests.length > 0 && (
+                  <div className={styles.heroPests}>
+                    <p className={styles.heroPestsLabel}>Pests Identified</p>
+                    <div className={styles.heroPestIconRow}>
+                      {plottedPests.map(pest => {
+                        const iconSvg = pestIconMap[pest.id] ?? null;
+                        const stampType = pest.stampType ?? getPestStampType(pest.id);
+                        return (
+                          <div key={pest.id} className={styles.heroPestIcon}>
+                            <div className={styles.heroPestIconCircle}>
+                              {iconSvg ? (
+                                <span className={styles.heroPestIconSvg} dangerouslySetInnerHTML={{ __html: iconSvg }} />
+                              ) : (
+                                <MapStampGlyph type={stampType} size={24} />
+                              )}
+                            </div>
+                            <span className={styles.heroPestIconLabel}>{pest.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {quote.inspector && (
+                  <div className={styles.inspectorCard}>
+                    <div className={styles.inspectorInfo}>
+                      {quote.inspector.avatar_url ? (
+                        <Image
+                          src={quote.inspector.avatar_url}
+                          alt={quote.inspector.name}
+                          width={57}
+                          height={57}
+                          className={styles.inspectorAvatar}
+                        />
+                      ) : (
+                        <div className={styles.inspectorAvatarFallback}>
+                          {quote.inspector.name.charAt(0)}
+                        </div>
+                      )}
+                      <div className={styles.inspectorText}>
+                        <p className={styles.inspectorName}>{quote.inspector.name}</p>
+                        <p className={styles.inspectorTitle}>{quote.inspector.title || 'Lead Sales Inspector'}</p>
+                      </div>
+                    </div>
+                    {inspectionAddress && (
+                      <>
+                        <div className={styles.inspectorSeparator} />
+                        <div className={styles.inspectorAddress}>
+                          <p className={styles.inspectorAddressLabel}>Inspection Address:</p>
+                          <div className={styles.inspectorAddressSeparator} />
+                          <p className={styles.inspectorAddressValue}>{inspectionAddress}</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </HeroSection>
+
           <div className={styles.quoteStep}>
             <div className={styles.contentArea}>
               <QuoteServicePanel
@@ -781,7 +854,7 @@ export default function QuoteContent({
             {/* Header */}
             <div className={styles.scheduleModalHeader}>
               <h3>Schedule Service</h3>
-              <button type="button" onClick={() => setScheduleModalOpen(false)}>&#215;</button>
+              <button type="button" className={styles.scheduleModalCloseBtn} onClick={() => setScheduleModalOpen(false)}>&#215;</button>
             </div>
 
             {/* Scrollable body */}
@@ -821,21 +894,6 @@ export default function QuoteContent({
                 </div>
               </div>
 
-              {/* Wisetack financing */}
-              {company.wisetack_enabled && (
-                <div className={styles.scheduleModalSection}>
-                  <label className={styles.wisetackFinancingLabel}>
-                    <span className={`${styles.wisetackFinancingCheckbox} ${interestedInFinancing ? styles.wisetackFinancingCheckboxChecked : ''}`} />
-                    <input
-                      type="checkbox"
-                      checked={interestedInFinancing}
-                      onChange={e => setInterestedInFinancing(e.target.checked)}
-                      className={styles.wisetackCheckboxInput}
-                    />
-                    I&apos;m Interested In Financing
-                  </label>
-                </div>
-              )}
 
               {/* Terms & Conditions */}
               <div className={styles.scheduleModalSection}>
