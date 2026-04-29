@@ -21,6 +21,7 @@ interface LeadQuoteBuilderProps {
   onShowToast?: (message: string, type: 'success' | 'error') => void;
   onEditPests?: () => void;
   onReady?: () => void;
+  onLineItemsSaved?: (itemCount: number) => void;
 }
 
 interface DbLineItem {
@@ -88,16 +89,23 @@ export function LeadQuoteBuilder({
   onShowToast,
   onEditPests,
   onReady,
+  onLineItemsSaved,
 }: LeadQuoteBuilderProps) {
   const [lineItems, setLineItems] = useState<BuilderLineItem[]>([]);
   const [appliedDiscount, setAppliedDiscount] = useState<AvailableDiscount | null>(null);
   const [isBuilderReady, setIsBuilderReady] = useState(false);
   const hydratedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const lineItemsRef = useRef<BuilderLineItem[]>([]);
   const onReadyRef = useRef(onReady);
   const hasFiredReadyRef = useRef(false);
+  const onShowToastRef = useRef(onShowToast);
+  const onLineItemsSavedRef = useRef(onLineItemsSaved);
   useEffect(() => {
     onReadyRef.current = onReady;
+    onShowToastRef.current = onShowToast;
+    onLineItemsSavedRef.current = onLineItemsSaved;
+    lineItemsRef.current = lineItems;
   });
 
   const isLoading = isQuoteLoading || !isBuilderReady;
@@ -124,6 +132,9 @@ export function LeadQuoteBuilder({
       );
       setLineItems(ordered.map(dbItemToBuilderItem));
     }
+    if (quote.applied_discount) {
+      setAppliedDiscount(quote.applied_discount as unknown as AvailableDiscount);
+    }
   }, [quote]);
 
   const plottedPests: PlottedPest[] = useMemo(
@@ -139,11 +150,8 @@ export function LeadQuoteBuilder({
     return map;
   }, [selectedPests]);
 
-  const handleChange = useCallback(
-    (items: BuilderLineItem[]) => {
-      hydratedRef.current = true;
-      setLineItems(items);
-
+  const scheduleSave = useCallback(
+    (items: BuilderLineItem[], discount: AvailableDiscount | null, delayMs: number) => {
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(async () => {
         try {
@@ -154,11 +162,11 @@ export function LeadQuoteBuilder({
               leadId: lead.id,
               companyId: lead.company_id,
               quoteLineItems: items,
-              discountTarget: appliedDiscount?.applies_to_price ?? 'initial',
-              discountAmount: appliedDiscount?.discount_value ?? null,
+              discountTarget: discount?.applies_to_price ?? 'initial',
+              discountAmount: discount?.discount_value ?? null,
               discountType:
-                appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
-              discountId: appliedDiscount?.id ?? null,
+                discount?.discount_type === 'percentage' ? '%' : '$',
+              discountId: discount?.id ?? null,
             }),
           });
           const data = await res.json();
@@ -170,19 +178,33 @@ export function LeadQuoteBuilder({
           if (qData.success && qData.data) {
             await broadcastQuoteUpdate(qData.data);
           }
+
+          onLineItemsSavedRef.current?.(items.length);
         } catch (err) {
           console.error('Failed to save quote line items', err);
-          onShowToast?.('Failed to save quote changes', 'error');
+          onShowToastRef.current?.('Failed to save quote changes', 'error');
         }
-      }, 1500);
+      }, delayMs);
     },
-    [
-      lead.id,
-      lead.company_id,
-      appliedDiscount,
-      broadcastQuoteUpdate,
-      onShowToast,
-    ]
+    [lead.id, lead.company_id, broadcastQuoteUpdate]
+  );
+
+  const handleChange = useCallback(
+    (items: BuilderLineItem[]) => {
+      hydratedRef.current = true;
+      setLineItems(items);
+      scheduleSave(items, appliedDiscount, 1500);
+    },
+    [appliedDiscount, scheduleSave]
+  );
+
+  const handleDiscountChange = useCallback(
+    (discount: AvailableDiscount | null) => {
+      hydratedRef.current = true;
+      setAppliedDiscount(discount);
+      scheduleSave(lineItemsRef.current, discount, 300);
+    },
+    [scheduleSave]
   );
 
   useEffect(() => {
@@ -207,7 +229,7 @@ export function LeadQuoteBuilder({
           companyId={lead.company_id}
           pestIconMap={pestIconMap}
           selectedDiscount={appliedDiscount}
-          onDiscountChange={setAppliedDiscount}
+          onDiscountChange={handleDiscountChange}
           onEditPests={onEditPests}
           pricingReadOnly
           onReady={handleBuilderReady}

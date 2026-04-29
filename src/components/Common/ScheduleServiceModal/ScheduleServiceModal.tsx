@@ -85,6 +85,19 @@ export function ScheduleServiceModal({
 
   const totalInitial = quote?.total_initial_price ?? 0;
   const totalRecurring = quote?.total_recurring_price ?? 0;
+  const subtotalInitial = quote?.subtotal_initial_price ?? totalInitial;
+  const subtotalRecurring = quote?.subtotal_recurring_price ?? totalRecurring;
+  const discount = quote?.applied_discount ?? null;
+  const initialDiscountAmount =
+    discount && (discount.applies_to_price === 'initial' || discount.applies_to_price === 'both')
+      ? Math.max(0, subtotalInitial - totalInitial)
+      : 0;
+  const recurringDiscountAmount =
+    discount && (discount.applies_to_price === 'recurring' || discount.applies_to_price === 'both')
+      ? Math.max(0, subtotalRecurring - totalRecurring)
+      : 0;
+  const hasDiscount =
+    !!discount && (initialDiscountAmount > 0 || recurringDiscountAmount > 0);
   const showPricing = quote != null && (totalInitial > 0 || totalRecurring > 0);
 
   const isDisabled = !scheduledDate || !scheduledTime || isSubmitting;
@@ -141,6 +154,11 @@ export function ScheduleServiceModal({
                 <span className={styles.pricingValue}>
                   {formatCurrency(totalInitial)}
                 </span>
+                {initialDiscountAmount > 0 && (
+                  <span className={styles.pricingOriginal}>
+                    was {formatCurrency(subtotalInitial)}
+                  </span>
+                )}
               </div>
               {totalRecurring > 0 && (
                 <>
@@ -151,10 +169,33 @@ export function ScheduleServiceModal({
                       {formatCurrency(totalRecurring)}
                       <span className={styles.pricingSuffix}>/mo</span>
                     </span>
+                    {recurringDiscountAmount > 0 && (
+                      <span className={styles.pricingOriginal}>
+                        was {formatCurrency(subtotalRecurring)}/mo
+                      </span>
+                    )}
                   </div>
                 </>
               )}
             </div>
+            {hasDiscount && discount && (
+              <div className={styles.discountBanner}>
+                <div className={styles.discountInfo}>
+                  <span className={styles.discountName}>
+                    {discount.discount_name} applied
+                  </span>
+                  <span className={styles.discountAmount}>
+                    {initialDiscountAmount > 0 &&
+                      `−${formatCurrency(initialDiscountAmount)} off initial`}
+                    {initialDiscountAmount > 0 &&
+                      recurringDiscountAmount > 0 &&
+                      ' · '}
+                    {recurringDiscountAmount > 0 &&
+                      `−${formatCurrency(recurringDiscountAmount)}/mo off recurring`}
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

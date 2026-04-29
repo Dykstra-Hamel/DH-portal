@@ -12,7 +12,6 @@ import { SupportCaseDetailsSidebar } from '@/components/Common/SupportCaseStepCo
 import { Toast } from '@/components/Common/Toast';
 import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
-import { formatHeaderDate } from '@/lib/date-utils';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { useBranches } from '@/hooks/useBranches';
@@ -295,14 +294,9 @@ function SupportCaseDetailPageContent({ params }: SupportCasePageProps) {
         ? `${supportCase.customer.first_name || ''} ${supportCase.customer.last_name || ''}`.trim() || 'Support Case'
         : 'Support Case';
 
-      // Format timestamps with HTML formatting
-      const createdDate = formatHeaderDate(supportCase.created_at, true);
-      const updatedDate = formatHeaderDate(supportCase.updated_at, true);
-      const description = `Created: <span>${createdDate}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Last update: <span>${updatedDate}</span>`;
-
       setPageHeader({
         title: customerName,
-        description: description,
+        description: '',
         supportCaseAssignmentControls: {
           caseStatus: supportCase.status,
           assignedTo: selectedAssignee,

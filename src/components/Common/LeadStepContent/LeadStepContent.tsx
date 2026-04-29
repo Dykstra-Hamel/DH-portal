@@ -45,6 +45,7 @@ interface LeadStepContentProps {
   onFinalizeSale?: (handler: () => void) => void;
   onNotInterested?: () => void;
   onReadyToSchedule?: () => void;
+  onLineItemsSaved?: (itemCount: number) => void;
 }
 
 export function LeadStepContent({
@@ -58,6 +59,7 @@ export function LeadStepContent({
   onFinalizeSale,
   onNotInterested,
   onReadyToSchedule,
+  onLineItemsSaved,
 }: LeadStepContentProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [isCommunicationExpanded, setIsCommunicationExpanded] = useState(true);
@@ -677,6 +679,7 @@ export function LeadStepContent({
         onShowToast={onShowToast}
         onEditPests={() => setIsPestModalOpen(true)}
         onReady={handleQuoteTabReady}
+        onLineItemsSaved={onLineItemsSaved}
       />
       {isQuoteTabReady && (
       <div className={styles.quoteTabActions}>
