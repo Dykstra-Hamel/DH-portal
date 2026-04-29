@@ -76,6 +76,7 @@ export interface Lead {
   next_follow_up_at?: string;
   estimated_value?: number;
   priority: LeadPriority;
+  property_type?: 'residential' | 'commercial' | null;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
@@ -236,6 +237,7 @@ export interface LeadFormData {
   next_follow_up_at?: string;
   estimated_value?: number;
   priority: LeadPriority;
+  property_type?: 'residential' | 'commercial' | null;
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;

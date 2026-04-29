@@ -47,6 +47,13 @@ export function LeadProgressBar({ leadStatus, onStatusChange }: LeadProgressBarP
 
           const stepClassName = `${styles.step} ${stateClass} ${interactive && !current ? styles.stepInteractive : ''}`;
 
+          const displayLabel =
+            step.id === 'new'
+              ? leadStatus === 'new'
+                ? 'Unassigned'
+                : 'Assigned'
+              : step.label;
+
           return (
             <span key={step.id} className={styles.stepWrapper}>
               {i > 0 && <span className={styles.separator} aria-hidden />}
@@ -61,12 +68,12 @@ export function LeadProgressBar({ leadStatus, onStatusChange }: LeadProgressBarP
                   aria-current={current ? 'step' : undefined}
                 >
                   {completed && <Check size={11} strokeWidth={2.5} />}
-                  <span>{step.label}</span>
+                  <span>{displayLabel}</span>
                 </button>
               ) : (
                 <div className={stepClassName}>
                   {completed && <Check size={11} strokeWidth={2.5} />}
-                  <span>{step.label}</span>
+                  <span>{displayLabel}</span>
                 </div>
               )}
             </span>

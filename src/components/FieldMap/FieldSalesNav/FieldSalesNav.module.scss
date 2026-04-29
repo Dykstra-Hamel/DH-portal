@@ -75,6 +75,21 @@
   padding: 0;
 }
 
+.newItemDisabled {
+  cursor: not-allowed;
+  pointer-events: none;
+
+  .newBtn {
+    background: var(--gray-300);
+    box-shadow: none;
+    color: var(--gray-100);
+  }
+
+  .newLabel {
+    color: var(--gray-300);
+  }
+}
+
 .newBtn {
   width: 52px;
   height: 52px;

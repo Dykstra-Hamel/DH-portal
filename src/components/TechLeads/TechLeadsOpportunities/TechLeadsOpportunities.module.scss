@@ -7,7 +7,6 @@
 
 .header {
   padding: 20px 16px 0;
-  background: var(--white);
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -45,7 +44,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
 
   &:hover {
     color: var(--gray-700);

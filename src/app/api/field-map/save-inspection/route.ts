@@ -1,6 +1,44 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import {
+  createOrFindServiceAddress,
+  linkCustomerToServiceAddress,
+  type ServiceAddressData,
+} from '@/lib/service-addresses';
+
+interface IncomingAddressComponents {
+  street_number?: string;
+  route?: string;
+  locality?: string;
+  administrative_area_level_1?: string;
+  postal_code?: string;
+  formatted_address?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+function buildStructuredAddressData(
+  components: IncomingAddressComponents | null | undefined
+): ServiceAddressData | null {
+  if (!components) return null;
+  const street = [components.street_number, components.route]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const city = (components.locality ?? '').trim();
+  const state = (components.administrative_area_level_1 ?? '').trim();
+  const zip = (components.postal_code ?? '').trim();
+  if (!street && !city && !state && !zip) return null;
+  return {
+    street_address: street,
+    city,
+    state,
+    zip_code: zip,
+    latitude: components.latitude,
+    longitude: components.longitude,
+  };
+}
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -30,6 +68,7 @@ export async function POST(request: NextRequest) {
       clientEmail,
       clientPhone,
       address,
+      addressComponents,
       serviceAddressId: providedServiceAddressId,
       pestTypes,
       mapPlotData,
@@ -37,7 +76,20 @@ export async function POST(request: NextRequest) {
       leadId: existingLeadId,
       stopId,
       routeStopId,
-    } = body;
+    } = body as {
+      clientName?: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      address?: string;
+      addressComponents?: IncomingAddressComponents | null;
+      serviceAddressId?: string | null;
+      pestTypes?: unknown;
+      mapPlotData?: unknown;
+      companyId?: string;
+      leadId?: string;
+      stopId?: string | number;
+      routeStopId?: string;
+    };
 
     if (!clientName || !address) {
       return NextResponse.json({ error: 'Client name and address are required' }, { status: 400 });
@@ -126,10 +178,35 @@ export async function POST(request: NextRequest) {
       customerId = newCustomer.id;
     }
 
-    // ── Service address find / upsert ─────────────────────────────────────
-    let serviceAddressId: string | null = providedServiceAddressId ?? null;
+    // ── Service address resolution ────────────────────────────────────────
+    // Priority: (1) caller-provided id, (2) structured Google Places
+    // components → createOrFindServiceAddress dedupes & creates, (3) legacy
+    // single-string fallback when nothing structured is available.
+    let serviceAddressId: string | null = null;
+
+    if (providedServiceAddressId) {
+      const { data: existing } = await adminClient
+        .from('service_addresses')
+        .select('id')
+        .eq('id', providedServiceAddressId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+      if (existing?.id) serviceAddressId = existing.id;
+    }
 
     if (!serviceAddressId) {
+      const structured = buildStructuredAddressData(addressComponents);
+      if (structured) {
+        const result = await createOrFindServiceAddress(companyId, structured);
+        if (result.success && result.serviceAddressId) {
+          serviceAddressId = result.serviceAddressId;
+        }
+      }
+    }
+
+    if (!serviceAddressId && address) {
+      // Last-resort fallback: legacy single-string match. Used only when no
+      // structured components were sent (e.g. older clients).
       const { data: existingAddress } = await adminClient
         .from('service_addresses')
         .select('id')
@@ -147,6 +224,26 @@ export async function POST(request: NextRequest) {
           .single();
         serviceAddressId = newAddress?.id ?? null;
       }
+    }
+
+    // Maintain the customer ↔ service_address junction so the field-sales
+    // lead list query (which joins via customer_service_addresses) can show
+    // the address. Mark as primary only if the customer doesn't already have
+    // one — don't stomp an existing primary. Skip silently on failure — the
+    // lead still saves.
+    if (customerId && serviceAddressId) {
+      const { data: existingPrimary } = await adminClient
+        .from('customer_service_addresses')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('is_primary_address', true)
+        .maybeSingle();
+      await linkCustomerToServiceAddress(
+        customerId,
+        serviceAddressId,
+        'owner',
+        !existingPrimary
+      );
     }
 
     // ── Resolve lead ID — check route_stops to avoid duplicates ──────────

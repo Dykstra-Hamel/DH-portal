@@ -2199,7 +2199,7 @@ function StepMapPlot({
                     : null;
                 const selectedSegmentLabel = selectedSegment ? `${Math.round(selectedSegment.feet)} ft` : '';
                 const selectedSegmentBubbleWidth = selectedSegmentLabel
-                  ? Math.max(50, selectedSegmentLabel.length * 8 + 18)
+                  ? Math.max(34, selectedSegmentLabel.length * 6.5 + 10)
                   : 0;
                 const W = canvasSize.width;
                 const H = canvasSize.height;
@@ -2358,7 +2358,7 @@ function StepMapPlot({
                     {canRenderDimensions && outline.isClosed && (outline.type === 'house' || outline.type === 'garage' || outline.type === 'yard') &&
                       getOutlineSegmentDimensions(outline).map((seg, i) => {
                         const label = `${Math.round(seg.feet)} ft`;
-                        const bubbleW = Math.max(46, label.length * 8 + 18);
+                        const bubbleW = Math.max(32, label.length * 6.5 + 10);
                         return (
                           <g
                             key={`dim-${outline.id}-${i}`}
@@ -2368,11 +2368,11 @@ function StepMapPlot({
                           >
                             <rect
                               x={-bubbleW / 2}
-                              y={-11}
+                              y={-9}
                               width={bubbleW}
-                              height={22}
-                              rx="9"
-                              ry="9"
+                              height={18}
+                              rx="7"
+                              ry="7"
                               className={styles.mapDimensionBubble}
                             />
                             <text
@@ -2419,11 +2419,11 @@ function StepMapPlot({
                         >
                           <rect
                             x={-selectedSegmentBubbleWidth / 2}
-                            y={-11}
+                            y={-9}
                             width={selectedSegmentBubbleWidth}
-                            height={22}
-                            rx="9"
-                            ry="9"
+                            height={18}
+                            rx="7"
+                            ry="7"
                             className={styles.mapDimensionBubble}
                           />
                           <text
