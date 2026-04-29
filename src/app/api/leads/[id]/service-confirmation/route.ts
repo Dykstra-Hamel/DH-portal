@@ -181,10 +181,24 @@ export async function POST(
       scheduledDate: formatScheduledDate(lead.scheduled_date),
       scheduledTime: formatScheduledTime(lead.scheduled_time),
 
-      streetAddress: lead.primary_service_address?.street_address || '',
-      city: lead.primary_service_address?.city || '',
-      state: lead.primary_service_address?.state || '',
-      zipCode: lead.primary_service_address?.zip_code || '',
+      ...(() => {
+        const sa = lead.primary_service_address;
+        const streetAddress = (sa?.street_address || '').trim();
+        const city = (sa?.city || '').trim();
+        const state = (sa?.state || '').trim();
+        const zip = (sa?.zip_code || '').trim();
+        const composed = [streetAddress, city, [state, zip].filter(Boolean).join(' ')]
+          .map((p: string) => p.trim())
+          .filter(Boolean)
+          .join(', ');
+        return {
+          address: composed || 'Not provided',
+          streetAddress,
+          city,
+          state,
+          zipCode: zip,
+        };
+      })(),
 
       quoteTotalInitialPrice: formatCurrency(
         quoteRecord?.total_initial_price || 0
