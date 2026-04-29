@@ -30,6 +30,7 @@ interface Branch {
 interface CompanyUser {
   id: string;
   display_name: string;
+  email: string;
 }
 
 interface ZipCodeGroup {
@@ -586,7 +587,9 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
                 >
                   <option value="">No assigned user</option>
                   {companyUsers.map(u => (
-                    <option key={u.id} value={u.id}>{u.display_name}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.email ? `${u.display_name} — ${u.email}` : u.display_name}
+                    </option>
                   ))}
                 </select>
                 <button
@@ -637,7 +640,9 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
                       >
                         <option value="">No assigned user</option>
                         {companyUsers.map(u => (
-                          <option key={u.id} value={u.id}>{u.display_name}</option>
+                          <option key={u.id} value={u.id}>
+                            {u.email ? `${u.display_name} — ${u.email}` : u.display_name}
+                          </option>
                         ))}
                       </select>
                       <button
