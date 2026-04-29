@@ -158,6 +158,44 @@
   background: var(--gray-200);
 }
 
+.pricingOriginal {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--gray-500);
+  text-decoration: line-through;
+  margin-top: 2px;
+}
+
+.discountBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--success-50, #ecfdf5);
+  border: 1px solid var(--success-100, #d1fae5);
+  border-radius: var(--border-radius);
+}
+
+.discountInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.discountName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success-700, #047857);
+}
+
+.discountAmount {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--success-700, #047857);
+  word-break: break-word;
+}
+
 .preferences {
   display: grid;
   grid-template-columns: 1fr 1fr;

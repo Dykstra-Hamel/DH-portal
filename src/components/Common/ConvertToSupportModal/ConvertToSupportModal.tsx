@@ -45,9 +45,18 @@ export function ConvertToSupportModal({
           <AlertCircle size={24} className={styles.icon} />
         </div>
 
-        <h2 className={styles.modalTitle}>Convert to Support Case</h2>
+        <h2 className={styles.modalTitle}>Convert to Support Case?</h2>
         <p className={styles.modalDescription}>
-          This will create a new support case for {customerName} and archive the current lead. You&apos;ll be redirected to the leads page.
+          You&apos;re about to convert {customerName}&apos;s sales lead into a support case. Once converted:
+        </p>
+        <ul className={styles.warningList}>
+          <li>The current lead will be archived and removed from the sales pipeline.</li>
+          <li>The quote, pest selections, and any scheduling progress will <strong>not</strong> carry over to the new support case.</li>
+          <li>Active sales follow-up emails and tasks tied to this lead will stop.</li>
+          <li>You&apos;ll be redirected back to the leads list when this completes.</li>
+        </ul>
+        <p className={styles.modalDescription}>
+          The archived lead will remain in the system if you need to reference it later.
         </p>
 
         <div className={styles.formGroup}>

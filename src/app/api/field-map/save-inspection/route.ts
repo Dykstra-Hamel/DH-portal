@@ -66,10 +66,12 @@ export async function POST(request: NextRequest) {
     const companyId = userCompany.company_id;
     const { firstName, lastName } = splitName(clientName);
 
-    const pestSummary =
-      Array.isArray(pestTypes) && pestTypes.length > 0
-        ? pestTypes.join(', ')
-        : 'General pest control';
+    const pestList: string[] =
+      Array.isArray(pestTypes)
+        ? pestTypes.filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+        : [];
+    const primaryPest = pestList[0] ?? 'General pest control';
+    const additionalPests = pestList.slice(1);
 
     // ── Customer find / upsert ─────────────────────────────────────────────
     let customerId: string | null = null;
@@ -201,7 +203,8 @@ export async function POST(request: NextRequest) {
         .update({
           customer_id: customerId,
           service_address_id: serviceAddressId,
-          pest_type: pestSummary,
+          pest_type: primaryPest,
+          additional_pests: additionalPests,
           map_plot_data: mapPlotData ?? null,
           ...(stopId ? { pestpac_stop_id: String(stopId) } : {}),
         })
@@ -223,7 +226,8 @@ export async function POST(request: NextRequest) {
           lead_type: 'manual',
           lead_source: 'inspector',
           lead_status: 'in_process',
-          pest_type: pestSummary,
+          pest_type: primaryPest,
+          additional_pests: additionalPests,
           map_plot_data: mapPlotData ?? null,
           pestpac_stop_id: stopId ? String(stopId) : null,
           estimated_value: null,

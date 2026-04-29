@@ -148,4 +148,6 @@ export const FIELD_LABELS: Record<string, string> = {
   ticket_status: 'Ticket Status',
   issue_type: 'Issue Type',
   resolution_action: 'Resolution Action',
+  additional_pests: 'Additional Pests',
+  pest_type: 'Pest Type',
 };

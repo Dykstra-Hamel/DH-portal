@@ -70,7 +70,7 @@ interface SupportCaseAssignmentControls {
 
 interface GlobalLowerHeaderProps {
   title: ReactNode;
-  description: string;
+  description: ReactNode;
   titleLeading?: ReactNode;
   titleLogo?: ReactNode;
   showAddButton?: boolean;
@@ -296,6 +296,21 @@ export function GlobalLowerHeader({
     return leadStatus === 'scheduling' || leadStatus === 'won';
   };
 
+  const isLeadUnassigned = () => {
+    if (!leadAssignmentControls) return true;
+    if (isSchedulingStatus()) {
+      return (
+        !leadAssignmentControls.schedulerUser &&
+        !leadAssignmentControls.assignedScheduler
+      );
+    }
+    const { assignedTo, assignedUser } = leadAssignmentControls;
+    if (assignedTo === 'sales_team' || assignedTo === 'support_team') {
+      return false;
+    }
+    return !assignedUser && !assignedTo;
+  };
+
   const getTeamCount = () => {
     if (!leadAssignmentControls) return 0;
     const { assignableUsers, leadType } = leadAssignmentControls;
@@ -368,116 +383,111 @@ export function GlobalLowerHeader({
               <div className={styles.titleLogoCol}>{titleLogo}</div>
               <div className={styles.titleStack}>
                 <h1 className={styles.title}>{title}</h1>
-                <p
-                  className={styles.description}
-                  dangerouslySetInnerHTML={{ __html: description }}
-                />
+                <p className={styles.description}>{description}</p>
               </div>
             </div>
           ) : (
             <div className={styles.titleStack}>
               <h1 className={styles.title}>{title}</h1>
-              <p
-                className={styles.description}
-                dangerouslySetInnerHTML={{ __html: description }}
-              />
+              <p className={styles.description}>{description}</p>
             </div>
           )}
         </div>
 
         {leadAssignmentControls && (
           <div className={styles.controlsSection}>
-            {/* Lead Type Dropdown */}
-            <div className={styles.controlGroup} ref={leadTypeRef}>
-              <label className={styles.controlLabel}>Lead Type:</label>
-              <button
-                className={styles.controlDropdown}
-                onClick={() => setIsLeadTypeOpen(!isLeadTypeOpen)}
-              >
-                <span className={styles.controlValue}>
-                  {getLeadTypeDisplay()}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`}
-                />
-              </button>
-              {isLeadTypeOpen && (
-                <div className={styles.dropdownMenu}>
-                  <button
-                    className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'sales' ? styles.selected : ''}`}
-                    onClick={() => {
-                      const handler =
-                        leadAssignmentControls.onLeadTypeChangeWithModal ||
-                        leadAssignmentControls.onLeadTypeChange;
-                      handler('sales');
-                      setIsLeadTypeOpen(false);
-                    }}
-                  >
-                    Sales Lead
-                  </button>
-                  <button
-                    className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'support' ? styles.selected : ''}`}
-                    onClick={() => {
-                      const handler =
-                        leadAssignmentControls.onLeadTypeChangeWithModal ||
-                        leadAssignmentControls.onLeadTypeChange;
-                      handler('support');
-                      setIsLeadTypeOpen(false);
-                    }}
-                  >
-                    Support Case
-                  </button>
-                  <button
-                    className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === 'junk' ? styles.selected : ''}`}
-                    onClick={() => {
-                      const handler =
-                        leadAssignmentControls.onLeadTypeChangeWithModal ||
-                        leadAssignmentControls.onLeadTypeChange;
-                      handler('junk');
-                      setIsLeadTypeOpen(false);
-                    }}
-                  >
-                    Junk
-                  </button>
-                </div>
-              )}
-            </div>
-
             {/* Assigned To / Scheduler Dropdown */}
             <div className={styles.controlGroup} ref={assignedToRef}>
-              <label className={styles.controlLabel}>Assigned To:</label>
-              <button
-                className={styles.controlDropdown}
-                onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
-              >
-                <div className={styles.assignedToContent}>
-                  {(() => {
-                    const display = getAssignedToDisplay();
-                    if (display.avatar === 'team') {
-                      return <TeamAvatar />;
-                    }
-                    return (
-                      <MiniAvatar
-                        firstName={display.firstName}
-                        lastName={display.lastName}
-                        email={display.email || ''}
-                        userId={display.userId}
-                        avatarUrl={display.avatar as string | null}
-                        size="small"
-                        showTooltip={false}
-                      />
-                    );
-                  })()}
-                  <span className={styles.controlValue}>
-                    {getAssignedToDisplay().name}
+              {isLeadUnassigned() ? (
+                <>
+                  <span className={styles.currentlyAssignedLabel}>
+                    Currently Assigned To:
                   </span>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`}
-                />
-              </button>
+                  <span className={styles.unassignedText}>Unassigned</span>
+                  <button
+                    type="button"
+                    className={styles.assignButton}
+                    onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="16"
+                      height="16"
+                      viewBox="0 0 16 16"
+                      fill="none"
+                      aria-hidden="true"
+                    >
+                      <path
+                        d="M9.66536 13V11.6667C9.66536 10.9594 9.38441 10.2811 8.88432 9.78105C8.38422 9.28095 7.70594 9 6.9987 9H2.9987C2.29145 9 1.61318 9.28095 1.11308 9.78105C0.612983 10.2811 0.332031 10.9594 0.332031 11.6667V13"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M4.9987 6.33333C6.47146 6.33333 7.66536 5.13943 7.66536 3.66667C7.66536 2.19391 6.47146 1 4.9987 1C3.52594 1 2.33203 2.19391 2.33203 3.66667C2.33203 5.13943 3.52594 6.33333 4.9987 6.33333Z"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M11.668 4.3335V8.3335"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                      <path
+                        d="M13.668 6.3335H9.66797"
+                        stroke="currentColor"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                    Assign
+                  </button>
+                </>
+              ) : (
+                <>
+                  <span className={styles.currentlyAssignedLabel}>
+                    Currently Assigned To:
+                  </span>
+                  <button
+                    className={styles.controlDropdown}
+                    onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
+                  >
+                    <div className={styles.assignedToContent}>
+                      {(() => {
+                        const display = getAssignedToDisplay();
+                        if (display.avatar === 'team') {
+                          return <TeamAvatar />;
+                        }
+                        return (
+                          <MiniAvatar
+                            firstName={display.firstName}
+                            lastName={display.lastName}
+                            email={display.email || ''}
+                            userId={display.userId}
+                            avatarUrl={display.avatar as string | null}
+                            size="small"
+                            className={styles.assignedAvatar}
+                            showTooltip={false}
+                          />
+                        );
+                      })()}
+                      <span className={styles.controlValue}>
+                        {getAssignedToDisplay().name}
+                      </span>
+                    </div>
+                    <ChevronDown
+                      size={16}
+                      className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`}
+                    />
+                  </button>
+                </>
+              )}
               {isAssignedToOpen && (
                 <div className={styles.dropdownMenu}>
                   {isSchedulingStatus() ? (
@@ -672,46 +682,6 @@ export function GlobalLowerHeader({
               )}
             </div>
 
-            {/* Status Dropdown */}
-            <div className={styles.controlGroup} ref={statusRef}>
-              <label className={styles.controlLabel}>Status:</label>
-              <button
-                className={styles.controlDropdown}
-                onClick={() => setIsStatusOpen(!isStatusOpen)}
-              >
-                <span className={styles.controlValue}>
-                  {getStatusDisplay()}
-                </span>
-                <ChevronDown
-                  size={16}
-                  className={`${styles.chevron} ${isStatusOpen ? styles.open : ''}`}
-                />
-              </button>
-              {isStatusOpen && (
-                <div className={styles.dropdownMenu}>
-                  {[
-                    { value: 'new', label: 'New' },
-                    { value: 'in_process', label: 'In Process' },
-                    { value: 'quoted', label: 'Quoted' },
-                    { value: 'scheduling', label: 'Ready to Schedule' },
-                    { value: 'won', label: 'Won' },
-                    { value: 'lost', label: 'Lost' },
-                  ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      className={`${styles.dropdownOption} ${leadAssignmentControls.leadStatus === value ? styles.selected : ''}`}
-                      onClick={() => {
-                        leadAssignmentControls.onStatusChange(value);
-                        setIsStatusOpen(false);
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Branch Dropdown (only rendered when company has branches) */}
             {leadAssignmentControls.availableBranches && leadAssignmentControls.availableBranches.length > 0 && (
               <div className={styles.controlGroup} ref={branchRef}>
@@ -757,6 +727,50 @@ export function GlobalLowerHeader({
                 )}
               </div>
             )}
+
+            {/* Lead Type Dropdown */}
+            <div className={styles.controlGroup} ref={leadTypeRef}>
+              <button
+                className={styles.controlDropdown}
+                onClick={() => setIsLeadTypeOpen(!isLeadTypeOpen)}
+              >
+                <span className={styles.controlValue}>
+                  {getLeadTypeDisplay()}
+                </span>
+                <ChevronDown
+                  size={16}
+                  className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`}
+                />
+              </button>
+              {isLeadTypeOpen && (
+                <div className={styles.dropdownMenu}>
+                  {[
+                    { value: 'sales', label: 'Sales Lead' },
+                    { value: 'support', label: 'Support Case' },
+                    { value: 'junk', label: 'Junk' },
+                  ].map(({ value, label }) => (
+                    <button
+                      key={value}
+                      className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === value ? styles.selected : ''}`}
+                      onClick={() => {
+                        if (
+                          (value === 'junk' || value === 'support') &&
+                          value !== leadAssignmentControls.leadType &&
+                          leadAssignmentControls.onLeadTypeChangeWithModal
+                        ) {
+                          leadAssignmentControls.onLeadTypeChangeWithModal(value);
+                        } else {
+                          leadAssignmentControls.onLeadTypeChange(value);
+                        }
+                        setIsLeadTypeOpen(false);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
