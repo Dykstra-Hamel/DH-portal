@@ -4,7 +4,7 @@
  * Two-column hero with content left, image collage right
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import Image from 'next/image';
 import styles from './quotecontent.module.scss';
 import { MapPlotData } from '@/components/FieldMap/MapPlot/types';
@@ -20,9 +20,16 @@ interface HeroSectionProps {
   companyId: string;
   mapPlotData?: MapPlotData | null;
   brandPrimary?: string | null;
+  children?: ReactNode;
 }
 
-export default function HeroSection({ hero, companyId, mapPlotData, brandPrimary }: HeroSectionProps) {
+export default function HeroSection({
+  hero,
+  companyId,
+  mapPlotData,
+  brandPrimary,
+  children,
+}: HeroSectionProps) {
   const [reviewData, setReviewData] = useState<{
     rating: number;
     reviewCount: number;
@@ -70,6 +77,7 @@ export default function HeroSection({ hero, companyId, mapPlotData, brandPrimary
   return (
     <section id="hero-section" className={styles.heroSection}>
       <div className={styles.heroContainer}>
+        {children}
         {/* Left column - Content */}
         <div className={styles.heroContent}>
           <h1 className={styles.heroTitle}>{hero.title}</h1>

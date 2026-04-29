@@ -92,7 +92,8 @@ export async function GET(
           comments,
           requested_date,
           requested_time,
-          map_plot_data
+          map_plot_data,
+          assigned_to
         ),
         company:companies(
           id,
@@ -265,6 +266,24 @@ export async function GET(
       };
     });
 
+    // Fetch inspector profile if the lead has an assigned user
+    let inspector: { name: string; title: string | null; avatar_url: string | null } | null = null;
+    const assignedTo = (quote.lead as any)?.assigned_to;
+    if (assignedTo) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, title, uploaded_avatar_url, avatar_url')
+        .eq('id', assignedTo)
+        .single();
+      if (profile) {
+        inspector = {
+          name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Inspector',
+          title: profile.title ?? null,
+          avatar_url: profile.uploaded_avatar_url ?? profile.avatar_url ?? null,
+        };
+      }
+    }
+
     // Fetch featured plans not already in the quote
     const quotedPlanIds = new Set(
       (quote.line_items || [])
@@ -285,7 +304,7 @@ export async function GET(
 
     return NextResponse.json({
       success: true,
-      data: { ...quote, line_items: transformedLineItems, featured_plans: filteredFeaturedPlans },
+      data: { ...quote, line_items: transformedLineItems, featured_plans: filteredFeaturedPlans, inspector },
     });
   } catch (error) {
     console.error('Error in public quote GET:', error);
