@@ -242,14 +242,25 @@ export async function POST(
         ? formatYardSizeRange(quote.yard_size_range)
         : 'Not specified',
 
-      // Service address variables
-      address: lead.primary_service_address
-        ? `${lead.primary_service_address.street_address}, ${lead.primary_service_address.city}, ${lead.primary_service_address.state} ${lead.primary_service_address.zip_code}`
-        : 'Not provided',
-      streetAddress: lead.primary_service_address?.street_address || '',
-      city: lead.primary_service_address?.city || '',
-      state: lead.primary_service_address?.state || '',
-      zipCode: lead.primary_service_address?.zip_code || '',
+      // Service address variables — sourced from the lead's linked service_addresses row.
+      ...(() => {
+        const sa = lead.primary_service_address;
+        const streetAddress = (sa?.street_address || '').trim();
+        const city = (sa?.city || '').trim();
+        const state = (sa?.state || '').trim();
+        const zip = (sa?.zip_code || '').trim();
+        const composed = [streetAddress, city, [state, zip].filter(Boolean).join(' ')]
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .join(', ');
+        return {
+          address: composed || 'Not provided',
+          streetAddress,
+          city,
+          state,
+          zipCode: zip,
+        };
+      })(),
 
       // Scheduling info
       requestedDate: formatPreferredDay(lead.requested_date, 'Not specified'),
