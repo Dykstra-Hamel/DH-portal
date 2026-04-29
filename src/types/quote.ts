@@ -43,8 +43,11 @@ export interface Quote {
   signature_data?: string;
   device_data?: any;
 
-  // Customer feedback
+  // Customer feedback / inspector notes
   customer_comments?: string;
+
+  // FieldMap wizard data
+  safety_checklist_responses?: unknown;
 
   // Timestamps
   created_at: string;

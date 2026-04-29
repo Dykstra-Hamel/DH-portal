@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Pencil, X, ChevronLeft, ChevronRight, Truck, MapPin } from 'lucide-react';
 import { Lead, LeadSource } from '@/types/lead';
+import { Quote } from '@/types/quote';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { authenticatedFetch } from '@/lib/api-client';
@@ -12,11 +13,27 @@ import { formatPreferredDay } from '@/lib/date-utils';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
-interface LeadCallFormInfoProps {
-  lead: Lead;
+// Types for checklist responses stored in quote.safety_checklist_responses
+interface ChecklistResponse {
+  questionId: string;
+  questionText: string;
+  answerType: 'yes_no' | 'text';
+  answer: string;
+  parentQuestionId?: string | null;
 }
 
-export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
+interface ChecklistResponseGroup {
+  checklistId: string;
+  checklistName: string;
+  responses: ChecklistResponse[];
+}
+
+interface LeadCallFormInfoProps {
+  lead: Lead;
+  quote?: Quote | null;
+}
+
+export function LeadCallFormInfo({ lead, quote }: LeadCallFormInfoProps) {
   const [showCallSummary, setShowCallSummary] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [portalContainer, setPortalContainer] = useState<Element | null>(null);
@@ -147,6 +164,82 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
     );
   };
 
+  const renderQuoteNotes = () => {
+    if (!quote?.customer_comments) return null;
+    return (
+      <div className={styles.transcriptSection}>
+        <div className={styles.transcriptHeader}>
+          <h4 className={cardStyles.dataLabel}>Quote Notes</h4>
+        </div>
+        <div className={styles.summaryPlainContent}>
+          <span className={cardStyles.transcriptText}>{quote.customer_comments}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderChecklistAnswers = () => {
+    const raw = quote?.safety_checklist_responses;
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+
+    // Validate it's the new grouped format (not legacy flat format)
+    const groups = raw as ChecklistResponseGroup[];
+    if (!groups[0]?.checklistName) return null;
+
+    return (
+      <div className={styles.transcriptSection}>
+        <div className={styles.transcriptHeader}>
+          <h4 className={cardStyles.dataLabel}>Checklist Answers</h4>
+        </div>
+        <div className={styles.checklistAnswers}>
+          {groups.map(group => {
+            const topLevel = group.responses.filter(r => !r.parentQuestionId);
+            return (
+              <div key={group.checklistId} className={styles.checklistGroup}>
+                <p className={styles.checklistGroupName}>{group.checklistName}</p>
+                {topLevel.map(resp => {
+                  const children = group.responses.filter(r => r.parentQuestionId === resp.questionId);
+                  return (
+                    <div key={resp.questionId} className={styles.checklistItem}>
+                      <div className={styles.checklistQuestion}>
+                        <span className={styles.checklistQuestionText}>{resp.questionText}</span>
+                        {resp.answerType === 'yes_no' ? (
+                          <span className={`${styles.checklistBadge} ${resp.answer === 'yes' ? styles.checklistBadgeYes : styles.checklistBadgeNo}`}>
+                            {resp.answer === 'yes' ? 'Yes' : 'No'}
+                          </span>
+                        ) : (
+                          <span className={styles.checklistAnswerText}>{resp.answer}</span>
+                        )}
+                      </div>
+                      {children.length > 0 && (
+                        <div className={styles.checklistChildren}>
+                          {children.map(child => (
+                            <div key={child.questionId} className={styles.checklistItem}>
+                              <div className={styles.checklistQuestion}>
+                                <span className={styles.checklistQuestionText}>{child.questionText}</span>
+                                {child.answerType === 'yes_no' ? (
+                                  <span className={`${styles.checklistBadge} ${child.answer === 'yes' ? styles.checklistBadgeYes : styles.checklistBadgeNo}`}>
+                                    {child.answer === 'yes' ? 'Yes' : 'No'}
+                                  </span>
+                                ) : (
+                                  <span className={styles.checklistAnswerText}>{child.answer}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const handleSaveAttribution = async () => {
     setIsSaving(true);
     try {
@@ -267,6 +360,8 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
               </div>
             </div>
           )}
+          {renderQuoteNotes()}
+          {renderChecklistAnswers()}
         </div>
       ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>

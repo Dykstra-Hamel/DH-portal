@@ -914,9 +914,221 @@
     .safetyChecklistFooter {
       display: flex;
       justify-content: flex-end;
+      gap: 10px;
       padding-top: 16px;
       border-top: 1px solid #f3f4f6;
       margin-top: 20px;
+    }
+
+    .salesChecklistListHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      gap: 16px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #171717;
+        margin: 0 0 6px 0;
+      }
+
+      p {
+        font-size: 14px;
+        color: #6A7282;
+        margin: 0;
+      }
+
+      .saveButton {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+    }
+
+    .checklistRows {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checklistRow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #f9fafb;
+
+      .checklistRowInfo {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .checklistRowName {
+          font-size: 14px;
+          font-weight: 600;
+          color: #171717;
+        }
+
+        .checklistRowMeta {
+          font-size: 12px;
+          color: #6A7282;
+        }
+      }
+
+      .checklistRowActions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+    }
+
+    .activeBadge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      background: #dcfce7;
+      color: #16a34a;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .inactiveBadge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      background: #f3f4f6;
+      color: #6A7282;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .editPanelHeader {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #171717;
+        margin: 0;
+      }
+    }
+
+    .backButton {
+      background: none;
+      border: none;
+      font-size: 14px;
+      color: #005194;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      text-decoration: underline;
+
+      &:hover {
+        color: #003d73;
+      }
+    }
+
+    .editPanelForm {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .editPanelField {
+      margin-bottom: 16px;
+
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: var(--border-radius);
+        font-size: 14px;
+        color: #171717;
+        box-sizing: border-box;
+        transition: border-color 0.2s;
+
+        &::placeholder {
+          color: #9ca3af;
+        }
+
+        &:focus {
+          outline: none;
+          border-color: #005194;
+        }
+
+        &:disabled {
+          background: #f3f4f6;
+          cursor: not-allowed;
+        }
+      }
+    }
+
+    .editPanelLabel {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #171717;
+      margin-bottom: 6px;
+    }
+
+    .editPanelSection {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+    }
+
+    .planCheckboxList {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .planCheckboxLabel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #171717;
+      cursor: pointer;
+
+      input[type="checkbox"] {
+        cursor: pointer;
+        accent-color: #005194;
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .editCancelBtn {
+      padding: 10px 20px;
+      background: white;
+      color: #6a7282;
+      border: 1px solid #d1d5db;
+      border-radius: var(--border-radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover:not(:disabled) {
+        background: #f3f4f6;
+        color: #171717;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
     }
 
     .iconButton {

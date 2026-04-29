@@ -10,7 +10,7 @@ import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPl
 import { MapStampGlyph } from '@/components/FieldMap/MapPlot/glyphs';
 import VideoLightbox from '@/components/Quote/QuoteContent/VideoLightbox';
 import type { QuoteLineItem, AvailableDiscount } from './QuoteBuildStep';
-import type { SafetyChecklistResponse } from './SafetyChecklistStep';
+import type { ChecklistResponseGroup } from './SalesChecklistStep';
 import {
   formatCurrency,
   formatLineItemLabel,
@@ -25,6 +25,7 @@ import {
   getEnabledTimeOptions,
 } from '@/lib/time-options';
 import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
+import QuoteServicePanel from '@/components/Quote/QuoteServicePanel/QuoteServicePanel';
 
 // ── FAQ item (same as PlanDetails) ────────────────────────────────────────
 
@@ -151,7 +152,7 @@ interface ReviewStepProps {
   appliedDiscount?: AvailableDiscount | null;
   quoteSubtotalInitial?: number | null;
   quoteTotalInitial?: number | null;
-  checklistResponses?: SafetyChecklistResponse[];
+  checklistResponses?: ChecklistResponseGroup[];
   onBack: () => void;
   onAddLineItem?: (item: QuoteLineItem) => void;
 }
@@ -210,6 +211,7 @@ export function ReviewStep({
   const [activeFaqTab, setActiveFaqTab] = useState(0);
   const [videoLightboxUrl, setVideoLightboxUrl] = useState<string | null>(null);
 
+  const [localNotes, setLocalNotes] = useState(notes);
   const [actionState, setActionState] = useState<ActionState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showEmailInput, setShowEmailInput] = useState(false);
@@ -416,7 +418,8 @@ export function ReviewStep({
               discount_value: appliedDiscount.discount_value,
               applies_to_price: appliedDiscount.applies_to_price,
               recurring_discount_type: appliedDiscount.recurring_discount_type,
-              recurring_discount_value: appliedDiscount.recurring_discount_value,
+              recurring_discount_value:
+                appliedDiscount.recurring_discount_value,
             }
           : {}),
       }),
@@ -526,6 +529,20 @@ export function ReviewStep({
       } as React.CSSProperties)
     : {};
 
+  // ── Save inspector notes to quote ────────────────────────────────────
+  const saveNotes = useCallback(async () => {
+    if (!leadId) return;
+    try {
+      await fetch(`/api/leads/${leadId}/quote`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: localNotes }),
+      });
+    } catch {
+      // Non-critical — continue even if save fails
+    }
+  }, [leadId, localNotes]);
+
   // ── API call ───────────────────────────────────────────────────────────
   const callSendQuoteApi = useCallback(
     async (emailOverride: string | null, sendEmail: boolean) => {
@@ -566,6 +583,7 @@ export function ReviewStep({
     setActionState('sending');
     setErrorMsg(null);
     try {
+      await saveNotes();
       await callSendQuoteApi(enteredEmail || null, true);
       setActionState('sent');
     } catch (err) {
@@ -612,6 +630,7 @@ export function ReviewStep({
   ) {
     setActionState('scheduling');
     setErrorMsg(null);
+    await saveNotes();
     try {
       const res = await fetch('/api/field-map/schedule', {
         method: 'POST',
@@ -947,6 +966,160 @@ export function ReviewStep({
     setAdditionalLineItems(prev => prev.filter(i => i.id !== newId));
   }
 
+  // ── Render props for QuoteServicePanel ────────────────────────────────
+
+  function renderPlanHeaderPestIcon(item: QuoteLineItem): React.ReactNode {
+    if (!item.catalogItemId) return null;
+    const catalogCoveredIds: string[] =
+      item.coveredPestIds.length > 0
+        ? item.coveredPestIds
+        : (catalogDetails[item.catalogItemId ?? '']?.pest_coverage ?? []).map(
+            (c: any) => c.pest_id as string
+          );
+
+    const coveredPlotted = plottedPests.filter(p =>
+      catalogCoveredIds.includes(p.id)
+    );
+    const singlePest = coveredPlotted.length === 1 ? coveredPlotted[0] : null;
+
+    if (!singlePest && coveredPlotted.length > 1) {
+      return (
+        <div className={styles.planHeaderPestIcon}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="26"
+            viewBox="0 0 34 36"
+            fill="none"
+            className={styles.planHeaderShieldIcon}
+          >
+            <path
+              d="M31.1667 0H2.83333C2.08189 0 1.36122 0.303427 0.829864 0.84353C0.298511 1.38363 0 2.11617 0 2.87999V12.96C0 22.4495 4.51917 28.2005 8.31052 31.3541C12.3941 34.7489 16.4564 35.9009 16.6334 35.9495C16.8769 36.0168 17.1337 36.0168 17.3772 35.9495C17.5543 35.9009 21.6112 34.7489 25.7001 31.3541C29.4808 28.2005 34 22.4495 34 12.96V2.87999C34 2.11617 33.7015 1.38363 33.1701 0.84353C32.6388 0.303427 31.9181 0 31.1667 0ZM25.0892 12.5388L15.1725 22.6187C15.0409 22.7526 14.8847 22.8588 14.7127 22.9313C14.5407 23.0038 14.3564 23.0411 14.1702 23.0411C13.984 23.0411 13.7997 23.0038 13.6277 22.9313C13.4557 22.8588 13.2995 22.7526 13.1679 22.6187L8.91792 18.2987C8.65209 18.0285 8.50275 17.6621 8.50275 17.28C8.50275 16.8978 8.65209 16.5314 8.91792 16.2612C9.18374 15.991 9.54428 15.8392 9.92021 15.8392C10.2961 15.8392 10.6567 15.991 10.9225 16.2612L14.1667 19.5641L23.081 10.5012C23.2127 10.3674 23.3689 10.2613 23.5409 10.1888C23.7129 10.1164 23.8972 10.0792 24.0833 10.0792C24.2695 10.0792 24.4538 10.1164 24.6258 10.1888C24.7977 10.2613 24.954 10.3674 25.0856 10.5012C25.2172 10.635 25.3217 10.7938 25.3929 10.9686C25.4641 11.1434 25.5008 11.3308 25.5008 11.52C25.5008 11.7092 25.4641 11.8965 25.3929 12.0713C25.3217 12.2461 25.2172 12.405 25.0856 12.5388H25.0892Z"
+              fill="#2478F5"
+            />
+          </svg>
+        </div>
+      );
+    }
+    if (coveredPlotted.length === 0) return null;
+    const pestId = singlePest?.id ?? null;
+    if (!pestId) return null;
+    const plottedPest = singlePest ?? plottedPests.find(p => p.id === pestId);
+    const iconSvg = pestIconMap[pestId] ?? null;
+    const stampType = plottedPest?.stampType ?? getPestStampType(pestId);
+    return (
+      <div className={styles.planHeaderPestIcon}>
+        {iconSvg ? (
+          <span
+            className={styles.planHeaderPestIconSvg}
+            dangerouslySetInnerHTML={{ __html: iconSvg }}
+          />
+        ) : (
+          <MapStampGlyph type={stampType} size={24} />
+        )}
+      </div>
+    );
+  }
+
+  function renderRecommendedAddonsForItem(
+    item: QuoteLineItem
+  ): React.ReactNode {
+    const recommendedLineItems = addonItems.filter(
+      a => a.parentLineItemId === item.id && a.isRecommended !== undefined
+    );
+    if (recommendedLineItems.length === 0) return null;
+
+    const planCatalogData = catalogDetails[item.catalogItemId ?? ''];
+    const catalogOrder: string[] = planCatalogData?.recommended_addon_ids ?? [];
+    const ordered =
+      catalogOrder.length > 0
+        ? ([
+            ...catalogOrder
+              .map(id => recommendedLineItems.find(a => a.catalogItemId === id))
+              .filter(Boolean),
+            ...recommendedLineItems.filter(
+              a => !catalogOrder.includes(a.catalogItemId ?? '')
+            ),
+          ] as typeof recommendedLineItems)
+        : recommendedLineItems;
+
+    if (ordered.length === 0) return null;
+
+    return (
+      <div className={styles.planCardAddons}>
+        <div className={styles.planCardAddonBtnGroup}>
+          {ordered.map(addon => {
+            const isChecked = selectedItemIds.has(addon.id);
+            const recurringCost = addon.recurringCost ?? 0;
+            const initialCost = addon.initialCost ?? 0;
+            const abbr: Record<string, string> = {
+              monthly: 'mo',
+              quarterly: 'qtr',
+              'semi-annually': 'semi',
+              'semi-annual': 'semi',
+              annually: 'yr',
+              annual: 'yr',
+              'bi-monthly': '2mo',
+              'bi-annually': '6mo',
+              'one-time': 'once',
+            };
+            const freqAbbr = addon.frequency
+              ? (abbr[addon.frequency.toLowerCase()] ?? addon.frequency)
+              : 'mo';
+            const priceLabel =
+              recurringCost > 0
+                ? `$${recurringCost.toFixed(0)}/${freqAbbr}`
+                : initialCost > 0
+                  ? `$${initialCost.toFixed(0)}`
+                  : '';
+            return (
+              <div key={addon.id} className={styles.planCardAddonBtnWrap}>
+                {addon.isRecommended === true && (
+                  <span className={styles.planCardAddonRecommendedLabel}>
+                    Recommended
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className={`${styles.planCardAddonBtn}${isChecked ? ` ${styles.planCardAddonBtnSelected}` : ''}`}
+                  onClick={() =>
+                    toggleRecommendedAddon(
+                      addon.id,
+                      ordered.map(a => a.id)
+                    )
+                  }
+                >
+                  {isChecked && (
+                    <span className={styles.planCardAddonBtnCheck}>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="27"
+                        height="27"
+                        viewBox="0 0 27 27"
+                        fill="none"
+                      >
+                        <circle cx="13.5" cy="13.5" r="13.5" />
+                        <path d="M13.75 4C11.8216 4 9.93657 4.57183 8.33319 5.64317C6.72982 6.71451 5.48013 8.23726 4.74218 10.0188C4.00422 11.8004 3.81114 13.7608 4.18735 15.6521C4.56355 17.5434 5.49215 19.2807 6.85571 20.6443C8.21928 22.0079 9.95656 22.9365 11.8479 23.3127C13.7392 23.6889 15.6996 23.4958 17.4812 22.7578C19.2627 22.0199 20.7855 20.7702 21.8568 19.1668C22.9282 17.5634 23.5 15.6784 23.5 13.75C23.4973 11.165 22.4692 8.68661 20.6413 6.85872C18.8134 5.03084 16.335 4.00273 13.75 4ZM18.0306 12.0306L12.7806 17.2806C12.711 17.3504 12.6283 17.4057 12.5372 17.4434C12.4462 17.4812 12.3486 17.5006 12.25 17.5006C12.1514 17.5006 12.0538 17.4812 11.9628 17.4434C11.8718 17.4057 11.789 17.3504 11.7194 17.2806L9.46938 15.0306C9.32865 14.8899 9.24959 14.699 9.24959 14.5C9.24959 14.301 9.32865 14.1101 9.46938 13.9694C9.61011 13.8286 9.80098 13.7496 10 13.7496C10.199 13.7496 10.3899 13.8286 10.5306 13.9694L12.25 15.6897L16.9694 10.9694C17.0391 10.8997 17.1218 10.8444 17.2128 10.8067C17.3039 10.769 17.4015 10.7496 17.5 10.7496C17.5986 10.7496 17.6961 10.769 17.7872 10.8067C17.8782 10.8444 17.9609 10.8997 18.0306 10.9694C18.1003 11.0391 18.1556 11.1218 18.1933 11.2128C18.231 11.3039 18.2504 11.4015 18.2504 11.5C18.2504 11.5985 18.231 11.6961 18.1933 11.7872C18.1556 11.8782 18.1003 11.9609 18.0306 12.0306Z" />
+                      </svg>
+                    </span>
+                  )}
+                  <span className={styles.planCardAddonBtnLabel}>
+                    {formatLineItemLabel(addon)}
+                  </span>
+                </button>
+                {priceLabel && (
+                  <span className={styles.planCardAddonBtnPrice}>
+                    {priceLabel}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
   // ── Totals helpers ─────────────────────────────────────────────────────
   const billingFrequency = recurringByFrequency[0]?.frequency ?? 'monthly';
   const planItems = effectiveLineItems.filter(
@@ -1184,652 +1357,27 @@ export function ReviewStep({
         {/* ── Content area ── */}
         <div className={qcStyles.contentArea}>
           <div className={qcStyles.contentAreaInner}>
-            {/* ── Plan cards (Plans / Bundles / Custom) ── */}
-            {planItems.length > 0 && (
-              <div className={qcStyles.plansContainer} id="pestProtectionPlans">
-                <h2>Quoted Services</h2>
-                {planItems.map(item => {
-                  const detail = getPlanContent(item);
-                  const hasContent =
-                    item.type === 'plan-addon' && planHasContent(item);
-                  const hasRecommended = addonItems.some(
-                    a =>
-                      a.parentLineItemId === item.id &&
-                      a.isRecommended !== undefined
-                  );
-                  const hasSpecialtyLines = quoteLineItems.some(
-                    c =>
-                      c.catalogItemKind === 'specialty-line' &&
-                      c.parentLineItemId === item.id
-                  );
-                  const isExpandable =
-                    hasContent || hasRecommended;
-                  const isExpanded = expandedItemId === item.id;
-                  const isSelected = selectedItemIds.has(item.id);
-                  const isOnly =
-                    multipleItems && selectedItemIds.size === 1 && isSelected;
-
-                  const imageUrl =
-                    detail?.plan_image_url ?? detail?.bundle_image_url ?? null;
-                  const description =
-                    detail?.plan_description ??
-                    detail?.bundle_description ??
-                    null;
-                  const features: string[] =
-                    detail?.plan_features ?? detail?.bundle_features ?? [];
-                  const disclaimer: string | null =
-                    detail?.plan_disclaimer ?? null;
-                  const videoUrl: string | null =
-                    detail?.plan_video_url ?? null;
-
-                  // Aggregate product children into this item's displayed price
-                  const productChildren = quoteLineItems.filter(
-                    c =>
-                      c.catalogItemKind === 'product' &&
-                      c.parentLineItemId === item.id
-                  );
-                  const selectedAddonChildren = addonItems.filter(
-                    a =>
-                      a.parentLineItemId === item.id &&
-                      selectedItemIds.has(a.id)
-                  );
-                  const specialtyLineChildren = quoteLineItems.filter(
-                    c =>
-                      c.catalogItemKind === 'specialty-line' &&
-                      c.parentLineItemId === item.id
-                  );
-                  const selectedSpecialtyChildren = isSelected
-                    ? specialtyLineChildren.filter(c =>
-                        selectedItemIds.has(c.id)
-                      )
-                    : [];
-                  // For the card header price display, always use whichever specialty-line
-                  // children the user has individually checked (selectedItemIds tracks this
-                  // independently of the parent). This prevents the price from disappearing
-                  // when the parent is unchecked, and prevents it from jumping to the full
-                  // total of all children.
-                  const displaySpecialtyChildren = specialtyLineChildren.filter(
-                    c => selectedItemIds.has(c.id)
-                  );
-                  const aggInitial =
-                    (item.initialCost ?? 0) +
-                    productChildren.reduce(
-                      (s, c) => s + (c.initialCost ?? 0),
-                      0
-                    ) +
-                    selectedAddonChildren.reduce(
-                      (s, a) => s + (a.initialCost ?? 0),
-                      0
-                    ) +
-                    displaySpecialtyChildren.reduce(
-                      (s, c) => s + (c.initialCost ?? 0),
-                      0
-                    );
-                  const aggRecurring =
-                    (item.recurringCost ?? 0) +
-                    productChildren.reduce(
-                      (s, c) => s + (c.recurringCost ?? 0),
-                      0
-                    ) +
-                    selectedAddonChildren.reduce(
-                      (s, a) => s + (a.recurringCost ?? 0),
-                      0
-                    );
-
-                  return (
-                    <div
-                      key={item.id}
-                      ref={el => {
-                        if (el) planCardRefs.current.set(item.id, el);
-                        else planCardRefs.current.delete(item.id);
-                      }}
-                      className={`${qcStyles.planCard} ${qcStyles.collapsible} ${isExpanded ? qcStyles.expanded : ''}`}
-                    >
-                      <div
-                        className={qcStyles.planHeader}
-                        onClick={
-                          isExpandable
-                            ? () => toggleExpanded(item.id)
-                            : undefined
-                        }
-                        style={{ cursor: isExpandable ? 'pointer' : 'default' }}
-                      >
-                        {multipleItems && (
-                          <label
-                            className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isSelected}
-                              onChange={() => toggleItemSelected(item.id)}
-                              disabled={isOnly}
-                            />
-                            <span
-                              className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
-                            />
-                          </label>
-                        )}
-                        {(() => {
-                          // coveredPestIds is [] when loaded from DB — derive from catalog
-                          const catalogCoveredIds: string[] =
-                            item.coveredPestIds.length > 0
-                              ? item.coveredPestIds
-                              : (
-                                  catalogDetails[item.catalogItemId ?? '']
-                                    ?.pest_coverage ?? []
-                                ).map((c: any) => c.pest_id as string);
-
-                          // Find which plotted pests this plan covers
-                          const coveredPlotted = plottedPests.filter(p =>
-                            catalogCoveredIds.includes(p.id)
-                          );
-                          const singlePest =
-                            coveredPlotted.length === 1
-                              ? coveredPlotted[0]
-                              : null;
-
-                          // Multiple plotted pests covered → shield icon
-                          if (!singlePest && coveredPlotted.length > 1) {
-                            return (
-                              <div className={styles.planHeaderPestIcon}>
-                                <svg
-                                  xmlns="http://www.w3.org/2000/svg"
-                                  width="24"
-                                  height="26"
-                                  viewBox="0 0 34 36"
-                                  fill="none"
-                                  className={styles.planHeaderShieldIcon}
-                                >
-                                  <path
-                                    d="M31.1667 0H2.83333C2.08189 0 1.36122 0.303427 0.829864 0.84353C0.298511 1.38363 0 2.11617 0 2.87999V12.96C0 22.4495 4.51917 28.2005 8.31052 31.3541C12.3941 34.7489 16.4564 35.9009 16.6334 35.9495C16.8769 36.0168 17.1337 36.0168 17.3772 35.9495C17.5543 35.9009 21.6112 34.7489 25.7001 31.3541C29.4808 28.2005 34 22.4495 34 12.96V2.87999C34 2.11617 33.7015 1.38363 33.1701 0.84353C32.6388 0.303427 31.9181 0 31.1667 0ZM25.0892 12.5388L15.1725 22.6187C15.0409 22.7526 14.8847 22.8588 14.7127 22.9313C14.5407 23.0038 14.3564 23.0411 14.1702 23.0411C13.984 23.0411 13.7997 23.0038 13.6277 22.9313C13.4557 22.8588 13.2995 22.7526 13.1679 22.6187L8.91792 18.2987C8.65209 18.0285 8.50275 17.6621 8.50275 17.28C8.50275 16.8978 8.65209 16.5314 8.91792 16.2612C9.18374 15.991 9.54428 15.8392 9.92021 15.8392C10.2961 15.8392 10.6567 15.991 10.9225 16.2612L14.1667 19.5641L23.081 10.5012C23.2127 10.3674 23.3689 10.2613 23.5409 10.1888C23.7129 10.1164 23.8972 10.0792 24.0833 10.0792C24.2695 10.0792 24.4538 10.1164 24.6258 10.1888C24.7977 10.2613 24.954 10.3674 25.0856 10.5012C25.2172 10.635 25.3217 10.7938 25.3929 10.9686C25.4641 11.1434 25.5008 11.3308 25.5008 11.52C25.5008 11.7092 25.4641 11.8965 25.3929 12.0713C25.3217 12.2461 25.2172 12.405 25.0856 12.5388H25.0892Z"
-                                    fill="#2478F5"
-                                  />
-                                </svg>
-                              </div>
-                            );
-                          }
-
-                          // No plotted pests covered → render nothing
-                          if (coveredPlotted.length === 0) return null;
-
-                          const pestId = singlePest?.id ?? null;
-                          if (!pestId) return null;
-
-                          // Use plottedPest stampType when available (more accurate than getPestStampType)
-                          const plottedPest =
-                            singlePest ??
-                            plottedPests.find(p => p.id === pestId);
-                          const iconSvg = pestIconMap[pestId] ?? null;
-                          const stampType =
-                            plottedPest?.stampType ?? getPestStampType(pestId);
-
-                          return (
-                            <div className={styles.planHeaderPestIcon}>
-                              {iconSvg ? (
-                                <span
-                                  className={styles.planHeaderPestIconSvg}
-                                  dangerouslySetInnerHTML={{ __html: iconSvg }}
-                                />
-                              ) : (
-                                <MapStampGlyph type={stampType} size={24} />
-                              )}
-                            </div>
-                          );
-                        })()}
-                        <div>
-                          <h3 className={qcStyles.planHeaderTitle}>
-                            {formatLineItemLabel(item)}
-                          </h3>
-                          {item.selectedVariantLabel && (
-                            <span className={styles.variantBadge}>
-                              {item.selectedVariantLabel}
-                            </span>
-                          )}
-                        </div>
-
-                        <div
-                          className={`${qcStyles.addonHeaderRight}${isSelected ? ` ${qcStyles.addonHeaderRightWithPill}` : ''}`}
-                        >
-                          {isSelected && (
-                            <span className={qcStyles.addedToPlanPill}>
-                              Added To Plan
-                            </span>
-                          )}
-                          <div className={qcStyles.planHeaderPricing}>
-                            {aggRecurring > 0 && (
-                              <span className={qcStyles.planHeaderRecurring}>
-                                <sup>$</sup>
-                                {aggRecurring.toFixed(0)}
-                                <span
-                                  className={qcStyles.planRecurringFrequency}
-                                >
-                                  /{abbreviateFrequency(item.frequency)}
-                                </span>
-                              </span>
-                            )}
-                            {aggRecurring > 0 && aggInitial > 0 && (
-                              <span className={qcStyles.planHeaderDivider}>
-                                |
-                              </span>
-                            )}
-                            {aggInitial > 0 && (
-                              <span className={qcStyles.planHeaderInitial}>
-                                <sup>$</sup>
-                                {aggInitial.toFixed(0)}
-                                {aggRecurring > 0 && (
-                                  <span className={qcStyles.initialText}>
-                                    {item.frequency === 'one-time'
-                                      ? ' One Time'
-                                      : ' Initial'}
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </div>
-                          {isExpandable && (
-                            <span className={qcStyles.planHeaderIcon}>
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="32"
-                                height="32"
-                                viewBox="0 0 32 32"
-                                fill="none"
-                              >
-                                <circle cx="16" cy="16" r="16" fill="#000" />
-                                <path
-                                  d="M10 14L16 20L22 14"
-                                  stroke="white"
-                                  strokeWidth="1.75"
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                />
-                              </svg>
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {isExpandable && (
-                        <div
-                          ref={el => {
-                            if (el) contentWrapperRefs.current.set(item.id, el);
-                            else contentWrapperRefs.current.delete(item.id);
-                          }}
-                          className={qcStyles.planContentWrapper}
-                          style={{ maxHeight: isExpanded ? '3000px' : '0' }}
-                        >
-                          {hasContent && (
-                            <div className={qcStyles.planContent}>
-                              <div className={qcStyles.planContentGrid}>
-                                {description && (
-                                  <p className={qcStyles.planDescription}>
-                                    {description}
-                                  </p>
-                                )}
-                                <div className={qcStyles.planContentLeft}>
-                                  {features.length > 0 && (
-                                    <div className={qcStyles.planIncluded}>
-                                      <h4>What&apos;s Included:</h4>
-                                      <ul className={qcStyles.featuresList}>
-                                        {features.map((f, fi) => (
-                                          <li
-                                            key={fi}
-                                            className={qcStyles.feature}
-                                          >
-                                            <span
-                                              className={
-                                                qcStyles.featureCheckmark
-                                              }
-                                            >
-                                              <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="20"
-                                                height="20"
-                                                viewBox="0 0 20 20"
-                                                fill="none"
-                                              >
-                                                <g clipPath="url(#clip-rv)">
-                                                  <path
-                                                    d="M18.1678 8.33332C18.5484 10.2011 18.2772 12.1428 17.3994 13.8348C16.5216 15.5268 15.0902 16.8667 13.3441 17.6311C11.5979 18.3955 9.64252 18.5381 7.80391 18.0353C5.9653 17.5325 4.35465 16.4145 3.24056 14.8678C2.12646 13.3212 1.57626 11.4394 1.68171 9.53615C1.78717 7.63294 2.54189 5.8234 3.82004 4.4093C5.09818 2.9952 6.82248 2.06202 8.70538 1.76537C10.5883 1.46872 12.516 1.82654 14.167 2.77916"
-                                                    stroke="#000"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                  />
-                                                  <path
-                                                    d="M7.5 9.16659L10 11.6666L18.3333 3.33325"
-                                                    stroke="#000"
-                                                    strokeWidth="2"
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                  />
-                                                </g>
-                                                <defs>
-                                                  <clipPath id="clip-rv">
-                                                    <rect
-                                                      width="20"
-                                                      height="20"
-                                                      fill="white"
-                                                    />
-                                                  </clipPath>
-                                                </defs>
-                                              </svg>
-                                            </span>
-                                            {f}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )}
-                                  <div className={qcStyles.pricingSection}>
-                                    <div className={qcStyles.priceContainer}>
-                                      {aggRecurring > 0 && (
-                                        <div className={qcStyles.priceLeft}>
-                                          <div
-                                            className={qcStyles.priceRecurring}
-                                          >
-                                            <sup>$</sup>
-                                            {aggRecurring.toFixed(0)}
-                                            <sup
-                                              className={qcStyles.priceAsterisk}
-                                            >
-                                              *
-                                            </sup>
-                                            <span
-                                              className={
-                                                qcStyles.priceFrequency
-                                              }
-                                            >
-                                              /
-                                              {abbreviateFrequency(
-                                                item.frequency
-                                              )}
-                                            </span>
-                                          </div>
-                                        </div>
-                                      )}
-                                      {aggInitial > 0 && (
-                                        <div
-                                          className={
-                                            item.frequency === 'one-time' ||
-                                            aggRecurring === 0
-                                              ? qcStyles.priceLeft
-                                              : qcStyles.priceRight
-                                          }
-                                        >
-                                          <div
-                                            className={qcStyles.priceRecurring}
-                                          >
-                                            <sup>$</sup>
-                                            {aggInitial.toFixed(0)}
-                                            {item.frequency !== 'one-time' &&
-                                              aggRecurring > 0 && (
-                                                <span
-                                                  className={
-                                                    qcStyles.priceFrequency
-                                                  }
-                                                >
-                                                  /Initial
-                                                </span>
-                                              )}
-                                          </div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {disclaimer && (
-                                    <div className={qcStyles.planDisclaimer}>
-                                      <p
-                                        dangerouslySetInnerHTML={{
-                                          __html: disclaimer,
-                                        }}
-                                      />
-                                    </div>
-                                  )}
-                                </div>
-                                <div className={qcStyles.planContentRight}>
-                                  {imageUrl && (
-                                    <div className={qcStyles.planImageWrapper}>
-                                      <Image
-                                        src={imageUrl}
-                                        alt={formatLineItemLabel(item)}
-                                        fill
-                                        className={qcStyles.planImage}
-                                      />
-                                    </div>
-                                  )}
-
-                                  {videoUrl && (
-                                    <button
-                                      type="button"
-                                      className={styles.planVideoCallout}
-                                      onClick={() =>
-                                        setVideoLightboxUrl(videoUrl)
-                                      }
-                                      aria-label="Play plan video"
-                                    >
-                                      <span
-                                        className={styles.planVideoCalloutText}
-                                      >
-                                        Watch Our Service Video
-                                      </span>
-                                      <span
-                                        className={styles.planVideoCalloutPlay}
-                                      >
-                                        <svg
-                                          xmlns="http://www.w3.org/2000/svg"
-                                          width="31"
-                                          height="36"
-                                          viewBox="0 0 31 36"
-                                          fill="none"
-                                        >
-                                          <path
-                                            d="M30.75 17.7535L-1.67211e-06 35.5071L-1.20052e-07 1.77294e-05L30.75 17.7535Z"
-                                            fill="white"
-                                          />
-                                        </svg>
-                                      </span>
-                                    </button>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          {/* ── Recommended add-ons for this plan ── */}
-                          {(() => {
-                            // All recommended add-on line items are saved with isRecommended !== undefined
-                            const recommendedLineItems = addonItems.filter(
-                              a =>
-                                a.parentLineItemId === item.id &&
-                                a.isRecommended !== undefined
-                            );
-
-                            // Preserve catalog order if available
-                            const planCatalogData =
-                              catalogDetails[item.catalogItemId ?? ''];
-                            const catalogOrder: string[] =
-                              planCatalogData?.recommended_addon_ids ?? [];
-                            const ordered =
-                              catalogOrder.length > 0
-                                ? ([
-                                    ...catalogOrder
-                                      .map(id =>
-                                        recommendedLineItems.find(
-                                          a => a.catalogItemId === id
-                                        )
-                                      )
-                                      .filter(Boolean),
-                                    ...recommendedLineItems.filter(
-                                      a =>
-                                        !catalogOrder.includes(
-                                          a.catalogItemId ?? ''
-                                        )
-                                    ),
-                                  ] as typeof recommendedLineItems)
-                                : recommendedLineItems;
-
-                            if (ordered.length === 0) return null;
-
-                            return (
-                              <div className={styles.planCardAddons}>
-                                <div className={styles.planCardAddonBtnGroup}>
-                                  {ordered.map(addon => {
-                                    const isChecked = selectedItemIds.has(
-                                      addon.id
-                                    );
-                                    const recurringCost =
-                                      addon.recurringCost ?? 0;
-                                    const initialCost = addon.initialCost ?? 0;
-                                    const priceLabel =
-                                      recurringCost > 0
-                                        ? `$${recurringCost.toFixed(0)}/${abbreviateFrequency(addon.frequency)}`
-                                        : initialCost > 0
-                                          ? `$${initialCost.toFixed(0)}`
-                                          : '';
-                                    return (
-                                      <div
-                                        key={addon.id}
-                                        className={styles.planCardAddonBtnWrap}
-                                      >
-                                        {addon.isRecommended === true && (
-                                          <span
-                                            className={
-                                              styles.planCardAddonRecommendedLabel
-                                            }
-                                          >
-                                            Recommended
-                                          </span>
-                                        )}
-                                        <button
-                                          type="button"
-                                          className={`${styles.planCardAddonBtn}${isChecked ? ` ${styles.planCardAddonBtnSelected}` : ''}`}
-                                          onClick={() =>
-                                            toggleRecommendedAddon(addon.id, ordered.map(a => a.id))
-                                          }
-                                        >
-                                          {isChecked && (
-                                            <span
-                                              className={
-                                                styles.planCardAddonBtnCheck
-                                              }
-                                            >
-                                              <svg
-                                                xmlns="http://www.w3.org/2000/svg"
-                                                width="27"
-                                                height="27"
-                                                viewBox="0 0 27 27"
-                                                fill="none"
-                                              >
-                                                <circle
-                                                  cx="13.5"
-                                                  cy="13.5"
-                                                  r="13.5"
-                                                />
-                                                <path d="M13.75 4C11.8216 4 9.93657 4.57183 8.33319 5.64317C6.72982 6.71451 5.48013 8.23726 4.74218 10.0188C4.00422 11.8004 3.81114 13.7608 4.18735 15.6521C4.56355 17.5434 5.49215 19.2807 6.85571 20.6443C8.21928 22.0079 9.95656 22.9365 11.8479 23.3127C13.7392 23.6889 15.6996 23.4958 17.4812 22.7578C19.2627 22.0199 20.7855 20.7702 21.8568 19.1668C22.9282 17.5634 23.5 15.6784 23.5 13.75C23.4973 11.165 22.4692 8.68661 20.6413 6.85872C18.8134 5.03084 16.335 4.00273 13.75 4ZM18.0306 12.0306L12.7806 17.2806C12.711 17.3504 12.6283 17.4057 12.5372 17.4434C12.4462 17.4812 12.3486 17.5006 12.25 17.5006C12.1514 17.5006 12.0538 17.4812 11.9628 17.4434C11.8718 17.4057 11.789 17.3504 11.7194 17.2806L9.46938 15.0306C9.32865 14.8899 9.24959 14.699 9.24959 14.5C9.24959 14.301 9.32865 14.1101 9.46938 13.9694C9.61011 13.8286 9.80098 13.7496 10 13.7496C10.199 13.7496 10.3899 13.8286 10.5306 13.9694L12.25 15.6897L16.9694 10.9694C17.0391 10.8997 17.1218 10.8444 17.2128 10.8067C17.3039 10.769 17.4015 10.7496 17.5 10.7496C17.5986 10.7496 17.6961 10.769 17.7872 10.8067C17.8782 10.8444 17.9609 10.8997 18.0306 10.9694C18.1003 11.0391 18.1556 11.1218 18.1933 11.2128C18.231 11.3039 18.2504 11.4015 18.2504 11.5C18.2504 11.5985 18.231 11.6961 18.1933 11.7872C18.1556 11.8782 18.1003 11.9609 18.0306 12.0306Z" />
-                                              </svg>
-                                            </span>
-                                          )}
-                                          <span
-                                            className={
-                                              styles.planCardAddonBtnLabel
-                                            }
-                                          >
-                                            {formatLineItemLabel(addon)}
-                                          </span>
-                                        </button>
-                                        {priceLabel && (
-                                          <span
-                                            className={
-                                              styles.planCardAddonBtnPrice
-                                            }
-                                          >
-                                            {priceLabel}
-                                          </span>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                {/* ── Add-ons (previously "Additional Recommendations") ── */}
-                {addonItems
-                  .filter(i => i.isRecommended === undefined)
-                  .map(addon => {
-                    const isChecked = selectedItemIds.has(addon.id);
-                    const isOnly =
-                      multipleItems && selectedItemIds.size === 1 && isChecked;
-                    return (
-                      <div
-                        key={addon.id}
-                        className={`${qcStyles.planCard} ${qcStyles.collapsible}`}
-                      >
-                        <div className={qcStyles.planHeader}>
-                          <label
-                            className={`${qcStyles.addonCheckbox} ${isOnly ? qcStyles.addonCheckboxLastPlan : ''}`}
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => toggleItemSelected(addon.id)}
-                              disabled={isOnly}
-                            />
-                            <span
-                              className={`${qcStyles.addonCheckboxCustom} ${isOnly ? qcStyles.addonCheckboxDisabled : ''}`}
-                            />
-                          </label>
-                          <div>
-                            <h3 className={qcStyles.planHeaderTitle}>
-                              {formatLineItemLabel(addon)}
-                            </h3>
-                          </div>
-                          <div className={qcStyles.addonHeaderRight}>
-                            <div className={qcStyles.planHeaderPricing}>
-                              {(addon.recurringCost ?? 0) > 0 && (
-                                <span className={qcStyles.planHeaderRecurring}>
-                                  <sup>$</sup>
-                                  {(addon.recurringCost ?? 0).toFixed(0)}
-                                  <span
-                                    className={qcStyles.planRecurringFrequency}
-                                  >
-                                    /{abbreviateFrequency(addon.frequency)}
-                                  </span>
-                                </span>
-                              )}
-                              {(addon.recurringCost ?? 0) > 0 &&
-                                (addon.initialCost ?? 0) > 0 && (
-                                  <span className={qcStyles.planHeaderDivider}>
-                                    |
-                                  </span>
-                                )}
-                              {(addon.initialCost ?? 0) > 0 && (
-                                <span className={qcStyles.planHeaderInitial}>
-                                  <sup>$</sup>
-                                  {(addon.initialCost ?? 0).toFixed(0)}
-                                  {(addon.recurringCost ?? 0) > 0 && (
-                                    <span className={qcStyles.initialText}>
-                                      {' '}
-                                      Initial
-                                    </span>
-                                  )}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
+            {/* ── Plan cards via QuoteServicePanel ── */}
+            <QuoteServicePanel
+              quoteLineItems={effectiveLineItems}
+              selectedItemIds={selectedItemIds}
+              onToggleItem={toggleItemSelected}
+              expandedItemId={expandedItemId}
+              onSetExpandedItem={id => {
+                if (id === null) {
+                  setExpandedItemId(null);
+                } else {
+                  toggleExpanded(id);
+                }
+              }}
+              getContent={getPlanContent}
+              onToggleRecommendedAddon={toggleRecommendedAddon}
+              renderPlanHeaderExtra={renderPlanHeaderPestIcon}
+              renderRecommendedAddons={renderRecommendedAddonsForItem}
+              multipleItems={multipleItems}
+              showTotals={false}
+              showFaqs={false}
+            />
 
             {/* ── Additional Services We Offer ── */}
             {featuredPlans.length > 0 && (
@@ -2313,9 +1861,12 @@ export function ReviewStep({
                               multipleItems &&
                               selectedItemIds.size === 1 &&
                               addonSelected;
-                            const isRecommendedAddon = addon.isRecommended !== undefined;
+                            const isRecommendedAddon =
+                              addon.isRecommended !== undefined;
                             const recommendedSiblingIds = isRecommendedAddon
-                              ? childAddons.filter(a => a.isRecommended !== undefined).map(a => a.id)
+                              ? childAddons
+                                  .filter(a => a.isRecommended !== undefined)
+                                  .map(a => a.id)
                               : [];
                             return (
                               <div
@@ -2331,7 +1882,10 @@ export function ReviewStep({
                                       checked={addonSelected}
                                       onChange={() =>
                                         isRecommendedAddon
-                                          ? toggleRecommendedAddon(addon.id, recommendedSiblingIds)
+                                          ? toggleRecommendedAddon(
+                                              addon.id,
+                                              recommendedSiblingIds
+                                            )
                                           : toggleItemSelected(addon.id)
                                       }
                                       disabled={addonOnly}
@@ -2549,14 +2103,6 @@ export function ReviewStep({
                     </div>
                   </>
                 )}
-              </div>
-            )}
-
-            {/* Notes */}
-            {notes && (
-              <div className={styles.notesSection}>
-                <p className={styles.notesLabel}>Inspector Notes</p>
-                <p className={styles.notesText}>{notes}</p>
               </div>
             )}
 

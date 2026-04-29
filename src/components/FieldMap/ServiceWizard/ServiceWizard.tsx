@@ -20,8 +20,8 @@ import {
 } from './steps/MapPlotStep';
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem, AvailableDiscount } from './steps/QuoteBuildStep';
-import { SafetyChecklistStep } from './steps/SafetyChecklistStep';
-import type { SafetyChecklistResponse } from './steps/SafetyChecklistStep';
+import { SalesChecklistStep } from './steps/SalesChecklistStep';
+import type { SalesChecklist, ChecklistResponseGroup } from './steps/SalesChecklistStep';
 import { ReviewStep } from './steps/ReviewStep';
 import styles from './ServiceWizard.module.scss';
 
@@ -42,6 +42,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [routeStopId, setRouteStopId] = useState<string | null>(
     routeStopIdParam
   );
+  const [serviceAddressId, setServiceAddressId] = useState<string | null>(null);
   const leadIdParam = searchParams.get('leadId') ?? null;
 
   const [clientInfo, setClientInfo] = useState({
@@ -73,18 +74,17 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   >(undefined);
 
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
-  const [safetyChecklistEnabled, setSafetyChecklistEnabled] = useState(false);
-  const [checklistResponses, setChecklistResponses] = useState<SafetyChecklistResponse[]>([]);
+  const [salesChecklists, setSalesChecklists] = useState<SalesChecklist[]>([]);
+  const [checklistResponseGroups, setChecklistResponseGroups] = useState<ChecklistResponseGroup[]>([]);
 
-  // Fetch safety checklist setting
+  // Fetch sales checklists
   useEffect(() => {
     const companyId = selectedCompany?.id;
     if (!companyId) return;
-    fetch(`/api/companies/${companyId}/settings`)
+    fetch(`/api/companies/${companyId}/sales-checklists`)
       .then(r => (r.ok ? r.json() : null))
-      .then((data: { settings?: Record<string, { value: string | boolean | number | null }> } | null) => {
-        if (!data?.settings) return;
-        setSafetyChecklistEnabled(data.settings?.safety_checklist_enabled?.value === true);
+      .then((data: SalesChecklist[] | null) => {
+        setSalesChecklists(data ?? []);
       })
       .catch(() => {});
   }, [selectedCompany?.id]);
@@ -268,9 +268,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         }
         if (
           Array.isArray(quoteData?.data?.safety_checklist_responses) &&
-          quoteData.data.safety_checklist_responses.length > 0
+          quoteData.data.safety_checklist_responses.length > 0 &&
+          Array.isArray(quoteData.data.safety_checklist_responses[0]?.responses)
         ) {
-          setChecklistResponses(quoteData.data.safety_checklist_responses);
+          setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
         }
         setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
         setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
@@ -298,6 +299,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
         if (!routeStopIdParam && stopData.routeStopId) {
           setRouteStopId(stopData.routeStopId);
+        }
+
+        if (stopData.serviceAddressId) {
+          setServiceAddressId(stopData.serviceAddressId);
         }
 
         setClientInfo({
@@ -383,7 +388,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               Array.isArray(quoteData?.data?.safety_checklist_responses) &&
               quoteData.data.safety_checklist_responses.length > 0
             ) {
-              setChecklistResponses(quoteData.data.safety_checklist_responses);
+              setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
             }
 
             if (lineItems.length > 0) {
@@ -475,15 +480,28 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  // Dynamic step configuration based on safety checklist setting
-  const STEP_LABELS = safetyChecklistEnabled
-    ? ['Address', 'Photos', 'Map', 'Quote', 'Checklist', 'Review']
+  // Dynamic step configuration based on sales checklists
+  const hasChecklists = salesChecklists.length > 0;
+  const STEP_LABELS = hasChecklists
+    ? ['Address', 'Photos', 'Map', 'Quote', 'Sales Checklist', 'Review']
     : BASE_STEP_LABELS;
   const STEP_COUNT = STEP_LABELS.length;
   // Step indices
   const QUOTE_STEP = 3;
-  const CHECKLIST_STEP = safetyChecklistEnabled ? 4 : -1;
-  const REVIEW_STEP = safetyChecklistEnabled ? 5 : 4;
+  const CHECKLIST_STEP = hasChecklists ? 4 : -1;
+  const REVIEW_STEP = hasChecklists ? 5 : 4;
+
+  // Checklists whose linked plans match the current quote
+  const applicableChecklists = useMemo(() => {
+    const planIds = new Set(
+      quoteLineItems
+        .filter(li => li.catalogItemKind === 'plan' && li.catalogItemId)
+        .map(li => li.catalogItemId as string)
+    );
+    return salesChecklists.filter(
+      cl => cl.isActive && cl.linkedPlanIds.some(id => planIds.has(id))
+    );
+  }, [salesChecklists, quoteLineItems]);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents &&
@@ -535,6 +553,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           leadId,
           stopId: stopId ?? undefined,
           routeStopId: routeStopId ?? undefined,
+          serviceAddressId: serviceAddressId ?? undefined,
         }),
       }).catch(() => {});
     }, 1500);
@@ -594,10 +613,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         return true;
       default:
         if (currentStep === CHECKLIST_STEP) {
-          return (
-            checklistResponses.length > 0 &&
-            checklistResponses.every((r) => r.answer !== '')
-          );
+          // Allow advance if no applicable checklists (will be auto-skipped in handleNext)
+          if (applicableChecklists.length === 0) return true;
+          const allResponses = checklistResponseGroups.flatMap(g => Array.isArray(g.responses) ? g.responses : []);
+          return allResponses.length > 0 && allResponses.every(r => r != null && r.answer !== '');
         }
         if (currentStep === REVIEW_STEP) return true;
         return false;
@@ -638,6 +657,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             leadId: leadId ?? undefined,
             stopId: stopId ?? undefined,
             routeStopId: routeStopId ?? undefined,
+            serviceAddressId: serviceAddressId ?? undefined,
           }),
         });
         const data = await res.json();
@@ -671,6 +691,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             leadId: leadId ?? undefined,
             stopId: stopId ?? undefined,
             routeStopId: routeStopId ?? undefined,
+            serviceAddressId: serviceAddressId ?? undefined,
           }),
         });
         const data = await res.json();
@@ -759,8 +780,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       return;
     }
 
-    // After Checklist step — save checklist responses to the quote
-    if (safetyChecklistEnabled && currentStep === CHECKLIST_STEP) {
+    // After Checklist step — save checklist responses to the quote (or skip if none applicable)
+    if (currentStep === CHECKLIST_STEP) {
+      if (applicableChecklists.length === 0) {
+        advanceStep(REVIEW_STEP);
+        return;
+      }
       if (quoteId) {
         setIsSavingStep(true);
         try {
@@ -776,7 +801,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               discountType:
                 appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
               discountId: appliedDiscount?.id ?? null,
-              checklistResponses,
+              checklistResponses: checklistResponseGroups,
             }),
           });
         } catch {
@@ -878,13 +903,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           </div>
         );
       default: {
-        if (safetyChecklistEnabled && currentStep === CHECKLIST_STEP) {
+        if (currentStep === CHECKLIST_STEP) {
           return (
             <div className={styles.stepScrollable}>
-              <SafetyChecklistStep
-                companyId={selectedCompany?.id ?? ''}
-                responses={checklistResponses}
-                onChange={setChecklistResponses}
+              <SalesChecklistStep
+                checklists={applicableChecklists}
+                responseGroups={checklistResponseGroups}
+                onChange={setChecklistResponseGroups}
               />
             </div>
           );
@@ -912,7 +937,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               appliedDiscount={appliedDiscount}
               quoteSubtotalInitial={quoteSubtotalInitial}
               quoteTotalInitial={quoteTotalInitial}
-              checklistResponses={checklistResponses}
+              checklistResponses={checklistResponseGroups}
               onBack={handleBack}
               onAddLineItem={handleAddLineItem}
             />

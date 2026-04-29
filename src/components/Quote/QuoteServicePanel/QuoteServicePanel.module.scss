@@ -1,0 +1,84 @@
+/* ── Total pricing header ── */
+.totalPricingHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  h3 {
+    margin: 0;
+    color: var(--brand-secondary);
+  }
+}
+
+/* ── Discount applied row ── */
+.discountAppliedRow {
+  color: var(--gray-700);
+  font-size: 16px;
+
+  div {
+    color: var(--gray-700);
+    font-size: 16px;
+  }
+}
+
+/* ── Addon rows inside the totals list ── */
+.totalAddonItem {
+  font-size: 12px !important;
+  padding-top: 3px !important;
+  padding-bottom: 3px !important;
+  margin-left: 30px;
+  color: var(--gray-700);
+
+  @media (max-width: 768px) {
+    margin-left: 24px;
+  }
+}
+
+/* Shrinks the checkbox for total addon rows */
+.totalAddonCheckbox span {
+  width: 16px !important;
+  height: 16px !important;
+  border-radius: 2px !important;
+  background-size: 12px 10px !important;
+}
+
+/* ── Video callout button ── */
+.planVideoCallout {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  margin-top: 12px;
+  border-radius: 4px;
+  background: #e8edf7;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  gap: 16px;
+  text-align: left;
+
+  &:hover {
+    background: #dce4f3;
+  }
+}
+
+.planVideoCalloutText {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--brand-secondary);
+  font-family: var(--secondary-font, var(--primary-font));
+  line-height: 27px;
+  text-align: center;
+}
+
+.planVideoCalloutPlay {
+  flex-shrink: 0;
+  width: 131px;
+  height: 79px;
+  background: var(--brand-secondary);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

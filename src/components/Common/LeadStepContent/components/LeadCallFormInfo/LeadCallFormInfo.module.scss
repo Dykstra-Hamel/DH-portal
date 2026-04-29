@@ -380,3 +380,75 @@
   font-size: 13px;
   margin-top: 12px;
 }
+
+// Checklist answers
+.checklistAnswers {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.checklistGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checklistGroupName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin: 0 0 4px;
+}
+
+.checklistItem {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.checklistQuestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checklistQuestionText {
+  font-size: 13px;
+  color: var(--gray-700);
+  flex: 1;
+}
+
+.checklistBadge {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.checklistBadgeYes {
+  background: var(--green-100, #dcfce7);
+  color: var(--green-700, #15803d);
+}
+
+.checklistBadgeNo {
+  background: var(--red-100, #fee2e2);
+  color: var(--red-700, #b91c1c);
+}
+
+.checklistAnswerText {
+  font-size: 13px;
+  color: var(--gray-600);
+  font-style: italic;
+}
+
+.checklistChildren {
+  margin-left: 16px;
+  padding-left: 12px;
+  border-left: 2px solid var(--gray-200);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

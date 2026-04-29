@@ -25,14 +25,28 @@ type SalesTab =
   | 'quickQuote'
   | 'cadences'
   | 'leadAssignment'
-  | 'safetyChecklist';
+  | 'salesChecklists';
 
-interface SafetyChecklistQuestion {
+interface ChecklistQuestion {
   id: string;
   text: string;
   answerType: 'yes_no' | 'text';
   order: number;
-  parentId?: string; // if set, this question is a conditional child shown when parent answer = 'yes'
+  parentId?: string;
+}
+
+interface SalesChecklist {
+  id: string;
+  name: string;
+  displayOrder: number;
+  isActive: boolean;
+  questions: ChecklistQuestion[];
+  linkedPlanIds: string[];
+}
+
+interface ServicePlanOption {
+  id: string;
+  plan_name: string;
 }
 
 interface ZipCodeGroup {
@@ -80,11 +94,17 @@ export default function SalesConfigManager({
   const [zipCodeGroups, setZipCodeGroups] = useState<ZipCodeGroup[]>([]);
   const [loadingGroups, setLoadingGroups] = useState(false);
   const [savingLeadAssignment, setSavingLeadAssignment] = useState(false);
-  const [safetyChecklistEnabled, setSafetyChecklistEnabled] = useState(false);
-  const [safetyChecklistQuestions, setSafetyChecklistQuestions] = useState<
-    SafetyChecklistQuestion[]
-  >([]);
-  const [savingSafetyChecklist, setSavingSafetyChecklist] = useState(false);
+  const [salesChecklists, setSalesChecklists] = useState<SalesChecklist[]>([]);
+  const [editingChecklist, setEditingChecklist] = useState<SalesChecklist | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [servicePlans, setServicePlans] = useState<ServicePlanOption[]>([]);
+  const [loadingChecklists, setLoadingChecklists] = useState(false);
+  const [savingChecklist, setSavingChecklist] = useState(false);
+  // Edit panel state
+  const [editName, setEditName] = useState('');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editLinkedPlanIds, setEditLinkedPlanIds] = useState<string[]>([]);
+  const [editQuestions, setEditQuestions] = useState<ChecklistQuestion[]>([]);
   const [newQuestionText, setNewQuestionText] = useState('');
   const [newQuestionAnswerType, setNewQuestionAnswerType] = useState<
     'yes_no' | 'text'
@@ -92,8 +112,8 @@ export default function SalesConfigManager({
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null
   );
-  const [editText, setEditText] = useState('');
-  const [editAnswerType, setEditAnswerType] = useState<'yes_no' | 'text'>(
+  const [editQuestionText, setEditQuestionText] = useState('');
+  const [editQuestionAnswerType, setEditQuestionAnswerType] = useState<'yes_no' | 'text'>(
     'yes_no'
   );
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -105,6 +125,8 @@ export default function SalesConfigManager({
     loadCadences();
     loadDefaultCadences();
     loadZipCodeGroups();
+    loadSalesChecklists();
+    loadServicePlans();
   }, [companyId]);
 
   const loadDefaultCadences = async () => {
@@ -133,31 +155,6 @@ export default function SalesConfigManager({
       setInspectorPropertyTypeEnabled(
         settings?.inspector_property_type_enabled?.value === true
       );
-      setAutoAssignCustomQuoteLeads(
-        settings?.auto_assign_custom_quote_leads?.value === true
-      );
-      setTechnicianPropertyTypeEnabled(
-        settings?.technician_property_type_enabled?.value === true
-      );
-      setInspectorPropertyTypeEnabled(
-        settings?.inspector_property_type_enabled?.value === true
-      );
-      setSafetyChecklistEnabled(
-        settings?.safety_checklist_enabled?.value === true
-      );
-      const rawQuestions = settings?.safety_checklist_questions?.value;
-
-      const parsedRaw: any[] = rawQuestions ? JSON.parse(rawQuestions) : [];
-      // Migrate old format (conditionalQuestion on parent → parentId on child)
-      const migratedQuestions: SafetyChecklistQuestion[] = parsedRaw.map(q => {
-        const { conditionalQuestion, ...rest } = q;
-        const parent = parsedRaw.find(
-          (p: { conditionalQuestion?: { questionId?: string } }) =>
-            p.conditionalQuestion?.questionId === q.id
-        );
-        return parent ? { ...rest, parentId: parent.id } : rest;
-      });
-      setSafetyChecklistQuestions(migratedQuestions);
     } catch {
       // Non-critical — silently ignore
     }
@@ -179,73 +176,163 @@ export default function SalesConfigManager({
     }
   };
 
-  const handleSaveSafetyChecklist = async () => {
+  const loadSalesChecklists = async () => {
     try {
-      setSavingSafetyChecklist(true);
-      setError(null);
-
-      const response = await fetch(`/api/companies/${companyId}/settings`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          settings: {
-            safety_checklist_enabled: {
-              value: safetyChecklistEnabled ? 'true' : 'false',
-              type: 'boolean',
-            },
-            safety_checklist_questions: {
-              value: JSON.stringify(safetyChecklistQuestions),
-              type: 'json',
-            },
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const { error: errorMsg } = await response.json();
-        throw new Error(errorMsg || 'Failed to save Safety Checklist settings');
-      }
-
-      setSuccess('Safety Checklist settings saved successfully');
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : 'Failed to save Safety Checklist settings'
-      );
+      setLoadingChecklists(true);
+      const res = await fetch(`/api/companies/${companyId}/sales-checklists`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setSalesChecklists(Array.isArray(data) ? data.map((cl: any) => ({
+        id: cl.id,
+        name: cl.name,
+        displayOrder: cl.displayOrder,
+        isActive: cl.isActive,
+        questions: (cl.questions ?? []).map((q: any) => ({
+          id: q.id,
+          text: q.text,
+          answerType: q.answerType,
+          order: q.displayOrder,
+          parentId: q.parentQuestionId ?? undefined,
+        })),
+        linkedPlanIds: cl.linkedPlanIds ?? [],
+      })) : []);
+    } catch {
+      // Non-critical
     } finally {
-      setSavingSafetyChecklist(false);
+      setLoadingChecklists(false);
+    }
+  };
+
+  const loadServicePlans = async () => {
+    try {
+      const res = await fetch(`/api/companies/${companyId}/service-plans`);
+      if (!res.ok) return;
+      const data = await res.json();
+      const plans = Array.isArray(data) ? data : (data.plans ?? data.data ?? []);
+      setServicePlans(plans.map((p: any) => ({ id: p.id, plan_name: p.plan_name })));
+    } catch {
+      // Non-critical
+    }
+  };
+
+  const openCreatePanel = () => {
+    setEditingChecklist(null);
+    setEditName('');
+    setEditIsActive(true);
+    setEditLinkedPlanIds([]);
+    setEditQuestions([]);
+    setNewQuestionText('');
+    setNewQuestionAnswerType('yes_no');
+    setEditingQuestionId(null);
+    setIsCreating(true);
+  };
+
+  const openEditPanel = (cl: SalesChecklist) => {
+    setEditingChecklist(cl);
+    setEditName(cl.name);
+    setEditIsActive(cl.isActive);
+    setEditLinkedPlanIds([...cl.linkedPlanIds]);
+    setEditQuestions(cl.questions.map(q => ({ ...q })));
+    setNewQuestionText('');
+    setNewQuestionAnswerType('yes_no');
+    setEditingQuestionId(null);
+    setIsCreating(true);
+  };
+
+  const closeEditPanel = () => {
+    setIsCreating(false);
+    setEditingChecklist(null);
+  };
+
+  const handleSaveChecklist = async () => {
+    if (!editName.trim()) {
+      setError('Checklist name is required');
+      return;
+    }
+    try {
+      setSavingChecklist(true);
+      setError(null);
+      const payload = {
+        name: editName.trim(),
+        isActive: editIsActive,
+        displayOrder: editingChecklist?.displayOrder ?? salesChecklists.length,
+        questions: editQuestions.map((q, idx) => ({
+          id: q.id,
+          text: q.text,
+          answerType: q.answerType,
+          displayOrder: idx,
+          parentQuestionId: q.parentId ?? null,
+        })),
+        linkedPlanIds: editLinkedPlanIds,
+      };
+      let res: Response;
+      if (editingChecklist) {
+        res = await fetch(
+          `/api/companies/${companyId}/sales-checklists/${editingChecklist.id}`,
+          { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+        );
+      } else {
+        res = await fetch(
+          `/api/companies/${companyId}/sales-checklists`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
+        );
+      }
+      if (!res.ok) {
+        const { error: errMsg } = await res.json();
+        throw new Error(errMsg || 'Failed to save checklist');
+      }
+      setSuccess(editingChecklist ? 'Checklist updated' : 'Checklist created');
+      closeEditPanel();
+      await loadSalesChecklists();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save checklist');
+    } finally {
+      setSavingChecklist(false);
+    }
+  };
+
+  const handleDeleteChecklist = async (id: string) => {
+    if (!confirm('Delete this checklist? This cannot be undone.')) return;
+    try {
+      setError(null);
+      const res = await fetch(`/api/companies/${companyId}/sales-checklists/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) throw new Error('Failed to delete');
+      setSuccess('Checklist deleted');
+      await loadSalesChecklists();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete checklist');
     }
   };
 
   const handleAddQuestion = () => {
     if (!newQuestionText.trim()) return;
-    const newQuestion: SafetyChecklistQuestion = {
+    const newQuestion: ChecklistQuestion = {
       id: crypto.randomUUID(),
       text: newQuestionText.trim(),
       answerType: newQuestionAnswerType,
-      order: safetyChecklistQuestions.length,
+      order: editQuestions.length,
     };
-    setSafetyChecklistQuestions(prev => [...prev, newQuestion]);
+    setEditQuestions(prev => [...prev, newQuestion]);
     setNewQuestionText('');
     setNewQuestionAnswerType('yes_no');
   };
 
   const handleDeleteQuestion = (id: string) => {
-    setSafetyChecklistQuestions(prev =>
+    setEditQuestions(prev =>
       prev
         .filter(q => q.id !== id)
         .map((q, idx) => ({
           ...q,
           order: idx,
-          // Un-nest any children of the deleted question
           parentId: q.parentId === id ? undefined : q.parentId,
         }))
     );
   };
 
   const handleUnNest = (id: string) => {
-    setSafetyChecklistQuestions(prev =>
+    setEditQuestions(prev =>
       prev.map(q => (q.id === id ? { ...q, parentId: undefined } : q))
     );
   };
@@ -260,7 +347,7 @@ export default function SalesConfigManager({
     e.preventDefault();
     e.stopPropagation();
     if (!draggingId) return;
-    setSafetyChecklistQuestions(prev => {
+    setEditQuestions(prev => {
       const dragging = prev.find(q => q.id === draggingId);
       if (!dragging) return prev;
       const withoutDragging = prev.filter(q => q.id !== draggingId);
@@ -289,14 +376,14 @@ export default function SalesConfigManager({
     e.preventDefault();
     e.stopPropagation();
     if (!draggingId || draggingId === parentId) return;
-    setSafetyChecklistQuestions(prev =>
+    setEditQuestions(prev =>
       prev.map(q => (q.id === draggingId ? { ...q, parentId } : q))
     );
     handleDragEnd();
   };
 
   const handleMoveQuestion = (id: string, direction: 'up' | 'down') => {
-    setSafetyChecklistQuestions(prev => {
+    setEditQuestions(prev => {
       const rootIds = prev.filter(q => !q.parentId).map(q => q.id);
       const rootIdx = rootIds.indexOf(id);
       if (rootIdx < 0) return prev;
@@ -311,28 +398,28 @@ export default function SalesConfigManager({
     });
   };
 
-  const handleStartEdit = (q: SafetyChecklistQuestion) => {
+  const handleStartEditQuestion = (q: ChecklistQuestion) => {
     setEditingQuestionId(q.id);
-    setEditText(q.text);
-    setEditAnswerType(q.answerType);
+    setEditQuestionText(q.text);
+    setEditQuestionAnswerType(q.answerType);
   };
 
-  const handleCancelEdit = () => {
+  const handleCancelEditQuestion = () => {
     setEditingQuestionId(null);
-    setEditText('');
-    setEditAnswerType('yes_no');
+    setEditQuestionText('');
+    setEditQuestionAnswerType('yes_no');
   };
 
-  const handleSaveEdit = () => {
-    if (!editingQuestionId || !editText.trim()) return;
-    setSafetyChecklistQuestions(prev =>
+  const handleSaveEditQuestion = () => {
+    if (!editingQuestionId || !editQuestionText.trim()) return;
+    setEditQuestions(prev =>
       prev.map(q =>
         q.id === editingQuestionId
-          ? { ...q, text: editText.trim(), answerType: editAnswerType }
+          ? { ...q, text: editQuestionText.trim(), answerType: editQuestionAnswerType }
           : q
       )
     );
-    handleCancelEdit();
+    handleCancelEditQuestion();
   };
 
   const handleSaveLeadAssignment = async () => {
@@ -602,10 +689,10 @@ export default function SalesConfigManager({
         </button>
         <button
           type="button"
-          className={`${styles.tabButton} ${activeTab === 'safetyChecklist' ? styles.active : ''}`}
-          onClick={() => setActiveTab('safetyChecklist')}
+          className={`${styles.tabButton} ${activeTab === 'salesChecklists' ? styles.active : ''}`}
+          onClick={() => setActiveTab('salesChecklists')}
         >
-          Safety Checklist
+          Sales Checklists
         </button>
       </div>
 
@@ -1021,409 +1108,512 @@ export default function SalesConfigManager({
         </div>
       )}
 
-      {activeTab === 'safetyChecklist' && (
+      {activeTab === 'salesChecklists' && (
         <div className={styles.safetyChecklistCard}>
-          <div className={styles.safetyChecklistHeader}>
-            <h3>Safety Checklist</h3>
-            <p>
-              Configure questions that inspectors must answer before submitting
-              a quote.
-            </p>
-          </div>
-
-          <div className={styles.toggleRow}>
-            <span className={styles.toggleLabel}>Enable Safety Checklist</span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={safetyChecklistEnabled}
-              className={`${styles.toggleSwitch} ${safetyChecklistEnabled ? styles.toggleOn : ''}`}
-              onClick={() => setSafetyChecklistEnabled(v => !v)}
-              disabled={savingSafetyChecklist}
-            >
-              <span className={styles.toggleThumb} />
-            </button>
-          </div>
-
-          <div className={styles.questionsSection}>
-            <p className={styles.questionsSectionTitle}>Questions</p>
-
-            {(() => {
-              const rootQuestions = safetyChecklistQuestions.filter(
-                q => !q.parentId
-              );
-              return (
-                <div
-                  className={styles.questionsList}
-                  onDragOver={e => e.preventDefault()}
-                  onDrop={e => handleDropOnRoot(e, null)}
+          {!isCreating ? (
+            // ── List view ──────────────────────────────────────────────────
+            <>
+              <div className={styles.salesChecklistListHeader}>
+                <div>
+                  <h3>Sales Checklists</h3>
+                  <p>
+                    Create named checklists linked to service plans. Checklists
+                    appear in the wizard when the customer&apos;s quote includes
+                    a linked plan.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.saveButton}
+                  onClick={openCreatePanel}
                 >
-                  {rootQuestions.length === 0 && (
-                    <p className={styles.questionsEmpty}>
-                      No questions added yet.
-                    </p>
+                  <Plus size={14} />
+                  Create Checklist
+                </button>
+              </div>
+
+              {loadingChecklists ? (
+                <p className={styles.questionsEmpty}>Loading&hellip;</p>
+              ) : salesChecklists.length === 0 ? (
+                <p className={styles.questionsEmpty}>
+                  No checklists yet. Create one to get started.
+                </p>
+              ) : (
+                <div className={styles.checklistRows}>
+                  {salesChecklists.map(cl => (
+                    <div key={cl.id} className={styles.checklistRow}>
+                      <div className={styles.checklistRowInfo}>
+                        <span className={styles.checklistRowName}>{cl.name}</span>
+                        <span className={styles.checklistRowMeta}>
+                          {cl.questions.filter(q => !q.parentId).length} question
+                          {cl.questions.filter(q => !q.parentId).length !== 1 ? 's' : ''}
+                          &nbsp;&middot;&nbsp;
+                          {cl.linkedPlanIds.length} plan
+                          {cl.linkedPlanIds.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      {cl.isActive ? (
+                        <span className={styles.activeBadge}>Active</span>
+                      ) : (
+                        <span className={styles.inactiveBadge}>Inactive</span>
+                      )}
+                      <div className={styles.checklistRowActions}>
+                        <button
+                          type="button"
+                          className={styles.iconButton}
+                          onClick={() => openEditPanel(cl)}
+                          title="Edit checklist"
+                        >
+                          <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.iconButton}
+                          onClick={() => handleDeleteChecklist(cl.id)}
+                          title="Delete checklist"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          ) : (
+            // ── Edit / Create panel ─────────────────────────────────────────
+            <>
+              <div className={styles.editPanelHeader}>
+                <button
+                  type="button"
+                  className={styles.backButton}
+                  onClick={closeEditPanel}
+                >
+                  &larr; Back
+                </button>
+                <h3>{editingChecklist ? 'Edit Checklist' : 'Create Checklist'}</h3>
+              </div>
+
+              <div className={styles.editPanelForm}>
+                <div className={styles.editPanelField}>
+                  <label className={styles.editPanelLabel}>Name</label>
+                  <input
+                    type="text"
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    placeholder="e.g. Roof Safety Checklist"
+                    disabled={savingChecklist}
+                  />
+                </div>
+
+                <div className={styles.toggleRow}>
+                  <span className={styles.toggleLabel}>Active</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={editIsActive}
+                    className={`${styles.toggleSwitch} ${editIsActive ? styles.toggleOn : ''}`}
+                    onClick={() => setEditIsActive(v => !v)}
+                    disabled={savingChecklist}
+                  >
+                    <span className={styles.toggleThumb} />
+                  </button>
+                </div>
+
+                {/* Linked service plans */}
+                <div className={styles.editPanelSection}>
+                  <p className={styles.questionsSectionTitle}>Linked Service Plans</p>
+                  {servicePlans.length === 0 ? (
+                    <p className={styles.questionsEmpty}>No service plans found.</p>
+                  ) : (
+                    <div className={styles.planCheckboxList}>
+                      {servicePlans.map(plan => (
+                        <label key={plan.id} className={styles.planCheckboxLabel}>
+                          <input
+                            type="checkbox"
+                            checked={editLinkedPlanIds.includes(plan.id)}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setEditLinkedPlanIds(prev => [...prev, plan.id]);
+                              } else {
+                                setEditLinkedPlanIds(prev =>
+                                  prev.filter(id => id !== plan.id)
+                                );
+                              }
+                            }}
+                            disabled={savingChecklist}
+                          />
+                          {plan.plan_name}
+                        </label>
+                      ))}
+                    </div>
                   )}
+                </div>
 
-                  {rootQuestions.map((q, idx) => {
-                    const children = safetyChecklistQuestions.filter(
-                      q2 => q2.parentId === q.id
-                    );
-                    const isEditing = editingQuestionId === q.id;
-                    const isDraggingThis = draggingId === q.id;
-                    const isDropTarget =
-                      dropBeforeId === q.id &&
-                      draggingId &&
-                      draggingId !== q.id;
-                    const isConditionalTarget = dropParentId === q.id;
+                {/* Questions */}
+                <div className={styles.questionsSection}>
+                  <p className={styles.questionsSectionTitle}>Questions</p>
 
+                  {(() => {
+                    const rootQuestions = editQuestions.filter(q => !q.parentId);
                     return (
-                      <div key={q.id} className={styles.questionGroupWrapper}>
-                        {isDropTarget && (
-                          <div className={styles.dropInsertLine} />
+                      <div
+                        className={styles.questionsList}
+                        onDragOver={e => e.preventDefault()}
+                        onDrop={e => handleDropOnRoot(e, null)}
+                      >
+                        {rootQuestions.length === 0 && (
+                          <p className={styles.questionsEmpty}>
+                            No questions added yet.
+                          </p>
                         )}
 
-                        <div
-                          className={`${styles.questionGroup} ${isDraggingThis ? styles.dragging : ''}`}
-                          draggable={!isEditing}
-                          onDragStart={e => {
-                            e.dataTransfer.effectAllowed = 'move';
-                            setDraggingId(q.id);
-                          }}
-                          onDragEnd={handleDragEnd}
-                        >
-                          {isEditing ? (
-                            // ── Edit mode ──────────────────────────────────
-                            <div className={styles.questionEditRow}>
-                              <div className={styles.questionEditFields}>
-                                <div className={styles.questionEditTop}>
-                                  <input
-                                    type="text"
-                                    className={styles.addQuestionInput}
-                                    value={editText}
-                                    onChange={e => setEditText(e.target.value)}
-                                    autoFocus
-                                    onKeyDown={e => {
-                                      if (e.key === 'Enter') handleSaveEdit();
-                                      if (e.key === 'Escape')
-                                        handleCancelEdit();
-                                    }}
-                                  />
-                                  <select
-                                    className={styles.addQuestionSelect}
-                                    value={editAnswerType}
-                                    onChange={e =>
-                                      setEditAnswerType(
-                                        e.target.value as 'yes_no' | 'text'
-                                      )
-                                    }
-                                  >
-                                    <option value="yes_no">Yes / No</option>
-                                    <option value="text">Text</option>
-                                  </select>
-                                </div>
-                              </div>
-                              <div className={styles.questionEditActions}>
-                                <button
-                                  type="button"
-                                  className={styles.editSaveBtn}
-                                  onClick={handleSaveEdit}
-                                  disabled={!editText.trim()}
-                                >
-                                  Save
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.editCancelBtn}
-                                  onClick={handleCancelEdit}
-                                >
-                                  Cancel
-                                </button>
-                              </div>
-                            </div>
-                          ) : (
-                            // ── View mode ──────────────────────────────────
-                            <div
-                              className={styles.questionRow}
-                              onDragOver={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (draggingId && draggingId !== q.id) {
-                                  setDropBeforeId(q.id);
-                                  setDropParentId(null);
-                                }
-                              }}
-                              onDrop={e => handleDropOnRoot(e, q.id)}
-                            >
-                              <GripVertical
-                                size={16}
-                                className={styles.dragHandle}
-                              />
-                              <span className={styles.questionRowIndex}>
-                                {idx + 1}.
-                              </span>
-                              <span className={styles.questionRowLabel}>
-                                {q.text}
-                              </span>
-                              <span className={styles.questionTypeBadge}>
-                                {q.answerType === 'yes_no'
-                                  ? 'Yes / No'
-                                  : 'Text'}
-                              </span>
-                              <div className={styles.questionRowActions}>
-                                <button
-                                  type="button"
-                                  className={styles.iconButton}
-                                  onClick={() => handleStartEdit(q)}
-                                  disabled={savingSafetyChecklist}
-                                  title="Edit question"
-                                >
-                                  <Edit2 size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.iconButton}
-                                  onClick={() => handleMoveQuestion(q.id, 'up')}
-                                  disabled={idx === 0 || savingSafetyChecklist}
-                                  title="Move up"
-                                >
-                                  <ChevronUp size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.iconButton}
-                                  onClick={() =>
-                                    handleMoveQuestion(q.id, 'down')
-                                  }
-                                  disabled={
-                                    idx === rootQuestions.length - 1 ||
-                                    savingSafetyChecklist
-                                  }
-                                  title="Move down"
-                                >
-                                  <ChevronDown size={14} />
-                                </button>
-                                <button
-                                  type="button"
-                                  className={styles.iconButton}
-                                  onClick={() => handleDeleteQuestion(q.id)}
-                                  disabled={savingSafetyChecklist}
-                                  title="Delete question"
-                                >
-                                  <Trash2 size={14} />
-                                </button>
-                              </div>
-                            </div>
-                          )}
+                        {rootQuestions.map((q, idx) => {
+                          const children = editQuestions.filter(
+                            q2 => q2.parentId === q.id
+                          );
+                          const isEditing = editingQuestionId === q.id;
+                          const isDraggingThis = draggingId === q.id;
+                          const isDropTarget =
+                            dropBeforeId === q.id &&
+                            draggingId &&
+                            draggingId !== q.id;
+                          const isConditionalTarget = dropParentId === q.id;
 
-                          {/* Conditional drop zone — only for Yes/No questions */}
-                          {q.answerType === 'yes_no' && (
-                            <div
-                              className={`${styles.conditionalZone} ${isConditionalTarget ? styles.conditionalZoneActive : ''}`}
-                              onDragOver={e => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (draggingId && draggingId !== q.id) {
-                                  setDropParentId(q.id);
-                                  setDropBeforeId(null);
-                                }
-                              }}
-                              onDragLeave={e => {
-                                if (
-                                  !e.currentTarget.contains(
-                                    e.relatedTarget as Node
-                                  )
-                                ) {
-                                  setDropParentId(null);
-                                }
-                              }}
-                              onDrop={e => handleDropOnConditional(e, q.id)}
-                            >
-                              <p className={styles.conditionalZoneLabel}>
-                                &#8627; If Yes, ask:
-                              </p>
+                          return (
+                            <div key={q.id} className={styles.questionGroupWrapper}>
+                              {isDropTarget && (
+                                <div className={styles.dropInsertLine} />
+                              )}
 
-                              {children.map(child => {
-                                const isEditingChild =
-                                  editingQuestionId === child.id;
-                                return (
-                                  <div
-                                    key={child.id}
-                                    className={`${styles.nestedQuestionRow} ${draggingId === child.id ? styles.dragging : ''}`}
-                                    draggable={!isEditingChild}
-                                    onDragStart={e => {
-                                      e.stopPropagation();
-                                      e.dataTransfer.effectAllowed = 'move';
-                                      setDraggingId(child.id);
-                                    }}
-                                    onDragEnd={handleDragEnd}
-                                  >
-                                    {isEditingChild ? (
-                                      <div className={styles.nestedEditRow}>
+                              <div
+                                className={`${styles.questionGroup} ${isDraggingThis ? styles.dragging : ''}`}
+                                draggable={!isEditing}
+                                onDragStart={e => {
+                                  e.dataTransfer.effectAllowed = 'move';
+                                  setDraggingId(q.id);
+                                }}
+                                onDragEnd={handleDragEnd}
+                              >
+                                {isEditing ? (
+                                  <div className={styles.questionEditRow}>
+                                    <div className={styles.questionEditFields}>
+                                      <div className={styles.questionEditTop}>
                                         <input
                                           type="text"
                                           className={styles.addQuestionInput}
-                                          value={editText}
-                                          onChange={e =>
-                                            setEditText(e.target.value)
-                                          }
+                                          value={editQuestionText}
+                                          onChange={e => setEditQuestionText(e.target.value)}
                                           autoFocus
                                           onKeyDown={e => {
-                                            if (e.key === 'Enter')
-                                              handleSaveEdit();
-                                            if (e.key === 'Escape')
-                                              handleCancelEdit();
+                                            if (e.key === 'Enter') handleSaveEditQuestion();
+                                            if (e.key === 'Escape') handleCancelEditQuestion();
                                           }}
                                         />
                                         <select
                                           className={styles.addQuestionSelect}
-                                          value={editAnswerType}
+                                          value={editQuestionAnswerType}
                                           onChange={e =>
-                                            setEditAnswerType(
-                                              e.target.value as
-                                                | 'yes_no'
-                                                | 'text'
+                                            setEditQuestionAnswerType(
+                                              e.target.value as 'yes_no' | 'text'
                                             )
                                           }
                                         >
-                                          <option value="yes_no">
-                                            Yes / No
-                                          </option>
+                                          <option value="yes_no">Yes / No</option>
                                           <option value="text">Text</option>
                                         </select>
-                                        <button
-                                          type="button"
-                                          className={styles.editSaveBtn}
-                                          onClick={handleSaveEdit}
-                                          disabled={!editText.trim()}
-                                        >
-                                          Save
-                                        </button>
-                                        <button
-                                          type="button"
-                                          className={styles.editCancelBtn}
-                                          onClick={handleCancelEdit}
-                                        >
-                                          Cancel
-                                        </button>
                                       </div>
-                                    ) : (
-                                      <>
-                                        <GripVertical
-                                          size={14}
-                                          className={styles.dragHandle}
-                                        />
-                                        <span
-                                          className={styles.nestedQuestionText}
-                                        >
-                                          {child.text}
-                                        </span>
-                                        <span
-                                          className={styles.questionTypeBadge}
-                                        >
-                                          {child.answerType === 'yes_no'
-                                            ? 'Yes / No'
-                                            : 'Text'}
-                                        </span>
-                                        <div
-                                          className={
-                                            styles.nestedQuestionActions
-                                          }
-                                        >
-                                          <button
-                                            type="button"
-                                            className={styles.iconButton}
-                                            onClick={() =>
-                                              handleStartEdit(child)
-                                            }
-                                            title="Edit question"
-                                          >
-                                            <Edit2 size={12} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={styles.iconButton}
-                                            onClick={() =>
-                                              handleUnNest(child.id)
-                                            }
-                                            title="Remove from conditional"
-                                          >
-                                            <X size={12} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            className={styles.iconButton}
-                                            onClick={() =>
-                                              handleDeleteQuestion(child.id)
-                                            }
-                                            title="Delete question"
-                                          >
-                                            <Trash2 size={12} />
-                                          </button>
-                                        </div>
-                                      </>
-                                    )}
+                                    </div>
+                                    <div className={styles.questionEditActions}>
+                                      <button
+                                        type="button"
+                                        className={styles.editSaveBtn}
+                                        onClick={handleSaveEditQuestion}
+                                        disabled={!editQuestionText.trim()}
+                                      >
+                                        Save
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={styles.editCancelBtn}
+                                        onClick={handleCancelEditQuestion}
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
                                   </div>
-                                );
-                              })}
+                                ) : (
+                                  <div
+                                    className={styles.questionRow}
+                                    onDragOver={e => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (draggingId && draggingId !== q.id) {
+                                        setDropBeforeId(q.id);
+                                        setDropParentId(null);
+                                      }
+                                    }}
+                                    onDrop={e => handleDropOnRoot(e, q.id)}
+                                  >
+                                    <GripVertical
+                                      size={16}
+                                      className={styles.dragHandle}
+                                    />
+                                    <span className={styles.questionRowIndex}>
+                                      {idx + 1}.
+                                    </span>
+                                    <span className={styles.questionRowLabel}>
+                                      {q.text}
+                                    </span>
+                                    <span className={styles.questionTypeBadge}>
+                                      {q.answerType === 'yes_no' ? 'Yes / No' : 'Text'}
+                                    </span>
+                                    <div className={styles.questionRowActions}>
+                                      <button
+                                        type="button"
+                                        className={styles.iconButton}
+                                        onClick={() => handleStartEditQuestion(q)}
+                                        disabled={savingChecklist}
+                                        title="Edit question"
+                                      >
+                                        <Edit2 size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={styles.iconButton}
+                                        onClick={() => handleMoveQuestion(q.id, 'up')}
+                                        disabled={idx === 0 || savingChecklist}
+                                        title="Move up"
+                                      >
+                                        <ChevronUp size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={styles.iconButton}
+                                        onClick={() => handleMoveQuestion(q.id, 'down')}
+                                        disabled={
+                                          idx === rootQuestions.length - 1 ||
+                                          savingChecklist
+                                        }
+                                        title="Move down"
+                                      >
+                                        <ChevronDown size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={styles.iconButton}
+                                        onClick={() => handleDeleteQuestion(q.id)}
+                                        disabled={savingChecklist}
+                                        title="Delete question"
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
 
-                              <p className={styles.conditionalDropHint}>
-                                Drag questions here to ask when
-                                &ldquo;Yes&rdquo;
-                              </p>
+                                {q.answerType === 'yes_no' && (
+                                  <div
+                                    className={`${styles.conditionalZone} ${isConditionalTarget ? styles.conditionalZoneActive : ''}`}
+                                    onDragOver={e => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (draggingId && draggingId !== q.id) {
+                                        setDropParentId(q.id);
+                                        setDropBeforeId(null);
+                                      }
+                                    }}
+                                    onDragLeave={e => {
+                                      if (
+                                        !e.currentTarget.contains(
+                                          e.relatedTarget as Node
+                                        )
+                                      ) {
+                                        setDropParentId(null);
+                                      }
+                                    }}
+                                    onDrop={e => handleDropOnConditional(e, q.id)}
+                                  >
+                                    <p className={styles.conditionalZoneLabel}>
+                                      &#8627; If Yes, ask:
+                                    </p>
+
+                                    {children.map(child => {
+                                      const isEditingChild =
+                                        editingQuestionId === child.id;
+                                      return (
+                                        <div
+                                          key={child.id}
+                                          className={`${styles.nestedQuestionRow} ${draggingId === child.id ? styles.dragging : ''}`}
+                                          draggable={!isEditingChild}
+                                          onDragStart={e => {
+                                            e.stopPropagation();
+                                            e.dataTransfer.effectAllowed = 'move';
+                                            setDraggingId(child.id);
+                                          }}
+                                          onDragEnd={handleDragEnd}
+                                        >
+                                          {isEditingChild ? (
+                                            <div className={styles.nestedEditRow}>
+                                              <input
+                                                type="text"
+                                                className={styles.addQuestionInput}
+                                                value={editQuestionText}
+                                                onChange={e =>
+                                                  setEditQuestionText(e.target.value)
+                                                }
+                                                autoFocus
+                                                onKeyDown={e => {
+                                                  if (e.key === 'Enter')
+                                                    handleSaveEditQuestion();
+                                                  if (e.key === 'Escape')
+                                                    handleCancelEditQuestion();
+                                                }}
+                                              />
+                                              <select
+                                                className={styles.addQuestionSelect}
+                                                value={editQuestionAnswerType}
+                                                onChange={e =>
+                                                  setEditQuestionAnswerType(
+                                                    e.target.value as 'yes_no' | 'text'
+                                                  )
+                                                }
+                                              >
+                                                <option value="yes_no">Yes / No</option>
+                                                <option value="text">Text</option>
+                                              </select>
+                                              <button
+                                                type="button"
+                                                className={styles.editSaveBtn}
+                                                onClick={handleSaveEditQuestion}
+                                                disabled={!editQuestionText.trim()}
+                                              >
+                                                Save
+                                              </button>
+                                              <button
+                                                type="button"
+                                                className={styles.editCancelBtn}
+                                                onClick={handleCancelEditQuestion}
+                                              >
+                                                Cancel
+                                              </button>
+                                            </div>
+                                          ) : (
+                                            <>
+                                              <GripVertical
+                                                size={14}
+                                                className={styles.dragHandle}
+                                              />
+                                              <span className={styles.nestedQuestionText}>
+                                                {child.text}
+                                              </span>
+                                              <span className={styles.questionTypeBadge}>
+                                                {child.answerType === 'yes_no'
+                                                  ? 'Yes / No'
+                                                  : 'Text'}
+                                              </span>
+                                              <div className={styles.nestedQuestionActions}>
+                                                <button
+                                                  type="button"
+                                                  className={styles.iconButton}
+                                                  onClick={() => handleStartEditQuestion(child)}
+                                                  title="Edit question"
+                                                >
+                                                  <Edit2 size={12} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className={styles.iconButton}
+                                                  onClick={() => handleUnNest(child.id)}
+                                                  title="Remove from conditional"
+                                                >
+                                                  <X size={12} />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  className={styles.iconButton}
+                                                  onClick={() =>
+                                                    handleDeleteQuestion(child.id)
+                                                  }
+                                                  title="Delete question"
+                                                >
+                                                  <Trash2 size={12} />
+                                                </button>
+                                              </div>
+                                            </>
+                                          )}
+                                        </div>
+                                      );
+                                    })}
+
+                                    <p className={styles.conditionalDropHint}>
+                                      Drag questions here to ask when &ldquo;Yes&rdquo;
+                                    </p>
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          )}
-                        </div>
+                          );
+                        })}
                       </div>
                     );
-                  })}
+                  })()}
+
+                  <div className={styles.addQuestionForm}>
+                    <input
+                      type="text"
+                      className={styles.addQuestionInput}
+                      placeholder="Question text"
+                      value={newQuestionText}
+                      onChange={e => setNewQuestionText(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') handleAddQuestion();
+                      }}
+                      disabled={savingChecklist}
+                    />
+                    <select
+                      className={styles.addQuestionSelect}
+                      value={newQuestionAnswerType}
+                      onChange={e =>
+                        setNewQuestionAnswerType(e.target.value as 'yes_no' | 'text')
+                      }
+                      disabled={savingChecklist}
+                    >
+                      <option value="yes_no">Yes / No</option>
+                      <option value="text">Text</option>
+                    </select>
+                    <button
+                      type="button"
+                      className={styles.addQuestionBtn}
+                      onClick={handleAddQuestion}
+                      disabled={!newQuestionText.trim() || savingChecklist}
+                    >
+                      <Plus size={14} />
+                      Add
+                    </button>
+                  </div>
                 </div>
-              );
-            })()}
+              </div>
 
-            <div className={styles.addQuestionForm}>
-              <input
-                type="text"
-                className={styles.addQuestionInput}
-                placeholder="Question text"
-                value={newQuestionText}
-                onChange={e => setNewQuestionText(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') handleAddQuestion();
-                }}
-                disabled={savingSafetyChecklist}
-              />
-              <select
-                className={styles.addQuestionSelect}
-                value={newQuestionAnswerType}
-                onChange={e =>
-                  setNewQuestionAnswerType(e.target.value as 'yes_no' | 'text')
-                }
-                disabled={savingSafetyChecklist}
-              >
-                <option value="yes_no">Yes / No</option>
-                <option value="text">Text</option>
-              </select>
-              <button
-                type="button"
-                className={styles.addQuestionBtn}
-                onClick={handleAddQuestion}
-                disabled={!newQuestionText.trim() || savingSafetyChecklist}
-              >
-                <Plus size={14} />
-                Add
-              </button>
-            </div>
-          </div>
-
-          <div className={styles.safetyChecklistFooter}>
-            <button
-              onClick={handleSaveSafetyChecklist}
-              className={styles.saveButton}
-              disabled={savingSafetyChecklist}
-            >
-              {savingSafetyChecklist ? 'Saving...' : 'Save Safety Checklist'}
-            </button>
-          </div>
+              <div className={styles.safetyChecklistFooter}>
+                <button
+                  type="button"
+                  className={styles.editCancelBtn}
+                  onClick={closeEditPanel}
+                  disabled={savingChecklist}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveChecklist}
+                  className={styles.saveButton}
+                  disabled={savingChecklist || !editName.trim()}
+                >
+                  {savingChecklist ? 'Saving...' : 'Save Checklist'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
 

@@ -8218,11 +8218,21 @@
   };
 
   // Helper function to format service date and time
-  const formatServiceDateTime = (dayString, timeString) => {
-  if (!dayString) return 'Day TBD';
+  const formatServiceDateTime = (dateString, timeString) => {
+  if (!dateString) return 'Date TBD';
 
-  // Capitalize the day name (e.g. "monday" -> "Monday")
-  const finalDay = dayString.charAt(0).toUpperCase() + dayString.slice(1).toLowerCase();
+  const date = new Date(dateString);
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  const formattedDate = date.toLocaleDateString('en-US', options);
+
+  // Convert date to "October 7th, 2025" format
+  const day = date.getDate();
+  let suffix = 'th';
+  if (day % 10 === 1 && day !== 11) suffix = 'st';
+  else if (day % 10 === 2 && day !== 12) suffix = 'nd';
+  else if (day % 10 === 3 && day !== 13) suffix = 'rd';
+
+  const finalDate = formattedDate.replace(day.toString(), day + suffix);
 
   // Format time
   let timeDisplay = '';
@@ -8236,7 +8246,7 @@
     timeDisplay = timeMap[timeString] || timeString;
   }
 
-  return timeDisplay ? `${finalDay} | ${timeDisplay}` : finalDay;
+  return timeDisplay ? `${finalDate} | ${timeDisplay}` : finalDate;
   };
 
   // Expose functions to window for onclick handlers
@@ -8811,7 +8821,7 @@
         </div>
         
         <h2 class="dh-step-heading">Great! When do you want us to get started?</h2>
-        <p class="dh-step-instruction">Select your preferred day and time for your appointment.</p>
+        <p class="dh-step-instruction">Select the your preferred date and time for your appointment.</p>
         
         <!-- Scheduling Fields -->
         <div class="dh-form-row">
@@ -8825,17 +8835,8 @@
                   <line x1="3" y1="10" x2="21" y2="10"/>
                 </svg>
               </div>
-              <select class="dh-form-input" id="start-date-input">
-                <option value=""></option>
-                <option value="monday">Monday</option>
-                <option value="tuesday">Tuesday</option>
-                <option value="wednesday">Wednesday</option>
-                <option value="thursday">Thursday</option>
-                <option value="friday">Friday</option>
-                <option value="saturday">Saturday</option>
-                <option value="sunday">Sunday</option>
-              </select>
-              <label class="dh-floating-label" for="start-date-input">Preferred Day</label>
+              <input type="date" class="dh-form-input" id="start-date-input" placeholder="Your Start Date">
+              <label class="dh-floating-label" for="start-date-input">Your Start Date</label>
             </div>
           </div>
           <div class="dh-form-group">
@@ -9380,6 +9381,15 @@
     }
   };
 
+  // Helper function to check if date is in the future
+  const isDateInFuture = dateStr => {
+    if (!dateStr) return false;
+    const selectedDate = new Date(dateStr);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time to start of day
+    return selectedDate > today;
+  };
+
   // Form validation with submission
   window.submitFormWithValidation = () => {
     const startDateInput = document.getElementById('start-date-input');
@@ -9394,14 +9404,20 @@
 
     let hasErrors = false;
 
-    // Validate preferred day
+    // Validate start date
     if (!startDateInput || !startDateInput.value) {
       if (startDateInput) {
         progressiveFormManager.showFieldError(
           startDateInput,
-          'Preferred day is required'
+          'Preferred start date is required'
         );
       }
+      hasErrors = true;
+    } else if (!isDateInFuture(startDateInput.value)) {
+      progressiveFormManager.showFieldError(
+        startDateInput,
+        'Please select a date that is at least one day in the future'
+      );
       hasErrors = true;
     }
 

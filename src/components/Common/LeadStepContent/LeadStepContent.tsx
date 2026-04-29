@@ -21,7 +21,7 @@ import {
 } from '@/lib/realtime/automation-execution-channel';
 import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
 import styles from './LeadStepContent.module.scss';
-import { ChevronRight, Mail } from 'lucide-react';
+import { ChevronRight, ExternalLink, Mail } from 'lucide-react';
 import { LeadContactSection } from './components/LeadContactSection';
 import { LeadPestPicker, type SelectedPest } from './components/LeadPestPicker';
 import { LeadQuoteBuilder } from './components/LeadQuoteBuilder';
@@ -688,6 +688,17 @@ export function LeadStepContent({
           <Mail size={18} />
           Email Quote
         </button>
+        {lead.company?.slug && quote?.id && quote?.quote_token && (
+          <a
+            href={`/${lead.company.slug}/quote/${quote.id}?token=${quote.quote_token}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.viewQuoteLink}
+          >
+            <ExternalLink size={16} />
+            View Quote
+          </a>
+        )}
         <button
           type="button"
           onClick={onNotInterested || (() => {})}
@@ -761,7 +772,7 @@ export function LeadStepContent({
 
         <div className={styles.tabPanel}>
           <div className={styles.tabPanelInner}>
-            {activeTab === 'summary' && <LeadCallFormInfo lead={lead} />}
+            {activeTab === 'summary' && <LeadCallFormInfo lead={lead} quote={quote} />}
             {activeTab === 'quote' && renderQuoteTab()}
             {activeTab === 'graph' && (
               lead.map_plot_data ? (

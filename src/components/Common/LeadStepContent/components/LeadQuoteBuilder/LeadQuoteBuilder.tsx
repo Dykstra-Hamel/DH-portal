@@ -58,6 +58,15 @@ function dbItemToBuilderItem(db: DbLineItem): BuilderLineItem {
     id = db.product_id;
   }
 
+  // Child specialty-line rows carry the parent's service_plan_id in the DB,
+  // so the kind derivation above wrongly classifies them as 'plan'.
+  // Correct by detecting the parent relationship.
+  if (db.parent_line_item_id && kind === 'plan') {
+    kind = 'specialty-line';
+    id = undefined; // parent's service_plan_id is not the specialty line's own ID;
+                    // clearing it lets openEditModal fall through to the name-based lookup
+  }
+
   const isPlanAddon = kind != null;
   return {
     id: db.id,
@@ -71,7 +80,7 @@ function dbItemToBuilderItem(db: DbLineItem): BuilderLineItem {
     initialCost: db.initial_price,
     recurringCost: db.recurring_price,
     frequency: db.billing_frequency,
-    isPrimary: kind !== 'addon',
+    isPrimary: kind === 'plan' || kind === 'bundle',
     quantity: db.quantity ?? null,
     isRecommended: db.is_recommended ?? undefined,
     isSelected: db.is_selected,

@@ -211,9 +211,15 @@ export async function PUT(
     // Remove id from updateData to prevent conflicts
     const { id: _, ...dataToUpdate } = updateData;
 
+    // Coerce empty strings for time/date fields to null so Postgres doesn't
+    // reject them with "invalid input syntax for type time/date"
+    const dbPayload: Record<string, unknown> = { ...dataToUpdate };
+    if (dbPayload.due_time === '') dbPayload.due_time = null;
+    if (dbPayload.due_date === '') dbPayload.due_date = null;
+
     const { data: task, error } = await supabase
       .from('tasks')
-      .update(dataToUpdate)
+      .update(dbPayload)
       .eq('id', id)
       .select(`
         *,

@@ -72,6 +72,7 @@ export async function GET(
         id, service_type, notes, access_instructions,
         scheduled_arrival, status, lat, lng,
         pestpac_stop_id, estimated_duration, lead_id,
+        service_address_id,
         customers ( first_name, last_name, email, phone, pestpac_client_id ),
         service_addresses ( street_address, city, state, zip_code )
       `)
@@ -99,6 +100,7 @@ export async function GET(
       return NextResponse.json({
         routeStopId: dbStop.id,
         leadId: (dbStop as any).lead_id ?? null,
+        serviceAddressId: (dbStop as any).service_address_id ?? null,
         stopId: dbStop.pestpac_stop_id ?? stopId,
         routeId: routeId ?? '',
         clientId: cust.pestpac_client_id ?? null,
