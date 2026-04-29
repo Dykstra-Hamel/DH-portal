@@ -1243,7 +1243,15 @@ function StepMapPlot({
       stampLongPressRef.current = null;
     }
 
-    // Arm drag only after a hold — short taps will trigger onClick instead
+    // Mouse/pen: arm drag immediately so click-and-drag works without a hold.
+    // A click without movement still fires onClick (dragMovedRef stays false).
+    // Touch: require a brief hold so casual taps during map panning don't drag.
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      stampDragArmedRef.current = true;
+      setDraggingStampId(stampId);
+      return;
+    }
+
     const timerId = setTimeout(() => {
       stampDragArmedRef.current = true;
       stampLongPressRef.current = null;
@@ -2820,7 +2828,11 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const handleRoWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     setRoAnimating(false);
-    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    // Scale by actual deltaY so trackpads (many small events) don't compound
+    // wildly and mouse wheels (large per-click delta) stay tame. Clamp to
+    // keep a single oversized event from jumping multiple zoom levels.
+    const clampedDelta = Math.max(-50, Math.min(50, e.deltaY));
+    const factor = Math.exp(-clampedDelta * 0.005);
     setRoTransform(prev => {
       const newScale = Math.max(1, Math.min(8, prev.scale * factor));
       const maxTx = previewSize.width * (newScale - 1) / 2;
