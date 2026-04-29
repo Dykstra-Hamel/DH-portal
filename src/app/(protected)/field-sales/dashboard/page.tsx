@@ -484,7 +484,7 @@ function FieldSalesDashboardInner() {
             )}
         </div>
 
-        <FieldSalesNav />
+        <FieldSalesNav disableNew={activeTab === 'home'} />
         <Toast
           message={successToast ?? ''}
           isVisible={!!successToast}

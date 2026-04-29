@@ -155,6 +155,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         const fullName =
           [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
           '';
+
+        if (typeof lead.service_address_id === 'string' && lead.service_address_id) {
+          setServiceAddressId(lead.service_address_id);
+        }
         const addressFromCustomer = [
           customer.address,
           customer.city,
@@ -547,6 +551,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           clientEmail: clientInfo.email,
           clientPhone: clientInfo.phone,
           address: inspectionAddress,
+          addressComponents: mapPlotData.addressComponents ?? undefined,
           pestTypes,
           mapPlotData,
           companyId: selectedCompany?.id ?? '',
@@ -651,6 +656,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             clientEmail: clientInfo.email,
             clientPhone: clientInfo.phone,
             address: inspectionAddress,
+            addressComponents: mapPlotData.addressComponents ?? undefined,
             pestTypes: [],
             mapPlotData,
             companyId: selectedCompany?.id ?? '',
@@ -685,6 +691,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             clientEmail: clientInfo.email,
             clientPhone: clientInfo.phone,
             address: inspectionAddress,
+            addressComponents: mapPlotData.addressComponents ?? undefined,
             pestTypes,
             mapPlotData,
             companyId: selectedCompany?.id ?? '',
@@ -857,6 +864,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             onClientPhoneChange={v =>
               setClientInfo(prev => ({ ...prev, phone: v }))
             }
+            onServiceAddressIdChange={setServiceAddressId}
             companyId={selectedCompany?.id ?? ''}
           />
         );

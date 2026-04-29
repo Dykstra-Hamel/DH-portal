@@ -9,7 +9,11 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
 import styles from './FieldSalesNav.module.scss';
 
-export function FieldSalesNav() {
+interface FieldSalesNavProps {
+  disableNew?: boolean;
+}
+
+export function FieldSalesNav({ disableNew = false }: FieldSalesNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const { selectedCompany, isAdmin } = useCompany();
@@ -220,8 +224,10 @@ export function FieldSalesNav() {
           {/* New — raised center button */}
           <button
             type="button"
-            className={styles.newItem}
+            className={`${styles.newItem} ${disableNew ? styles.newItemDisabled : ''}`}
             onClick={handleNewPress}
+            disabled={disableNew}
+            aria-disabled={disableNew}
           >
             <div className={styles.newBtn}>
               <svg

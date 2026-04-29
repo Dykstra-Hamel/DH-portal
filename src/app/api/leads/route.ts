@@ -577,6 +577,7 @@ export async function POST(request: NextRequest) {
             city: city || '',
             state: state || '',
             zip_code: zip || '', // DB uses zip_code, not zip
+            ...(propertyType ? { address_type: propertyType } : {}),
           },
         ])
         .select('id')

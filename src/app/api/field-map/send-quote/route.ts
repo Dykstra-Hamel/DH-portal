@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
     console.log('[send-quote] email gate', { sendEmail, clientEmail });
 
     if (sendEmail && clientEmail) {
-      const [templateSetting, company, fromEmail, tenantName, quoteRecord] = await Promise.all([
+      const [templateSetting, company, fromEmail, tenantName, quoteRecord, leadRecord] = await Promise.all([
         adminClient
           .from('company_settings')
           .select('setting_value')
@@ -110,6 +110,12 @@ export async function POST(request: NextRequest) {
           .from('quotes')
           .select('*, line_items:quote_line_items(*)')
           .eq('id', quoteId)
+          .single()
+          .then(r => r.data),
+        adminClient
+          .from('leads')
+          .select('id, primary_service_address:service_addresses(street_address, city, state, zip_code)')
+          .eq('id', leadId)
           .single()
           .then(r => r.data),
       ]);
@@ -233,11 +239,24 @@ export async function POST(request: NextRequest) {
             quoteYardSize: quoteRecord?.yard_size_range
               ? formatYardSizeRange(quoteRecord.yard_size_range)
               : 'Not specified',
-            address: clientName || '',
-            streetAddress: clientName || '',
-            city: '',
-            state: '',
-            zipCode: '',
+            ...(() => {
+              const sa = (leadRecord as { primary_service_address?: { street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null } | null } | null)?.primary_service_address;
+              const streetAddress = (sa?.street_address || '').trim();
+              const city = (sa?.city || '').trim();
+              const state = (sa?.state || '').trim();
+              const zip = (sa?.zip_code || '').trim();
+              const composed = [streetAddress, city, [state, zip].filter(Boolean).join(' ')]
+                .map((p) => p.trim())
+                .filter(Boolean)
+                .join(', ');
+              return {
+                address: composed || 'Not provided',
+                streetAddress,
+                city,
+                state,
+                zipCode: zip,
+              };
+            })(),
             requestedDate: 'Not specified',
             requestedTime: 'Not specified',
             brandPrimaryColor: brandData?.primary_color_hex || '',
@@ -270,10 +289,19 @@ export async function POST(request: NextRequest) {
           recurringCost: item.final_recurring_price ?? item.recurring_price ?? null,
           frequency: item.billing_frequency ?? null,
         }));
+        const sa = (leadRecord as { primary_service_address?: { street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null } | null } | null)?.primary_service_address;
+        const composedAddress = [
+          (sa?.street_address || '').trim(),
+          (sa?.city || '').trim(),
+          [(sa?.state || '').trim(), (sa?.zip_code || '').trim()].filter(Boolean).join(' '),
+        ]
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .join(', ');
         htmlContent = generateFieldMapQuoteEmailTemplate({
           inspectorName: inspectorName ?? 'Inspector',
           clientName: clientName || 'Customer',
-          clientAddress: '',
+          clientAddress: composedAddress,
           quoteLineItems: lineItems,
           totalInitial: quoteRecord.total_initial_price ?? 0,
           totalRecurring: quoteRecord.total_recurring_price ?? 0,

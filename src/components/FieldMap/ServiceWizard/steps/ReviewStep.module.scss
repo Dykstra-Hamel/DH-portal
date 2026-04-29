@@ -813,6 +813,45 @@
   margin-bottom: 12px;
 }
 
+.emailModalSheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--gray-25);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.emailModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emailModalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.emailModalCancel {
+  padding: 11px 18px;
+  background: transparent;
+  color: var(--gray-700);
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
 .emailInput {
   flex: 1;
   padding: 11px 14px;

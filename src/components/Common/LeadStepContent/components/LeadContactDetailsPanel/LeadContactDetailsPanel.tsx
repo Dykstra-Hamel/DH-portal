@@ -347,11 +347,30 @@ export function LeadContactDetailsPanel({
         <h3 className={styles.sectionHeading}>Service Location</h3>
         <ServiceLocationCard
           serviceAddress={lead.primary_service_address || null}
+          leadId={lead.id}
+          leadServiceAddressId={lead.service_address_id ?? null}
+          leadPropertyType={lead.property_type ?? null}
           startExpanded
           showSizeInputs
           pricingSettings={pricingSettings || undefined}
           onShowToast={onShowToast}
           onRequestUndo={onRequestUndo}
+          onPropertyTypeUpdated={value => {
+            // Surgical state patch — flip the button without a full lead refetch.
+            // Update lead.property_type, and patch the linked service_address's
+            // address_type only when it is the lead's actual linked row.
+            const linkedAddress =
+              lead.primary_service_address &&
+              lead.service_address_id &&
+              lead.primary_service_address.id === lead.service_address_id
+                ? { ...lead.primary_service_address, address_type: value }
+                : lead.primary_service_address;
+            onLeadUpdate?.({
+              ...lead,
+              property_type: value,
+              primary_service_address: linkedAddress,
+            });
+          }}
           editable
           onAddressSelect={handleAddressSelect}
           onSaveAddress={handleSaveAddress}

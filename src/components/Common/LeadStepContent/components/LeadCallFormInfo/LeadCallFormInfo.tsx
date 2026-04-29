@@ -677,11 +677,11 @@ export function LeadCallFormInfo({ lead, quote }: LeadCallFormInfoProps) {
             {lead.call_record.transcript && (
               <div className={styles.transcriptSection}>
                 <div className={styles.transcriptHeader}>
-                  <h4 className={cardStyles.dataLabel}>
-                    {showCallSummary ? 'Call Summary' : 'Transcript'}
-                  </h4>
-                  {lead.call_record.call_analysis?.call_summary && (
+                  {lead.call_record.call_analysis?.call_summary ? (
                     <div className={styles.toggleContainer}>
+                      <span className={styles.toggleLabel}>
+                        Conversation Details
+                      </span>
                       <button
                         className={`${styles.toggle} ${showCallSummary ? styles.active : ''}`}
                         onClick={() => setShowCallSummary(!showCallSummary)}
@@ -690,6 +690,10 @@ export function LeadCallFormInfo({ lead, quote }: LeadCallFormInfoProps) {
                       </button>
                       <span className={styles.toggleLabel}>Call Summary</span>
                     </div>
+                  ) : (
+                    <h4 className={cardStyles.dataLabel}>
+                      Conversation Details
+                    </h4>
                   )}
                 </div>
                 <div className={styles.transcriptContent}>

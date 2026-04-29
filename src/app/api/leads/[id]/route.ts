@@ -171,9 +171,30 @@ export async function GET(
       }
     }
 
-    // Get customer's primary service address if lead has a customer
+    // Resolve the service address shown alongside the lead.
+    // Prefer the lead's directly-linked service_address_id so the UI reads from
+    // the same row the property_type cascade writes to. Fall back to the
+    // customer's primary service address only when the lead has none linked.
     let primaryServiceAddress = null;
-    if (lead.customer_id) {
+    if (lead.service_address_id) {
+      try {
+        const { data: linkedAddress, error: linkedAddressError } =
+          await createAdminClient()
+            .from('service_addresses')
+            .select('*')
+            .eq('id', lead.service_address_id)
+            .maybeSingle();
+        if (!linkedAddressError && linkedAddress) {
+          primaryServiceAddress = linkedAddress;
+        }
+      } catch (linkedAddressError) {
+        console.error(
+          'Error fetching lead service address:',
+          linkedAddressError
+        );
+      }
+    }
+    if (!primaryServiceAddress && lead.customer_id) {
       try {
         const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
         primaryServiceAddress = result.serviceAddress;
@@ -245,7 +266,7 @@ export async function PUT(
     // First get the lead to check company access and capture current status and assignment
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
-      .select('company_id, lead_status, assigned_to, assigned_scheduler, furthest_completed_stage')
+      .select('company_id, lead_status, assigned_to, assigned_scheduler, furthest_completed_stage, service_address_id, customer_id')
       .eq('id', id)
       .single();
 
@@ -406,6 +427,26 @@ export async function PUT(
         },
         { status: 500 }
       );
+    }
+
+    // Cascade property_type to the linked service_address.
+    if (
+      (body.property_type === 'residential' ||
+        body.property_type === 'commercial') &&
+      existingLead.service_address_id
+    ) {
+      try {
+        await createAdminClient()
+          .from('service_addresses')
+          .update({ address_type: body.property_type })
+          .eq('id', existingLead.service_address_id);
+      } catch (cascadeError) {
+        console.error(
+          'Error cascading property_type to service_address:',
+          cascadeError
+        );
+        // Don't fail the request — lead was updated successfully.
+      }
     }
 
     // Log all field changes to activity log
@@ -666,9 +707,30 @@ export async function PUT(
       }
     }
 
-    // Get customer's primary service address if lead has a customer
+    // Resolve the service address shown alongside the lead.
+    // Prefer the lead's directly-linked service_address_id so the UI reads from
+    // the same row the property_type cascade writes to. Fall back to the
+    // customer's primary service address only when the lead has none linked.
     let primaryServiceAddress = null;
-    if (lead.customer_id) {
+    if (lead.service_address_id) {
+      try {
+        const { data: linkedAddress, error: linkedAddressError } =
+          await createAdminClient()
+            .from('service_addresses')
+            .select('*')
+            .eq('id', lead.service_address_id)
+            .maybeSingle();
+        if (!linkedAddressError && linkedAddress) {
+          primaryServiceAddress = linkedAddress;
+        }
+      } catch (linkedAddressError) {
+        console.error(
+          'Error fetching lead service address:',
+          linkedAddressError
+        );
+      }
+    }
+    if (!primaryServiceAddress && lead.customer_id) {
       try {
         const result = await getCustomerPrimaryServiceAddress(lead.customer_id);
         primaryServiceAddress = result.serviceAddress;

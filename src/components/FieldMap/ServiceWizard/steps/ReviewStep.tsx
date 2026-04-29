@@ -214,7 +214,7 @@ export function ReviewStep({
   const [localNotes, setLocalNotes] = useState(notes);
   const [actionState, setActionState] = useState<ActionState>('idle');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [showEmailInput, setShowEmailInput] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
   const [enteredEmail, setEnteredEmail] = useState('');
   const [showSigModal, setShowSigModal] = useState(false);
   const [showMapView, setShowMapView] = useState(false);
@@ -575,16 +575,12 @@ export function ReviewStep({
     ]
   );
 
-  async function handleSendQuote() {
-    if (!clientEmail && !showEmailInput) {
-      setShowEmailInput(true);
-      return;
-    }
+  async function dispatchSendQuote(emailOverride: string | null) {
     setActionState('sending');
     setErrorMsg(null);
     try {
       await saveNotes();
-      await callSendQuoteApi(enteredEmail || null, true);
+      await callSendQuoteApi(emailOverride, true);
       setActionState('sent');
     } catch (err) {
       setErrorMsg(
@@ -592,6 +588,23 @@ export function ReviewStep({
       );
       setActionState('error');
     }
+  }
+
+  function handleSendQuote() {
+    if (!clientEmail) {
+      setEnteredEmail('');
+      setErrorMsg(null);
+      setShowEmailModal(true);
+      return;
+    }
+    void dispatchSendQuote(null);
+  }
+
+  function handleConfirmEmailModal() {
+    const trimmed = enteredEmail.trim();
+    if (!trimmed) return;
+    setShowEmailModal(false);
+    void dispatchSendQuote(trimmed);
   }
 
   async function handleScheduleSubmit() {
@@ -2109,27 +2122,6 @@ export function ReviewStep({
             {/* Error */}
             {errorMsg && <p className={styles.errorMsg}>{errorMsg}</p>}
 
-            {/* Email capture */}
-            {showEmailInput && (
-              <div className={styles.emailCapture}>
-                <input
-                  type="email"
-                  className={styles.emailInput}
-                  value={enteredEmail}
-                  onChange={e => setEnteredEmail(e.target.value)}
-                  placeholder="customer@example.com"
-                />
-                <button
-                  type="button"
-                  className={styles.emailSendBtn}
-                  disabled={!enteredEmail.trim() || isBusy}
-                  onClick={handleSendQuote}
-                >
-                  Send
-                </button>
-              </div>
-            )}
-
             <div className={styles.actionSpacer} />
           </div>
         </div>
@@ -2175,6 +2167,72 @@ export function ReviewStep({
           videoUrl={videoLightboxUrl}
           onClose={() => setVideoLightboxUrl(null)}
         />
+      )}
+
+      {/* Email capture modal */}
+      {showEmailModal && (
+        <div
+          className={styles.sigOverlay}
+          style={brandingStyle}
+          onClick={e => {
+            if (e.target === e.currentTarget) setShowEmailModal(false);
+          }}
+        >
+          <div className={styles.emailModalSheet}>
+            <div className={styles.sigHeader}>
+              <h3 className={styles.sigTitle}>Send Quote</h3>
+              <button
+                type="button"
+                className={styles.sigCloseBtn}
+                onClick={() => setShowEmailModal(false)}
+                aria-label="Close"
+              >
+                &#215;
+              </button>
+            </div>
+            <p className={styles.sigSub}>
+              No email is on file for this customer. Enter the address to send
+              this quote to.
+            </p>
+            <div className={styles.emailModalBody}>
+              <label className={styles.sigLabel} htmlFor="quoteEmailInput">
+                Email Address
+              </label>
+              <input
+                id="quoteEmailInput"
+                type="email"
+                className={styles.emailInput}
+                value={enteredEmail}
+                onChange={e => setEnteredEmail(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleConfirmEmailModal();
+                  }
+                }}
+                placeholder="customer@example.com"
+                autoFocus
+              />
+            </div>
+            <div className={styles.emailModalActions}>
+              <button
+                type="button"
+                className={styles.emailModalCancel}
+                onClick={() => setShowEmailModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.emailSendBtn}
+                disabled={!enteredEmail.trim() || isBusy}
+                onClick={handleConfirmEmailModal}
+              >
+                Send Quote
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Unified Schedule Service modal */}

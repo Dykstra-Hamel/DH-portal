@@ -26,12 +26,17 @@ interface ServiceLocationCardProps {
     latitude?: number | null;
     longitude?: number | null;
     hasStreetView?: boolean | null;
+    address_type?: string | null;
   } | null;
+  leadId?: string;
+  leadServiceAddressId?: string | null;
+  leadPropertyType?: 'residential' | 'commercial' | null;
   startExpanded?: boolean;
   showSizeInputs?: boolean;
   pricingSettings?: CompanyPricingSettings;
   onShowToast?: (message: string, type: 'success' | 'error') => void;
   onRequestUndo?: (undoHandler: () => Promise<void>) => void;
+  onPropertyTypeUpdated?: (value: 'residential' | 'commercial') => void;
   editable?: boolean;
   onAddressSelect?: (addressComponents: AddressComponents) => void;
   onSaveAddress?: () => void;
@@ -52,11 +57,15 @@ interface ServiceLocationCardProps {
 
 export function ServiceLocationCard({
   serviceAddress,
+  leadId,
+  leadServiceAddressId,
+  leadPropertyType,
   startExpanded = false,
   showSizeInputs = false,
   pricingSettings,
   onShowToast,
   onRequestUndo,
+  onPropertyTypeUpdated,
   editable = false,
   onAddressSelect,
   onSaveAddress,
@@ -76,6 +85,93 @@ export function ServiceLocationCard({
 }: ServiceLocationCardProps) {
   const [selectedHomeSizeOption, setSelectedHomeSizeOption] = useState<string>('');
   const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
+
+  const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
+
+  // Derive the displayed value directly from DB props — never store it in
+  // local state. Only trust service_address.address_type when the address is
+  // the one actually linked to the lead (so the value matches what the
+  // property_type cascade writes to). Otherwise fall back to lead.property_type.
+  // Anything other than residential/commercial (industrial, mixed_use, etc.)
+  // defaults to residential per product spec.
+  const selectedPropertyType = useMemo<'residential' | 'commercial' | ''>(() => {
+    const isLinkedAddress =
+      !!leadServiceAddressId &&
+      !!serviceAddress?.id &&
+      serviceAddress.id === leadServiceAddressId;
+    if (isLinkedAddress) {
+      const at = serviceAddress?.address_type;
+      if (at === 'residential' || at === 'commercial') return at;
+      if (at) return 'residential';
+    }
+    if (leadPropertyType === 'residential' || leadPropertyType === 'commercial') {
+      return leadPropertyType;
+    }
+    return '';
+  }, [
+    leadServiceAddressId,
+    serviceAddress?.id,
+    serviceAddress?.address_type,
+    leadPropertyType,
+  ]);
+
+  const handleUpdatePropertyType = async (
+    value: 'residential' | 'commercial'
+  ) => {
+    if (isSavingPropertyType || !leadId) return;
+
+    setIsSavingPropertyType(true);
+
+    try {
+      await authenticatedFetch(`/api/leads/${leadId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ property_type: value }),
+      });
+      onShowToast?.('Property type updated', 'success');
+      onPropertyTypeUpdated?.(value);
+    } catch {
+      onShowToast?.('Failed to update property type', 'error');
+    } finally {
+      setIsSavingPropertyType(false);
+    }
+  };
+
+  const propertyTypeControl = (
+    <div className={styles.callDetailItem}>
+      <span className={cardStyles.dataLabel}>Property Type</span>
+      <div
+        className={styles.propertyTypeGroup}
+        role="radiogroup"
+        aria-label="Property Type"
+      >
+        <button
+          type="button"
+          role="radio"
+          aria-checked={selectedPropertyType === 'residential'}
+          className={`${styles.propertyTypeBtn} ${
+            selectedPropertyType === 'residential' ? styles.propertyTypeBtnActive : ''
+          }`}
+          onClick={() => handleUpdatePropertyType('residential')}
+          disabled={isSavingPropertyType}
+        >
+          Residential
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={selectedPropertyType === 'commercial'}
+          className={`${styles.propertyTypeBtn} ${
+            selectedPropertyType === 'commercial' ? styles.propertyTypeBtnActive : ''
+          }`}
+          onClick={() => handleUpdatePropertyType('commercial')}
+          disabled={isSavingPropertyType}
+        >
+          Commercial
+        </button>
+      </div>
+    </div>
+  );
 
   // Generate size options only if pricing settings are provided
   const homeSizeOptions = useMemo(() => {
@@ -283,6 +379,8 @@ export function ServiceLocationCard({
                   </div>
                 </>
               )}
+
+              {(serviceAddress?.id || leadId) && propertyTypeControl}
             </div>
           ) : (
             <div className={cardStyles.lightText}>
@@ -415,6 +513,48 @@ export function ServiceLocationCard({
                     </option>
                   ))}
                 </select>
+              </div>
+            </div>
+          )}
+
+          {(serviceAddress?.id || leadId) && (
+            <div className={`${styles.gridRow} ${styles.oneColumn}`}>
+              <div className={styles.formField}>
+                <label className={styles.fieldLabel}>Property Type</label>
+                <div
+                  className={styles.propertyTypeGroup}
+                  role="radiogroup"
+                  aria-label="Property Type"
+                >
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedPropertyType === 'residential'}
+                    className={`${styles.propertyTypeBtn} ${
+                      selectedPropertyType === 'residential'
+                        ? styles.propertyTypeBtnActive
+                        : ''
+                    }`}
+                    onClick={() => handleUpdatePropertyType('residential')}
+                    disabled={isSavingPropertyType}
+                  >
+                    Residential
+                  </button>
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={selectedPropertyType === 'commercial'}
+                    className={`${styles.propertyTypeBtn} ${
+                      selectedPropertyType === 'commercial'
+                        ? styles.propertyTypeBtnActive
+                        : ''
+                    }`}
+                    onClick={() => handleUpdatePropertyType('commercial')}
+                    disabled={isSavingPropertyType}
+                  >
+                    Commercial
+                  </button>
+                </div>
               </div>
             </div>
           )}
