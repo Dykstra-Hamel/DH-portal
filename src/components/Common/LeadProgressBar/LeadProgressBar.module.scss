@@ -50,7 +50,10 @@
 
 button.step {
   font-family: inherit;
-  cursor: not-allowed;
+
+  &:disabled {
+    cursor: default;
+  }
 }
 
 .stepInteractive {
