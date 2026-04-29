@@ -64,7 +64,7 @@ interface SupportCaseAssignmentControls {
 
 interface PageHeaderConfig {
   title: ReactNode;
-  description: string;
+  description: ReactNode;
   titleLeading?: ReactNode;
   titleLogo?: ReactNode;
   leadAssignmentControls?: LeadAssignmentControls;

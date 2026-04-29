@@ -1,10 +1,13 @@
 'use client';
 
-import { CircleCheck } from 'lucide-react';
+import { Check } from 'lucide-react';
 import styles from './LeadProgressBar.module.scss';
 
+type LeadStatus = 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost';
+
 interface LeadProgressBarProps {
-  leadStatus: 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost';
+  leadStatus: LeadStatus;
+  onStatusChange?: (status: LeadStatus) => void;
 }
 
 const STEPS = [
@@ -12,18 +15,11 @@ const STEPS = [
   { id: 'in_process', label: 'Working The Lead' },
   { id: 'quoted', label: 'Quoted' },
   { id: 'scheduling', label: 'Ready To Schedule' },
-];
+] as const;
 
 const STATUS_ORDER = ['new', 'in_process', 'quoted', 'scheduling'];
 
-export function LeadProgressBar({ leadStatus }: LeadProgressBarProps) {
-  const currentIndex =
-    leadStatus === 'won' || leadStatus === 'lost'
-      ? STATUS_ORDER.length - 1
-      : STATUS_ORDER.indexOf(leadStatus);
-
-  const progressWidth = ((currentIndex + 1) / STATUS_ORDER.length) * 100;
-
+export function LeadProgressBar({ leadStatus, onStatusChange }: LeadProgressBarProps) {
   const isCompleted = (stepId: string) => {
     if (leadStatus === 'won' || leadStatus === 'lost') return true;
     const stepIndex = STATUS_ORDER.indexOf(stepId);
@@ -35,14 +31,11 @@ export function LeadProgressBar({ leadStatus }: LeadProgressBarProps) {
   };
 
   const isFinished = leadStatus === 'won' || leadStatus === 'lost';
+  const interactive = !!onStatusChange;
 
   return (
     <div className={styles.progressBarRow}>
       <div className={styles.stepsContainer}>
-        <div
-          className={styles.gradientFill}
-          style={{ width: `${progressWidth}%` }}
-        />
         {STEPS.map((step, i) => {
           const completed = isCompleted(step.id);
           const current = isCurrent(step.id);
@@ -52,11 +45,31 @@ export function LeadProgressBar({ leadStatus }: LeadProgressBarProps) {
               ? styles.stepCurrent
               : styles.stepUpcoming;
 
+          const stepClassName = `${styles.step} ${stateClass} ${interactive && !current ? styles.stepInteractive : ''}`;
+
           return (
-            <div key={step.id} className={`${styles.step} ${stateClass}`}>
-              {completed && <CircleCheck size={14} />}
-              <span>{step.label}</span>
-            </div>
+            <span key={step.id} className={styles.stepWrapper}>
+              {i > 0 && <span className={styles.separator} aria-hidden />}
+              {interactive ? (
+                <button
+                  type="button"
+                  className={stepClassName}
+                  onClick={() =>
+                    !current && onStatusChange(step.id as LeadStatus)
+                  }
+                  disabled={current}
+                  aria-current={current ? 'step' : undefined}
+                >
+                  {completed && <Check size={11} strokeWidth={2.5} />}
+                  <span>{step.label}</span>
+                </button>
+              ) : (
+                <div className={stepClassName}>
+                  {completed && <Check size={11} strokeWidth={2.5} />}
+                  <span>{step.label}</span>
+                </div>
+              )}
+            </span>
           );
         })}
       </div>
