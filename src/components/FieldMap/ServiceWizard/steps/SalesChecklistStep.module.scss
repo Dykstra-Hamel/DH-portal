@@ -1,7 +1,8 @@
 .container {
   padding: 24px;
   margin: 0 auto;
-  width: 100%;
+  width: 750px;
+  max-width: 100%;
 }
 
 .header {
@@ -111,7 +112,7 @@
   padding: 12px 14px;
   background: #f0f7ff;
   border: 1px solid var(--gray-300);
-  border-radius: 3px;
+  border-radius: 4px;
 
   .conditionalLabel {
     font-size: 14px;
@@ -154,5 +155,42 @@
 
   &:last-child {
     margin-bottom: 0;
+  }
+}
+
+.dropdownSelect {
+  width: 100%;
+  max-width: 320px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--gray-700);
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-600);
+  }
+}
+
+.numberInput {
+  width: 100%;
+  max-width: 200px;
+  padding: 8px 12px;
+  border: 1px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 1rem;
+  font-family: inherit;
+  color: var(--gray-700);
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-600);
   }
 }

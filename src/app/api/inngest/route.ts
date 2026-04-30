@@ -34,6 +34,9 @@ import { syncGoogleReviews } from '@/lib/inngest/functions/sync-google-reviews';
 // Monthly Services Task Generation
 import { generateMonthlyServiceTasks } from '@/lib/inngest/functions/generate-monthly-service-tasks';
 
+// Nightly PestPac Route Sync
+import { syncPestPacRoutesNightly } from '@/lib/inngest/functions/sync-pestpac-routes-nightly';
+
 // Create the handler
 export const { GET, POST, PUT } = serve({
   client: inngest,
@@ -71,6 +74,8 @@ export const { GET, POST, PUT } = serve({
     syncGoogleReviews,
     // Monthly Services Task Generation
     generateMonthlyServiceTasks,
+    // Nightly PestPac Route Sync
+    syncPestPacRoutesNightly,
   ],
   streaming: false, // Disable streaming for compatibility
 });

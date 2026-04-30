@@ -30,9 +30,13 @@ type SalesTab =
 interface ChecklistQuestion {
   id: string;
   text: string;
-  answerType: 'yes_no' | 'text';
+  answerType: 'yes_no' | 'text' | 'number' | 'dropdown';
   order: number;
   parentId?: string;
+  minValue?: number | null;
+  maxValue?: number | null;
+  stepValue?: number | null;
+  dropdownOptions?: string[] | null;
 }
 
 interface SalesChecklist {
@@ -107,15 +111,25 @@ export default function SalesConfigManager({
   const [editQuestions, setEditQuestions] = useState<ChecklistQuestion[]>([]);
   const [newQuestionText, setNewQuestionText] = useState('');
   const [newQuestionAnswerType, setNewQuestionAnswerType] = useState<
-    'yes_no' | 'text'
+    'yes_no' | 'text' | 'number' | 'dropdown'
   >('yes_no');
+  const [newQuestionMinValue, setNewQuestionMinValue] = useState<number | ''>('');
+  const [newQuestionMaxValue, setNewQuestionMaxValue] = useState<number | ''>('');
+  const [newQuestionStepValue, setNewQuestionStepValue] = useState<number | ''>('');
+  const [newQuestionDropdownOptions, setNewQuestionDropdownOptions] = useState<string[]>([]);
+  const [newQuestionOptionInput, setNewQuestionOptionInput] = useState('');
   const [editingQuestionId, setEditingQuestionId] = useState<string | null>(
     null
   );
   const [editQuestionText, setEditQuestionText] = useState('');
-  const [editQuestionAnswerType, setEditQuestionAnswerType] = useState<'yes_no' | 'text'>(
+  const [editQuestionAnswerType, setEditQuestionAnswerType] = useState<'yes_no' | 'text' | 'number' | 'dropdown'>(
     'yes_no'
   );
+  const [editQuestionMinValue, setEditQuestionMinValue] = useState<number | ''>('');
+  const [editQuestionMaxValue, setEditQuestionMaxValue] = useState<number | ''>('');
+  const [editQuestionStepValue, setEditQuestionStepValue] = useState<number | ''>('');
+  const [editQuestionDropdownOptions, setEditQuestionDropdownOptions] = useState<string[]>([]);
+  const [editQuestionOptionInput, setEditQuestionOptionInput] = useState('');
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dropBeforeId, setDropBeforeId] = useState<string | null>(null);
   const [dropParentId, setDropParentId] = useState<string | null>(null);
@@ -193,6 +207,10 @@ export default function SalesConfigManager({
           answerType: q.answerType,
           order: q.displayOrder,
           parentId: q.parentQuestionId ?? undefined,
+          minValue: q.minValue ?? null,
+          maxValue: q.maxValue ?? null,
+          stepValue: q.stepValue ?? null,
+          dropdownOptions: q.dropdownOptions ?? null,
         })),
         linkedPlanIds: cl.linkedPlanIds ?? [],
       })) : []);
@@ -223,6 +241,11 @@ export default function SalesConfigManager({
     setEditQuestions([]);
     setNewQuestionText('');
     setNewQuestionAnswerType('yes_no');
+    setNewQuestionMinValue('');
+    setNewQuestionMaxValue('');
+    setNewQuestionStepValue('');
+    setNewQuestionDropdownOptions([]);
+    setNewQuestionOptionInput('');
     setEditingQuestionId(null);
     setIsCreating(true);
   };
@@ -235,6 +258,11 @@ export default function SalesConfigManager({
     setEditQuestions(cl.questions.map(q => ({ ...q })));
     setNewQuestionText('');
     setNewQuestionAnswerType('yes_no');
+    setNewQuestionMinValue('');
+    setNewQuestionMaxValue('');
+    setNewQuestionStepValue('');
+    setNewQuestionDropdownOptions([]);
+    setNewQuestionOptionInput('');
     setEditingQuestionId(null);
     setIsCreating(true);
   };
@@ -252,16 +280,38 @@ export default function SalesConfigManager({
     try {
       setSavingChecklist(true);
       setError(null);
+
+      const pendingQuestion: ChecklistQuestion | null = newQuestionText.trim()
+        ? {
+            id: crypto.randomUUID(),
+            text: newQuestionText.trim(),
+            answerType: newQuestionAnswerType,
+            order: editQuestions.length,
+            minValue: newQuestionAnswerType === 'number' && newQuestionMinValue !== '' ? newQuestionMinValue : null,
+            maxValue: newQuestionAnswerType === 'number' && newQuestionMaxValue !== '' ? newQuestionMaxValue : null,
+            stepValue: newQuestionAnswerType === 'number' && newQuestionStepValue !== '' ? newQuestionStepValue : null,
+            dropdownOptions: newQuestionAnswerType === 'dropdown' ? newQuestionDropdownOptions : null,
+          }
+        : null;
+
+      const effectiveQuestions = pendingQuestion
+        ? [...editQuestions, pendingQuestion]
+        : editQuestions;
+
       const payload = {
         name: editName.trim(),
         isActive: editIsActive,
         displayOrder: editingChecklist?.displayOrder ?? salesChecklists.length,
-        questions: editQuestions.map((q, idx) => ({
+        questions: effectiveQuestions.map((q, idx) => ({
           id: q.id,
           text: q.text,
           answerType: q.answerType,
           displayOrder: idx,
           parentQuestionId: q.parentId ?? null,
+          minValue: q.minValue ?? null,
+          maxValue: q.maxValue ?? null,
+          stepValue: q.stepValue ?? null,
+          dropdownOptions: q.dropdownOptions ?? null,
         })),
         linkedPlanIds: editLinkedPlanIds,
       };
@@ -277,9 +327,9 @@ export default function SalesConfigManager({
           { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }
         );
       }
+      const resBody = await res.json();
       if (!res.ok) {
-        const { error: errMsg } = await res.json();
-        throw new Error(errMsg || 'Failed to save checklist');
+        throw new Error(resBody.error || 'Failed to save checklist');
       }
       setSuccess(editingChecklist ? 'Checklist updated' : 'Checklist created');
       closeEditPanel();
@@ -313,10 +363,19 @@ export default function SalesConfigManager({
       text: newQuestionText.trim(),
       answerType: newQuestionAnswerType,
       order: editQuestions.length,
+      minValue: newQuestionAnswerType === 'number' && newQuestionMinValue !== '' ? newQuestionMinValue : null,
+      maxValue: newQuestionAnswerType === 'number' && newQuestionMaxValue !== '' ? newQuestionMaxValue : null,
+      stepValue: newQuestionAnswerType === 'number' && newQuestionStepValue !== '' ? newQuestionStepValue : null,
+      dropdownOptions: newQuestionAnswerType === 'dropdown' ? newQuestionDropdownOptions : null,
     };
     setEditQuestions(prev => [...prev, newQuestion]);
     setNewQuestionText('');
     setNewQuestionAnswerType('yes_no');
+    setNewQuestionMinValue('');
+    setNewQuestionMaxValue('');
+    setNewQuestionStepValue('');
+    setNewQuestionDropdownOptions([]);
+    setNewQuestionOptionInput('');
   };
 
   const handleDeleteQuestion = (id: string) => {
@@ -402,12 +461,22 @@ export default function SalesConfigManager({
     setEditingQuestionId(q.id);
     setEditQuestionText(q.text);
     setEditQuestionAnswerType(q.answerType);
+    setEditQuestionMinValue(q.minValue ?? '');
+    setEditQuestionMaxValue(q.maxValue ?? '');
+    setEditQuestionStepValue(q.stepValue ?? '');
+    setEditQuestionDropdownOptions(q.dropdownOptions ?? []);
+    setEditQuestionOptionInput('');
   };
 
   const handleCancelEditQuestion = () => {
     setEditingQuestionId(null);
     setEditQuestionText('');
     setEditQuestionAnswerType('yes_no');
+    setEditQuestionMinValue('');
+    setEditQuestionMaxValue('');
+    setEditQuestionStepValue('');
+    setEditQuestionDropdownOptions([]);
+    setEditQuestionOptionInput('');
   };
 
   const handleSaveEditQuestion = () => {
@@ -415,7 +484,15 @@ export default function SalesConfigManager({
     setEditQuestions(prev =>
       prev.map(q =>
         q.id === editingQuestionId
-          ? { ...q, text: editQuestionText.trim(), answerType: editQuestionAnswerType }
+          ? {
+              ...q,
+              text: editQuestionText.trim(),
+              answerType: editQuestionAnswerType,
+              minValue: editQuestionAnswerType === 'number' && editQuestionMinValue !== '' ? editQuestionMinValue : null,
+              maxValue: editQuestionAnswerType === 'number' && editQuestionMaxValue !== '' ? editQuestionMaxValue : null,
+              stepValue: editQuestionAnswerType === 'number' && editQuestionStepValue !== '' ? editQuestionStepValue : null,
+              dropdownOptions: editQuestionAnswerType === 'dropdown' ? editQuestionDropdownOptions : null,
+            }
           : q
       )
     );
@@ -1315,13 +1392,87 @@ export default function SalesConfigManager({
                                           value={editQuestionAnswerType}
                                           onChange={e =>
                                             setEditQuestionAnswerType(
-                                              e.target.value as 'yes_no' | 'text'
+                                              e.target.value as 'yes_no' | 'text' | 'number' | 'dropdown'
                                             )
                                           }
                                         >
                                           <option value="yes_no">Yes / No</option>
                                           <option value="text">Text</option>
+                                          <option value="number">Number</option>
+                                          <option value="dropdown">Dropdown</option>
                                         </select>
+                                        {editQuestionAnswerType === 'number' && (
+                                          <div className={styles.numberConfig}>
+                                            <label>
+                                              Min
+                                              <input
+                                                type="number"
+                                                value={editQuestionMinValue}
+                                                onChange={e => setEditQuestionMinValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                              />
+                                            </label>
+                                            <label>
+                                              Max
+                                              <input
+                                                type="number"
+                                                value={editQuestionMaxValue}
+                                                onChange={e => setEditQuestionMaxValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                              />
+                                            </label>
+                                            <label>
+                                              Step
+                                              <input
+                                                type="number"
+                                                value={editQuestionStepValue}
+                                                onChange={e => setEditQuestionStepValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                              />
+                                            </label>
+                                          </div>
+                                        )}
+                                        {editQuestionAnswerType === 'dropdown' && (
+                                          <div className={styles.dropdownOptionsEditor}>
+                                            <div className={styles.dropdownOptionsList}>
+                                              {editQuestionDropdownOptions.map((opt, i) => (
+                                                <span key={i} className={styles.dropdownOptionChip}>
+                                                  {opt}
+                                                  <button type="button" onClick={() => setEditQuestionDropdownOptions(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+                                                </span>
+                                              ))}
+                                              {editQuestionDropdownOptions.length === 0 && (
+                                                <span className={styles.dropdownOptionsEmpty}>No options added yet</span>
+                                              )}
+                                            </div>
+                                            <div className={styles.dropdownOptionAdd}>
+                                              <input
+                                                type="text"
+                                                placeholder="Add option..."
+                                                value={editQuestionOptionInput}
+                                                onChange={e => setEditQuestionOptionInput(e.target.value)}
+                                                onKeyDown={e => {
+                                                  if (e.key === 'Enter') {
+                                                    e.preventDefault();
+                                                    if (editQuestionOptionInput.trim()) {
+                                                      setEditQuestionDropdownOptions(prev => [...prev, editQuestionOptionInput.trim()]);
+                                                      setEditQuestionOptionInput('');
+                                                    }
+                                                  }
+                                                }}
+                                              />
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  if (editQuestionOptionInput.trim()) {
+                                                    setEditQuestionDropdownOptions(prev => [...prev, editQuestionOptionInput.trim()]);
+                                                    setEditQuestionOptionInput('');
+                                                  }
+                                                }}
+                                                disabled={!editQuestionOptionInput.trim()}
+                                              >
+                                                Add
+                                              </button>
+                                            </div>
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                     <div className={styles.questionEditActions}>
@@ -1366,7 +1517,7 @@ export default function SalesConfigManager({
                                       {q.text}
                                     </span>
                                     <span className={styles.questionTypeBadge}>
-                                      {q.answerType === 'yes_no' ? 'Yes / No' : 'Text'}
+                                      {q.answerType === 'yes_no' ? 'Yes / No' : q.answerType === 'number' ? 'Number' : q.answerType === 'dropdown' ? 'Dropdown' : 'Text'}
                                     </span>
                                     <div className={styles.questionRowActions}>
                                       <button
@@ -1475,13 +1626,87 @@ export default function SalesConfigManager({
                                                 value={editQuestionAnswerType}
                                                 onChange={e =>
                                                   setEditQuestionAnswerType(
-                                                    e.target.value as 'yes_no' | 'text'
+                                                    e.target.value as 'yes_no' | 'text' | 'number' | 'dropdown'
                                                   )
                                                 }
                                               >
                                                 <option value="yes_no">Yes / No</option>
                                                 <option value="text">Text</option>
+                                                <option value="number">Number</option>
+                                                <option value="dropdown">Dropdown</option>
                                               </select>
+                                              {editQuestionAnswerType === 'number' && (
+                                                <div className={styles.numberConfig}>
+                                                  <label>
+                                                    Min
+                                                    <input
+                                                      type="number"
+                                                      value={editQuestionMinValue}
+                                                      onChange={e => setEditQuestionMinValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    />
+                                                  </label>
+                                                  <label>
+                                                    Max
+                                                    <input
+                                                      type="number"
+                                                      value={editQuestionMaxValue}
+                                                      onChange={e => setEditQuestionMaxValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    />
+                                                  </label>
+                                                  <label>
+                                                    Step
+                                                    <input
+                                                      type="number"
+                                                      value={editQuestionStepValue}
+                                                      onChange={e => setEditQuestionStepValue(e.target.value === '' ? '' : Number(e.target.value))}
+                                                    />
+                                                  </label>
+                                                </div>
+                                              )}
+                                              {editQuestionAnswerType === 'dropdown' && (
+                                                <div className={styles.dropdownOptionsEditor}>
+                                                  <div className={styles.dropdownOptionsList}>
+                                                    {editQuestionDropdownOptions.map((opt, i) => (
+                                                      <span key={i} className={styles.dropdownOptionChip}>
+                                                        {opt}
+                                                        <button type="button" onClick={() => setEditQuestionDropdownOptions(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+                                                      </span>
+                                                    ))}
+                                                    {editQuestionDropdownOptions.length === 0 && (
+                                                      <span className={styles.dropdownOptionsEmpty}>No options added yet</span>
+                                                    )}
+                                                  </div>
+                                                  <div className={styles.dropdownOptionAdd}>
+                                                    <input
+                                                      type="text"
+                                                      placeholder="Add option..."
+                                                      value={editQuestionOptionInput}
+                                                      onChange={e => setEditQuestionOptionInput(e.target.value)}
+                                                      onKeyDown={e => {
+                                                        if (e.key === 'Enter') {
+                                                          e.preventDefault();
+                                                          if (editQuestionOptionInput.trim()) {
+                                                            setEditQuestionDropdownOptions(prev => [...prev, editQuestionOptionInput.trim()]);
+                                                            setEditQuestionOptionInput('');
+                                                          }
+                                                        }
+                                                      }}
+                                                    />
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => {
+                                                        if (editQuestionOptionInput.trim()) {
+                                                          setEditQuestionDropdownOptions(prev => [...prev, editQuestionOptionInput.trim()]);
+                                                          setEditQuestionOptionInput('');
+                                                        }
+                                                      }}
+                                                      disabled={!editQuestionOptionInput.trim()}
+                                                    >
+                                                      Add
+                                                    </button>
+                                                  </div>
+                                                </div>
+                                              )}
                                               <button
                                                 type="button"
                                                 className={styles.editSaveBtn}
@@ -1510,6 +1735,10 @@ export default function SalesConfigManager({
                                               <span className={styles.questionTypeBadge}>
                                                 {child.answerType === 'yes_no'
                                                   ? 'Yes / No'
+                                                  : child.answerType === 'number'
+                                                  ? 'Number'
+                                                  : child.answerType === 'dropdown'
+                                                  ? 'Dropdown'
                                                   : 'Text'}
                                               </span>
                                               <div className={styles.nestedQuestionActions}>
@@ -1559,38 +1788,118 @@ export default function SalesConfigManager({
                     );
                   })()}
 
-                  <div className={styles.addQuestionForm}>
-                    <input
-                      type="text"
-                      className={styles.addQuestionInput}
-                      placeholder="Question text"
-                      value={newQuestionText}
-                      onChange={e => setNewQuestionText(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') handleAddQuestion();
-                      }}
-                      disabled={savingChecklist}
-                    />
-                    <select
-                      className={styles.addQuestionSelect}
-                      value={newQuestionAnswerType}
-                      onChange={e =>
-                        setNewQuestionAnswerType(e.target.value as 'yes_no' | 'text')
-                      }
-                      disabled={savingChecklist}
-                    >
-                      <option value="yes_no">Yes / No</option>
-                      <option value="text">Text</option>
-                    </select>
-                    <button
-                      type="button"
-                      className={styles.addQuestionBtn}
-                      onClick={handleAddQuestion}
-                      disabled={!newQuestionText.trim() || savingChecklist}
-                    >
-                      <Plus size={14} />
-                      Add
-                    </button>
+                  <div className={styles.addQuestionFormWrapper}>
+                    <div className={styles.addQuestionForm}>
+                      <input
+                        type="text"
+                        className={styles.addQuestionInput}
+                        placeholder="Question text"
+                        value={newQuestionText}
+                        onChange={e => setNewQuestionText(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') handleAddQuestion();
+                        }}
+                        disabled={savingChecklist}
+                      />
+                      <select
+                        className={styles.addQuestionSelect}
+                        value={newQuestionAnswerType}
+                        onChange={e =>
+                          setNewQuestionAnswerType(e.target.value as 'yes_no' | 'text' | 'number' | 'dropdown')
+                        }
+                        disabled={savingChecklist}
+                      >
+                        <option value="yes_no">Yes / No</option>
+                        <option value="text">Text</option>
+                        <option value="number">Number</option>
+                        <option value="dropdown">Dropdown</option>
+                      </select>
+                      <button
+                        type="button"
+                        className={styles.addQuestionBtn}
+                        onClick={handleAddQuestion}
+                        disabled={!newQuestionText.trim() || savingChecklist}
+                      >
+                        <Plus size={14} />
+                        Add
+                      </button>
+                    </div>
+                    {newQuestionAnswerType === 'number' && (
+                      <div className={styles.numberConfig}>
+                        <label>
+                          Min
+                          <input
+                            type="number"
+                            value={newQuestionMinValue}
+                            onChange={e => setNewQuestionMinValue(e.target.value === '' ? '' : Number(e.target.value))}
+                            disabled={savingChecklist}
+                          />
+                        </label>
+                        <label>
+                          Max
+                          <input
+                            type="number"
+                            value={newQuestionMaxValue}
+                            onChange={e => setNewQuestionMaxValue(e.target.value === '' ? '' : Number(e.target.value))}
+                            disabled={savingChecklist}
+                          />
+                        </label>
+                        <label>
+                          Step
+                          <input
+                            type="number"
+                            value={newQuestionStepValue}
+                            onChange={e => setNewQuestionStepValue(e.target.value === '' ? '' : Number(e.target.value))}
+                            disabled={savingChecklist}
+                          />
+                        </label>
+                      </div>
+                    )}
+                    {newQuestionAnswerType === 'dropdown' && (
+                      <div className={styles.dropdownOptionsEditor}>
+                        <div className={styles.dropdownOptionsList}>
+                          {newQuestionDropdownOptions.map((opt, i) => (
+                            <span key={i} className={styles.dropdownOptionChip}>
+                              {opt}
+                              <button type="button" onClick={() => setNewQuestionDropdownOptions(prev => prev.filter((_, idx) => idx !== i))}>×</button>
+                            </span>
+                          ))}
+                          {newQuestionDropdownOptions.length === 0 && (
+                            <span className={styles.dropdownOptionsEmpty}>No options added yet</span>
+                          )}
+                        </div>
+                        <div className={styles.dropdownOptionAdd}>
+                          <input
+                            type="text"
+                            placeholder="Add option..."
+                            value={newQuestionOptionInput}
+                            onChange={e => setNewQuestionOptionInput(e.target.value)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                if (newQuestionOptionInput.trim()) {
+                                  setNewQuestionDropdownOptions(prev => [...prev, newQuestionOptionInput.trim()]);
+                                  setNewQuestionOptionInput('');
+                                }
+                              }
+                            }}
+                            disabled={savingChecklist}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (newQuestionOptionInput.trim()) {
+                                setNewQuestionDropdownOptions(prev => [...prev, newQuestionOptionInput.trim()]);
+                                setNewQuestionOptionInput('');
+                              }
+                            }}
+                            disabled={!newQuestionOptionInput.trim() || savingChecklist}
+                          >
+                            Add
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

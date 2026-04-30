@@ -480,17 +480,6 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
-  // Dynamic step configuration based on sales checklists
-  const hasChecklists = salesChecklists.length > 0;
-  const STEP_LABELS = hasChecklists
-    ? ['Address', 'Photos', 'Map', 'Quote', 'Sales Checklist', 'Review']
-    : BASE_STEP_LABELS;
-  const STEP_COUNT = STEP_LABELS.length;
-  // Step indices
-  const QUOTE_STEP = 3;
-  const CHECKLIST_STEP = hasChecklists ? 4 : -1;
-  const REVIEW_STEP = hasChecklists ? 5 : 4;
-
   // Checklists whose linked plans match the current quote
   const applicableChecklists = useMemo(() => {
     const planIds = new Set(
@@ -502,6 +491,17 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       cl => cl.isActive && cl.linkedPlanIds.some(id => planIds.has(id))
     );
   }, [salesChecklists, quoteLineItems]);
+
+  // Dynamic step configuration based on sales checklists
+  const hasChecklists = applicableChecklists.length > 0;
+  const STEP_LABELS = hasChecklists
+    ? ['Address', 'Photos', 'Map', 'Quote', 'Sales Checklist', 'Review']
+    : BASE_STEP_LABELS;
+  const STEP_COUNT = STEP_LABELS.length;
+  // Step indices
+  const QUOTE_STEP = 3;
+  const CHECKLIST_STEP = hasChecklists ? 4 : -1;
+  const REVIEW_STEP = hasChecklists ? 5 : 4;
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents &&
