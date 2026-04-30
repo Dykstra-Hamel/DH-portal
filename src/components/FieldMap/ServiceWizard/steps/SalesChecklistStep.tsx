@@ -5,9 +5,13 @@ import styles from './SalesChecklistStep.module.scss';
 export interface SalesChecklistQuestion {
   id: string;
   text: string;
-  answerType: 'yes_no' | 'text';
+  answerType: 'yes_no' | 'text' | 'number' | 'dropdown';
   displayOrder: number;
   parentQuestionId: string | null;
+  minValue?: number | null;
+  maxValue?: number | null;
+  stepValue?: number | null;
+  dropdownOptions?: string[] | null;
 }
 
 export interface SalesChecklist {
@@ -22,7 +26,7 @@ export interface SalesChecklist {
 export interface ChecklistResponse {
   questionId: string;
   questionText: string;
-  answerType: 'yes_no' | 'text';
+  answerType: 'yes_no' | 'text' | 'number' | 'dropdown';
   answer: 'yes' | 'no' | string;
   parentQuestionId?: string | null;
 }
@@ -181,6 +185,27 @@ export function SalesChecklistStep({
                           No
                         </button>
                       </div>
+                    ) : q.answerType === 'number' ? (
+                      <input
+                        type="number"
+                        className={styles.numberInput}
+                        min={q.minValue ?? undefined}
+                        max={q.maxValue ?? undefined}
+                        step={q.stepValue ?? 1}
+                        value={answer}
+                        onChange={e => handleAnswer(checklist, q, e.target.value)}
+                      />
+                    ) : q.answerType === 'dropdown' ? (
+                      <select
+                        className={styles.dropdownSelect}
+                        value={answer}
+                        onChange={e => handleAnswer(checklist, q, e.target.value)}
+                      >
+                        <option value="">&#8212; Select an option &#8212;</option>
+                        {(q.dropdownOptions ?? []).map(opt => (
+                          <option key={opt} value={opt}>{opt}</option>
+                        ))}
+                      </select>
                     ) : (
                       <textarea
                         className={styles.textAnswer}
@@ -216,6 +241,31 @@ export function SalesChecklistStep({
                                     No
                                   </button>
                                 </div>
+                              ) : child.answerType === 'number' ? (
+                                <input
+                                  type="number"
+                                  className={styles.numberInput}
+                                  min={child.minValue ?? undefined}
+                                  max={child.maxValue ?? undefined}
+                                  step={child.stepValue ?? 1}
+                                  value={childAnswer}
+                                  onChange={e =>
+                                    handleAnswer(checklist, child, e.target.value, q.id)
+                                  }
+                                />
+                              ) : child.answerType === 'dropdown' ? (
+                                <select
+                                  className={styles.dropdownSelect}
+                                  value={childAnswer}
+                                  onChange={e =>
+                                    handleAnswer(checklist, child, e.target.value, q.id)
+                                  }
+                                >
+                                  <option value="">&#8212; Select an option &#8212;</option>
+                                  {(child.dropdownOptions ?? []).map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                  ))}
+                                </select>
                               ) : (
                                 <textarea
                                   className={styles.textAnswer}

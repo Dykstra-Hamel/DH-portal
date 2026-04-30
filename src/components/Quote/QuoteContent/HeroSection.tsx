@@ -14,7 +14,6 @@ interface HeroSectionProps {
   hero: {
     title: string;
     subtitle: string;
-    buttonText: string;
     imageUrl?: string | null;
   };
   companyId: string;
@@ -124,12 +123,6 @@ export default function HeroSection({
               </div>
             </div>
           )}
-
-          <div className={styles.heroCtaContainer}>
-            <button className={styles.heroCta} onClick={scrollToSection}>
-              {hero.buttonText}
-            </button>
-          </div>
         </div>
 
         {/* Right column - House photo / Map or fallback */}

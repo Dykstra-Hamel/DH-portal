@@ -239,7 +239,6 @@ export function ReviewStep({
       new Set(
         quoteLineItems
           .filter(i => {
-            if (i.catalogItemKind === 'product') return false;
             // For DB-loaded items isSelected is set; for fresh in-memory items fall back to isRecommended heuristic
             return i.isSelected ?? i.isRecommended === undefined;
           })

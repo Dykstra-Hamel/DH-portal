@@ -58,6 +58,7 @@ export function LeadPestPicker({
   const [loading, setLoading] = useState(true);
   const [primaryId, setPrimaryId] = useState<string | null>(null);
   const [secondaryIds, setSecondaryIds] = useState<string[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
   const hydratedRef = useRef(false);
   const onSelectionChangeRef = useRef(onSelectionChange);
 
@@ -118,6 +119,26 @@ export function LeadPestPicker({
   useEffect(() => {
     onSelectionChangeRef.current(selected, primaryId);
   }, [selected, primaryId]);
+
+  const sortedOptions = useMemo(
+    () => [...options].sort((a, b) => labelFor(a).localeCompare(labelFor(b))),
+    [options]
+  );
+
+  const filteredOptions = useMemo(
+    () =>
+      searchQuery.trim()
+        ? sortedOptions.filter(o =>
+            labelFor(o).toLowerCase().includes(searchQuery.toLowerCase())
+          )
+        : sortedOptions,
+    [sortedOptions, searchQuery]
+  );
+
+  // Reset search when modal closes
+  useEffect(() => {
+    if (!isOpen) setSearchQuery('');
+  }, [isOpen]);
 
   // Close modal on Escape
   useEffect(() => {
@@ -230,8 +251,19 @@ export function LeadPestPicker({
             No pest options configured for this company.
           </div>
         ) : (
+          <>
+            {options.length > 10 && (
+              <input
+                type="search"
+                className={styles.searchInput}
+                placeholder="Search pests…"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                autoComplete="off"
+              />
+            )}
           <div className={styles.pestRow}>
-            {options.map(opt => {
+            {filteredOptions.map(opt => {
               const isPrimary = opt.id === primaryId;
               const isSecondary = secondaryIds.includes(opt.id);
               const isSelected = isPrimary || isSecondary;
@@ -315,6 +347,7 @@ export function LeadPestPicker({
               );
             })}
           </div>
+          </>
         )}
         <div className={styles.modalFooter}>
           <button type="button" className={styles.doneBtn} onClick={onClose}>

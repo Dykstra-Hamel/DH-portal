@@ -58,11 +58,16 @@ export async function PUT(
         answer_type: q.answerType ?? q.answer_type ?? 'yes_no',
         display_order: q.displayOrder ?? q.display_order ?? 0,
         parent_question_id: q.parentQuestionId ?? q.parent_question_id ?? null,
+        min_value: q.minValue ?? null,
+        max_value: q.maxValue ?? null,
+        step_value: q.stepValue ?? null,
+        dropdown_options: q.dropdownOptions ?? null,
       }));
       const { error: qError } = await supabase
         .from('sales_checklist_questions')
         .insert(questionsToInsert);
       if (qError) {
+        console.error('[PUT sales-checklists] qError:', qError);
         return NextResponse.json({ error: 'Failed to update questions' }, { status: 500 });
       }
     }

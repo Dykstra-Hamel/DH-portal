@@ -22,7 +22,11 @@ export async function GET(
           text,
           answer_type,
           display_order,
-          parent_question_id
+          parent_question_id,
+          min_value,
+          max_value,
+          step_value,
+          dropdown_options
         ),
         plan_links:sales_checklist_plan_links(
           service_plan_id
@@ -32,6 +36,7 @@ export async function GET(
       .order('display_order', { ascending: true });
 
     if (error) {
+      console.error('[GET sales-checklists] Supabase error:', error);
       return NextResponse.json({ error: 'Failed to fetch sales checklists' }, { status: 500 });
     }
 
@@ -45,9 +50,13 @@ export async function GET(
         .map(q => ({
           id: q.id,
           text: q.text,
-          answerType: q.answer_type as 'yes_no' | 'text',
+          answerType: q.answer_type as 'yes_no' | 'text' | 'number' | 'dropdown',
           displayOrder: q.display_order,
           parentQuestionId: q.parent_question_id ?? null,
+          minValue: q.min_value ?? null,
+          maxValue: q.max_value ?? null,
+          stepValue: q.step_value ?? null,
+          dropdownOptions: q.dropdown_options ?? null,
         })),
       linkedPlanIds: (cl.plan_links as any[]).map(l => l.service_plan_id),
     }));
@@ -99,6 +108,10 @@ export async function POST(
         answer_type: q.answerType ?? q.answer_type ?? 'yes_no',
         display_order: q.displayOrder ?? q.display_order ?? 0,
         parent_question_id: q.parentQuestionId ?? q.parent_question_id ?? null,
+        min_value: q.minValue ?? null,
+        max_value: q.maxValue ?? null,
+        step_value: q.stepValue ?? null,
+        dropdown_options: q.dropdownOptions ?? null,
       }));
       const { error: qError } = await supabase
         .from('sales_checklist_questions')
