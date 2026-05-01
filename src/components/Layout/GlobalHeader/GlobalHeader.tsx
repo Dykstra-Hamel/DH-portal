@@ -9,6 +9,7 @@ import { NotificationIcon } from '../NotificationIcon/NotificationIcon';
 import { UserAvatar } from '../UserAvatar/UserAvatar';
 import { GlobalCompanyDropdown } from './CompanyDropdown/GlobalCompanyDropdown';
 import { MobileCompanySwitcher } from './CompanyDropdown/MobileCompanySwitcher';
+import { ViewAsDropdown } from './ViewAsDropdown/ViewAsDropdown';
 import { useWizard } from '@/contexts/WizardContext';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
@@ -95,6 +96,7 @@ export function GlobalHeader({
           {rightActions}
           {!hideSearch && <SearchBar />}
           {!hideCompany && <GlobalCompanyDropdown />}
+          {isFieldSales && <ViewAsDropdown />}
           <NotificationIcon />
           <UserAvatar />
         </div>

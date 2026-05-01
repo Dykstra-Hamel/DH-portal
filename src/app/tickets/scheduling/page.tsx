@@ -13,6 +13,7 @@ import {
   subscribeToLeadUpdates,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
+import { BranchFilterDropdown } from '@/components/Common/BranchFilter/BranchFilterDropdown';
 import styles from './page.module.scss';
 
 interface Profile {
@@ -29,6 +30,7 @@ export default function SchedulingPage() {
   const [schedulingLeads, setSchedulingLeads] = useState<Lead[]>([]);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const router = useRouter();
 
   // Use global company context
@@ -84,7 +86,10 @@ export default function SchedulingPage() {
       setLeadsLoading(true);
 
       // Fetch all scheduling-related leads (scheduling, won, lost)
-      const response = await fetch(`/api/leads?companyId=${selectedCompany.id}`);
+      const branchSuffix = selectedBranchId ? `&branchId=${selectedBranchId}` : '';
+      const response = await fetch(
+        `/api/leads?companyId=${selectedCompany.id}${branchSuffix}`
+      );
 
       if (!response.ok) {
         throw new Error('Failed to fetch scheduling leads');
@@ -106,18 +111,24 @@ export default function SchedulingPage() {
     } finally {
       setLeadsLoading(false);
     }
+  }, [selectedCompany?.id, selectedBranchId]);
+
+  // Reset branch when company changes; the dropdown re-applies the user's
+  // default branch.
+  useEffect(() => {
+    setSelectedBranchId('');
   }, [selectedCompany?.id]);
 
   const handleEditLead = (lead: Lead) => {
     router.push(`/tickets/leads/${lead.id}?edit=true`);
   };
 
-  // Fetch scheduling leads when selectedCompany changes
+  // Fetch scheduling leads when selectedCompany or branch filter changes
   useEffect(() => {
     if (selectedCompany?.id) {
       fetchSchedulingLeads();
     }
-  }, [selectedCompany?.id, fetchSchedulingLeads]);
+  }, [selectedCompany?.id, selectedBranchId, fetchSchedulingLeads]);
 
   // Real-time subscription for lead updates
   useEffect(() => {
@@ -157,6 +168,16 @@ export default function SchedulingPage() {
 
   return (
     <div className={styles.pageContainer}>
+      {selectedCompany && (
+        <div style={{ padding: '0 0 12px' }}>
+          <BranchFilterDropdown
+            companyId={selectedCompany.id}
+            userId={user?.id}
+            value={selectedBranchId}
+            onChange={setSelectedBranchId}
+          />
+        </div>
+      )}
       {selectedCompany && (
         <div>
           <LeadsList

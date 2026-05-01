@@ -14,11 +14,13 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
 import { useCompanyRole } from '@/hooks/useCompanyRole';
 import { useUser } from '@/hooks/useUser';
+import { useViewAs } from '@/hooks/useViewAs';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
 import { FieldMapDashboard } from '@/components/FieldMap/FieldMapDashboard/FieldMapDashboard';
 import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsDashboard/FieldSalesLeadsDashboard';
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
+import { FieldSalesAdminDashboard } from '@/components/FieldSalesAdminDashboard/FieldSalesAdminDashboard';
 import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
 import { TechDashboardHome } from '@/components/TechLeads/TechDashboardHome/TechDashboardHome';
 import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
@@ -51,8 +53,20 @@ function FieldSalesDashboardInner() {
     userId ?? '',
     selectedCompany?.id ?? ''
   );
-  const { isCompanyAdmin } = useCompanyRole(selectedCompany?.id);
+  const { isCompanyAdmin, role: companyRole } = useCompanyRole(selectedCompany?.id);
   const { profile, user } = useUser();
+  const { viewAs } = useViewAs();
+  const [defaultManagerBranchId, setDefaultManagerBranchId] = useState<
+    string | null
+  >(null);
+
+  // A global admin can preview the dashboard as a different role/user via
+  // the ViewAsDropdown in the header. The override only changes which
+  // branch of the routing tree we render — data access is unchanged.
+  const viewAsActive =
+    isAdmin && !!viewAs && viewAs.companyId === selectedCompany?.id;
+  const effectiveDashboardRole: 'admin' | 'manager' | 'inspector' | 'tech' | null =
+    viewAsActive ? viewAs!.role : null;
   const { setPageHeader } = usePageActions();
   const { counts, newItemIndicators, clearNewItemIndicator } =
     useRealtimeCounts();
@@ -93,11 +107,87 @@ function FieldSalesDashboardInner() {
     });
   }, []);
 
-  const isTechnicianOnly =
+  // Resolve a manager's default branch: their first user_branch_assignments
+  // row for this company, falling back to the company's primary branch.
+  // Also fired when a global admin is impersonating a manager — in that
+  // case we look up the impersonated user's branches.
+  useEffect(() => {
+    const isManagerContext =
+      effectiveDashboardRole === 'manager' || companyRole === 'manager';
+    const targetUserId =
+      effectiveDashboardRole === 'manager' && viewAs ? viewAs.userId : userId;
+    if (!isManagerContext || !targetUserId || !selectedCompany?.id) {
+      setDefaultManagerBranchId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/users/${targetUserId}/branches?companyId=${selectedCompany.id}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const first = (data.assignments ?? [])[0];
+          if (first?.branch_id) {
+            if (!cancelled) setDefaultManagerBranchId(first.branch_id);
+            return;
+          }
+        }
+        const branchesRes = await fetch(
+          `/api/branches?companyId=${selectedCompany.id}`
+        );
+        if (branchesRes.ok && !cancelled) {
+          const data = await branchesRes.json();
+          const primary = (data.branches ?? []).find(
+            (b: any) => b.is_primary
+          );
+          setDefaultManagerBranchId(primary?.id ?? null);
+        }
+      } catch {
+        if (!cancelled) setDefaultManagerBranchId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    companyRole,
+    userId,
+    selectedCompany?.id,
+    effectiveDashboardRole,
+    viewAs,
+  ]);
+
+  const baseTechnicianOnly =
     !isAdmin &&
     departments.includes('technician') &&
     !departments.includes('inspector');
-  const isInspector = isAdmin || departments.includes('inspector');
+  const baseInspector = isAdmin || departments.includes('inspector');
+
+  // Apply view-as overrides for the inspector/tech tab views.
+  const isTechnicianOnly =
+    effectiveDashboardRole === 'tech'
+      ? true
+      : effectiveDashboardRole === 'inspector'
+      ? false
+      : baseTechnicianOnly;
+  const isInspector =
+    effectiveDashboardRole === 'inspector'
+      ? true
+      : effectiveDashboardRole === 'tech'
+      ? false
+      : baseInspector;
+
+  // Per-user data scope. When viewing as a specific inspector/tech, swap in
+  // their user_id where supported (FieldSalesLeadsDashboard, etc.). Panels
+  // that read useUser() internally will still see the actual signed-in user.
+  const effectiveUserId =
+    viewAsActive &&
+    (effectiveDashboardRole === 'inspector' ||
+      effectiveDashboardRole === 'tech')
+      ? viewAs!.userId
+      : userId;
 
   const TAB_ORDER = useMemo<DashboardTab[]>(
     () =>
@@ -239,10 +329,57 @@ function FieldSalesDashboardInner() {
     },
   };
 
-  // Inspector / Admin / Technician view (with tabs).
-  // The aggregated admin/manager reports dashboard is currently hidden —
-  // admins fall through to the inspector layout and reach TechLeads via
-  // the "+ New" button in FieldSalesNav.
+  // Company admin/owner — aggregated team reports dashboard (all branches).
+  // Company manager — same component but scoped to direct reports + default branch.
+  // Global admin can preview either via the ViewAsDropdown override.
+  const renderAdminOrManagerDashboard =
+    (isCompanyAdmin && !!selectedCompany?.id && !!userId) ||
+    (viewAsActive &&
+      (effectiveDashboardRole === 'admin' ||
+        effectiveDashboardRole === 'manager'));
+
+  if (renderAdminOrManagerDashboard && selectedCompany?.id) {
+    let dashboardRole: 'admin' | 'manager';
+    let managerUserIdForDashboard: string | undefined;
+
+    if (viewAsActive && effectiveDashboardRole === 'manager') {
+      dashboardRole = 'manager';
+      managerUserIdForDashboard = viewAs!.userId;
+    } else if (viewAsActive && effectiveDashboardRole === 'admin') {
+      dashboardRole = 'admin';
+      managerUserIdForDashboard = undefined;
+    } else {
+      dashboardRole = companyRole === 'manager' ? 'manager' : 'admin';
+      managerUserIdForDashboard =
+        dashboardRole === 'manager' ? userId ?? undefined : undefined;
+    }
+
+    return (
+      <div className={styles.wrapperInspector}>
+        <div className={styles.contentArea}>
+          <FieldSalesAdminDashboard
+            companyId={selectedCompany.id}
+            greetingName={profile?.first_name ?? undefined}
+            scopeRole={dashboardRole}
+            managerUserId={managerUserIdForDashboard}
+            defaultBranchId={
+              dashboardRole === 'manager' ? defaultManagerBranchId : null
+            }
+          />
+        </div>
+        <FieldSalesNav />
+        <Toast
+          message={successToast ?? ''}
+          isVisible={!!successToast}
+          onClose={() => setSuccessToast(null)}
+          type="success"
+          centered
+        />
+      </div>
+    );
+  }
+
+  // Inspector / Admin / Technician view (with tabs)
   if (isTechnicianOnly || isInspector) {
     return (
       <div className={styles.wrapperInspector}>
@@ -444,7 +581,7 @@ function FieldSalesDashboardInner() {
             <div className={styles.leadsSection}>
               <FieldSalesLeadsDashboard
                 companyId={selectedCompany?.id ?? ''}
-                userId={userId ?? ''}
+                userId={effectiveUserId ?? ''}
               />
             </div>
           )}

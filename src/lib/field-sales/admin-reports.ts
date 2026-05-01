@@ -7,6 +7,31 @@ export interface AdminReportFilters {
   userIds?: string[] | null;
   leadSource?: string[] | null;
   leadStatus?: string[] | null;
+  branchId?: string | null;
+  compare?: 'users' | 'branches' | null;
+  entityIds?: string[] | null;
+}
+
+export interface CompareDailyPoint {
+  date: string;
+  submitted: number;
+  won: number;
+  pipelineValue: number;
+  salesDollars: number;
+  stops: number;
+}
+
+export interface CompareSeries {
+  entityId: string;
+  entityLabel: string;
+  totals: {
+    submitted: number;
+    won: number;
+    pipelineValue: number;
+    salesDollars: number;
+    stops: number;
+  };
+  daily: CompareDailyPoint[];
 }
 
 export interface TeamMember {
@@ -49,6 +74,9 @@ export interface AdminReportData {
     userIds: string[] | null;
     leadSource: string[] | null;
     leadStatus: string[] | null;
+    branchId: string | null;
+    compare: 'users' | 'branches' | null;
+    entityIds: string[] | null;
   };
   totals: {
     submitted: number;
@@ -71,6 +99,7 @@ export interface AdminReportData {
   teamBreakdown: TeamBreakdownRow[];
   recentLeads: AdminRecentLead[];
   teamMembers: TeamMember[];
+  compareSeries: CompareSeries[] | null;
 }
 
 function toIsoDate(date: Date): string {
@@ -118,6 +147,9 @@ export async function getAdminFieldSalesReport(
     userIds,
     leadSource,
     leadStatus,
+    branchId,
+    compare,
+    entityIds,
   } = filters;
 
   const fromDate = filters.from ? new Date(filters.from) : defaultFromDate();
@@ -174,6 +206,7 @@ export async function getAdminFieldSalesReport(
       created_at,
       submitted_by,
       tech_discussed,
+      branch_id,
       customers ( first_name, last_name, city, state )
       `
     )
@@ -191,6 +224,9 @@ export async function getAdminFieldSalesReport(
   }
   if (leadStatus && leadStatus.length > 0) {
     leadsQuery = leadsQuery.in('lead_status', leadStatus);
+  }
+  if (branchId) {
+    leadsQuery = leadsQuery.eq('branch_id', branchId);
   }
 
   const { data: leadsData } = await leadsQuery;
@@ -418,6 +454,153 @@ export async function getAdminFieldSalesReport(
     };
   });
 
+  // ── Compare series (multi-entity per-day breakdown) ─────────────────────
+  // When `compare` is set, build one series per requested entity. For
+  // compare='users' we attribute leads via submitted_by and stops via the
+  // route's assigned_to. For compare='branches' we attribute leads via
+  // leads.branch_id; stops aren't branch-tagged today so we surface 0 there.
+  let compareSeries: CompareSeries[] | null = null;
+  if (compare && entityIds && entityIds.length > 0) {
+    const labels = new Map<string, string>();
+    if (compare === 'users') {
+      for (const eid of entityIds) {
+        labels.set(eid, memberById.get(eid)?.fullName ?? 'Unknown');
+      }
+    } else {
+      const { data: branchRows } = await admin
+        .from('branches')
+        .select('id, name')
+        .in('id', entityIds);
+      for (const b of branchRows ?? []) {
+        labels.set(b.id as string, (b.name as string) ?? 'Branch');
+      }
+      for (const eid of entityIds) {
+        if (!labels.has(eid)) labels.set(eid, 'Branch');
+      }
+    }
+
+    // Initialize buckets per entity per day
+    const dayKeys: string[] = sparkline.map(p => p.date);
+    type Bucket = {
+      submitted: number;
+      won: number;
+      pipelineValue: number;
+      salesDollars: number;
+      stops: number;
+    };
+    const blankBucket = (): Bucket => ({
+      submitted: 0,
+      won: 0,
+      pipelineValue: 0,
+      salesDollars: 0,
+      stops: 0,
+    });
+    const perEntity = new Map<string, Map<string, Bucket>>();
+    for (const eid of entityIds) {
+      const days = new Map<string, Bucket>();
+      for (const dk of dayKeys) days.set(dk, blankBucket());
+      perEntity.set(eid, days);
+    }
+
+    for (const l of leads) {
+      const day = (l.created_at as string).slice(0, 10);
+      const status = (l.lead_status as string) ?? '';
+      const value = leadValue(l);
+      const eid =
+        compare === 'users'
+          ? ((l.submitted_by as string | null) ?? null)
+          : ((l.branch_id as string | null) ?? null);
+      if (!eid) continue;
+      const days = perEntity.get(eid);
+      if (!days) continue;
+      const bucket = days.get(day);
+      if (!bucket) continue;
+      bucket.submitted += 1;
+      if (status === 'won') {
+        bucket.won += 1;
+        bucket.salesDollars += Number(l.estimated_value ?? 0);
+      }
+      if (['new', 'in_process', 'quoted', 'scheduling'].includes(status)) {
+        bucket.pipelineValue += value;
+      }
+    }
+
+    if (compare === 'users') {
+      // Stops by user via routes.assigned_to → route_stops
+      const userIdsSet = new Set(entityIds);
+      const userRoutes = routes.filter(r =>
+        userIdsSet.has(r.assigned_to as string | null as string)
+      );
+      const userRouteIds = userRoutes.map(r => r.id as string);
+      if (userRouteIds.length > 0) {
+        const { data: stopsForCompare } = await admin
+          .from('route_stops')
+          .select('route_id, status, actual_departure')
+          .in('route_id', userRouteIds);
+        const routeIdToUserId = new Map<string, string | null>();
+        const routeIdToDate = new Map<string, string>();
+        for (const r of userRoutes) {
+          routeIdToUserId.set(
+            r.id as string,
+            (r.assigned_to as string | null) ?? null
+          );
+          routeIdToDate.set(r.id as string, (r.route_date as string) ?? '');
+        }
+        for (const s of stopsForCompare ?? []) {
+          if (s.status !== 'completed') continue;
+          const rid = s.route_id as string;
+          const uid = routeIdToUserId.get(rid) ?? null;
+          if (!uid) continue;
+          // Attribute the stop to its actual_departure day; fall back to
+          // the route's date when the stop has no completion timestamp.
+          const dep = (s.actual_departure as string | null) ?? null;
+          const day = (dep ?? routeIdToDate.get(rid) ?? '').slice(0, 10);
+          const days = perEntity.get(uid);
+          const bucket = days?.get(day);
+          if (bucket) bucket.stops += 1;
+        }
+      }
+    }
+
+    compareSeries = entityIds.map(eid => {
+      const days = perEntity.get(eid) || new Map<string, Bucket>();
+      const daily: CompareDailyPoint[] = dayKeys.map(dk => {
+        const b = days.get(dk) ?? blankBucket();
+        return {
+          date: dk,
+          submitted: b.submitted,
+          won: b.won,
+          pipelineValue: Math.round(b.pipelineValue),
+          salesDollars: Math.round(b.salesDollars),
+          stops: b.stops,
+        };
+      });
+      const totals = daily.reduce(
+        (acc, p) => {
+          acc.submitted += p.submitted;
+          acc.won += p.won;
+          acc.pipelineValue += p.pipelineValue;
+          acc.salesDollars += p.salesDollars;
+          acc.stops += p.stops;
+          return acc;
+        },
+        {
+          submitted: 0,
+          won: 0,
+          pipelineValue: 0,
+          salesDollars: 0,
+          stops: 0,
+        }
+      );
+      return {
+        entityId: eid,
+        entityLabel: labels.get(eid) ?? eid,
+        totals,
+        daily,
+      };
+    });
+  }
+
   return {
     filters: {
       from: fromIso,
@@ -425,6 +608,9 @@ export async function getAdminFieldSalesReport(
       userIds: userIds && userIds.length > 0 ? userIds : null,
       leadSource: leadSource && leadSource.length > 0 ? leadSource : null,
       leadStatus: leadStatus && leadStatus.length > 0 ? leadStatus : null,
+      branchId: branchId ?? null,
+      compare: compare ?? null,
+      entityIds: entityIds && entityIds.length > 0 ? entityIds : null,
     },
     totals: {
       submitted,
@@ -447,6 +633,7 @@ export async function getAdminFieldSalesReport(
     teamBreakdown,
     recentLeads,
     teamMembers,
+    compareSeries,
   };
 }
 

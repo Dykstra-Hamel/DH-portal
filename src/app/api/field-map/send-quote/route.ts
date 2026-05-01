@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
       .neq('status', 'completed');
 
     // Update quote status to 'sent' (or 'draft' if not emailing)
-    const quoteStatus = sendEmail && clientEmail ? 'sent' : 'draft';
+    const quoteStatus = sendEmail ? 'sent' : 'draft';
     await adminClient.from('quotes').update({ quote_status: quoteStatus }).eq('id', quoteId);
 
     // ── Email ──────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[send-quote] email gate', { sendEmail, clientEmail });
 
-    if (sendEmail && clientEmail) {
+    if (sendEmail) {
       const [templateSetting, company, fromEmail, tenantName, quoteRecord, leadRecord] = await Promise.all([
         adminClient
           .from('company_settings')
@@ -313,7 +313,8 @@ export async function POST(request: NextRequest) {
       }
 
       if (htmlContent) {
-        // TODO: switch to clientEmail when ready for production
+        // Send Quote always goes to the logged-in user (sender confirmation),
+        // never to the customer.
         const recipient = user.email!;
         console.log('[send-quote] dispatching', {
           to: recipient,

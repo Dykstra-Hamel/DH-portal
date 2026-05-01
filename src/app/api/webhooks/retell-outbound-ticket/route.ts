@@ -13,6 +13,10 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -930,6 +934,36 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
         })
         .eq('id', callRecord.tickets.id);
     } else {
+      // Resolve branch_id. Prefer the cache-aware helper when a service
+      // address is already attached to this call's ticket; fall back to
+      // customer ZIP for new callers without an address yet.
+      let outboundBranchId: string | null = null;
+      const callTicketAddressId =
+        callRecord.tickets?.service_address_id ?? null;
+
+      if (callTicketAddressId && callRecord.company_id) {
+        outboundBranchId = await resolveBranchForServiceAddress(
+          supabase,
+          callRecord.company_id,
+          callTicketAddressId
+        );
+      }
+
+      if (!outboundBranchId && callRecord.customer_id && callRecord.company_id) {
+        const { data: customerForBranch } = await supabase
+          .from('customers')
+          .select('zip_code')
+          .eq('id', callRecord.customer_id)
+          .maybeSingle();
+        if (customerForBranch?.zip_code) {
+          outboundBranchId = await resolveBranchIdByZip(
+            supabase,
+            callRecord.company_id,
+            customerForBranch.zip_code
+          );
+        }
+      }
+
       // Create new ticket since action is required
       const { data: newTicket, error: ticketError } = await supabase
         .from('tickets')
@@ -942,6 +976,7 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
           call_direction: 'outbound',
           status: 'new',
           priority: 'medium',
+          branch_id: outboundBranchId,
           description: description.trim(),
           service_type: serviceType,
           pest_type: extractedData.pest_issue,

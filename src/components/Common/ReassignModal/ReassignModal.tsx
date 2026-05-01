@@ -27,6 +27,7 @@ interface ReassignModalProps {
   customerPhone?: string;
   companyId: string;
   currentAssigneeId?: string | null;
+  branchId?: string | null;
   type: 'lead' | 'support_case';
 }
 
@@ -39,6 +40,7 @@ export function ReassignModal({
   customerPhone,
   companyId,
   currentAssigneeId,
+  branchId,
   type,
 }: ReassignModalProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
@@ -50,6 +52,7 @@ export function ReassignModal({
   const { users: assignableUsers } = useAssignableUsers({
     companyId,
     departmentType: type === 'support_case' ? 'support' : 'sales',
+    branchId: branchId ?? null,
     enabled: true,
   });
 

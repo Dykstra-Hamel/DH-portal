@@ -12,6 +12,10 @@ import { captureDeviceData } from '@/lib/device-utils';
 import { inngest } from '@/lib/inngest/client';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendCampaignSubmissionNotification } from '@/lib/email/company-submission-notifications';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 interface RedeemRequest {
   customerId: string;
@@ -427,6 +431,23 @@ export async function POST(
       lead = updatedLead;
       console.log(`Updated existing lead ${lead.id} from '${existingLead.lead_status}' to '${leadStatus}'`);
     } else {
+      // Resolve branch via cache-aware helper when we have a service
+      // address. Falls back to ZIP-only when only the ZIP is known.
+      let redeemBranchId: string | null = null;
+      if (addressData?.id) {
+        redeemBranchId = await resolveBranchForServiceAddress(
+          supabase,
+          campaign.company_id,
+          addressData.id
+        );
+      } else if (addressData?.zip_code) {
+        redeemBranchId = await resolveBranchIdByZip(
+          supabase,
+          campaign.company_id,
+          addressData.zip_code
+        );
+      }
+
       // Create new lead based on redemption selections.
       const { data: newLead, error: createError } = await supabase
         .from('leads')
@@ -434,6 +455,7 @@ export async function POST(
           company_id: campaign.company_id,
           customer_id: body.customerId,
           service_address_id: addressData?.id || null,
+          branch_id: redeemBranchId,
           campaign_id: campaign.id,
           format: 'form',
           lead_source: 'campaign',

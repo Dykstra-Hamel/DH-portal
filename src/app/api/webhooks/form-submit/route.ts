@@ -30,6 +30,10 @@ import {
 import { deriveSource } from '@/lib/taxonomy/derive-source';
 import { inngest } from '@/lib/inngest/client';
 import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 /**
  * Check for recent duplicate form submissions
@@ -528,6 +532,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Resolve branch via the cache-aware helper when we have a service_address.
+    // Falls through to ZIP-only lookup when there's no address yet. Webhooks
+    // pay the geocode cost on first miss; subsequent submissions hit the cache.
+    let fsBranchId: string | null = null;
+    if (serviceAddressId) {
+      fsBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        companyId,
+        serviceAddressId
+      );
+    } else if (normalized.zip) {
+      fsBranchId = await resolveBranchIdByZip(supabase, companyId, normalized.zip);
+    }
+
     // Step 8.5: Normalize pest_type from Gemini output to a company pest name.
     // Fetches options once, then tries ticket.pest_type first, then pest_issue as a fallback.
     const pestOptions = await fetchCompanyPestOptions(supabase, companyId);
@@ -570,6 +588,7 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
+        branch_id: fsBranchId,
         campaign_id: campaign.id,
         lead_source: 'campaign',
         lead_type: 'campaign_form',
@@ -625,6 +644,7 @@ export async function POST(request: NextRequest) {
         company_id: companyId,
         customer_id: customerId,
         service_address_id: serviceAddressId,
+        branch_id: fsBranchId,
         type: 'web_form',
         source: deriveSource({ gclid, fbclid, utm_source: utmSource }),
         format: 'form',
@@ -711,6 +731,7 @@ export async function POST(request: NextRequest) {
         ticket_id: ticketId,
         lead_id: leadId,
         customer_id: customerId,
+        branch_id: fsBranchId,
       })
       .eq('id', submissionId);
 

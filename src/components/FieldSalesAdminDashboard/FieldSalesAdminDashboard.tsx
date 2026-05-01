@@ -28,6 +28,7 @@ import {
   SavedReportsDrawer,
   type SavedReport,
 } from './SavedReportsDrawer';
+import { useBranches } from '@/hooks/useBranches';
 import styles from './FieldSalesAdminDashboard.module.scss';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -65,6 +66,28 @@ interface AdminRecentLead {
   leadSource: string | null;
 }
 
+interface CompareDailyPoint {
+  date: string;
+  submitted: number;
+  won: number;
+  pipelineValue: number;
+  salesDollars: number;
+  stops: number;
+}
+
+interface CompareSeries {
+  entityId: string;
+  entityLabel: string;
+  totals: {
+    submitted: number;
+    won: number;
+    pipelineValue: number;
+    salesDollars: number;
+    stops: number;
+  };
+  daily: CompareDailyPoint[];
+}
+
 interface AdminReportData {
   filters: {
     from: string;
@@ -72,6 +95,9 @@ interface AdminReportData {
     userIds: string[] | null;
     leadSource: string[] | null;
     leadStatus: string[] | null;
+    branchId: string | null;
+    compare: 'users' | 'branches' | null;
+    entityIds: string[] | null;
   };
   totals: {
     submitted: number;
@@ -94,6 +120,7 @@ interface AdminReportData {
   teamBreakdown: TeamBreakdownRow[];
   recentLeads: AdminRecentLead[];
   teamMembers: TeamMember[];
+  compareSeries: CompareSeries[] | null;
 }
 
 interface GeneratedReport {
@@ -106,7 +133,20 @@ interface GeneratedReport {
 interface FieldSalesAdminDashboardProps {
   companyId: string;
   greetingName?: string;
+  scopeRole?: 'admin' | 'manager';
+  managerUserId?: string;
+  defaultBranchId?: string | null;
 }
+
+const COMPARE_METRICS = [
+  { key: 'submitted', label: 'Submitted Leads' },
+  { key: 'won', label: 'Won Leads' },
+  { key: 'salesDollars', label: 'Won Revenue ($)' },
+  { key: 'pipelineValue', label: 'Pipeline ($)' },
+  { key: 'stops', label: 'Stops Done' },
+] as const;
+
+type CompareMetricKey = typeof COMPARE_METRICS[number]['key'];
 
 // ── Constants ─────────────────────────────────────────────────────────────
 
@@ -222,12 +262,28 @@ function statusLabel(status: string): string {
 export function FieldSalesAdminDashboard({
   companyId,
   greetingName,
+  scopeRole = 'admin',
+  managerUserId,
+  defaultBranchId = null,
 }: FieldSalesAdminDashboardProps) {
   const [preset, setPreset] = useState<DatePreset>('30');
   const [dates, setDates] = useState(() => presetToDates('30'));
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(
+    defaultBranchId
+  );
+  const [mode, setMode] = useState<'single' | 'compare'>('single');
+  const [compareEntityIds, setCompareEntityIds] = useState<string[]>([]);
+  const [compareMetric, setCompareMetric] = useState<CompareMetricKey>(
+    'submitted'
+  );
+  const [managerTeam, setManagerTeam] = useState<TeamMember[] | null>(null);
+  const { branches: availableBranches } = useBranches(companyId);
+
+  const compareKind: 'users' | 'branches' =
+    scopeRole === 'admin' ? 'branches' : 'users';
 
   const [data, setData] = useState<AdminReportData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -269,9 +325,45 @@ export function FieldSalesAdminDashboard({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [filterOpen]);
 
+  // ── Fetch manager's team (when in manager scope) ─────────────────────
+  useEffect(() => {
+    if (scopeRole !== 'manager' || !managerUserId || !companyId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/users/${managerUserId}/reports?companyId=${companyId}`
+        );
+        if (!res.ok) {
+          if (!cancelled) setManagerTeam([]);
+          return;
+        }
+        const json = await res.json();
+        const list: TeamMember[] = (json.reports ?? []).map((r: any) => ({
+          id: r.user_id,
+          fullName:
+            r.profile?.display_name ||
+            `${r.profile?.first_name || ''} ${r.profile?.last_name || ''}`.trim() ||
+            r.profile?.email ||
+            'Unknown',
+          email: r.profile?.email ?? null,
+        }));
+        if (!cancelled) setManagerTeam(list);
+      } catch {
+        if (!cancelled) setManagerTeam([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [scopeRole, managerUserId, companyId]);
+
   // ── Fetch reports ────────────────────────────────────────────────────
   const fetchData = useCallback(async () => {
     if (!companyId) return;
+    // In manager scope: when no team is loaded yet, defer the request to
+    // avoid querying for "all users" before the report list arrives.
+    if (scopeRole === 'manager' && managerTeam === null) return;
     setLoading(true);
     setError(null);
     try {
@@ -279,11 +371,24 @@ export function FieldSalesAdminDashboard({
       params.set('companyId', companyId);
       params.set('from', dates.from);
       params.set('to', dates.to);
-      if (selectedUser) params.set('userIds', selectedUser);
+
+      if (mode === 'compare' && compareEntityIds.length >= 2) {
+        params.set('compare', compareKind);
+        params.set('entityIds', compareEntityIds.join(','));
+      } else if (scopeRole === 'manager' && managerTeam && managerTeam.length > 0) {
+        // Single mode for manager: scope to the manager's reports unless
+        // the user has explicitly picked one.
+        const ids = selectedUser ? [selectedUser] : managerTeam.map(m => m.id);
+        params.set('userIds', ids.join(','));
+      } else if (selectedUser) {
+        params.set('userIds', selectedUser);
+      }
+
       if (selectedSources.length > 0)
         params.set('leadSource', selectedSources.join(','));
       if (selectedStatuses.length > 0)
         params.set('leadStatus', selectedStatuses.join(','));
+      if (selectedBranchId) params.set('branchId', selectedBranchId);
 
       const res = await fetch(`/api/field-sales/admin-reports?${params.toString()}`);
       if (!res.ok) {
@@ -298,7 +403,20 @@ export function FieldSalesAdminDashboard({
     } finally {
       setLoading(false);
     }
-  }, [companyId, dates.from, dates.to, selectedUser, selectedSources, selectedStatuses]);
+  }, [
+    companyId,
+    dates.from,
+    dates.to,
+    selectedUser,
+    selectedSources,
+    selectedStatuses,
+    selectedBranchId,
+    mode,
+    compareKind,
+    compareEntityIds,
+    scopeRole,
+    managerTeam,
+  ]);
 
   useEffect(() => {
     fetchData();
@@ -363,27 +481,58 @@ export function FieldSalesAdminDashboard({
     setSelectedUser(null);
     setSelectedSources([]);
     setSelectedStatuses([]);
+    setSelectedBranchId(scopeRole === 'manager' ? defaultBranchId : null);
     handlePreset('30');
   };
 
+  // Source of truth for the team-member list. In manager scope it's the
+  // manager's direct reports; in admin scope it's everyone the report
+  // returns (server scoped to the company).
+  const visibleTeamMembers = useMemo<TeamMember[]>(() => {
+    if (scopeRole === 'manager') {
+      return managerTeam ?? [];
+    }
+    return data?.teamMembers ?? [];
+  }, [scopeRole, managerTeam, data?.teamMembers]);
+
   const filteredTeamMembers = useMemo(() => {
-    const members = data?.teamMembers ?? [];
     const q = teamSearch.trim().toLowerCase();
-    if (!q) return members;
-    return members.filter(m => m.fullName.toLowerCase().includes(q));
-  }, [data?.teamMembers, teamSearch]);
+    if (!q) return visibleTeamMembers;
+    return visibleTeamMembers.filter(m => m.fullName.toLowerCase().includes(q));
+  }, [visibleTeamMembers, teamSearch]);
 
   const selectedTeamMemberName = useMemo(() => {
     if (!selectedUser) return null;
     return (
-      data?.teamMembers.find(m => m.id === selectedUser)?.fullName ?? null
+      visibleTeamMembers.find(m => m.id === selectedUser)?.fullName ?? null
     );
-  }, [data?.teamMembers, selectedUser]);
+  }, [visibleTeamMembers, selectedUser]);
+
+  const selectedBranchName = useMemo(() => {
+    if (!selectedBranchId) return null;
+    return availableBranches.find(b => b.id === selectedBranchId)?.name ?? null;
+  }, [availableBranches, selectedBranchId]);
 
   const activeFilterCount =
     (selectedUser ? 1 : 0) +
     (selectedSources.length > 0 ? 1 : 0) +
-    (selectedStatuses.length > 0 ? 1 : 0);
+    (selectedStatuses.length > 0 ? 1 : 0) +
+    (selectedBranchId ? 1 : 0);
+
+  const toggleCompareEntity = (id: string) => {
+    setCompareEntityIds(prev =>
+      prev.includes(id) ? prev.filter(v => v !== id) : [...prev, id]
+    );
+  };
+
+  const compareEntityChoices = useMemo<
+    Array<{ id: string; label: string }>
+  >(() => {
+    if (compareKind === 'users') {
+      return visibleTeamMembers.map(m => ({ id: m.id, label: m.fullName }));
+    }
+    return availableBranches.map(b => ({ id: b.id, label: b.name }));
+  }, [compareKind, visibleTeamMembers, availableBranches]);
 
   // ── Prompt / Generate ────────────────────────────────────────────────
   const handleGenerate = async () => {
@@ -593,6 +742,54 @@ export function FieldSalesAdminDashboard({
             </p>
           </div>
           <div className={styles.headerActions}>
+            <div
+              role="tablist"
+              aria-label="Dashboard mode"
+              style={{
+                display: 'inline-flex',
+                gap: '0',
+                background: 'var(--gray-100, #f4f4f5)',
+                borderRadius: '999px',
+                padding: '2px',
+              }}
+            >
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'single'}
+                onClick={() => setMode('single')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  background:
+                    mode === 'single' ? 'white' : 'transparent',
+                  fontWeight: mode === 'single' ? 600 : 400,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Single
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={mode === 'compare'}
+                onClick={() => setMode('compare')}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  border: 'none',
+                  background:
+                    mode === 'compare' ? 'white' : 'transparent',
+                  fontWeight: mode === 'compare' ? 600 : 400,
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                }}
+              >
+                Compare
+              </button>
+            </div>
             <button
               type="button"
               className={styles.savedBtn}
@@ -652,6 +849,56 @@ export function FieldSalesAdminDashboard({
 
             {filterOpen && (
               <div className={styles.filterPopover} role="dialog">
+                {scopeRole === 'admin' && availableBranches.length > 0 && (
+                  <div className={styles.popoverSection}>
+                    <div className={styles.popoverSectionHeader}>
+                      <span className={styles.popoverSectionLabel}>Branch</span>
+                      {selectedBranchId && (
+                        <button
+                          type="button"
+                          className={styles.popoverSectionClear}
+                          onClick={() => setSelectedBranchId(null)}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
+                    {selectedBranchName && (
+                      <div className={styles.popoverSelectedHint}>
+                        {selectedBranchName}
+                      </div>
+                    )}
+                    <div className={styles.popoverMemberList}>
+                      <button
+                        type="button"
+                        className={`${styles.popoverMemberRow} ${selectedBranchId === null ? styles.popoverMemberRowSelected : ''}`}
+                        onClick={() => setSelectedBranchId(null)}
+                      >
+                        <span>All branches</span>
+                        {selectedBranchId === null && <Check size={14} />}
+                      </button>
+                      {availableBranches.map(b => {
+                        const isSelected = selectedBranchId === b.id;
+                        return (
+                          <button
+                            key={b.id}
+                            type="button"
+                            className={`${styles.popoverMemberRow} ${isSelected ? styles.popoverMemberRowSelected : ''}`}
+                            onClick={() =>
+                              setSelectedBranchId(isSelected ? null : b.id)
+                            }
+                          >
+                            <span>
+                              {b.name}
+                              {b.is_primary ? ' (Primary)' : ''}
+                            </span>
+                            {isSelected && <Check size={14} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className={styles.popoverSection}>
                   <div className={styles.popoverSectionHeader}>
                     <span className={styles.popoverSectionLabel}>Team Member</span>
@@ -773,7 +1020,19 @@ export function FieldSalesAdminDashboard({
       {loading && <DashboardSkeleton />}
       {error && <div className={styles.error}>{error}</div>}
 
-      {data && !loading && (
+      {data && !loading && mode === 'compare' && (
+        <CompareView
+          data={data}
+          compareKind={compareKind}
+          compareEntityIds={compareEntityIds}
+          choices={compareEntityChoices}
+          metric={compareMetric}
+          onMetricChange={setCompareMetric}
+          onToggleEntity={toggleCompareEntity}
+        />
+      )}
+
+      {data && !loading && mode === 'single' && (
         <>
           <section className={styles.section}>
             <header className={styles.sectionHeader}>
@@ -781,7 +1040,9 @@ export function FieldSalesAdminDashboard({
                 <Users size={18} />
               </div>
               <div className={styles.sectionHeaderText}>
-                <h2 className={styles.sectionTitle}>Team Overview</h2>
+                <h2 className={styles.sectionTitle}>
+                  {scopeRole === 'manager' ? 'My Team Overview' : 'Team Overview'}
+                </h2>
                 <p className={styles.sectionSubtitle}>
                   {data.filters.from} – {data.filters.to}
                 </p>
@@ -1159,6 +1420,191 @@ export function FieldSalesAdminDashboard({
         onDelete={deleteSaved}
       />
     </div>
+  );
+}
+
+interface CompareViewProps {
+  data: AdminReportData;
+  compareKind: 'users' | 'branches';
+  compareEntityIds: string[];
+  choices: Array<{ id: string; label: string }>;
+  metric: CompareMetricKey;
+  onMetricChange: (m: CompareMetricKey) => void;
+  onToggleEntity: (id: string) => void;
+}
+
+function CompareView({
+  data,
+  compareKind,
+  compareEntityIds,
+  choices,
+  metric,
+  onMetricChange,
+  onToggleEntity,
+}: CompareViewProps) {
+  const series = useMemo(() => data.compareSeries ?? [], [data.compareSeries]);
+
+  const chartSpec: ChartSpec | null = useMemo(() => {
+    if (series.length === 0) return null;
+    const dayKeys = series[0]?.daily.map(p => p.date) ?? [];
+    const rows = dayKeys.map(date => {
+      const row: Record<string, string | number> = { date: date.slice(5) };
+      for (const s of series) {
+        const point = s.daily.find(p => p.date === date);
+        row[s.entityLabel] = point ? (point as any)[metric] : 0;
+      }
+      return row;
+    });
+    return {
+      type: 'line',
+      xKey: 'date',
+      series: series.map(s => ({ key: s.entityLabel, label: s.entityLabel })),
+      data: rows,
+    };
+  }, [series, metric]);
+
+  const totalsTable = useMemo(() => {
+    return series.map(s => ({
+      entity: s.entityLabel,
+      submitted: s.totals.submitted,
+      won: s.totals.won,
+      pipeline: s.totals.pipelineValue,
+      sales: s.totals.salesDollars,
+      stops: s.totals.stops,
+    }));
+  }, [series]);
+
+  const compareLabel = compareKind === 'branches' ? 'branches' : 'team members';
+  const needMore = compareEntityIds.length < 2;
+
+  return (
+    <section className={styles.section}>
+      <header className={styles.sectionHeader}>
+        <div className={styles.sectionIcon}>
+          <Users size={18} />
+        </div>
+        <div className={styles.sectionHeaderText}>
+          <h2 className={styles.sectionTitle}>
+            Compare {compareKind === 'branches' ? 'Branches' : 'Team Members'}
+          </h2>
+          <p className={styles.sectionSubtitle}>
+            Pick two or more {compareLabel} and switch metrics to compare them.
+          </p>
+        </div>
+      </header>
+
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <h3 className={styles.cardTitle}>Selection</h3>
+          <span className={styles.cardMeta}>
+            {compareEntityIds.length} selected
+          </span>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            padding: '8px 16px 16px',
+          }}
+        >
+          {choices.map(c => {
+            const active = compareEntityIds.includes(c.id);
+            return (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => onToggleEntity(c.id)}
+                className={`${styles.filterChip} ${active ? styles.filterChipActive : ''}`}
+              >
+                {c.label}
+              </button>
+            );
+          })}
+          {choices.length === 0 && (
+            <span className={styles.popoverEmpty}>
+              No {compareLabel} available.
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className={styles.card}>
+        <div className={styles.cardHeader}>
+          <h3 className={styles.cardTitle}>Metric</h3>
+        </div>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: 8,
+            padding: '8px 16px 16px',
+          }}
+        >
+          {COMPARE_METRICS.map(m => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => onMetricChange(m.key)}
+              className={`${styles.filterChip} ${metric === m.key ? styles.filterChipActive : ''}`}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {needMore && (
+        <div className={styles.error}>
+          Select at least two {compareLabel} to render the comparison.
+        </div>
+      )}
+
+      {!needMore && chartSpec && (
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h3 className={styles.cardTitle}>
+              {COMPARE_METRICS.find(m => m.key === metric)?.label}
+            </h3>
+          </div>
+          <AdminChart spec={chartSpec} height={280} />
+        </div>
+      )}
+
+      {!needMore && totalsTable.length > 0 && (
+        <div className={styles.card}>
+          <div className={styles.cardHeader}>
+            <h3 className={styles.cardTitle}>Totals</h3>
+          </div>
+          <div className={styles.tableWrap}>
+            <table className={styles.dataTable}>
+              <thead>
+                <tr>
+                  <th>{compareKind === 'branches' ? 'Branch' : 'Team Member'}</th>
+                  <th>Submitted</th>
+                  <th>Won</th>
+                  <th>Pipeline</th>
+                  <th>Sales $</th>
+                  <th>Stops</th>
+                </tr>
+              </thead>
+              <tbody>
+                {totalsTable.map(r => (
+                  <tr key={r.entity}>
+                    <td>{r.entity}</td>
+                    <td>{r.submitted}</td>
+                    <td>{r.won}</td>
+                    <td>{r.pipeline.toLocaleString()}</td>
+                    <td>{r.sales.toLocaleString()}</td>
+                    <td>{r.stops}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }
 

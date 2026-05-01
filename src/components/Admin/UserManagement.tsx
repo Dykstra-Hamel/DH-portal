@@ -421,6 +421,11 @@ function EditUserModal({
     companyName: string;
     currentValue: string | null;
   } | null>(null);
+  const [editingManager, setEditingManager] = useState<{
+    userId: string;
+    companyId: string;
+    companyName: string;
+  } | null>(null);
 
   // Sync pending roles when relationships prop changes
   useEffect(() => {
@@ -779,6 +784,21 @@ function EditUserModal({
                       >
                         Branches
                       </button>
+                      {canHaveDepartments(pending.role as any) && (
+                        <button
+                          type="button"
+                          className={styles.actionLink}
+                          onClick={() =>
+                            setEditingManager({
+                              userId: user.id,
+                              companyId: rel.company_id,
+                              companyName: rel.companies?.name || '',
+                            })
+                          }
+                        >
+                          Manager
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={styles.actionLink}
@@ -846,6 +866,16 @@ function EditUserModal({
             setEditingPestPacId(null);
             onRelationshipsChange();
           }}
+        />
+      )}
+
+      {editingManager && (
+        <ManagerManagementModal
+          userId={editingManager.userId}
+          companyId={editingManager.companyId}
+          userName={displayName}
+          companyName={editingManager.companyName}
+          onClose={() => setEditingManager(null)}
         />
       )}
     </>
@@ -1248,6 +1278,155 @@ function BranchManagementModal({
             {saving ? 'Saving...' : 'Save Branch Access'}
           </button>
           <button type="button" className={styles.cancelButton} onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Manager Assignment Modal ─────────────────────────────────────────────────
+
+function ManagerManagementModal({
+  userId,
+  companyId,
+  userName,
+  companyName,
+  onClose,
+}: {
+  userId: string;
+  companyId: string;
+  userName: string;
+  companyName: string;
+  onClose: () => void;
+}) {
+  const [candidates, setCandidates] = useState<
+    Array<{ id: string; display_name: string; email: string }>
+  >([]);
+  const [selected, setSelected] = useState<string>('');
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // authenticatedFetch returns the parsed JSON body directly (not a
+        // Response). Errors throw, which we catch below.
+        const [usersJson, currentJson] = await Promise.all([
+          authenticatedFetch(`/api/companies/${companyId}/users`),
+          authenticatedFetch(
+            `/api/users/${userId}/manager?companyId=${companyId}`
+          ),
+        ]);
+
+        if (cancelled) return;
+
+        // Only users whose company role is 'manager' are eligible to be
+        // assigned as someone else's manager. Self is always excluded.
+        const list = (usersJson?.users || [])
+          .filter(
+            (u: any) =>
+              u.id !== userId && (u.roles || []).includes('manager')
+          )
+          .map((u: any) => ({
+            id: u.id,
+            display_name: u.display_name || u.email,
+            email: u.email,
+          }));
+        setCandidates(list);
+        setSelected(currentJson?.managerUserId || '');
+      } catch (err) {
+        if (!cancelled) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : 'Failed to load manager candidates'
+          );
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, companyId]);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      await authenticatedFetch(`/api/users/${userId}/manager`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          companyId,
+          managerUserId: selected || null,
+        }),
+      });
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : 'Failed to save manager assignment'
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className={`${styles.modal} ${styles.subModal}`}>
+      <div className={styles.modalContent}>
+        <div className={styles.modalHeader}>
+          <h3>Assign Manager</h3>
+          <button className={styles.closeButton} type="button" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className={styles.modalSection}>
+          <p className={styles.subModalMeta}>
+            <strong>{userName}</strong> at <strong>{companyName}</strong>
+          </p>
+          {loading ? (
+            <p>Loading candidates…</p>
+          ) : (
+            <div>
+              <label htmlFor="managerSelect">Manager</label>
+              <select
+                id="managerSelect"
+                value={selected}
+                onChange={e => setSelected(e.target.value)}
+                style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+              >
+                <option value="">— No manager —</option>
+                {candidates.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.display_name} ({c.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+          {error && (
+            <p style={{ color: 'red', marginTop: '8px' }}>{error}</p>
+          )}
+        </div>
+        <div className={styles.modalFooter}>
+          <button
+            type="button"
+            className={styles.saveButton}
+            onClick={handleSave}
+            disabled={saving || loading}
+          >
+            {saving ? 'Saving...' : 'Save'}
+          </button>
+          <button
+            type="button"
+            className={styles.cancelButton}
+            onClick={onClose}
+          >
             Close
           </button>
         </div>

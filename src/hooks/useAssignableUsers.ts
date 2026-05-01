@@ -16,12 +16,14 @@ interface AssignableUser {
 interface UseAssignableUsersProps {
   companyId: string | null | undefined;
   departmentType?: 'sales' | 'support' | 'all';
+  branchId?: string | null;
   enabled?: boolean;
 }
 
 export function useAssignableUsers({
   companyId,
   departmentType = 'all',
+  branchId,
   enabled = true,
 }: UseAssignableUsersProps) {
   const [users, setUsers] = useState<AssignableUser[]>([]);
@@ -63,7 +65,12 @@ export function useAssignableUsers({
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`/api/companies/${companyId}/users`);
+      const params = new URLSearchParams();
+      if (branchId) params.set('branchId', branchId);
+      const qs = params.toString();
+      const url = `/api/companies/${companyId}/users${qs ? `?${qs}` : ''}`;
+
+      const response = await fetch(url);
       if (!response.ok) {
         throw new Error('Failed to fetch users');
       }
@@ -82,7 +89,7 @@ export function useAssignableUsers({
     } finally {
       setLoading(false);
     }
-  }, [companyId, enabled, isUserEligible]);
+  }, [companyId, branchId, enabled, isUserEligible]);
 
   useEffect(() => {
     fetchAssignableUsers();

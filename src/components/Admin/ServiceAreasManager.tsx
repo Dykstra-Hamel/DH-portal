@@ -49,6 +49,26 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [zipCodes, setZipCodes] = useState<string[]>([]);
+  // Named zip-code service areas. Each entry is one row in service_areas
+  // with type='zip_code'. Replaces the legacy single-area "consolidated"
+  // approach; each named area can have its own branch.
+  const [zipCodeAreas, setZipCodeAreas] = useState<
+    Array<{
+      id?: string;
+      name: string;
+      branchId: string | null;
+      zipCodes: string[];
+    }>
+  >([]);
+  const [newAreaName, setNewAreaName] = useState('');
+  const [areaInputs, setAreaInputs] = useState<Record<string, string>>({});
+  const areaCsvInputRef = useRef<HTMLInputElement>(null);
+  const [csvTargetAreaIndex, setCsvTargetAreaIndex] = useState<number | null>(
+    null
+  );
+  const [areaCsvSummary, setAreaCsvSummary] = useState<
+    Record<number, string>
+  >({});
   const [initialCenter, setInitialCenter] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [branchAssignments, setBranchAssignments] = useState<Record<string, string>>({});
@@ -167,6 +187,18 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
             setBranchAssignments(assignments);
             const allZipCodes = [...new Set<string>(zipCodeAreas.flatMap((a: any) => a.zipCodes || []))];
             setZipCodes(allZipCodes);
+            // Hydrate named zip_code areas (each kept separate now). Filter
+            // out any "Zip Code Service Area" legacy single-bucket entries
+            // by surfacing whatever the server returns; users can rename
+            // and split as needed.
+            setZipCodeAreas(
+              zipCodeAreas.map((a: any) => ({
+                id: a.id,
+                name: a.name || 'Zip Code Service Area',
+                branchId: a.branchId ?? null,
+                zipCodes: Array.isArray(a.zipCodes) ? a.zipCodes : [],
+              }))
+            );
           }
         }
 
@@ -233,10 +265,9 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
   };
 
   const saveZipCodes = async (zipCodeList: string[]) => {
+    // Legacy fallback: kept for the unnamed flat-list flow. New callers
+    // should use saveZipCodeAreas instead.
     try {
-      // Zip codes live in the service_areas table as a zip_code-type entry.
-      // The PUT endpoint replaces all areas, so we must include the current
-      // geographic areas to avoid wiping them.
       const geographicAreas = serviceAreas.map(a => ({
         ...a,
         branchId: branchAssignments[a.id] ?? a.branchId ?? null,
@@ -259,6 +290,153 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
       console.error('Error saving zip codes:', error);
       alert('Failed to save zip codes. Please try again.');
     }
+  };
+
+  // Edits to named zip_code service areas are buffered locally; nothing
+  // hits the server until the user clicks "Save Changes" at the bottom
+  // of the section. `dirty` tracks whether there are unsaved local edits.
+  const [dirty, setDirty] = useState(false);
+  const saveInFlightRef = useRef(false);
+
+  const persistZipCodeAreas = async (
+    toSave: Array<{ id?: string; name: string; branchId: string | null; zipCodes: string[] }>
+  ): Promise<boolean> => {
+    if (saveInFlightRef.current) return false; // guard against double-click
+    saveInFlightRef.current = true;
+    try {
+      setSaving(true);
+      const geographicAreas = serviceAreas.map(a => ({
+        ...a,
+        branchId: branchAssignments[a.id] ?? a.branchId ?? null,
+      }));
+      const namedZipAreas = toSave
+        .filter(a => a.zipCodes.length > 0 || a.name.trim().length > 0)
+        .map(a => ({
+          id: a.id,
+          name: a.name.trim() || 'Zip Code Service Area',
+          type: 'zip_code',
+          zipCodes: [...new Set(a.zipCodes)],
+          priority: 0,
+          isActive: true,
+          branchId: a.branchId ?? null,
+        }));
+
+      const response = await fetch(`/api/service-areas/${companyId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ serviceAreas: [...geographicAreas, ...namedZipAreas] }),
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Failed to save zip-code service areas');
+      }
+      return true;
+    } catch (error) {
+      console.error('Error saving named zip code areas:', error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : 'Failed to save zip-code service areas. Please try again.'
+      );
+      return false;
+    } finally {
+      setSaving(false);
+      saveInFlightRef.current = false;
+    }
+  };
+
+  const handleSaveZipCodeAreas = async () => {
+    const ok = await persistZipCodeAreas(zipCodeAreas);
+    if (ok) setDirty(false);
+  };
+
+  const updateZipCodeArea = (
+    index: number,
+    patch: Partial<{ name: string; branchId: string | null; zipCodes: string[] }>
+  ) => {
+    setZipCodeAreas(prev =>
+      prev.map((area, i) => (i === index ? { ...area, ...patch } : area))
+    );
+    setDirty(true);
+  };
+
+  const addZipCodeArea = () => {
+    const name = newAreaName.trim() || `Service Area ${zipCodeAreas.length + 1}`;
+    setZipCodeAreas(prev => [
+      ...prev,
+      { name, branchId: null, zipCodes: [] as string[] },
+    ]);
+    setNewAreaName('');
+    setDirty(true);
+  };
+
+  const removeZipCodeArea = (index: number) => {
+    if (
+      !confirm(
+        `Remove service area "${zipCodeAreas[index]?.name}"? This will release its ZIPs from any branch.`
+      )
+    ) {
+      return;
+    }
+    setZipCodeAreas(prev => prev.filter((_, i) => i !== index));
+    setDirty(true);
+  };
+
+  const addZipToArea = (index: number) => {
+    const raw = (areaInputs[String(index)] ?? '').trim();
+    if (!raw) return;
+    const normalized = raw.split('-')[0]?.trim() ?? '';
+    if (!/^\d{5}$/.test(normalized)) {
+      alert('Please enter a 5-digit ZIP code');
+      return;
+    }
+    const area = zipCodeAreas[index];
+    if (!area || area.zipCodes.includes(normalized)) {
+      setAreaInputs(prev => ({ ...prev, [String(index)]: '' }));
+      return;
+    }
+    updateZipCodeArea(index, {
+      zipCodes: [...area.zipCodes, normalized],
+    });
+    setAreaInputs(prev => ({ ...prev, [String(index)]: '' }));
+  };
+
+  const removeZipFromArea = (index: number, zip: string) => {
+    const area = zipCodeAreas[index];
+    if (!area) return;
+    updateZipCodeArea(index, {
+      zipCodes: area.zipCodes.filter(z => z !== zip),
+    });
+  };
+
+  const handleAreaCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const targetIndex = csvTargetAreaIndex;
+    setCsvTargetAreaIndex(null);
+    if (targetIndex === null) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const area = zipCodeAreas[targetIndex];
+    if (!area) return;
+
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const text = (ev.target?.result as string) ?? '';
+      const candidates = text.split(/[\s,;\t]+/);
+      const valid: string[] = [];
+      for (const raw of candidates) {
+        const head = raw.trim().split('-')[0]?.trim() ?? '';
+        if (/^\d{5}$/.test(head)) valid.push(head);
+      }
+      const merged = [...new Set([...area.zipCodes, ...valid])];
+      const added = merged.length - area.zipCodes.length;
+      updateZipCodeArea(targetIndex, { zipCodes: merged });
+      setAreaCsvSummary(prev => ({
+        ...prev,
+        [targetIndex]: `Added ${added} new ZIP${added === 1 ? '' : 's'} (${valid.length} total in file).`,
+      }));
+    };
+    reader.readAsText(file);
+    e.target.value = '';
   };
 
   // CSV upload handler
@@ -330,15 +508,10 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
         handleUpdateGroup(groupId, { zip_codes: [...currentGroup.zip_codes, ...groupAdded] });
       }
 
-      setZipCodes(prev => {
-        const missingFromFlat = valid.filter(z => !prev.includes(z));
-        if (missingFromFlat.length > 0) {
-          const merged = [...prev, ...missingFromFlat];
-          saveZipCodes(merged);
-          return merged;
-        }
-        return prev;
-      });
+      // Zip Code Groups (user-assignment) are intentionally decoupled
+      // from named zip_code service areas (branch-routing). Don't mirror
+      // group ZIPs into the flat service_area list — that used to wipe
+      // the named areas via a competing PUT.
 
       setGroupCsvSummary(prev => ({
         ...prev,
@@ -440,12 +613,8 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
     setGroupZipInput(prev => ({ ...prev, [group.id]: '' }));
     handleUpdateGroup(group.id, { zip_codes: updated });
 
-    // Also add to the main service area zip list if not already there
-    if (!zipCodes.includes(zip)) {
-      const merged = [...zipCodes, zip];
-      setZipCodes(merged);
-      saveZipCodes(merged);
-    }
+    // (Decoupled from named zip_code service areas — see comment above
+    // about why we no longer mirror group ZIPs into the flat list.)
   };
 
   const handleRemoveZipFromGroup = (group: ZipCodeGroup, zip: string) => {
@@ -497,59 +666,324 @@ export default function ServiceAreasManager({ companyId }: ServiceAreasManagerPr
 
       {!showServiceAreaMap ? (
         <div className={styles.zipCodeSection}>
-          {/* Flat zip code input row */}
-          <div className={styles.serviceAreaInput}>
+          {/* Hidden CSV file inputs (group csv stays for the groups section
+              below; area csv targets a specific named area via state). */}
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,.txt"
+            className={styles.hiddenFileInput}
+            onChange={handleCsvUpload}
+          />
+          <input
+            ref={groupCsvInputRef}
+            type="file"
+            accept=".csv,.txt"
+            className={styles.hiddenFileInput}
+            onChange={handleGroupCsvUpload}
+          />
+          <input
+            ref={areaCsvInputRef}
+            type="file"
+            accept=".csv,.txt"
+            className={styles.hiddenFileInput}
+            onChange={handleAreaCsvUpload}
+          />
+
+          {/* New named-area creator */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              marginBottom: 16,
+              padding: 12,
+              background: '#f9fafb',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+            }}
+          >
             <input
               type="text"
-              value={serviceAreaInput}
-              onChange={e => setServiceAreaInput(e.target.value)}
-              placeholder="Enter zip code (e.g., 12345)"
-              onKeyDown={e => e.key === 'Enter' && addZipCode()}
+              value={newAreaName}
+              onChange={e => setNewAreaName(e.target.value)}
+              placeholder="New service area name (e.g., 'North Zone')"
+              style={{
+                flex: 1,
+                padding: '6px 10px',
+                fontSize: 13,
+                borderRadius: 6,
+                border: '1px solid #d1d5db',
+              }}
+              onKeyDown={e => e.key === 'Enter' && addZipCodeArea()}
             />
-            <button onClick={addZipCode} type="button">
-              Add
-            </button>
             <button
               type="button"
-              className={styles.uploadCsvButton}
-              onClick={() => { setCsvSummary(null); csvInputRef.current?.click(); }}
+              onClick={addZipCodeArea}
+              style={{
+                padding: '6px 12px',
+                fontSize: 13,
+                fontWeight: 500,
+                color: 'white',
+                background: '#3b82f6',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
             >
-              Upload CSV
+              + Add Service Area
             </button>
-            <input
-              ref={csvInputRef}
-              type="file"
-              accept=".csv,.txt"
-              className={styles.hiddenFileInput}
-              onChange={handleCsvUpload}
-            />
-            <input
-              ref={groupCsvInputRef}
-              type="file"
-              accept=".csv,.txt"
-              className={styles.hiddenFileInput}
-              onChange={handleGroupCsvUpload}
-            />
           </div>
 
-          {csvSummary && (
-            <p className={styles.csvSummary}>{csvSummary}</p>
+          {/* Named ZIP-list service areas (each = one row in service_areas
+              with type='zip_code'). Each has its own branch and ZIPs. */}
+          {zipCodeAreas.length === 0 ? (
+            <p className={styles.emptyState}>
+              No zip-code service areas configured. Create one above to assign
+              ZIPs to a branch.
+            </p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {zipCodeAreas.map((area, idx) => (
+                <div
+                  key={area.id ?? `new-${idx}`}
+                  style={{
+                    border: '1px solid #e5e7eb',
+                    borderRadius: 8,
+                    padding: 16,
+                    background: '#ffffff',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 12,
+                      alignItems: 'center',
+                      marginBottom: 12,
+                      flexWrap: 'wrap',
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={area.name}
+                      onChange={e =>
+                        updateZipCodeArea(idx, { name: e.target.value })
+                      }
+                      style={{
+                        flex: 1,
+                        minWidth: 180,
+                        padding: '6px 10px',
+                        fontSize: 14,
+                        fontWeight: 500,
+                        borderRadius: 6,
+                        border: '1px solid #d1d5db',
+                      }}
+                    />
+                    {branches.length > 0 && (
+                      <select
+                        value={area.branchId ?? ''}
+                        onChange={e =>
+                          updateZipCodeArea(idx, {
+                            branchId: e.target.value || null,
+                          })
+                        }
+                        style={{
+                          fontSize: 13,
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: '1px solid #d1d5db',
+                          background: '#fff',
+                        }}
+                      >
+                        <option value="">— No branch —</option>
+                        {branches.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => removeZipCodeArea(idx)}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: 12,
+                        fontWeight: 500,
+                        color: '#b91c1c',
+                        background: '#fef2f2',
+                        border: '1px solid #fecaca',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      gap: 8,
+                      alignItems: 'center',
+                      marginBottom: 8,
+                    }}
+                  >
+                    <input
+                      type="text"
+                      value={areaInputs[String(idx)] ?? ''}
+                      onChange={e =>
+                        setAreaInputs(prev => ({
+                          ...prev,
+                          [String(idx)]: e.target.value,
+                        }))
+                      }
+                      placeholder="Add a ZIP (e.g., 12345)"
+                      onKeyDown={e => e.key === 'Enter' && addZipToArea(idx)}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: 13,
+                        borderRadius: 6,
+                        border: '1px solid #d1d5db',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => addZipToArea(idx)}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: 13,
+                        background: '#fff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Add ZIP
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAreaCsvSummary(prev => {
+                          const next = { ...prev };
+                          delete next[idx];
+                          return next;
+                        });
+                        setCsvTargetAreaIndex(idx);
+                        areaCsvInputRef.current?.click();
+                      }}
+                      style={{
+                        padding: '6px 10px',
+                        fontSize: 13,
+                        background: '#fff',
+                        border: '1px solid #d1d5db',
+                        borderRadius: 6,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Upload CSV
+                    </button>
+                  </div>
+
+                  {areaCsvSummary[idx] && (
+                    <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 8px' }}>
+                      {areaCsvSummary[idx]}
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: 6,
+                    }}
+                  >
+                    {area.zipCodes.length === 0 ? (
+                      <span style={{ fontSize: 12, color: '#9ca3af' }}>
+                        No ZIPs yet.
+                      </span>
+                    ) : (
+                      area.zipCodes.map(zip => (
+                        <span
+                          key={zip}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 4,
+                            fontSize: 12,
+                            padding: '3px 8px',
+                            background: '#eff6ff',
+                            color: '#1e40af',
+                            border: '1px solid #bfdbfe',
+                            borderRadius: 999,
+                          }}
+                        >
+                          {zip}
+                          <button
+                            type="button"
+                            onClick={() => removeZipFromArea(idx, zip)}
+                            style={{
+                              border: 'none',
+                              background: 'transparent',
+                              color: '#1e40af',
+                              cursor: 'pointer',
+                              padding: 0,
+                              fontSize: 14,
+                              lineHeight: 1,
+                            }}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
 
-          <div className={styles.serviceAreas}>
-            {zipCodes.map(zipCode => (
-              <span key={zipCode} className={styles.serviceArea}>
-                {zipCode}
-                <button type="button" onClick={() => removeZipCode(zipCode)}>
-                  ×
-                </button>
+          {/* Save bar — only renders when there are unsaved local edits */}
+          {(dirty || saving) && (
+            <div
+              style={{
+                position: 'sticky',
+                bottom: 0,
+                marginTop: 16,
+                padding: '12px 16px',
+                background: '#fffbeb',
+                border: '1px solid #fcd34d',
+                borderRadius: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                gap: 12,
+                zIndex: 5,
+              }}
+            >
+              <span style={{ fontSize: 13, color: '#92400e', fontWeight: 500 }}>
+                {dirty
+                  ? 'You have unsaved changes to your zip-code service areas.'
+                  : 'Saving…'}
               </span>
-            ))}
-          </div>
-          {zipCodes.length === 0 && (
-            <p className={styles.emptyState}>
-              No zip codes configured. Add zip codes to restrict service to specific areas.
-            </p>
+              <button
+                type="button"
+                onClick={handleSaveZipCodeAreas}
+                disabled={!dirty || saving}
+                style={{
+                  padding: '8px 16px',
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'white',
+                  background: dirty && !saving ? '#3b82f6' : '#9ca3af',
+                  border: 'none',
+                  borderRadius: 6,
+                  cursor: dirty && !saving ? 'pointer' : 'not-allowed',
+                }}
+              >
+                {saving ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
           )}
 
           {/* Zip Code Groups section */}

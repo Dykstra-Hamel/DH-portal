@@ -15,6 +15,11 @@ function parseCsv(value: string | null): string[] | null {
   return parts.length > 0 ? parts : null;
 }
 
+function parseCompare(value: string | null): 'users' | 'branches' | null {
+  if (value === 'users' || value === 'branches') return value;
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await getAuthenticatedUser();
@@ -43,13 +48,58 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: access.reason }, { status: access.status });
     }
 
+    const userIds = parseCsv(searchParams.get('userIds'));
+    const compare = parseCompare(searchParams.get('compare'));
+    const entityIds = parseCsv(searchParams.get('entityIds'));
+    const branchId = searchParams.get('branchId');
+
+    // Manager-scope guard: a manager-role caller (not admin/owner/global)
+    // can only request reports for their direct reports. They cannot fudge
+    // the URL with someone else's user_id.
+    if (
+      !isGlobalAdmin &&
+      access.ok &&
+      access.role === 'manager'
+    ) {
+      const { data: reports } = await admin
+        .from('user_companies')
+        .select('user_id')
+        .eq('company_id', companyId)
+        .eq('manager_user_id', user.id);
+      const allowed = new Set((reports ?? []).map(r => r.user_id as string));
+
+      const requestedUsers: string[] = [];
+      if (userIds) requestedUsers.push(...userIds);
+      if (compare === 'users' && entityIds) requestedUsers.push(...entityIds);
+
+      for (const uid of requestedUsers) {
+        if (!allowed.has(uid)) {
+          return NextResponse.json(
+            { error: 'User is not one of your direct reports' },
+            { status: 403 }
+          );
+        }
+      }
+
+      // Managers compare branches? Disallowed by design.
+      if (compare === 'branches') {
+        return NextResponse.json(
+          { error: 'Branch comparison is admin-only' },
+          { status: 403 }
+        );
+      }
+    }
+
     const report = await getAdminFieldSalesReport(admin, {
       companyId,
       from: searchParams.get('from'),
       to: searchParams.get('to'),
-      userIds: parseCsv(searchParams.get('userIds')),
+      userIds,
       leadSource: parseCsv(searchParams.get('leadSource')),
       leadStatus: parseCsv(searchParams.get('leadStatus')),
+      branchId: branchId || null,
+      compare,
+      entityIds,
     });
 
     return NextResponse.json(report);

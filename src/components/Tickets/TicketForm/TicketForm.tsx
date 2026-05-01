@@ -16,6 +16,9 @@ import {
   SearchableDropdown,
   SearchableDropdownItem,
 } from '@/components/Common/SearchableDropdown';
+import { useBranches } from '@/hooks/useBranches';
+import { useDefaultBranch } from '@/hooks/useDefaultBranch';
+import { useUser } from '@/hooks/useUser';
 import styles from './TicketForm.module.scss';
 
 interface TicketFormProps {
@@ -51,6 +54,17 @@ export default function TicketForm({
   const [errors, setErrors] = useState<
     Partial<Record<keyof TicketFormData, string>>
   >({});
+
+  // Branch picker — defaults to a "Auto" option that does NOT send branch_id
+  // in the body. Server then resolves via the full chain (ZIP fast-path,
+  // assignee branch, submitter branch). Picking a specific branch sends
+  // an explicit branch_id override.
+  const { user } = useUser();
+  const { branches } = useBranches(companyId);
+  const { branchId: defaultBranchId } = useDefaultBranch(user?.id, companyId);
+  const [branchSelection, setBranchSelection] = useState<string>(''); // '' = Auto
+  const defaultBranchName =
+    branches.find(b => b.id === defaultBranchId)?.name ?? null;
 
   const [pestOptions, setPestOptions] = useState<Array<{ id: string; name: string; custom_label: string }>>([]);
   const [loadingPestOptions, setLoadingPestOptions] = useState(false);
@@ -255,6 +269,9 @@ export default function TicketForm({
 
       const dataToSend = {
         ...formData,
+        // Branch override — only send when the user picked a specific
+        // branch. '' means "Auto" → let server resolve.
+        ...(branchSelection ? { branch_id: branchSelection } : {}),
         // Map format to database type
         // Include customer data if creating new customer
         ...(showNewCustomer && {
@@ -272,7 +289,7 @@ export default function TicketForm({
       };
       onFormDataChange(isValid ? dataToSend : null);
     }
-  }, [formData, newCustomerData, showNewCustomer, onFormDataChange]);
+  }, [formData, newCustomerData, showNewCustomer, branchSelection, onFormDataChange]);
 
   return (
     <div className={styles.ticketForm}>
@@ -581,6 +598,31 @@ export default function TicketForm({
           ))}
         </select>
       </div>
+
+      {/* Branch (hidden when company has no branches) */}
+      {branches.length > 0 && (
+        <div className={styles.formGroup}>
+          <label htmlFor="branch" className={styles.label}>
+            Branch
+          </label>
+          <select
+            name="branch"
+            value={branchSelection}
+            onChange={e => setBranchSelection(e.target.value)}
+            className={styles.select}
+          >
+            <option value="">
+              Auto{defaultBranchName ? ` (your branch — ${defaultBranchName})` : ''}
+            </option>
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>
+                {b.name}
+                {b.is_primary ? ' (Primary)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Ticket Type and Pest Type */}
       <div className={styles.row}>

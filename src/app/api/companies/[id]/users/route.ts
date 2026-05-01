@@ -20,6 +20,7 @@ export async function GET(
     
     const { user, isGlobalAdmin, supabase } = authResult;
     const { id: companyId } = await params;
+    const branchId = request.nextUrl.searchParams.get('branchId');
 
     // Verify user has access to this company
     const accessCheck = await verifyCompanyAccess(supabase, user.id, companyId, isGlobalAdmin);
@@ -48,7 +49,41 @@ export async function GET(
     }
 
     // Get user IDs to query profiles
-    const userIds = companyUsers.map((cu: { user_id: string }) => cu.user_id);
+    let userIds = companyUsers.map((cu: { user_id: string }) => cu.user_id);
+
+    // Branch-scoped filter: when a record's branch is specified, drop users
+    // restricted to other branches. Users with no user_branch_assignments rows
+    // for this company are unrestricted and pass through.
+    if (branchId) {
+      const { data: ubaRows, error: ubaError } = await queryClient
+        .from('user_branch_assignments')
+        .select('user_id, branch_id')
+        .eq('company_id', companyId)
+        .in('user_id', userIds);
+
+      if (ubaError) {
+        console.error('Error fetching branch assignments:', ubaError);
+        return createErrorResponse('Failed to fetch branch assignments');
+      }
+
+      const userBranches = new Map<string, Set<string>>();
+      (ubaRows || []).forEach((row: { user_id: string; branch_id: string }) => {
+        if (!userBranches.has(row.user_id)) {
+          userBranches.set(row.user_id, new Set());
+        }
+        userBranches.get(row.user_id)!.add(row.branch_id);
+      });
+
+      userIds = userIds.filter((uid: string) => {
+        const set = userBranches.get(uid);
+        if (!set || set.size === 0) return true; // unrestricted
+        return set.has(branchId);
+      });
+
+      if (userIds.length === 0) {
+        return createSuccessResponse({ users: [] });
+      }
+    }
 
     // Now fetch the profiles for those users with their departments (using admin client if admin)
     const { data: profiles, error: profilesError } = await queryClient

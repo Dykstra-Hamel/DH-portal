@@ -16,6 +16,10 @@ import {
 } from '@/lib/service-addresses';
 import { inngest } from '@/lib/inngest/client';
 import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -585,6 +589,37 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
   let ticketId: string | null = null;
   let leadId: string | null = null;
 
+  // Resolve branch_id for both lead and ticket paths. Prefer the cache-
+  // aware helper when a service_address has been attached to the call
+  // record (covers most repeat callers). Falls back to customer ZIP for
+  // brand-new callers without an address yet.
+  let resolvedBranchId: string | null = null;
+  const callServiceAddressId = (callRecord as { service_address_id?: string | null })
+    .service_address_id ?? null;
+
+  if (callServiceAddressId && callRecord.company_id) {
+    resolvedBranchId = await resolveBranchForServiceAddress(
+      supabase,
+      callRecord.company_id,
+      callServiceAddressId
+    );
+  }
+
+  if (!resolvedBranchId && callRecord.customer_id && callRecord.company_id) {
+    const { data: customerForBranch } = await supabase
+      .from('customers')
+      .select('zip_code')
+      .eq('id', callRecord.customer_id)
+      .maybeSingle();
+    if (customerForBranch?.zip_code) {
+      resolvedBranchId = await resolveBranchIdByZip(
+        supabase,
+        callRecord.company_id,
+        customerForBranch.zip_code
+      );
+    }
+  }
+
   // Check campaign attribution — existing customers only
   const attribution =
     callRecord.customer_id && callRecord.company_id
@@ -615,6 +650,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         format: 'call',
         lead_status: 'new',
         priority: 'medium',
+        branch_id: resolvedBranchId,
         service_type: extractedData.pest_issue,
         comments: description.trim(),
         created_at: new Date().toISOString(),
@@ -682,6 +718,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         call_record_id: callRecord.id,
         status: 'new',
         priority: 'medium',
+        branch_id: resolvedBranchId,
         service_type: serviceType,
         pest_type: extractedData.pest_issue,
         description: description.trim(),
