@@ -147,6 +147,7 @@ export default function TicketReviewModal({
   } = useAssignableUsers({
     companyId: ticket.company_id,
     departmentType: selectedQualification === 'sales' ? 'sales' : 'support',
+    branchId: selectedBranchId ?? null,
     enabled: isOpen,
   });
   const [loadingCallRecord, setLoadingCallRecord] = useState(false);

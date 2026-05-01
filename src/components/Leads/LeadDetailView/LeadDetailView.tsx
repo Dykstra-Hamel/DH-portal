@@ -101,6 +101,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   const { users: assignableUsers } = useAssignableUsers({
     companyId: lead?.company_id,
     departmentType: ticketType === 'support' ? 'support' : 'sales',
+    branchId: lead?.branch_id ?? null,
     enabled: ticketType !== 'junk',
   });
   const { branches: availableBranches } = useBranches(lead?.company_id);
@@ -1485,6 +1486,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
           customerPhone={lead.customer?.phone}
           companyId={lead.company_id}
           currentAssigneeId={lead.assigned_to}
+          branchId={lead.branch_id ?? null}
           type="lead"
         />
 

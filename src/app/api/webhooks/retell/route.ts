@@ -4,6 +4,7 @@ import { sendEvent } from '@/lib/inngest/client';
 import { sendCallSummaryNotifications } from '@/lib/email/call-summary-notifications';
 import { CallSummaryEmailData } from '@/lib/email/types';
 import { findCompanyByAgentId } from '@/lib/agent-utils';
+import { resolveBranchIdByZip } from '@/lib/branch-filter';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(durationSeconds: number | null): number | null {
@@ -176,6 +177,24 @@ async function handleCallStarted(supabase: any, callData: any) {
       customerId = newCustomer.id;
     }
 
+    // Resolve branch_id from existing customer's ZIP. Returns null when the
+    // customer has no ZIP yet or the company hasn't tagged a service_area.
+    let retellBranchId: string | null = null;
+    if (customerId && companyId) {
+      const { data: customerForBranch } = await supabase
+        .from('customers')
+        .select('zip_code')
+        .eq('id', customerId)
+        .maybeSingle();
+      if (customerForBranch?.zip_code) {
+        retellBranchId = await resolveBranchIdByZip(
+          supabase,
+          companyId,
+          customerForBranch.zip_code
+        );
+      }
+    }
+
     // Always create a new lead for inbound calls
     const { data: newLead, error: leadError } = await supabase
       .from('leads')
@@ -186,6 +205,7 @@ async function handleCallStarted(supabase: any, callData: any) {
         lead_type: 'phone_call',
         lead_status: 'new', // Will be updated based on AI qualification later
         priority: 'medium',
+        branch_id: retellBranchId,
         comments: `📞 Inbound call started at ${new Date().toISOString()}`,
         created_at: new Date().toISOString(),
       })

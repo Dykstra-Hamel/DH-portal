@@ -6,6 +6,10 @@ import {
   linkCustomerToServiceAddress,
   type ServiceAddressData,
 } from '@/lib/service-addresses';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 interface IncomingAddressComponents {
   street_number?: string;
@@ -313,6 +317,28 @@ export async function POST(request: NextRequest) {
       }
       leadId = resolvedLeadId as string;
     } else {
+      // Resolve branch via cache-aware helper when we have a persisted
+      // service_address (gets cache + geocoding fallback). For the rare
+      // path where the address wasn't created yet, fall back to ZIP-only
+      // matching against the structured address components.
+      let inspectionBranchId: string | null = null;
+      if (serviceAddressId) {
+        inspectionBranchId = await resolveBranchForServiceAddress(
+          adminClient,
+          companyId,
+          serviceAddressId
+        );
+      } else {
+        const candidateZip = addressComponents?.postal_code?.trim() || null;
+        if (candidateZip) {
+          inspectionBranchId = await resolveBranchIdByZip(
+            adminClient,
+            companyId,
+            candidateZip
+          );
+        }
+      }
+
       const { data: newLead, error: leadError } = await adminClient
         .from('leads')
         .insert({
@@ -323,6 +349,7 @@ export async function POST(request: NextRequest) {
           lead_type: 'manual',
           lead_source: 'inspector',
           lead_status: 'in_process',
+          branch_id: inspectionBranchId,
           pest_type: primaryPest,
           additional_pests: additionalPests,
           map_plot_data: mapPlotData ?? null,

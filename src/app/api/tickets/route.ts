@@ -13,7 +13,12 @@ import {
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
-import { getUserBranchFilter } from '@/lib/branch-filter';
+import {
+  getUserBranchFilter,
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+  resolveDefaultBranchForUser,
+} from '@/lib/branch-filter';
 import { sendTicketCreatedNotification } from '@/lib/email/company-submission-notifications';
 
 /**
@@ -147,14 +152,18 @@ export async function GET(request: NextRequest) {
       return accessCheck;
     }
 
-    // If count only, return counts for all tabs using optimized helper
+    // If count only, return counts for all tabs using optimized helper.
+    // Branch filter mirrors the list query: explicit branchId -> that
+    // branch + null; otherwise fall back to the user-restriction filter.
     if (countOnly) {
-      const branchFilter = await getUserBranchFilter(
-        supabase,
-        user.id,
-        companyId,
-        isGlobalAdmin
-      );
+      const branchFilter = branchId
+        ? `branch_id.is.null,branch_id.eq.${branchId}`
+        : await getUserBranchFilter(
+            supabase,
+            user.id,
+            companyId,
+            isGlobalAdmin
+          );
       const counts = await getTicketTabCounts(
         companyId,
         includeArchived,
@@ -213,9 +222,11 @@ export async function GET(request: NextRequest) {
       query = query.or('archived.is.null,archived.eq.false');
     }
 
-    // Apply branch filter: explicit branchId param OR user restriction
+    // Branch filter: explicit branchId always shows that branch + null
+    // records (so unassigned-branch tickets stay visible). Without an
+    // explicit pick, fall back to user-restriction (user's branches + null).
     if (branchId) {
-      query = query.eq('branch_id', branchId);
+      query = query.or(`branch_id.is.null,branch_id.eq.${branchId}`);
     } else {
       const branchFilter = await getUserBranchFilter(
         supabase,
@@ -306,13 +317,17 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('Failed to fetch tickets');
     }
 
-    // Always fetch tab counts so UI badges stay accurate, even when the current tab has no rows
-    const branchFilter = await getUserBranchFilter(
-      supabase,
-      user.id,
-      companyId,
-      isGlobalAdmin
-    );
+    // Always fetch tab counts so UI badges stay accurate, even when the
+    // current tab has no rows. Mirror the list filter: explicit branchId
+    // shows that branch + null; otherwise user-restriction filter.
+    const branchFilter = branchId
+      ? `branch_id.is.null,branch_id.eq.${branchId}`
+      : await getUserBranchFilter(
+          supabase,
+          user.id,
+          companyId,
+          isGlobalAdmin
+        );
     const counts = await getTicketTabCounts(
       companyId,
       includeArchived,
@@ -537,10 +552,64 @@ export async function POST(request: NextRequest) {
       return accessCheck;
     }
 
+    // Branch resolution order:
+    //   1. Explicit branch_id in body (caller override).
+    //   2. service_address-aware resolver (cache -> ZIP -> coords-validate).
+    //      skipGeocode: don't add Google API latency to a user submission.
+    //   3. Customer ZIP fast-path when no service_address.
+    //   4. Assignee's default branch when assigned_to is set.
+    //   5. Submitter's default branch as final fallback.
+    let resolvedBranchId: string | null = ticketData.branch_id ?? null;
+
+    // Step 2: service-address aware
+    if (!resolvedBranchId && ticketData.service_address_id) {
+      resolvedBranchId = await resolveBranchForServiceAddress(
+        queryClient,
+        ticketData.company_id,
+        ticketData.service_address_id,
+        { skipGeocode: true }
+      );
+    }
+
+    // Step 3: customer-zip fallback when no service_address
+    if (!resolvedBranchId && !ticketData.service_address_id && ticketData.customer_id) {
+      const { data: cust } = await queryClient
+        .from('customers')
+        .select('zip_code')
+        .eq('id', ticketData.customer_id)
+        .maybeSingle();
+      const candidateZip = cust?.zip_code?.trim() || null;
+      if (candidateZip) {
+        resolvedBranchId = await resolveBranchIdByZip(
+          queryClient,
+          ticketData.company_id,
+          candidateZip
+        );
+      }
+    }
+
+    // Step 4: assignee's default branch
+    if (!resolvedBranchId && ticketData.assigned_to) {
+      resolvedBranchId = await resolveDefaultBranchForUser(
+        queryClient,
+        ticketData.assigned_to,
+        ticketData.company_id
+      );
+    }
+
+    // Step 5: submitter's default branch
+    if (!resolvedBranchId) {
+      resolvedBranchId = await resolveDefaultBranchForUser(
+        queryClient,
+        user.id,
+        ticketData.company_id
+      );
+    }
+
     // Insert the new ticket
     const { data: ticket, error: insertError } = await queryClient
       .from('tickets')
-      .insert([ticketData])
+      .insert([{ ...ticketData, branch_id: resolvedBranchId }])
       .select(
         `
         *,

@@ -2779,8 +2779,8 @@ export function NewOpportunityWizard() {
   const [companyTimeOptions, setCompanyTimeOptions] =
     useState<TimeOption[]>(DEFAULT_TIME_OPTIONS);
 
-  // Current user's id and display name — used to own the lead on Send Lead
-  // and for the "Service Today" attribution note.
+  // Current user's id and display name. The id pre-assigns upsell leads to
+  // the submitting tech; the name backs the "Service Today" attribution note.
   const [techUserId, setTechUserId] = useState<string | null>(null);
   const [techName, setTechName] = useState('');
 
@@ -3221,7 +3221,7 @@ export function NewOpportunityWizard() {
     }
   };
 
-  // Fetch current user's display name for "Service Today" attribution note
+  // Fetch current user's id + display name (id used to pre-assign upsells).
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
@@ -3491,8 +3491,10 @@ export function NewOpportunityWizard() {
         serviceType: aiResult.service_category || undefined,
         techDiscussed: techMentioned === true,
         propertyType: propertyType ?? undefined,
-        // Upsell leads stay owned by the tech; new-lead flow goes in
-        // unassigned so sales can triage.
+        // TechRoutes assignment rule:
+        //   - Upsell flow: stays with the submitting tech.
+        //   - New-lead flow: leave unset so the auto_assign_quote_lead
+        //     trigger can route to an inspector by zip + property_type.
         ...(techUserId && leadType === 'upsell'
           ? { assignedTo: techUserId }
           : {}),

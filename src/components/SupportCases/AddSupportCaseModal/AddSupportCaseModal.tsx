@@ -40,6 +40,7 @@ export function AddSupportCaseModal({ isOpen, onClose, companyId, onSuccess }: A
   } = useAssignableUsers({
     companyId,
     departmentType: 'support',
+    branchId: null,
     enabled: isOpen,
   });
 

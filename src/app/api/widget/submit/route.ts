@@ -45,7 +45,11 @@ import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendEvent } from '@/lib/inngest/client';
 import { createOrFindServiceAddress, linkCustomerToServiceAddress, extractAddressData } from '@/lib/service-addresses';
 import { generateQuoteToken, generateQuoteUrl } from '@/lib/quote-utils';
-import { resolveDefaultBranchId } from '@/lib/branch-filter';
+import {
+  resolveDefaultBranchId,
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 // Helper function to check if auto-calling is enabled for a company
 async function shouldAutoCall(companyId: string): Promise<boolean> {
@@ -399,9 +403,26 @@ export async function POST(request: NextRequest) {
       converted_from_partial: !!partialLead,
     };
 
-    // Check service area coverage if coordinates or zip code are provided
-    let serviceAreaValidation = null;
-    if (submission.coordinates || submission.addressDetails?.zip) {
+    // ZIP fast-path: if the submission's ZIP matches a branch-tagged
+    // service area, we already have what we need — skip the validate call
+    // (which can also geocode for polygon/radius areas).
+    let serviceAreaValidation: any = null;
+    let zipFastBranchId: string | null = null;
+    if (submission.addressDetails?.zip) {
+      zipFastBranchId = await resolveBranchIdByZip(
+        supabase,
+        submission.companyId,
+        submission.addressDetails.zip
+      );
+    }
+
+    if (zipFastBranchId) {
+      // Synthesize a minimal validation result — downstream code only reads
+      // `served`, `areas`, and `primaryArea` for note formatting. No actual
+      // geocoding happens.
+      serviceAreaValidation = { served: true, areas: [], primaryArea: null };
+    } else if (submission.coordinates || submission.addressDetails?.zip) {
+      // Fall back to full validation (polygon/radius geocoding + zip match).
       try {
         const validationResponse = await fetch(
           `${process.env.NEXT_PUBLIC_SITE_URL}/api/service-areas/validate`,
@@ -621,12 +642,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Resolve branch: from matched service area, or fall back to primary branch
-    const widgetBranchId = await resolveDefaultBranchId(
-      supabase,
-      submission.companyId,
-      serviceAreaValidation?.primaryArea?.id ?? null
-    );
+    // Resolve branch: when we have a service_address, use the cache-aware
+    // helper (gets the per-address cache benefit on repeat submissions).
+    // Otherwise fall back to ZIP fast-path or the matched service area.
+    let widgetBranchId: string | null = null;
+    if (serviceAddressId) {
+      widgetBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        submission.companyId,
+        serviceAddressId
+      );
+    }
+    if (!widgetBranchId) {
+      widgetBranchId =
+        zipFastBranchId ??
+        (await resolveDefaultBranchId(
+          supabase,
+          submission.companyId,
+          serviceAreaValidation?.primaryArea?.id ?? null
+        ));
+    }
 
     // Create lead with enhanced attribution data
     const { data: lead, error: leadError } = await supabase

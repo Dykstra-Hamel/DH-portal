@@ -205,6 +205,32 @@ export function canManageSettings(role: string): boolean {
   return ['admin', 'manager', 'owner'].includes(role);
 }
 
+// Dashboard view selector. Existing isCompanyAdmin* helpers still treat
+// 'manager' as company-admin for permissions; this helper exists so the
+// field-sales dashboard can render a manager-scoped view (direct reports +
+// default branch) without weakening permission gates elsewhere.
+export type CompanyDashboardRole = 'admin' | 'manager' | 'member';
+
+export async function getCompanyDashboardRole(
+  userId: string,
+  companyId: string
+): Promise<CompanyDashboardRole> {
+  if (!userId || !companyId) return 'member';
+
+  const supabase = createAdminClient();
+  const { data: row } = await supabase
+    .from('user_companies')
+    .select('role')
+    .eq('user_id', userId)
+    .eq('company_id', companyId)
+    .maybeSingle();
+
+  const role = row?.role;
+  if (role === 'admin' || role === 'owner') return 'admin';
+  if (role === 'manager') return 'manager';
+  return 'member';
+}
+
 // Synchronous helper to check if user is company admin from UserCompany array
 export function isCompanyAdminSync(
   userCompanies: UserCompany[],

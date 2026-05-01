@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 export async function GET(
   request: NextRequest,
@@ -86,10 +90,10 @@ export async function POST(
     // Use admin client to create lead
     const supabase = createAdminClient();
 
-    // First verify customer exists
+    // First verify customer exists (fetch zip_code for branch resolution)
     const { data: customer, error: customerError } = await supabase
       .from('customers')
-      .select('id, company_id')
+      .select('id, company_id, zip_code')
       .eq('id', id)
       .single();
 
@@ -110,11 +114,30 @@ export async function POST(
       );
     }
 
+    // Resolve branch_id. Prefer service_address-aware helper when one is
+    // supplied; otherwise fall back to customer's ZIP.
+    let resolvedBranchId: string | null = body.branch_id ?? null;
+    if (!resolvedBranchId && body.service_address_id) {
+      resolvedBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        customer.company_id,
+        body.service_address_id
+      );
+    }
+    if (!resolvedBranchId && customer.zip_code) {
+      resolvedBranchId = await resolveBranchIdByZip(
+        supabase,
+        customer.company_id,
+        customer.zip_code
+      );
+    }
+
     // Create lead with customer and company IDs
     const leadData = {
       ...body,
       customer_id: id,
       company_id: customer.company_id,
+      branch_id: resolvedBranchId,
     };
 
     const { data: lead, error } = await supabase

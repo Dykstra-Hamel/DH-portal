@@ -1,5 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { normalizeZip } from '@/lib/branch-filter';
+
+// Normalize an array of input ZIPs to 5-digit form, dropping invalid entries.
+function normalizeZipList(zips: string[] | null | undefined): string[] {
+  if (!Array.isArray(zips)) return [];
+  const out: string[] = [];
+  for (const raw of zips) {
+    const n = normalizeZip(typeof raw === 'string' ? raw : null);
+    if (n && !out.includes(n)) out.push(n);
+  }
+  return out;
+}
+
+// Find the first existing service area in this company that already
+// claims any of the given ZIPs (excluding `excludeId` if provided). Used
+// to enforce app-level "ZIP belongs to one service area" validation.
+async function findZipConflict(
+  supabase: ReturnType<typeof createAdminClient>,
+  companyId: string,
+  zips: string[],
+  excludeIds: string[] = []
+): Promise<{ id: string; name: string; conflicting: string } | null> {
+  if (zips.length === 0) return null;
+  const { data: existing } = await supabase
+    .from('service_areas')
+    .select('id, name, zip_codes, is_active, type')
+    .eq('company_id', companyId)
+    .eq('is_active', true)
+    .eq('type', 'zip_code');
+
+  const incoming = new Set(zips);
+  for (const row of existing ?? []) {
+    if (excludeIds.includes(row.id)) continue;
+    const stored: string[] = row.zip_codes ?? [];
+    for (const z of stored) {
+      if (incoming.has(z)) {
+        return { id: row.id, name: row.name, conflicting: z };
+      }
+    }
+  }
+  return null;
+}
 
 // TypeScript interfaces for service area data
 interface ServiceAreaFromDB {
@@ -196,8 +238,27 @@ export async function POST(
           { status: 400 }
         );
       }
-      
-      insertData.zip_codes = zipCodes;
+
+      const normalized = normalizeZipList(zipCodes);
+      if (normalized.length === 0) {
+        return NextResponse.json(
+          { error: 'No valid 5-digit zip codes provided' },
+          { status: 400 }
+        );
+      }
+
+      const conflict = await findZipConflict(supabase, companyId, normalized);
+      if (conflict) {
+        return NextResponse.json(
+          {
+            error: `ZIP ${conflict.conflicting} is already used by service area "${conflict.name}"`,
+            conflictingAreaId: conflict.id,
+          },
+          { status: 409 }
+        );
+      }
+
+      insertData.zip_codes = normalized;
     }
 
     const { data: newArea, error } = await supabase
@@ -213,6 +274,13 @@ export async function POST(
         { status: 500 }
       );
     }
+
+    // Invalidate the per-address branch cache for this company; next ticket
+    // /lead at any address will re-resolve through the helper.
+    await supabase
+      .from('service_addresses')
+      .update({ branch_id: null, branch_resolved_at: null })
+      .eq('company_id', companyId);
 
     return NextResponse.json({
       success: true,
@@ -255,6 +323,31 @@ export async function PUT(
     }
 
     const supabase = createAdminClient();
+
+    // Validate the incoming set for self-overlap before touching the DB.
+    // Each ZIP can appear in only one zip_code-type service area within the
+    // payload (and across all zip_code areas, which we re-validate below
+    // after upsert against any rows we don't delete — but the bulk PUT
+    // deletes everything for the company, so the only remaining check is
+    // self-overlap inside the payload itself).
+    const seenZips = new Map<string, string>();
+    for (const area of serviceAreas) {
+      if (area.type !== 'zip_code') continue;
+      const normalized = normalizeZipList(area.zipCodes ?? null);
+      area.zipCodes = normalized;
+      for (const z of normalized) {
+        const otherName = seenZips.get(z);
+        if (otherName && otherName !== area.name) {
+          return NextResponse.json(
+            {
+              error: `ZIP ${z} appears in both "${otherName}" and "${area.name}". Each ZIP can belong to only one service area.`,
+            },
+            { status: 409 }
+          );
+        }
+        seenZips.set(z, area.name);
+      }
+    }
 
     // Start a transaction-like operation
     // First, delete all existing service areas for the company
@@ -332,6 +425,13 @@ export async function PUT(
         );
       }
     }
+
+    // Invalidate the per-address branch cache for this company; next ticket
+    // /lead at any address will re-resolve through the helper.
+    await supabase
+      .from('service_addresses')
+      .update({ branch_id: null, branch_resolved_at: null })
+      .eq('company_id', companyId);
 
     return NextResponse.json({
       success: true,
