@@ -658,12 +658,22 @@ export function SecondarySideNav({
             ],
           },
         ];
-      case 'field-sales':
+      case 'field-sales': {
+        // Admins/managers/owners get the team-reports view inline on the
+        // Field Sales dashboard, so the standalone Reports page is hidden
+        // from them. Inspectors/techs still see it.
+        const hasManagerLevelDashboard =
+          isAdmin ||
+          companyRole === 'owner' ||
+          companyRole === 'admin' ||
+          companyRole === 'manager';
         return [
           {
             items: [
               { text: 'Dashboard', href: '/field-sales/dashboard' },
-              { text: 'Reports', href: '/field-sales/reports' },
+              ...(hasManagerLevelDashboard
+                ? []
+                : [{ text: 'Reports', href: '/field-sales/reports' }]),
             ],
           },
           // Tech Leads and Field Map sections hidden for now.
@@ -687,6 +697,7 @@ export function SecondarySideNav({
             ],
           }] : []),
         ];
+      }
       case 'tickets':
       default:
         return [

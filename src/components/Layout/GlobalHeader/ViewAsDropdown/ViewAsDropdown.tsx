@@ -182,8 +182,8 @@ export function ViewAsDropdown() {
             position: 'absolute',
             top: 'calc(100% + 6px)',
             right: 0,
-            minWidth: 320,
-            maxWidth: 360,
+            minWidth: 380,
+            maxWidth: 420,
             background: 'white',
             border: '1px solid #e5e7eb',
             borderRadius: 10,
@@ -256,6 +256,7 @@ export function ViewAsDropdown() {
                     boxShadow: active
                       ? '0 1px 2px rgba(0,0,0,0.06)'
                       : 'none',
+                    whiteSpace: 'nowrap',
                   }}
                 >
                   {ROLE_LABELS[role]}
@@ -413,10 +414,7 @@ export function ViewAsDropdown() {
           {overrideActive && (
             <button
               type="button"
-              onClick={() => {
-                clear();
-                setOpen(false);
-              }}
+              onClick={handlePickAdmin}
               style={{
                 marginTop: 10,
                 padding: '8px 10px',

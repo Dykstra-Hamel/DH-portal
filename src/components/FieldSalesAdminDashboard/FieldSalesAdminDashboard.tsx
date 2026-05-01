@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Users,
   FileText,
@@ -19,16 +20,14 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import {
-  TechLeadDetailModal,
-  type TechLead,
-} from '@/components/TechLeads/TechLeadDetailModal/TechLeadDetailModal';
 import { AdminChart, type ChartSpec } from './AdminChart';
 import {
   SavedReportsDrawer,
   type SavedReport,
 } from './SavedReportsDrawer';
+import { TeamMemberCard } from './TeamMemberCard';
 import { useBranches } from '@/hooks/useBranches';
+import { authenticatedFetch } from '@/lib/api-client';
 import styles from './FieldSalesAdminDashboard.module.scss';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -37,11 +36,19 @@ interface TeamMember {
   id: string;
   fullName: string;
   email: string | null;
+  avatarUrl?: string | null;
+  uploadedAvatarUrl?: string | null;
+  departments?: string[];
+  roles?: string[];
 }
 
 interface TeamBreakdownRow {
   userId: string;
   fullName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  uploadedAvatarUrl: string | null;
+  departments: string[];
   submitted: number;
   won: number;
   lost: number;
@@ -49,6 +56,9 @@ interface TeamBreakdownRow {
   wonRevenue: number;
   techDiscussedCount: number;
   stopsCompleted: number;
+  leadsFromStops: number;
+  winRate: number;
+  pipelineValue: number;
 }
 
 interface AdminRecentLead {
@@ -113,6 +123,7 @@ interface AdminReportData {
     stopsCompleted: number;
     routesCompleted: number;
     referredToSales: number;
+    leadsFromTechs: number;
   };
   sparkline: { date: string; count: number }[];
   leadsByStatus: { status: string; count: number }[];
@@ -148,9 +159,19 @@ const COMPARE_METRICS = [
 
 type CompareMetricKey = typeof COMPARE_METRICS[number]['key'];
 
+type CompareKind = 'branches' | 'inspectors' | 'technicians' | 'managers';
+
+const COMPARE_KIND_LABELS: Record<CompareKind, string> = {
+  branches: 'Branches',
+  inspectors: 'Inspectors',
+  technicians: 'Technicians',
+  managers: 'Teams',
+};
+
 // ── Constants ─────────────────────────────────────────────────────────────
 
 const DATE_PRESETS = [
+  { value: 'today', label: 'Today' },
   { value: '7', label: 'Last 7 days' },
   { value: '30', label: 'Last 30 days' },
   { value: '90', label: 'Last 90 days' },
@@ -186,6 +207,9 @@ function toIsoDate(date: Date): string {
 function presetToDates(preset: DatePreset): { from: string; to: string } {
   const now = new Date();
   const to = toIsoDate(now);
+  if (preset === 'today') {
+    return { from: to, to };
+  }
   if (preset === 'mtd') {
     const d = new Date(now.getFullYear(), now.getMonth(), 1);
     return { from: toIsoDate(d), to };
@@ -259,6 +283,23 @@ function statusLabel(status: string): string {
 
 // ── Component ─────────────────────────────────────────────────────────────
 
+type MetricKey =
+  | 'submitted'
+  | 'won'
+  | 'won_revenue'
+  | 'pipeline'
+  | 'tech_discussed'
+  | 'leads_from_techs';
+
+const METRIC_TITLES: Record<MetricKey, string> = {
+  submitted: 'Submitted Leads',
+  won: 'Won Leads',
+  won_revenue: 'Won Leads (by Revenue)',
+  pipeline: 'Pipeline Leads',
+  tech_discussed: 'Tech Discussed Leads',
+  leads_from_techs: 'Leads From Techs',
+};
+
 export function FieldSalesAdminDashboard({
   companyId,
   greetingName,
@@ -268,29 +309,54 @@ export function FieldSalesAdminDashboard({
 }: FieldSalesAdminDashboardProps) {
   const [preset, setPreset] = useState<DatePreset>('30');
   const [dates, setDates] = useState(() => presetToDates('30'));
-  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [selectedBranchId, setSelectedBranchId] = useState<string | null>(
-    defaultBranchId
+  const [compareKind, setCompareKind] = useState<CompareKind>(
+    scopeRole === 'admin' ? 'branches' : 'inspectors'
   );
-  const [mode, setMode] = useState<'single' | 'compare'>('single');
-  const [compareEntityIds, setCompareEntityIds] = useState<string[]>([]);
+  const [compareEntityIds, setCompareEntityIds] = useState<string[]>(
+    defaultBranchId && scopeRole === 'admin' ? [defaultBranchId] : []
+  );
   const [compareMetric, setCompareMetric] = useState<CompareMetricKey>(
     'submitted'
   );
   const [managerTeam, setManagerTeam] = useState<TeamMember[] | null>(null);
+  const [companyUsers, setCompanyUsers] = useState<TeamMember[] | null>(null);
   const { branches: availableBranches } = useBranches(companyId);
 
-  const compareKind: 'users' | 'branches' =
-    scopeRole === 'admin' ? 'branches' : 'users';
+  // mode is derived: 0-1 entities = single view, 2+ entities = compare view
+  const mode: 'single' | 'compare' =
+    compareEntityIds.length >= 2 ? 'compare' : 'single';
+
+  // Wire-level compare value: inspectors/technicians both map to 'users';
+  // managers/branches map to themselves.
+  const wireCompareKind: 'users' | 'branches' | 'managers' =
+    compareKind === 'branches'
+      ? 'branches'
+      : compareKind === 'managers'
+        ? 'managers'
+        : 'users';
+
+  const router = useRouter();
 
   const [data, setData] = useState<AdminReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedLead, setSelectedLead] = useState<TechLead | null>(null);
-  const [leadLoadingId, setLeadLoadingId] = useState<string | null>(null);
+  // Metric drill-down modal (KPI card click → list of leads contributing
+  // to that metric). Lead clicks inside the modal navigate via router.
+  const [activeMetric, setActiveMetric] = useState<MetricKey | null>(null);
+  const [metricLeads, setMetricLeads] = useState<AdminRecentLead[] | null>(
+    null
+  );
+  const [metricLoading, setMetricLoading] = useState(false);
+
+  const goToLead = useCallback(
+    (leadId: string) => {
+      router.push(`/field-sales/leads/${leadId}`);
+    },
+    [router]
+  );
 
   // Custom prompt / Gemini state
   const [promptText, setPromptText] = useState('');
@@ -325,20 +391,60 @@ export function FieldSalesAdminDashboard({
     return () => document.removeEventListener('mousedown', onDocClick);
   }, [filterOpen]);
 
+  // ── Fetch full company roster (used by Compare-by lists for both scopes) ──
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/companies/${companyId}/users`);
+        if (!res.ok) {
+          if (!cancelled) setCompanyUsers([]);
+          return;
+        }
+        const json = await res.json();
+        const list: TeamMember[] = (json.users ?? []).map((u: any) => {
+          const first = u.profile?.first_name ?? u.first_name ?? '';
+          const last = u.profile?.last_name ?? u.last_name ?? '';
+          const fullName =
+            `${first} ${last}`.trim() ||
+            u.profile?.email ||
+            u.email ||
+            'Unknown';
+          return {
+            id: u.id ?? u.user_id,
+            fullName,
+            email: u.profile?.email ?? u.email ?? null,
+            avatarUrl: u.profile?.avatar_url ?? u.avatar_url ?? null,
+            uploadedAvatarUrl:
+              u.profile?.uploaded_avatar_url ?? u.uploaded_avatar_url ?? null,
+            departments: Array.isArray(u.departments) ? u.departments : [],
+            roles: Array.isArray(u.roles) ? u.roles : [],
+          } as TeamMember;
+        });
+        if (!cancelled) setCompanyUsers(list);
+      } catch {
+        if (!cancelled) setCompanyUsers([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
   // ── Fetch manager's team (when in manager scope) ─────────────────────
+  // /api/users/[id]/reports requires a Bearer token (verifyAuth) — use
+  // authenticatedFetch so the Supabase session token is attached. A plain
+  // fetch() returns 401 here, which would silently set managerTeam=[] and
+  // make the Compare-By popover claim "No direct reports yet."
   useEffect(() => {
     if (scopeRole !== 'manager' || !managerUserId || !companyId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
+        const json = await authenticatedFetch(
           `/api/users/${managerUserId}/reports?companyId=${companyId}`
         );
-        if (!res.ok) {
-          if (!cancelled) setManagerTeam([]);
-          return;
-        }
-        const json = await res.json();
         const list: TeamMember[] = (json.reports ?? []).map((r: any) => ({
           id: r.user_id,
           fullName:
@@ -372,23 +478,33 @@ export function FieldSalesAdminDashboard({
       params.set('from', dates.from);
       params.set('to', dates.to);
 
-      if (mode === 'compare' && compareEntityIds.length >= 2) {
-        params.set('compare', compareKind);
+      if (mode === 'compare') {
+        params.set('compare', wireCompareKind);
         params.set('entityIds', compareEntityIds.join(','));
-      } else if (scopeRole === 'manager' && managerTeam && managerTeam.length > 0) {
-        // Single mode for manager: scope to the manager's reports unless
-        // the user has explicitly picked one.
-        const ids = selectedUser ? [selectedUser] : managerTeam.map(m => m.id);
-        params.set('userIds', ids.join(','));
-      } else if (selectedUser) {
-        params.set('userIds', selectedUser);
+      } else if (compareEntityIds.length === 1) {
+        // 1 entity selected = single-mode filter to that entity
+        if (compareKind === 'branches') {
+          params.set('branchId', compareEntityIds[0]);
+        } else if (compareKind === 'managers') {
+          // Pick a single manager → scope global metrics to their team
+          // (their direct reports). Server expands managerId on its side.
+          params.set('managerId', compareEntityIds[0]);
+        } else {
+          params.set('userIds', compareEntityIds[0]);
+        }
+      } else if (
+        scopeRole === 'manager' &&
+        managerTeam &&
+        managerTeam.length > 0
+      ) {
+        // No selection in manager scope: scope to the manager's full team
+        params.set('userIds', managerTeam.map(m => m.id).join(','));
       }
 
       if (selectedSources.length > 0)
         params.set('leadSource', selectedSources.join(','));
       if (selectedStatuses.length > 0)
         params.set('leadStatus', selectedStatuses.join(','));
-      if (selectedBranchId) params.set('branchId', selectedBranchId);
 
       const res = await fetch(`/api/field-sales/admin-reports?${params.toString()}`);
       if (!res.ok) {
@@ -407,11 +523,10 @@ export function FieldSalesAdminDashboard({
     companyId,
     dates.from,
     dates.to,
-    selectedUser,
     selectedSources,
     selectedStatuses,
-    selectedBranchId,
     mode,
+    wireCompareKind,
     compareKind,
     compareEntityIds,
     scopeRole,
@@ -442,22 +557,82 @@ export function FieldSalesAdminDashboard({
     fetchSaved();
   }, [fetchSaved]);
 
-  // ── Lead drill-down ──────────────────────────────────────────────────
-  const openLead = async (leadId: string) => {
-    if (leadLoadingId) return;
-    setLeadLoadingId(leadId);
-    try {
-      const res = await fetch(
-        `/api/tech-leads/leads?companyId=${companyId}&leadId=${leadId}`
-      );
-      if (res.ok) {
-        const json = await res.json();
-        if (json.lead) setSelectedLead(json.lead);
+  // ── KPI drill-down: fetch the leads contributing to a single metric ──
+  // Mirrors fetchData's filter shape so the modal stays consistent with
+  // whatever the dashboard is currently filtered to. We only send filters
+  // that are actually in effect — single-mode (1 entity selected) sets the
+  // narrowed scope (branchId / managerId / userIds); manager-default scope
+  // sends userIds for the manager's full team.
+  const openMetric = useCallback(
+    async (metric: MetricKey) => {
+      if (!companyId) return;
+      setActiveMetric(metric);
+      setMetricLeads(null);
+      setMetricLoading(true);
+
+      const params = new URLSearchParams();
+      params.set('companyId', companyId);
+      params.set('from', dates.from);
+      params.set('to', dates.to);
+      params.set('metric', metric);
+
+      if (mode !== 'compare' && compareEntityIds.length === 1) {
+        if (compareKind === 'branches') {
+          params.set('branchId', compareEntityIds[0]);
+        } else if (compareKind === 'managers') {
+          params.set('managerId', compareEntityIds[0]);
+        } else {
+          params.set('userIds', compareEntityIds[0]);
+        }
+      } else if (
+        mode !== 'compare' &&
+        scopeRole === 'manager' &&
+        managerTeam &&
+        managerTeam.length > 0
+      ) {
+        params.set('userIds', managerTeam.map(m => m.id).join(','));
       }
-    } finally {
-      setLeadLoadingId(null);
-    }
-  };
+      if (selectedSources.length > 0) {
+        params.set('leadSource', selectedSources.join(','));
+      }
+      if (selectedStatuses.length > 0) {
+        params.set('leadStatus', selectedStatuses.join(','));
+      }
+
+      try {
+        const res = await fetch(
+          `/api/field-sales/admin-reports/leads?${params.toString()}`
+        );
+        if (!res.ok) {
+          setMetricLeads([]);
+          return;
+        }
+        const json = (await res.json()) as { leads: AdminRecentLead[] };
+        setMetricLeads(json.leads ?? []);
+      } catch {
+        setMetricLeads([]);
+      } finally {
+        setMetricLoading(false);
+      }
+    },
+    [
+      companyId,
+      dates.from,
+      dates.to,
+      mode,
+      compareEntityIds,
+      compareKind,
+      scopeRole,
+      managerTeam,
+      selectedSources,
+      selectedStatuses,
+    ]
+  );
+
+  const closeMetricModal = useCallback(() => {
+    setActiveMetric(null);
+    setMetricLeads(null);
+  }, []);
 
   // ── Filter handlers ──────────────────────────────────────────────────
   const handlePreset = (p: DatePreset) => {
@@ -478,46 +653,76 @@ export function FieldSalesAdminDashboard({
   };
 
   const clearAllFilters = () => {
-    setSelectedUser(null);
     setSelectedSources([]);
     setSelectedStatuses([]);
-    setSelectedBranchId(scopeRole === 'manager' ? defaultBranchId : null);
+    setCompareEntityIds([]);
     handlePreset('30');
   };
 
-  // Source of truth for the team-member list. In manager scope it's the
-  // manager's direct reports; in admin scope it's everyone the report
-  // returns (server scoped to the company).
-  const visibleTeamMembers = useMemo<TeamMember[]>(() => {
-    if (scopeRole === 'manager') {
-      return managerTeam ?? [];
+  // Available kinds the user can compare by. Managers and admins share the
+  // same set — defaults differ (manager defaults to their own team) but
+  // there are no access restrictions.
+  const availableCompareKinds = useMemo<CompareKind[]>(
+    () => ['branches', 'inspectors', 'technicians', 'managers'],
+    []
+  );
+
+  // Full company roster — both admins and managers can compare against
+  // anyone in the company. (managerTeam is still used for the default view
+  // and the "My Team Overview" header, but no longer restricts the picker.)
+  const scopedRoster = useMemo<TeamMember[]>(() => {
+    if (!companyUsers) return [];
+    return companyUsers;
+  }, [companyUsers]);
+
+  // Choices in the popover entity picker, swapping on compareKind
+  const compareEntityChoices = useMemo<
+    Array<{ id: string; label: string; subtitle?: string | null }>
+  >(() => {
+    if (compareKind === 'branches') {
+      return availableBranches.map(b => ({
+        id: b.id,
+        label: b.name,
+        subtitle: b.is_primary ? 'Primary' : null,
+      }));
     }
-    return data?.teamMembers ?? [];
-  }, [scopeRole, managerTeam, data?.teamMembers]);
+    if (compareKind === 'managers') {
+      return scopedRoster
+        .filter(u => (u.roles ?? []).includes('manager'))
+        .map(u => ({ id: u.id, label: u.fullName, subtitle: u.email }));
+    }
+    const dept = compareKind === 'inspectors' ? 'inspector' : 'technician';
+    return scopedRoster
+      .filter(u => (u.departments ?? []).includes(dept))
+      .map(u => ({ id: u.id, label: u.fullName, subtitle: u.email }));
+  }, [compareKind, availableBranches, scopedRoster]);
 
-  const filteredTeamMembers = useMemo(() => {
+  const filteredCompareChoices = useMemo(() => {
     const q = teamSearch.trim().toLowerCase();
-    if (!q) return visibleTeamMembers;
-    return visibleTeamMembers.filter(m => m.fullName.toLowerCase().includes(q));
-  }, [visibleTeamMembers, teamSearch]);
-
-  const selectedTeamMemberName = useMemo(() => {
-    if (!selectedUser) return null;
-    return (
-      visibleTeamMembers.find(m => m.id === selectedUser)?.fullName ?? null
+    if (!q) return compareEntityChoices;
+    return compareEntityChoices.filter(c =>
+      `${c.label} ${c.subtitle ?? ''}`.toLowerCase().includes(q)
     );
-  }, [visibleTeamMembers, selectedUser]);
+  }, [compareEntityChoices, teamSearch]);
 
-  const selectedBranchName = useMemo(() => {
-    if (!selectedBranchId) return null;
-    return availableBranches.find(b => b.id === selectedBranchId)?.name ?? null;
-  }, [availableBranches, selectedBranchId]);
+  // Reset selection whenever compareKind changes (entities aren't comparable
+  // across kinds). Skipped when the caller is intentionally changing both
+  // kind + ids in the same gesture (e.g. clicking a Team member card sets
+  // kind='inspectors' AND entityIds=[member.id] together — without the skip
+  // this effect would wipe the freshly-set selection on the next render).
+  const skipNextKindResetRef = useRef(false);
+  useEffect(() => {
+    if (skipNextKindResetRef.current) {
+      skipNextKindResetRef.current = false;
+      return;
+    }
+    setCompareEntityIds([]);
+  }, [compareKind]);
 
   const activeFilterCount =
-    (selectedUser ? 1 : 0) +
+    (compareEntityIds.length > 0 ? 1 : 0) +
     (selectedSources.length > 0 ? 1 : 0) +
-    (selectedStatuses.length > 0 ? 1 : 0) +
-    (selectedBranchId ? 1 : 0);
+    (selectedStatuses.length > 0 ? 1 : 0);
 
   const toggleCompareEntity = (id: string) => {
     setCompareEntityIds(prev =>
@@ -525,14 +730,6 @@ export function FieldSalesAdminDashboard({
     );
   };
 
-  const compareEntityChoices = useMemo<
-    Array<{ id: string; label: string }>
-  >(() => {
-    if (compareKind === 'users') {
-      return visibleTeamMembers.map(m => ({ id: m.id, label: m.fullName }));
-    }
-    return availableBranches.map(b => ({ id: b.id, label: b.name }));
-  }, [compareKind, visibleTeamMembers, availableBranches]);
 
   // ── Prompt / Generate ────────────────────────────────────────────────
   const handleGenerate = async () => {
@@ -596,7 +793,8 @@ export function FieldSalesAdminDashboard({
             preset,
             from: dates.from,
             to: dates.to,
-            userIds: selectedUser ? [selectedUser] : null,
+            compareKind,
+            compareEntityIds,
             leadSource: selectedSources,
             leadStatus: selectedStatuses,
           },
@@ -624,15 +822,32 @@ export function FieldSalesAdminDashboard({
       preset?: DatePreset;
       from?: string;
       to?: string;
+      compareKind?: CompareKind;
+      compareEntityIds?: string[];
+      // Legacy fields from pre-Compare-by saved reports
       userIds?: string[] | null;
+      branchId?: string | null;
       leadSource?: string[] | null;
       leadStatus?: string[] | null;
     };
     if (f?.preset) setPreset(f.preset);
     if (f?.from && f?.to) setDates({ from: f.from, to: f.to });
-    setSelectedUser(
-      Array.isArray(f?.userIds) && f.userIds.length > 0 ? f.userIds[0] : null
-    );
+
+    if (f?.compareKind && Array.isArray(f.compareEntityIds)) {
+      setCompareKind(f.compareKind);
+      setCompareEntityIds(f.compareEntityIds);
+    } else if (f?.branchId) {
+      setCompareKind('branches');
+      setCompareEntityIds([f.branchId]);
+    } else if (Array.isArray(f?.userIds) && f.userIds.length > 0) {
+      // Legacy: assume inspector unless we know otherwise (department info
+      // arrives async with the company roster, so default to inspectors)
+      setCompareKind('inspectors');
+      setCompareEntityIds(f.userIds);
+    } else {
+      setCompareEntityIds([]);
+    }
+
     setSelectedSources(Array.isArray(f?.leadSource) ? f.leadSource : []);
     setSelectedStatuses(Array.isArray(f?.leadStatus) ? f.leadStatus : []);
 
@@ -742,64 +957,16 @@ export function FieldSalesAdminDashboard({
             </p>
           </div>
           <div className={styles.headerActions}>
-            <div
-              role="tablist"
-              aria-label="Dashboard mode"
-              style={{
-                display: 'inline-flex',
-                gap: '0',
-                background: 'var(--gray-100, #f4f4f5)',
-                borderRadius: '999px',
-                padding: '2px',
-              }}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'single'}
-                onClick={() => setMode('single')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '999px',
-                  border: 'none',
-                  background:
-                    mode === 'single' ? 'white' : 'transparent',
-                  fontWeight: mode === 'single' ? 600 : 400,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                Single
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={mode === 'compare'}
-                onClick={() => setMode('compare')}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '999px',
-                  border: 'none',
-                  background:
-                    mode === 'compare' ? 'white' : 'transparent',
-                  fontWeight: mode === 'compare' ? 600 : 400,
-                  fontSize: '13px',
-                  cursor: 'pointer',
-                }}
-              >
-                Compare
-              </button>
-            </div>
             <button
               type="button"
-              className={styles.savedBtn}
-              onClick={() => setDrawerOpen(true)}
+              className={`${styles.savedBtn} ${styles.savedBtnDisabled ?? ''}`}
+              disabled
+              aria-disabled="true"
+              title="Coming soon"
             >
               <Folder size={14} />
               <span>Saved Reports</span>
-              {savedReports.length > 0 && (
-                <span className={styles.savedBadge}>{savedReports.length}</span>
-              )}
+              <span className={styles.savedComingSoon}>(coming soon)</span>
             </button>
           </div>
         </div>
@@ -825,7 +992,7 @@ export function FieldSalesAdminDashboard({
             className={styles.clearBtn}
             onClick={clearAllFilters}
             disabled={
-              !selectedUser &&
+              compareEntityIds.length === 0 &&
               selectedSources.length === 0 &&
               selectedStatuses.length === 0 &&
               preset === '30'
@@ -849,110 +1016,72 @@ export function FieldSalesAdminDashboard({
 
             {filterOpen && (
               <div className={styles.filterPopover} role="dialog">
-                {scopeRole === 'admin' && availableBranches.length > 0 && (
-                  <div className={styles.popoverSection}>
-                    <div className={styles.popoverSectionHeader}>
-                      <span className={styles.popoverSectionLabel}>Branch</span>
-                      {selectedBranchId && (
-                        <button
-                          type="button"
-                          className={styles.popoverSectionClear}
-                          onClick={() => setSelectedBranchId(null)}
-                        >
-                          Clear
-                        </button>
-                      )}
-                    </div>
-                    {selectedBranchName && (
-                      <div className={styles.popoverSelectedHint}>
-                        {selectedBranchName}
-                      </div>
-                    )}
-                    <div className={styles.popoverMemberList}>
-                      <button
-                        type="button"
-                        className={`${styles.popoverMemberRow} ${selectedBranchId === null ? styles.popoverMemberRowSelected : ''}`}
-                        onClick={() => setSelectedBranchId(null)}
-                      >
-                        <span>All branches</span>
-                        {selectedBranchId === null && <Check size={14} />}
-                      </button>
-                      {availableBranches.map(b => {
-                        const isSelected = selectedBranchId === b.id;
-                        return (
-                          <button
-                            key={b.id}
-                            type="button"
-                            className={`${styles.popoverMemberRow} ${isSelected ? styles.popoverMemberRowSelected : ''}`}
-                            onClick={() =>
-                              setSelectedBranchId(isSelected ? null : b.id)
-                            }
-                          >
-                            <span>
-                              {b.name}
-                              {b.is_primary ? ' (Primary)' : ''}
-                            </span>
-                            {isSelected && <Check size={14} />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
                 <div className={styles.popoverSection}>
                   <div className={styles.popoverSectionHeader}>
-                    <span className={styles.popoverSectionLabel}>Team Member</span>
-                    {selectedUser && (
+                    <span className={styles.popoverSectionLabel}>
+                      Compare by
+                    </span>
+                    {compareEntityIds.length > 0 && (
                       <button
                         type="button"
                         className={styles.popoverSectionClear}
-                        onClick={() => setSelectedUser(null)}
+                        onClick={() => setCompareEntityIds([])}
                       >
-                        Clear
+                        Clear all
                       </button>
                     )}
                   </div>
-                  {selectedTeamMemberName && (
-                    <div className={styles.popoverSelectedHint}>
-                      {selectedTeamMemberName}
-                    </div>
-                  )}
+                  <div className={styles.popoverChipRow}>
+                    {availableCompareKinds.map(k => (
+                      <button
+                        key={k}
+                        type="button"
+                        className={`${styles.filterChip} ${compareKind === k ? styles.filterChipActive : ''}`}
+                        onClick={() => setCompareKind(k)}
+                      >
+                        {COMPARE_KIND_LABELS[k]}
+                      </button>
+                    ))}
+                  </div>
+                  <p className={styles.popoverHelp}>
+                    Pick 1 to filter the dashboard. Pick 2+ to compare them
+                    side-by-side.
+                  </p>
                   <div className={styles.popoverSearch}>
                     <Search size={14} className={styles.popoverSearchIcon} />
                     <input
                       type="text"
                       className={styles.popoverSearchInput}
-                      placeholder="Search team members"
+                      placeholder={`Search ${COMPARE_KIND_LABELS[compareKind].toLowerCase()}`}
                       value={teamSearch}
                       onChange={e => setTeamSearch(e.target.value)}
                     />
                   </div>
                   <div className={styles.popoverMemberList}>
-                    <button
-                      type="button"
-                      className={`${styles.popoverMemberRow} ${selectedUser === null ? styles.popoverMemberRowSelected : ''}`}
-                      onClick={() => setSelectedUser(null)}
-                    >
-                      <span>All team members</span>
-                      {selectedUser === null && <Check size={14} />}
-                    </button>
-                    {filteredTeamMembers.map(m => {
-                      const isSelected = selectedUser === m.id;
+                    {filteredCompareChoices.map(c => {
+                      const isSelected = compareEntityIds.includes(c.id);
                       return (
                         <button
-                          key={m.id}
+                          key={c.id}
                           type="button"
                           className={`${styles.popoverMemberRow} ${isSelected ? styles.popoverMemberRowSelected : ''}`}
-                          onClick={() => setSelectedUser(isSelected ? null : m.id)}
+                          onClick={() => toggleCompareEntity(c.id)}
                         >
-                          <span>{m.fullName}</span>
+                          <span className={styles.popoverMemberRowLabel}>
+                            <span>{c.label}</span>
+                            {c.subtitle && (
+                              <span className={styles.popoverMemberRowSubtitle}>
+                                {c.subtitle}
+                              </span>
+                            )}
+                          </span>
                           {isSelected && <Check size={14} />}
                         </button>
                       );
                     })}
-                    {filteredTeamMembers.length === 0 && (
+                    {filteredCompareChoices.length === 0 && (
                       <div className={styles.popoverEmpty}>
-                        No team members match &quot;{teamSearch}&quot;
+                        {`No ${COMPARE_KIND_LABELS[compareKind].toLowerCase()} match.`}
                       </div>
                     )}
                   </div>
@@ -1015,6 +1144,27 @@ export function FieldSalesAdminDashboard({
             )}
           </div>
         </div>
+        {compareEntityIds.length > 0 && (
+          <div className={styles.compareStrip}>
+            <span className={styles.compareStripLabel}>
+              {mode === 'compare' ? 'Comparing' : 'Filtered to'}:
+            </span>
+            <span className={styles.compareStripKind}>
+              {COMPARE_KIND_LABELS[compareKind]}
+            </span>
+            <span className={styles.compareStripCount}>
+              {compareEntityIds.length} selected
+            </span>
+            <button
+              type="button"
+              className={styles.compareStripClear}
+              onClick={() => setCompareEntityIds([])}
+              aria-label="Clear comparison"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       {loading && <DashboardSkeleton />}
@@ -1055,12 +1205,14 @@ export function FieldSalesAdminDashboard({
                 label="Submitted"
                 value={data.totals.submitted}
                 variant="primary"
+                onClick={() => openMetric('submitted')}
               />
               <KpiCard
                 icon={<TrendingUp size={18} />}
                 label="Won"
                 value={data.totals.won}
                 variant="success"
+                onClick={() => openMetric('won')}
               />
               <KpiCard
                 icon={<Target size={18} />}
@@ -1073,11 +1225,13 @@ export function FieldSalesAdminDashboard({
                 label="Won Revenue"
                 value={formatCurrency(data.totals.wonRevenue)}
                 variant="success"
+                onClick={() => openMetric('won_revenue')}
               />
               <KpiCard
                 icon={<DollarSign size={18} />}
                 label="Pipeline"
                 value={formatCurrency(data.totals.pipelineValue)}
+                onClick={() => openMetric('pipeline')}
               />
               <KpiCard
                 icon={<CheckCircle2 size={18} />}
@@ -1086,14 +1240,16 @@ export function FieldSalesAdminDashboard({
               />
               <KpiCard
                 icon={<ArrowUpRight size={18} />}
-                label="Referred"
-                value={data.totals.referredToSales}
+                label="Leads From Techs"
+                value={data.totals.leadsFromTechs}
                 variant="accent"
+                onClick={() => openMetric('leads_from_techs')}
               />
               <KpiCard
                 icon={<Sparkles size={18} />}
                 label="Tech Discussed"
                 value={data.totals.techDiscussedCount}
+                onClick={() => openMetric('tech_discussed')}
               />
             </div>
           </section>
@@ -1125,54 +1281,57 @@ export function FieldSalesAdminDashboard({
           {data.teamBreakdown.length > 0 && (
             <div className={styles.card}>
               <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>Team Leaderboard</h3>
+                <h3 className={styles.cardTitle}>Team</h3>
+                <span className={styles.cardMeta}>
+                  {data.teamBreakdown.length}
+                </span>
               </div>
-              <ul className={styles.list}>
-                {data.teamBreakdown.map(member => (
-                  <li key={member.userId} className={styles.listItem}>
-                    <button
-                      type="button"
-                      className={styles.listItemLink}
-                      onClick={() =>
-                        setSelectedUser(current =>
-                          current === member.userId ? null : member.userId
+              <div className={styles.teamGrid}>
+                {data.teamBreakdown.slice(0, 60).map(member => {
+                  const isActive =
+                    compareKind !== 'branches' &&
+                    compareEntityIds.length === 1 &&
+                    compareEntityIds[0] === member.userId;
+                  return (
+                    <TeamMemberCard
+                      key={member.userId}
+                      member={member}
+                      isActive={isActive}
+                      onToggle={id => {
+                        const depts = member.departments ?? [];
+                        const targetKind: CompareKind = depts.includes(
+                          'technician'
                         )
-                      }
-                    >
-                      <div className={styles.avatarCircle}>
-                        {member.fullName.charAt(0).toUpperCase()}
-                      </div>
-                      <div className={styles.listItemBody}>
-                        <div className={styles.listItemTitle}>
-                          {member.fullName}
-                        </div>
-                        <div className={styles.listItemMeta}>
-                          <span className={styles.metaPill}>
-                            {member.submitted} submitted
-                          </span>
-                          {member.won > 0 && (
-                            <span className={styles.metaPill}>
-                              {member.won} won
-                            </span>
-                          )}
-                          {member.stopsCompleted > 0 && (
-                            <span className={styles.metaPill}>
-                              {member.stopsCompleted} stops
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className={styles.listItemTrailing}>
-                        {member.wonRevenue > 0 && (
-                          <span className={styles.money}>
-                            {formatCurrency(member.wonRevenue)}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                          ? 'technicians'
+                          : 'inspectors';
+                        const isClearingSelf =
+                          compareEntityIds.length === 1 &&
+                          compareEntityIds[0] === id;
+                        if (isClearingSelf) {
+                          setCompareEntityIds([]);
+                        } else {
+                          // Tell the kind-change reset effect to skip its
+                          // next firing — we're setting kind + ids atomically.
+                          // Only set the ref when the kind is actually
+                          // changing; otherwise it would stay armed and
+                          // suppress the next legitimate kind change.
+                          if (compareKind !== targetKind) {
+                            skipNextKindResetRef.current = true;
+                          }
+                          setCompareKind(targetKind);
+                          setCompareEntityIds([id]);
+                        }
+                        // Scroll back to the top so the user sees the
+                        // "Filtered to:" pill and the KPI/chart updates —
+                        // the team cards live at the bottom of the page.
+                        if (typeof window !== 'undefined') {
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }
+                      }}
+                    />
+                  );
+                })}
+              </div>
             </div>
           )}
 
@@ -1189,9 +1348,8 @@ export function FieldSalesAdminDashboard({
                   <li key={lead.id} className={styles.listItem}>
                     <button
                       type="button"
-                      onClick={() => openLead(lead.id)}
+                      onClick={() => goToLead(lead.id)}
                       className={styles.listItemLink}
-                      disabled={leadLoadingId === lead.id}
                     >
                       <div className={styles.listItemBody}>
                         <div className={styles.listItemTitle}>
@@ -1239,7 +1397,8 @@ export function FieldSalesAdminDashboard({
         </>
       )}
 
-      {/* Custom prompt box */}
+      {/* Custom prompt box — temporarily hidden while we rework the AI flow */}
+      {false && (
       <section className={styles.promptSection}>
         <header className={styles.sectionHeader}>
           <div className={styles.sectionIcon} data-variant="ai">
@@ -1312,6 +1471,7 @@ export function FieldSalesAdminDashboard({
 
         {saveToast && <div className={styles.toast}>{saveToast}</div>}
       </section>
+      )}
 
       {reportModalOpen && generatedReport && (
         <div
@@ -1403,10 +1563,16 @@ export function FieldSalesAdminDashboard({
         </div>
       )}
 
-      {selectedLead && (
-        <TechLeadDetailModal
-          lead={selectedLead}
-          onClose={() => setSelectedLead(null)}
+      {activeMetric && (
+        <MetricLeadsModal
+          title={METRIC_TITLES[activeMetric]}
+          loading={metricLoading}
+          leads={metricLeads ?? []}
+          onClose={closeMetricModal}
+          onLeadClick={leadId => {
+            closeMetricModal();
+            goToLead(leadId);
+          }}
         />
       )}
 
@@ -1425,9 +1591,9 @@ export function FieldSalesAdminDashboard({
 
 interface CompareViewProps {
   data: AdminReportData;
-  compareKind: 'users' | 'branches';
+  compareKind: CompareKind;
   compareEntityIds: string[];
-  choices: Array<{ id: string; label: string }>;
+  choices: Array<{ id: string; label: string; subtitle?: string | null }>;
   metric: CompareMetricKey;
   onMetricChange: (m: CompareMetricKey) => void;
   onToggleEntity: (id: string) => void;
@@ -1447,18 +1613,22 @@ function CompareView({
   const chartSpec: ChartSpec | null = useMemo(() => {
     if (series.length === 0) return null;
     const dayKeys = series[0]?.daily.map(p => p.date) ?? [];
+    // Key chart columns/series by entityId, not entityLabel — two compared
+    // entities can legitimately share a display name (e.g. test users), and
+    // a name collision would overwrite the data row and collapse both lines
+    // onto one. entityLabel stays as the user-visible legend text.
     const rows = dayKeys.map(date => {
       const row: Record<string, string | number> = { date: date.slice(5) };
       for (const s of series) {
         const point = s.daily.find(p => p.date === date);
-        row[s.entityLabel] = point ? (point as any)[metric] : 0;
+        row[s.entityId] = point ? (point as any)[metric] : 0;
       }
       return row;
     });
     return {
       type: 'line',
       xKey: 'date',
-      series: series.map(s => ({ key: s.entityLabel, label: s.entityLabel })),
+      series: series.map(s => ({ key: s.entityId, label: s.entityLabel })),
       data: rows,
     };
   }, [series, metric]);
@@ -1474,8 +1644,11 @@ function CompareView({
     }));
   }, [series]);
 
-  const compareLabel = compareKind === 'branches' ? 'branches' : 'team members';
-  const needMore = compareEntityIds.length < 2;
+  const compareLabel = COMPARE_KIND_LABELS[compareKind].toLowerCase();
+  const selectedChoices = useMemo(
+    () => choices.filter(c => compareEntityIds.includes(c.id)),
+    [choices, compareEntityIds]
+  );
 
   return (
     <section className={styles.section}>
@@ -1485,10 +1658,11 @@ function CompareView({
         </div>
         <div className={styles.sectionHeaderText}>
           <h2 className={styles.sectionTitle}>
-            Compare {compareKind === 'branches' ? 'Branches' : 'Team Members'}
+            Comparing {COMPARE_KIND_LABELS[compareKind]}
           </h2>
           <p className={styles.sectionSubtitle}>
-            Pick two or more {compareLabel} and switch metrics to compare them.
+            Use the filter to add or remove {compareLabel}. Switch metrics to
+            view different dimensions.
           </p>
         </div>
       </header>
@@ -1500,32 +1674,18 @@ function CompareView({
             {compareEntityIds.length} selected
           </span>
         </div>
-        <div
-          style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: 8,
-            padding: '8px 16px 16px',
-          }}
-        >
-          {choices.map(c => {
-            const active = compareEntityIds.includes(c.id);
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => onToggleEntity(c.id)}
-                className={`${styles.filterChip} ${active ? styles.filterChipActive : ''}`}
-              >
-                {c.label}
-              </button>
-            );
-          })}
-          {choices.length === 0 && (
-            <span className={styles.popoverEmpty}>
-              No {compareLabel} available.
-            </span>
-          )}
+        <div className={styles.compareSelectionChips}>
+          {selectedChoices.map(c => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => onToggleEntity(c.id)}
+              className={`${styles.filterChip} ${styles.filterChipActive}`}
+            >
+              {c.label}
+              <X size={12} />
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1554,13 +1714,7 @@ function CompareView({
         </div>
       </div>
 
-      {needMore && (
-        <div className={styles.error}>
-          Select at least two {compareLabel} to render the comparison.
-        </div>
-      )}
-
-      {!needMore && chartSpec && (
+      {chartSpec && (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <h3 className={styles.cardTitle}>
@@ -1571,7 +1725,7 @@ function CompareView({
         </div>
       )}
 
-      {!needMore && totalsTable.length > 0 && (
+      {totalsTable.length > 0 && (
         <div className={styles.card}>
           <div className={styles.cardHeader}>
             <h3 className={styles.cardTitle}>Totals</h3>
@@ -1580,7 +1734,9 @@ function CompareView({
             <table className={styles.dataTable}>
               <thead>
                 <tr>
-                  <th>{compareKind === 'branches' ? 'Branch' : 'Team Member'}</th>
+                  <th>
+                    {compareKind === 'branches' ? 'Branch' : 'Team Member'}
+                  </th>
                   <th>Submitted</th>
                   <th>Won</th>
                   <th>Pipeline</th>
@@ -1613,14 +1769,150 @@ interface KpiCardProps {
   label: string;
   value: number | string;
   variant?: 'primary' | 'success' | 'accent' | 'default';
+  onClick?: () => void;
 }
 
-function KpiCard({ icon, label, value, variant = 'default' }: KpiCardProps) {
+function KpiCard({
+  icon,
+  label,
+  value,
+  variant = 'default',
+  onClick,
+}: KpiCardProps) {
+  const className = `${styles.kpi} ${styles[`kpi-${variant}`]} ${
+    onClick ? styles.kpiClickable ?? '' : ''
+  }`;
+  if (onClick) {
+    return (
+      <button type="button" className={className} onClick={onClick}>
+        <div className={styles.kpiIcon}>{icon}</div>
+        <div className={styles.kpiValue}>{value}</div>
+        <div className={styles.kpiLabel}>{label}</div>
+      </button>
+    );
+  }
   return (
-    <div className={`${styles.kpi} ${styles[`kpi-${variant}`]}`}>
+    <div className={className}>
       <div className={styles.kpiIcon}>{icon}</div>
       <div className={styles.kpiValue}>{value}</div>
       <div className={styles.kpiLabel}>{label}</div>
+    </div>
+  );
+}
+
+interface MetricLeadsModalProps {
+  title: string;
+  loading: boolean;
+  leads: AdminRecentLead[];
+  onClose: () => void;
+  onLeadClick: (leadId: string) => void;
+}
+
+function MetricLeadsModal({
+  title,
+  loading,
+  leads,
+  onClose,
+  onLeadClick,
+}: MetricLeadsModalProps) {
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  return (
+    <div
+      className={styles.metricModalBackdrop}
+      onClick={onClose}
+      role="presentation"
+    >
+      <div
+        className={styles.metricModalCard}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className={styles.metricModalHeader}>
+          <h3 className={styles.metricModalTitle}>{title}</h3>
+          <div className={styles.metricModalHeaderRight}>
+            {!loading && (
+              <span className={styles.cardMeta}>{leads.length}</span>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className={styles.metricModalClose}
+              aria-label="Close"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        </div>
+
+        <div className={styles.metricModalBody}>
+          {loading && (
+            <div className={styles.metricModalEmpty}>Loading…</div>
+          )}
+          {!loading && leads.length === 0 && (
+            <div className={styles.metricModalEmpty}>
+              No leads match this metric for the current filters.
+            </div>
+          )}
+          {!loading && leads.length > 0 && (
+            <ul className={styles.list}>
+              {leads.map(lead => (
+                <li key={lead.id} className={styles.listItem}>
+                  <button
+                    type="button"
+                    onClick={() => onLeadClick(lead.id)}
+                    className={styles.listItemLink}
+                  >
+                    <div className={styles.listItemBody}>
+                      <div className={styles.listItemTitle}>
+                        {lead.customerName}
+                      </div>
+                      <div className={styles.listItemMeta}>
+                        <span
+                          className={`${styles.statusChip} ${statusChipClass(lead.status)}`}
+                        >
+                          {statusLabel(lead.status)}
+                        </span>
+                        {lead.serviceType && (
+                          <span className={styles.metaPill}>
+                            {lead.serviceType}
+                          </span>
+                        )}
+                        {(lead.city || lead.state) && (
+                          <span className={styles.metaText}>
+                            {[lead.city, lead.state]
+                              .filter(Boolean)
+                              .join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className={styles.listItemTrailing}>
+                      {lead.estimatedValue ? (
+                        <span className={styles.money}>
+                          {formatCurrency(Number(lead.estimatedValue))}
+                        </span>
+                      ) : null}
+                      <span className={styles.relativeTime}>
+                        {formatRelative(lead.createdAt)}
+                      </span>
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

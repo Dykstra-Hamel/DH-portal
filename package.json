@@ -32,6 +32,7 @@
     "stopstart": "supabase stop && supabase start"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.92.0",
     "@aws-sdk/client-sesv2": "^3.939.0",
     "@ducanh2912/next-pwa": "^10.2.9",
     "@emotion/react": "^11.14.0",

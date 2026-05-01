@@ -331,12 +331,16 @@ function FieldSalesDashboardInner() {
 
   // Company admin/owner — aggregated team reports dashboard (all branches).
   // Company manager — same component but scoped to direct reports + default branch.
-  // Global admin can preview either via the ViewAsDropdown override.
+  // Global admin (no view-as override) — admin dashboard, even if they don't
+  // have a user_companies row for the selected company.
+  // Global admin (with override) — preview as the chosen role.
   const renderAdminOrManagerDashboard =
-    (isCompanyAdmin && !!selectedCompany?.id && !!userId) ||
-    (viewAsActive &&
-      (effectiveDashboardRole === 'admin' ||
-        effectiveDashboardRole === 'manager'));
+    !!selectedCompany?.id &&
+    !!userId &&
+    ((!viewAsActive && (isCompanyAdmin || isAdmin)) ||
+      (viewAsActive &&
+        (effectiveDashboardRole === 'admin' ||
+          effectiveDashboardRole === 'manager')));
 
   if (renderAdminOrManagerDashboard && selectedCompany?.id) {
     let dashboardRole: 'admin' | 'manager';

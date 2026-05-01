@@ -1,54 +1,62 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/api-utils';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { verifyCompanyAdminAccess } from '@/lib/field-sales/admin-reports';
 import {
-  getBroadAdminDataset,
-  verifyCompanyAdminAccess,
-} from '@/lib/field-sales/admin-reports';
-import { getGeminiClient } from '@/lib/ai/gemini-client';
+  Anthropic,
+  getAnthropicClient,
+} from '@/lib/ai/anthropic-client';
+import { ASK_THE_DATA_SYSTEM_PROMPT } from '@/lib/field-sales/ai-system-prompt';
+import {
+  AI_TOOLS,
+  executeTool,
+  type AiToolContext,
+  type GeneratedReport,
+} from '@/lib/field-sales/ai-tools';
 
 interface GenerateBody {
   companyId: string;
   prompt: string;
 }
 
-const SYSTEM_INSTRUCTION = `You are a field-sales operations analyst answering on-the-fly questions for a company admin/manager.
-You receive a JSON "dataset" containing pre-aggregated company-wide numbers and a natural-language request. The dataset covers ALL of the company's field-sales activity — it is not pre-filtered.
+const MODEL = 'claude-haiku-4-5';
+const MAX_TOKENS = 4096;
+const MAX_TOOL_ITERATIONS = 12;
 
-Structure of the dataset:
-- company: total company members, plus counts of users in the "inspector" and "technician" departments.
-- allTime: aggregates across every lead ever created for this company, including leadsByStatus, leadsBySource, a leadsBySourceAndStatus matrix, wonRevenue, pipelineValue, annualizedLeadValue, annualizedWonValue, leadsWithQuoteCount, and route-stop totals. The allTime.fieldSales* fields are restricted to lead_source in {technician, field_map}, which is how "Field Sales" leads are defined.
-- last12Months: the same measures restricted to the rolling 12-month window (windowFrom..windowTo), plus a 12-bucket monthly series.
-- perUser: per-person stats for every company member. Each entry includes companyRole, departments (array — "inspector" and/or "technician" indicate Field Sales roles), lead/route counts, and dollar aggregates for every submitter: leadsSubmittedAllTime, leadsWonAllTime, leadsLostAllTime, leadsInProcessAllTime, wonRevenueAllTime (sum of estimated_value on won leads only — one-time charge only), totalEstimatedValueAllTime (sum of estimated_value across ALL leads the user submitted regardless of status — one-time charge only), pipelineValueAllTime (sum of estimated_value across open/pipeline statuses: new, in_process, quoted, scheduling), annualizedLeadValueAllTime (RECOMMENDED for "total value of leads per user" — sum across every lead the user submitted of the quote's full annualized value: initial + recurring × annual multiplier based on billing_frequency; falls back to estimated_value for leads without a quote), annualizedWonValueAllTime (same annualized calculation but restricted to won leads), leadsWithQuoteAllTime (how many of that user's leads actually have a quote attached — use to explain coverage).
-- When the user asks "how much revenue / value did X produce", PREFER the annualized* fields over wonRevenue / totalEstimatedValue, because those only count the one-time initial charge and undersell recurring-revenue leads.
-- notes.fieldSalesSourceValues, notes.inspectorDepartmentValue, notes.technicianDepartmentValue are the canonical values you should match against.
-
-Respond ONLY with a single valid JSON object matching this schema — no markdown fences, no prose outside the JSON:
-
-{
-  "title": string,                // short title (<= 80 chars)
-  "summary": string,              // 1-3 plain sentences answering the request using ONLY the dataset numbers
-  "chart": {                      // OPTIONAL — include only if a chart clearly helps
-    "type": "bar" | "line" | "pie" | "area",
-    "xKey": string,
-    "series": [{ "key": string, "label": string }],
-    "data": [ { "<xKey>": string | number, ...numericKeys } ]
-  },
-  "table": {                      // OPTIONAL — include only if a tabular breakdown helps
-    "columns": string[],
-    "rows": string[][]
-  }
+// Build the messages.create payload with cache_control on the last tool
+// definition AND on the system prompt — this places one cache breakpoint
+// after each, so subsequent calls can read the cached prefix instead of
+// re-tokenizing the full system+tools block.
+function buildCachedSystem(): Anthropic.MessageParam['content'] extends infer _
+  ? Array<{
+      type: 'text';
+      text: string;
+      cache_control?: { type: 'ephemeral' };
+    }>
+  : never {
+  return [
+    {
+      type: 'text',
+      text: ASK_THE_DATA_SYSTEM_PROMPT,
+      cache_control: { type: 'ephemeral' },
+    },
+  ] as never;
 }
 
-Hard rules:
-- Every number you cite MUST come directly from the dataset. Do NOT compute across categories the dataset doesn't already aggregate; do NOT estimate or round up.
-- If the question requires a metric that isn't pre-computed (e.g., "inspections" when the dataset only has route stops), say so plainly in the summary and use the closest available measure, naming it exactly.
-- When the user says "inspectors" or "technicians", filter perUser by departments containing "inspector" / "technician". When they say "Field Sales", use allTime.fieldSales* OR filter leads where lead_source in notes.fieldSalesSourceValues.
-- Chart data points must be copied verbatim from the dataset. Keep <= 30 points. For pies, use one series with {"<xKey>": string, value: number}.
-- Prefer a table when the user asks for "broken down by user" or similar per-person lists.
-- Never echo the request verbatim in the title.
-- If the dataset is empty or the answer is zero, say so — do not fabricate activity.
-`;
+function buildCachedTools() {
+  // Anthropic SDK accepts the tools array directly. We tag the last tool
+  // (submit_report) with cache_control so the prompt cache spans through
+  // all tool definitions.
+  return AI_TOOLS.map((tool, idx) => {
+    if (idx === AI_TOOLS.length - 1) {
+      return {
+        ...tool,
+        cache_control: { type: 'ephemeral' as const },
+      };
+    }
+    return tool;
+  });
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,33 +82,146 @@ export async function POST(request: NextRequest) {
       isGlobalAdmin
     );
     if (!access.ok) {
-      return NextResponse.json({ error: access.reason }, { status: access.status });
+      return NextResponse.json(
+        { error: access.reason },
+        { status: access.status }
+      );
     }
 
-    const dataset = await getBroadAdminDataset(admin, companyId);
-
-    let generated: unknown;
+    let client: Anthropic;
     try {
-      const gemini = getGeminiClient();
-      const result = await gemini.generate<unknown>(
-        `Dataset:\n${JSON.stringify(dataset)}\n\nRequest: ${prompt.trim()}`,
-        {
-          systemInstruction: SYSTEM_INSTRUCTION,
-          jsonMode: true,
-          temperature: 0,
-          maxOutputTokens: 2048,
-        }
-      );
-      generated = result.data;
+      client = getAnthropicClient();
     } catch (err) {
-      console.error('Admin report Gemini error:', err);
+      console.error('Anthropic config error:', err);
       return NextResponse.json(
-        { error: 'AI service unavailable. Please try again.' },
+        { error: 'AI service is not configured.' },
         { status: 502 }
       );
     }
 
-    return NextResponse.json({ result: generated, dataset });
+    const ctx: AiToolContext = {
+      admin,
+      companyId,
+      _dataset: null,
+    };
+
+    const messages: Anthropic.MessageParam[] = [
+      {
+        role: 'user',
+        content: prompt.trim(),
+      },
+    ];
+
+    let finalReport: GeneratedReport | null = null;
+
+    for (let iter = 0; iter < MAX_TOOL_ITERATIONS; iter++) {
+      let response: Anthropic.Message;
+      try {
+        response = await client.messages.create({
+          model: MODEL,
+          max_tokens: MAX_TOKENS,
+          system: buildCachedSystem(),
+          // Cast: SDK type allows cache_control on tools but the strict
+          // typedef in older SDK builds may not include it on every tool —
+          // the runtime accepts it as documented.
+          tools: buildCachedTools() as unknown as Anthropic.Tool[],
+          messages,
+        });
+      } catch (err) {
+        if (err instanceof Anthropic.RateLimitError) {
+          return NextResponse.json(
+            { error: 'AI service is rate-limited. Try again shortly.' },
+            { status: 429 }
+          );
+        }
+        if (err instanceof Anthropic.AuthenticationError) {
+          console.error('Anthropic auth error:', err);
+          return NextResponse.json(
+            { error: 'AI service is not configured.' },
+            { status: 502 }
+          );
+        }
+        if (err instanceof Anthropic.APIError) {
+          console.error('Anthropic API error:', err);
+          return NextResponse.json(
+            { error: 'AI service unavailable. Please try again.' },
+            { status: 502 }
+          );
+        }
+        throw err;
+      }
+
+      // Append the assistant's full response (text + tool_use blocks) to
+      // the running transcript so the next turn has correct context.
+      messages.push({ role: 'assistant', content: response.content });
+
+      // Find any tool_use blocks; the model may emit multiple per turn.
+      const toolUses = response.content.filter(
+        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
+      );
+
+      if (toolUses.length === 0) {
+        // The model ended its turn without calling submit_report. Nudge it.
+        if (response.stop_reason === 'end_turn') {
+          messages.push({
+            role: 'user',
+            content:
+              'You must finish by calling the submit_report tool with the final answer.',
+          });
+          continue;
+        }
+        // Some other stop reason with no tool calls — bail.
+        break;
+      }
+
+      // Check for the terminal tool first — if the model called it we are
+      // done, regardless of any other tool calls in the same turn.
+      const submission = toolUses.find(t => t.name === 'submit_report');
+      if (submission) {
+        finalReport = submission.input as GeneratedReport;
+        break;
+      }
+
+      // Otherwise execute every tool_use block and feed the results back.
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      for (const tu of toolUses) {
+        try {
+          const out = await executeTool(
+            ctx,
+            tu.name,
+            (tu.input ?? {}) as Record<string, unknown>
+          );
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tu.id,
+            content: JSON.stringify(out),
+          });
+        } catch (err) {
+          console.error(`Tool ${tu.name} threw:`, err);
+          toolResults.push({
+            type: 'tool_result',
+            tool_use_id: tu.id,
+            content: JSON.stringify({
+              error: err instanceof Error ? err.message : 'tool failed',
+            }),
+            is_error: true,
+          });
+        }
+      }
+      messages.push({ role: 'user', content: toolResults });
+    }
+
+    if (!finalReport) {
+      return NextResponse.json(
+        {
+          error:
+            'Could not generate a report after several rounds of analysis. Try a more specific prompt.',
+        },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({ result: finalReport });
   } catch (error) {
     console.error('Admin report generate error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

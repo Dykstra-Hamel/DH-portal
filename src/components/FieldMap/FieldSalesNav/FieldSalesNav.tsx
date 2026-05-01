@@ -18,6 +18,7 @@ export function FieldSalesNav({ disableNew = false }: FieldSalesNavProps = {}) {
   const pathname = usePathname();
   const { selectedCompany, isAdmin } = useCompany();
   const [userId, setUserId] = useState<string | null>(null);
+  const [companyRole, setCompanyRole] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState(false);
   const [showLeadTypePicker, setShowLeadTypePicker] = useState(false);
 
@@ -27,6 +28,30 @@ export function FieldSalesNav({ disableNew = false }: FieldSalesNavProps = {}) {
       setUserId(data.user?.id ?? null);
     });
   }, []);
+
+  // Mirror the role check used by SecondarySideNav: admins/managers/owners
+  // get team reporting inline on the dashboard, so the bottom-bar Reports
+  // tab is disabled for them.
+  useEffect(() => {
+    if (!selectedCompany?.id || !userId) {
+      setCompanyRole(null);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from('user_companies')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('company_id', selectedCompany.id)
+      .maybeSingle()
+      .then(({ data }) => setCompanyRole((data?.role as string | null) ?? null));
+  }, [selectedCompany?.id, userId]);
+
+  const reportsDisabled =
+    isAdmin ||
+    companyRole === 'owner' ||
+    companyRole === 'admin' ||
+    companyRole === 'manager';
 
   const { departments } = useUserDepartments(
     userId ?? '',
@@ -267,54 +292,107 @@ export function FieldSalesNav({ disableNew = false }: FieldSalesNavProps = {}) {
             <span className={styles.newLabel}>New</span>
           </button>
 
-          {/* Third item: Reports */}
-          <Link
-            href={thirdHref}
-            className={`${styles.navItem} ${isActive(thirdHref) ? styles.active : ''}`}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
+          {/* Third item: Reports — disabled for admins/managers/owners,
+              who get team reports inline on the dashboard. */}
+          {reportsDisabled ? (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`${styles.navItem} ${styles.navItemDisabled ?? ''}`}
             >
-              <path
-                d="M3 20h18"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <rect
-                x="5"
-                y="11"
-                width="3"
-                height="6"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <rect
-                x="10.5"
-                y="7"
-                width="3"
-                height="10"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <rect
-                x="16"
-                y="4"
-                width="3"
-                height="13"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-            </svg>
-            <span className={styles.label}>{thirdLabel}</span>
-          </Link>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 20h18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <rect
+                  x="5"
+                  y="11"
+                  width="3"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="10.5"
+                  y="7"
+                  width="3"
+                  height="10"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="16"
+                  y="4"
+                  width="3"
+                  height="13"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+              <span className={styles.label}>{thirdLabel}</span>
+            </button>
+          ) : (
+            <Link
+              href={thirdHref}
+              className={`${styles.navItem} ${isActive(thirdHref) ? styles.active : ''}`}
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 20h18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <rect
+                  x="5"
+                  y="11"
+                  width="3"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="10.5"
+                  y="7"
+                  width="3"
+                  height="10"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="16"
+                  y="4"
+                  width="3"
+                  height="13"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+              <span className={styles.label}>{thirdLabel}</span>
+            </Link>
+          )}
         </div>
       </nav>
     </>
