@@ -24,6 +24,10 @@ import {
   DEFAULT_TIME_OPTIONS,
   getEnabledTimeOptions,
 } from '@/lib/time-options';
+import {
+  calculateFeaturedPlanPrice,
+} from '@/lib/pricing-calculations';
+import type { CompanyPricingSettings } from '@/types/pricing';
 
 interface AlternativeColor {
   hex: string;
@@ -96,6 +100,9 @@ interface Quote {
     requested_time: string | null;
     map_plot_data?: any;
   };
+  yard_sq_ft?: number | null;
+  home_sq_ft?: number | null;
+  pricing_settings?: CompanyPricingSettings | null;
   featured_plans?: Array<{
     id: string;
     plan_name: string;
@@ -105,11 +112,20 @@ interface Quote {
     plan_description: string | null;
     plan_features: string[];
     plan_image_url: string | null;
+    // Pricing configuration fields
+    pricing_type?: string | null;
+    price_per_unit?: number | null;
+    minimum_price?: number | null;
+    yard_sqft_pricing?: any;
+    home_size_pricing?: any;
+    yard_size_pricing?: any;
   }>;
   inspector?: {
     name: string;
     title: string | null;
     avatar_url: string | null;
+    contact_phone?: string | null;
+    contact_email?: string | null;
   } | null;
 }
 
@@ -141,9 +157,7 @@ export default function QuoteContent({
   const [termsNudge, setTermsNudge] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [heroImageUrl, setHeroImageUrl] = useState<string>(
-    '/images/quote-hero-placeholder.svg'
-  );
+  const [heroImageUrl, setHeroImageUrl] = useState<string | null>(null);
   const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [additionalLineItems, setAdditionalLineItems] = useState<
     QuoteLineItem[]
@@ -154,6 +168,8 @@ export default function QuoteContent({
   const [expandedFeaturedId, setExpandedFeaturedId] = useState<string | null>(
     null
   );
+  const [companyPricingSettings, setCompanyPricingSettings] =
+    useState<CompanyPricingSettings | null>(quote.pricing_settings ?? null);
 
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
     () =>
@@ -171,23 +187,41 @@ export default function QuoteContent({
     (item as any).planContent ?? null;
 
   const toggleItem = (id: string) => {
-    setSelectedItemIds(prev => {
-      const item = effectiveLineItems.find(i => i.id === id);
-      if (prev.has(id)) {
-        if (item?.catalogItemKind !== 'addon') {
-          const planCount = [...prev].filter(sid =>
-            effectiveLineItems.find(
-              i => i.id === sid && i.catalogItemKind !== 'addon'
-            )
-          ).length;
-          if (planCount <= 1) return prev;
-        }
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
+    const item = effectiveLineItems.find(i => i.id === id);
+    const currentlySelected = selectedItemIds.has(id);
+
+    let newIsSelected: boolean;
+    if (currentlySelected) {
+      if (item?.catalogItemKind !== 'addon') {
+        const planCount = [...selectedItemIds].filter(sid =>
+          effectiveLineItems.find(
+            i => i.id === sid && i.catalogItemKind !== 'addon'
+          )
+        ).length;
+        if (planCount <= 1) return; // can't deselect last plan
       }
-      return new Set([...prev, id]);
+      newIsSelected = false;
+    } else {
+      newIsSelected = true;
+    }
+
+    setSelectedItemIds(prev => {
+      const next = new Set(prev);
+      if (newIsSelected) {
+        next.add(id);
+      } else {
+        next.delete(id);
+      }
+      return next;
     });
+
+    if (token) {
+      fetch(`/api/quotes/${quote.id}/public/line-items/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, is_selected: newIsSelected }),
+      }).catch(err => console.error('Failed to persist line item selection:', err));
+    }
   };
 
   const toggleRecommendedAddon = (id: string, siblingIds: string[]) => {
@@ -206,6 +240,16 @@ export default function QuoteContent({
   };
 
   async function handleAddFeaturedPlan(plan: (typeof featuredPlans)[number]) {
+    // Calculate accurate price using stored yard sq ft and size ranges
+    const { initialPrice: calcInitial, recurringPrice: calcRecurring } =
+      calculateFeaturedPlanPrice(plan, {
+        yardSqFt: quote.yard_sq_ft ?? null,
+        homeSqFt: quote.home_sq_ft ?? null,
+        homeSizeRange: quote.home_size_range ?? null,
+        yardSizeRange: quote.yard_size_range ?? null,
+        companySettings: companyPricingSettings,
+      });
+
     const tempId = crypto.randomUUID();
     const newItem: QuoteLineItem = {
       id: tempId,
@@ -215,8 +259,8 @@ export default function QuoteContent({
       catalogItemName: plan.plan_name,
       coveredPestIds: [],
       coveredPestLabels: [],
-      initialCost: plan.initial_price ?? 0,
-      recurringCost: plan.recurring_price ?? 0,
+      initialCost: calcInitial,
+      recurringCost: calcRecurring,
       frequency: plan.billing_frequency ?? 'monthly',
       isPrimary: true,
       isSelected: true,
@@ -233,8 +277,8 @@ export default function QuoteContent({
         body: JSON.stringify({
           service_plan_id: plan.id,
           plan_name: plan.plan_name,
-          initial_price: plan.initial_price ?? 0,
-          recurring_price: plan.recurring_price ?? 0,
+          initial_price: calcInitial,
+          recurring_price: calcRecurring,
           billing_frequency: plan.billing_frequency ?? 'monthly',
           display_order: quote.line_items.length + additionalLineItems.length,
         }),
@@ -353,6 +397,17 @@ export default function QuoteContent({
 
   const [interestedInFinancing, setInterestedInFinancing] = useState(false);
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
+
+  // Fetch pricing settings if not already provided in the quote payload
+  useEffect(() => {
+    if (companyPricingSettings) return;
+    fetch(`/api/companies/${company.id}/pricing-settings`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: any) => {
+        if (data?.data) setCompanyPricingSettings(data.data);
+      })
+      .catch(() => {});
+  }, [company.id, companyPricingSettings]);
 
   useEffect(() => {
     fetch(
@@ -670,13 +725,22 @@ export default function QuoteContent({
           <h2>Additional Services We Offer</h2>
           {featuredPlans.map(plan => {
             const isExpanded = expandedFeaturedId === plan.id;
-            const isOneTime =
-              plan.billing_frequency === 'one-time' || !plan.recurring_price;
             const features: string[] = plan.plan_features ?? [];
             const imageUrl = plan.plan_image_url ?? null;
             const description = plan.plan_description ?? null;
-            const recurringPrice = plan.recurring_price ?? 0;
-            const initialPrice = plan.initial_price ?? 0;
+            // Calculate accurate price using stored measurements and size ranges
+            const {
+              initialPrice,
+              recurringPrice,
+              isExact: priceIsExact,
+            } = calculateFeaturedPlanPrice(plan, {
+              yardSqFt: quote.yard_sq_ft ?? null,
+              homeSizeRange: quote.home_size_range ?? null,
+              yardSizeRange: quote.yard_size_range ?? null,
+              companySettings: companyPricingSettings,
+            });
+            const isOneTime =
+              plan.billing_frequency === 'one-time' || !plan.recurring_price;
             const hasContent = !!(
               description ||
               features.length > 0 ||
@@ -719,14 +783,14 @@ export default function QuoteContent({
                   <div className={styles.addonHeaderRight}>
                     {isOneTime && initialPrice ? (
                       <span className={styles.additionalServicePrice}>
-                        From <sup>$</sup>
+                        {priceIsExact ? '' : 'From '}<sup>$</sup>
                         <span className={styles.additionalServicePriceNumber}>
                           {initialPrice.toFixed(0)}
                         </span>
                       </span>
                     ) : recurringPrice ? (
                       <span className={styles.additionalServicePrice}>
-                        From <sup>$</sup>
+                        {priceIsExact ? '' : 'From '}<sup>$</sup>
                         <span className={styles.additionalServicePriceNumber}>
                           {recurringPrice.toFixed(0)}
                         </span>
@@ -893,6 +957,7 @@ export default function QuoteContent({
             companyId={company.id}
             mapPlotData={mapPlotData}
             brandPrimary={branding?.primary_color ?? null}
+            satelliteImageUrl={heroImageUrl}
           >
             {/* Pests Identified + Inspector Card (shown when inspection data exists) */}
             {(plottedPests.length > 0 || quote.inspector) && (
@@ -950,6 +1015,16 @@ export default function QuoteContent({
                         <p className={styles.inspectorTitle}>
                           {quote.inspector.title || 'Lead Sales Inspector'}
                         </p>
+                        {(quote.inspector.contact_phone || company.phone) && (
+                          <p className={styles.inspectorPhone}>
+                            {quote.inspector.contact_phone || company.phone}
+                          </p>
+                        )}
+                        {quote.inspector.contact_email && (
+                          <p className={styles.inspectorEmail}>
+                            {quote.inspector.contact_email}
+                          </p>
+                        )}
                       </div>
                     </div>
                     {inspectionAddress && (

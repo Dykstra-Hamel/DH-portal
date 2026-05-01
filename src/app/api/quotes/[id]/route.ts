@@ -83,6 +83,46 @@ export async function GET(
   }
 }
 
+// PATCH: Lightweight update for specific quote fields (e.g. yard_sq_ft)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+
+    if (!id) {
+      return NextResponse.json({ error: 'Quote ID is required' }, { status: 400 });
+    }
+
+    const supabase = createAdminClient();
+
+    const allowedFields = ['yard_sq_ft', 'home_sq_ft'] as const;
+    const updateData: Record<string, unknown> = {};
+    for (const field of allowedFields) {
+      if (field in body) updateData[field] = body[field];
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('quotes')
+      .update(updateData)
+      .eq('id', id);
+
+    if (error) {
+      return NextResponse.json({ error: 'Failed to update quote' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
 // PUT: Update a quote
 export async function PUT(
   request: NextRequest,

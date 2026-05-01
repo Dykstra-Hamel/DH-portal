@@ -19,6 +19,7 @@ interface HeroSectionProps {
   companyId: string;
   mapPlotData?: MapPlotData | null;
   brandPrimary?: string | null;
+  satelliteImageUrl?: string | null;
   children?: ReactNode;
 }
 
@@ -27,6 +28,7 @@ export default function HeroSection({
   companyId,
   mapPlotData,
   brandPrimary,
+  satelliteImageUrl,
   children,
 }: HeroSectionProps) {
   const [reviewData, setReviewData] = useState<{
@@ -63,20 +65,9 @@ export default function HeroSection({
     fetchReviews();
   }, [companyId]);
 
-  const scrollToSection = () => {
-    const section = document.getElementById('pestProtectionPlans');
-    if (section) {
-      const offset = 70; // Account for fixed header
-      const targetY =
-        section.getBoundingClientRect().top + window.scrollY - offset;
-      window.scrollTo({ top: Math.max(targetY, 0), behavior: 'smooth' });
-    }
-  };
-
   return (
     <section id="hero-section" className={styles.heroSection}>
       <div className={styles.heroContainer}>
-        {children}
         {/* Left column - Content */}
         <div className={styles.heroContent}>
           <h1 className={styles.heroTitle}>{hero.title}</h1>
@@ -84,7 +75,7 @@ export default function HeroSection({
             className={styles.heroSubtitle}
             dangerouslySetInnerHTML={{ __html: hero.subtitle || '' }}
           ></p>
-
+          {children}
           {/* Review Badge */}
           {!isLoading && reviewData && (
             <div className={styles.reviewBadge}>
@@ -208,31 +199,16 @@ export default function HeroSection({
                 </button>
               )}
             </div>
-          ) : hero.imageUrl ? (
-            <Image
-              src={hero.imageUrl}
-              alt="Campaign hero"
-              width={522}
-              height={418}
-              quality={85}
-              className={styles.heroImageDisplay}
-              priority={true}
-            />
-          ) : (
-            <div className={styles.imagePlaceholder}>
-              <svg
-                width="200"
-                height="200"
-                viewBox="0 0 200 200"
-                fill="none"
-                xmlns="http://www.w3.org/2000/svg"
-              >
-                <rect width="200" height="200" fill="#E5E7EB" />
-                <path d="M100 60L120 100H80L100 60Z" fill="#9CA3AF" />
-                <circle cx="100" cy="130" r="20" fill="#9CA3AF" />
-              </svg>
+          ) : satelliteImageUrl ? (
+            <div className={styles.heroMapWrap}>
+              <Image
+                src={satelliteImageUrl}
+                alt="Satellite view of service address"
+                fill
+                style={{ objectFit: 'cover' }}
+              />
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

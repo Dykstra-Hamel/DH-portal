@@ -656,6 +656,126 @@ export function calculateIntervalCount(
 }
 
 /**
+ * Calculate the displayed price for a featured plan card, taking into account
+ * map-measured yard sq ft, quote size ranges, and the plan's pricing configuration.
+ *
+ * Returns `isExact = true` when we have enough context to compute the actual price
+ * (so the caller can drop the "From" prefix). Returns `isExact = false` when we can
+ * only determine the base/floor price (show "From $X").
+ */
+export function calculateFeaturedPlanPrice(
+  plan: {
+    initial_price: number | null;
+    recurring_price: number | null;
+    billing_frequency: string | null;
+    pricing_type?: string | null;
+    price_per_unit?: number | null;
+    minimum_price?: number | null;
+    yard_sqft_pricing?: ServicePlanPricing['yard_sqft_pricing'];
+    home_size_pricing?: ServicePlanPricing['home_size_pricing'] | null;
+    yard_size_pricing?: ServicePlanPricing['yard_size_pricing'] | null;
+  },
+  context: {
+    yardSqFt?: number | null;
+    homeSqFt?: number | null;
+    homeSizeRange?: string | null;
+    yardSizeRange?: string | null;
+    companySettings?: CompanyPricingSettings | null;
+  }
+): { initialPrice: number; recurringPrice: number; isExact: boolean } {
+  let initialPrice = plan.initial_price ?? 0;
+  let recurringPrice = plan.recurring_price ?? 0;
+  let isExact = false;
+
+  const { yardSqFt, homeSqFt, homeSizeRange, yardSizeRange, companySettings } = context;
+
+  // 1. Per-unit pricing (per_sqft, per_acre, per_linear_foot) — most precise
+  if (plan.pricing_type && plan.price_per_unit != null) {
+    if (plan.pricing_type === 'per_sqft' && yardSqFt != null && yardSqFt > 0) {
+      const raw = yardSqFt * plan.price_per_unit;
+      initialPrice = plan.minimum_price != null ? Math.max(raw, plan.minimum_price) : raw;
+      isExact = true;
+    } else if (plan.pricing_type === 'per_acre' && yardSizeRange && companySettings) {
+      // Convert acre range start to numeric acres, then to sq ft for a rough estimate
+      const acreStart = parseFloat(yardSizeRange.replace('+', '').split('-')[0]);
+      if (!isNaN(acreStart) && acreStart > 0) {
+        const raw = acreStart * plan.price_per_unit;
+        initialPrice = plan.minimum_price != null ? Math.max(raw, plan.minimum_price) : raw;
+        isExact = false; // range-based, not exact
+      }
+    }
+    // Return early for per-unit plans — no additive interval adjustments apply
+    return { initialPrice, recurringPrice, isExact };
+  }
+
+  // 2. Yard sqft interval pricing
+  if (plan.yard_sqft_pricing && yardSqFt != null && yardSqFt > 0 && companySettings) {
+    const options = generateYardSqftOptions(companySettings, {
+      yard_sqft_pricing: plan.yard_sqft_pricing,
+      // Provide no-op stubs for required fields we don't need here
+      home_size_pricing: plan.home_size_pricing ?? { initial_cost_per_interval: 0, recurring_cost_per_interval: 0 },
+      yard_size_pricing: plan.yard_size_pricing ?? { initial_cost_per_interval: 0, recurring_cost_per_interval: 0 },
+      linear_feet_pricing: { initial_price_per_foot: [] },
+    });
+    const match = options.find(o =>
+      o.rangeEnd === null ? yardSqFt >= o.rangeStart : yardSqFt >= o.rangeStart && yardSqFt <= o.rangeEnd
+    );
+    if (match) {
+      initialPrice += match.initialIncrease;
+      recurringPrice += match.recurringIncrease;
+      isExact = true;
+    }
+  }
+
+  // 3. Home size interval pricing — prefer raw sq ft measurement; fall back to range string
+  if (plan.home_size_pricing && companySettings) {
+    const lookupVal = homeSqFt != null && homeSqFt > 0
+      ? homeSqFt
+      : homeSizeRange ? parseRangeStart(homeSizeRange) : null;
+
+    if (lookupVal != null) {
+      const options = generateHomeSizeOptions(companySettings, {
+        home_size_pricing: plan.home_size_pricing,
+        yard_size_pricing: plan.yard_size_pricing ?? { initial_cost_per_interval: 0, recurring_cost_per_interval: 0 },
+        linear_feet_pricing: { initial_price_per_foot: [] },
+      });
+      const match = findSizeOptionByValue(lookupVal, options);
+      if (match) {
+        initialPrice += match.initialIncrease;
+        recurringPrice += match.recurringIncrease;
+        isExact = homeSqFt != null && homeSqFt > 0;
+      }
+    }
+  }
+
+  // 4. Yard acre interval pricing
+  if (plan.yard_size_pricing && yardSizeRange && companySettings) {
+    const startVal = parseFloat(yardSizeRange.replace('+', '').split('-')[0]);
+    if (!isNaN(startVal)) {
+      const options = generateYardSizeOptions(companySettings, {
+        home_size_pricing: plan.home_size_pricing ?? { initial_cost_per_interval: 0, recurring_cost_per_interval: 0 },
+        yard_size_pricing: plan.yard_size_pricing,
+        linear_feet_pricing: { initial_price_per_foot: [] },
+      });
+      const match = findSizeOptionByValue(startVal, options);
+      if (match) {
+        initialPrice += match.initialIncrease;
+        recurringPrice += match.recurringIncrease;
+        isExact = true;
+      }
+    }
+  }
+
+  return { initialPrice, recurringPrice, isExact };
+}
+
+/** Parse the start value from a range string like "0-1500", "1501-2000", or "3000+" */
+function parseRangeStart(range: string): number {
+  if (range.includes('+')) return parseFloat(range.replace('+', ''));
+  return parseFloat(range.split('-')[0]);
+}
+
+/**
  * Calculate price for per-unit pricing (per_sqft, per_linear_foot, per_acre).
  * Formula: max(quantity × pricePerUnit, minimumPrice ?? 0)
  */

@@ -35,6 +35,9 @@ export interface Quote {
   home_size_range?: string;
   yard_size_range?: string;
 
+  // Map-measured yard area (sq ft) — persisted from ServiceWizard map outlines
+  yard_sq_ft?: number | null;
+
   // Pricing subtotals (pre-discount)
   subtotal_initial_price?: number;
   subtotal_recurring_price?: number;

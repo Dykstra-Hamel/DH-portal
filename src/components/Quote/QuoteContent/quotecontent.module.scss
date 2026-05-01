@@ -1850,7 +1850,7 @@
   padding: 0 147px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
 
   @media (max-width: 1400px) {
     padding: 0 60px;
@@ -3724,6 +3724,16 @@
 }
 
 .inspectorTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--color-text-gray);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
+.inspectorPhone,
+.inspectorEmail {
   margin: 0;
   font-size: 12px;
   font-weight: 500;

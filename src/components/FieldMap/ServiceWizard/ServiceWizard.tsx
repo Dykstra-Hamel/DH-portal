@@ -57,6 +57,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     'Inspector';
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const inspectorTitle = profile?.title ?? null;
+  const inspectorPhone = profile?.phone ?? null;
+  const inspectorEmail = profile?.contact_email ?? null;
+  const companyPhone = selectedCompany?.phone ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
   const initialStep = stopId || leadIdParam ? 1 : 0;
@@ -936,6 +939,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               inspectorName={inspectorName}
               inspectorAvatarUrl={inspectorAvatarUrl}
               inspectorTitle={inspectorTitle}
+              inspectorPhone={inspectorPhone}
+              inspectorEmail={inspectorEmail}
+              companyPhone={companyPhone}
               companyName={companyName}
               companyId={selectedCompany?.id ?? ''}
               leadId={leadId}
