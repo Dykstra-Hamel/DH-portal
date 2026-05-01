@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 export async function POST(
   request: NextRequest,
@@ -331,11 +335,34 @@ export async function POST(
         }
       }
 
+      // Inherit branch_id from the source ticket; otherwise use the
+      // cache-aware helper on the ticket's service_address (covers ZIP,
+      // coords, and on-demand geocode). Final fallback: customer ZIP.
+      let qualifiedBranchId: string | null = ticket.branch_id ?? null;
+      if (!qualifiedBranchId && ticket.service_address_id) {
+        qualifiedBranchId = await resolveBranchForServiceAddress(
+          supabase,
+          ticket.company_id,
+          ticket.service_address_id
+        );
+      }
+      if (!qualifiedBranchId) {
+        const candidateZip = ticket.customer?.zip_code?.trim() || null;
+        if (candidateZip) {
+          qualifiedBranchId = await resolveBranchIdByZip(
+            supabase,
+            ticket.company_id,
+            candidateZip
+          );
+        }
+      }
+
       // Create a new lead from the ticket
       const leadInsertData: any = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         service_address_id: ticket.service_address_id,
+        branch_id: qualifiedBranchId,
         format: ticket.format || null,
         lead_source: mapTicketSourceToLeadSource(ticket.source),
         lead_type: ticket.type,
@@ -922,11 +949,34 @@ export async function POST(
         }
       };
 
+      // Inherit branch_id from the source ticket; otherwise use the
+      // cache-aware helper on the ticket's service_address. Final
+      // fallback: customer ZIP.
+      let supportBranchId: string | null = ticket.branch_id ?? null;
+      if (!supportBranchId && ticket.service_address_id) {
+        supportBranchId = await resolveBranchForServiceAddress(
+          supabase,
+          ticket.company_id,
+          ticket.service_address_id
+        );
+      }
+      if (!supportBranchId) {
+        const candidateZip = ticket.customer?.zip_code?.trim() || null;
+        if (candidateZip) {
+          supportBranchId = await resolveBranchIdByZip(
+            supabase,
+            ticket.company_id,
+            candidateZip
+          );
+        }
+      }
+
       // Create a new support case from the ticket
       const supportCaseInsertData = {
         company_id: ticket.company_id,
         customer_id: ticket.customer_id,
         ticket_id: ticket.id,
+        branch_id: supportBranchId,
         format: ticket.format || null,
         source: ticket.source ? mapTicketSourceToSupportCaseSource(ticket.source) : null,
         issue_type: issueType,

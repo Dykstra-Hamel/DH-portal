@@ -47,6 +47,23 @@ export async function PUT(
       updateData.longitude = body.longitude;
     }
 
+    if (body.address_type !== undefined) {
+      const allowed = new Set([
+        'residential',
+        'commercial',
+        'industrial',
+        'mixed_use',
+      ]);
+      if (body.address_type === null || allowed.has(body.address_type)) {
+        updateData.address_type = body.address_type;
+      } else {
+        return NextResponse.json(
+          { error: 'Invalid address_type' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Note: hasStreetView field doesn't exist in database schema yet
     // Ignoring this field to prevent 500 errors
     // TODO: Add has_street_view column in future migration if needed

@@ -37,6 +37,12 @@
   }
 }
 
+.departmentOptionWrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .departmentOption {
   display: flex;
   align-items: flex-start;
@@ -62,6 +68,70 @@
     cursor: not-allowed;
     background: #f3f4f6;
   }
+}
+
+.propertyTypeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  margin-left: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+}
+
+.propertyTypeLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.propertyTypeOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.propertyTypeOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  font-size: 13px;
+  color: #334155;
+  background: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+
+  input[type='radio'] {
+    accent-color: #3b82f6;
+  }
+
+  &:hover:not(.disabled) {
+    border-color: #94a3b8;
+  }
+
+  &.propertyTypeSelected {
+    border-color: #3b82f6;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 500;
+  }
+
+  &.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.propertyTypeError {
+  font-size: 12px;
+  color: #dc2626;
 }
 
 .checkbox {

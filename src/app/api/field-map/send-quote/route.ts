@@ -7,9 +7,6 @@ import { getFullQuoteUrl } from '@/lib/quote-utils';
 import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
 import { generateFieldMapQuoteEmailTemplate } from '@/lib/email/templates/field-map-quote';
 
-// TODO: switch to customerEmail when ready for production
-const QUOTE_RECIPIENT = 'jason@dykstrahamel.com';
-
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -34,7 +31,18 @@ export async function POST(request: NextRequest) {
       companyName: bodyCompanyName,
     } = body;
 
+    console.log('[send-quote] body', {
+      leadId,
+      quoteId,
+      companyId: bodyCompanyId,
+      sendEmail,
+      clientEmail,
+      clientName,
+      inspectorName,
+    });
+
     if (!leadId || !quoteId) {
+      console.warn('[send-quote] missing leadId or quoteId');
       return NextResponse.json({ error: 'leadId and quoteId are required' }, { status: 400 });
     }
 
@@ -73,14 +81,16 @@ export async function POST(request: NextRequest) {
       .neq('status', 'completed');
 
     // Update quote status to 'sent' (or 'draft' if not emailing)
-    const quoteStatus = sendEmail && clientEmail ? 'sent' : 'draft';
+    const quoteStatus = sendEmail ? 'sent' : 'draft';
     await adminClient.from('quotes').update({ quote_status: quoteStatus }).eq('id', quoteId);
 
     // ── Email ──────────────────────────────────────────────────────────────
     let emailSent = false;
 
-    if (sendEmail && clientEmail) {
-      const [templateSetting, company, fromEmail, tenantName, quoteRecord] = await Promise.all([
+    console.log('[send-quote] email gate', { sendEmail, clientEmail });
+
+    if (sendEmail) {
+      const [templateSetting, company, fromEmail, tenantName, quoteRecord, leadRecord] = await Promise.all([
         adminClient
           .from('company_settings')
           .select('setting_value')
@@ -102,7 +112,23 @@ export async function POST(request: NextRequest) {
           .eq('id', quoteId)
           .single()
           .then(r => r.data),
+        adminClient
+          .from('leads')
+          .select('id, primary_service_address:service_addresses(street_address, city, state, zip_code)')
+          .eq('id', leadId)
+          .single()
+          .then(r => r.data),
       ]);
+
+      console.log('[send-quote] prefetch', {
+        hasTemplateSetting: !!templateSetting?.setting_value,
+        templateId: templateSetting?.setting_value ?? null,
+        hasCompany: !!company,
+        fromEmail,
+        tenantName,
+        hasQuoteRecord: !!quoteRecord,
+        quoteLineItemCount: quoteRecord?.line_items?.length ?? 0,
+      });
 
       let htmlContent: string | null = null;
       let subjectLine = `Field Inspection Quote \u2014 ${clientName || 'Customer'}`;
@@ -213,11 +239,24 @@ export async function POST(request: NextRequest) {
             quoteYardSize: quoteRecord?.yard_size_range
               ? formatYardSizeRange(quoteRecord.yard_size_range)
               : 'Not specified',
-            address: clientName || '',
-            streetAddress: clientName || '',
-            city: '',
-            state: '',
-            zipCode: '',
+            ...(() => {
+              const sa = (leadRecord as { primary_service_address?: { street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null } | null } | null)?.primary_service_address;
+              const streetAddress = (sa?.street_address || '').trim();
+              const city = (sa?.city || '').trim();
+              const state = (sa?.state || '').trim();
+              const zip = (sa?.zip_code || '').trim();
+              const composed = [streetAddress, city, [state, zip].filter(Boolean).join(' ')]
+                .map((p) => p.trim())
+                .filter(Boolean)
+                .join(', ');
+              return {
+                address: composed || 'Not provided',
+                streetAddress,
+                city,
+                state,
+                zipCode: zip,
+              };
+            })(),
             requestedDate: 'Not specified',
             requestedTime: 'Not specified',
             brandPrimaryColor: brandData?.primary_color_hex || '',
@@ -250,10 +289,19 @@ export async function POST(request: NextRequest) {
           recurringCost: item.final_recurring_price ?? item.recurring_price ?? null,
           frequency: item.billing_frequency ?? null,
         }));
+        const sa = (leadRecord as { primary_service_address?: { street_address?: string | null; city?: string | null; state?: string | null; zip_code?: string | null } | null } | null)?.primary_service_address;
+        const composedAddress = [
+          (sa?.street_address || '').trim(),
+          (sa?.city || '').trim(),
+          [(sa?.state || '').trim(), (sa?.zip_code || '').trim()].filter(Boolean).join(' '),
+        ]
+          .map((p) => p.trim())
+          .filter(Boolean)
+          .join(', ');
         htmlContent = generateFieldMapQuoteEmailTemplate({
           inspectorName: inspectorName ?? 'Inspector',
           clientName: clientName || 'Customer',
-          clientAddress: '',
+          clientAddress: composedAddress,
           quoteLineItems: lineItems,
           totalInitial: quoteRecord.total_initial_price ?? 0,
           totalRecurring: quoteRecord.total_recurring_price ?? 0,
@@ -265,17 +313,36 @@ export async function POST(request: NextRequest) {
       }
 
       if (htmlContent) {
-        await sendEmailRouted({
-          tenantName,
+        // Send Quote always goes to the logged-in user (sender confirmation),
+        // never to the customer.
+        const recipient = user.email!;
+        console.log('[send-quote] dispatching', {
+          to: recipient,
           from: fromEmail,
           fromName: company?.name || bodyCompanyName || 'FieldMap',
-          to: QUOTE_RECIPIENT, // TODO: switch to clientEmail when ready for production
           subject: subjectLine,
-          html: htmlContent,
           companyId,
-          source: 'field_map',
+          tenantName,
+          htmlLength: htmlContent.length,
         });
-        emailSent = true;
+        try {
+          const result = await sendEmailRouted({
+            tenantName,
+            from: fromEmail,
+            fromName: company?.name || bodyCompanyName || 'FieldMap',
+            to: recipient,
+            subject: subjectLine,
+            html: htmlContent,
+            companyId,
+            source: 'field_map',
+          });
+          console.log('[send-quote] sendEmailRouted result', result);
+          emailSent = true;
+        } catch (sendErr) {
+          console.error('[send-quote] sendEmailRouted threw', sendErr);
+        }
+      } else {
+        console.warn('[send-quote] no htmlContent built — skipping send');
       }
     }
 

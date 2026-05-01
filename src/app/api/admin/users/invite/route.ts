@@ -18,6 +18,20 @@ export async function POST(request: NextRequest) {
     const supabase = createAdminClient();
     const body = await request.json();
 
+    const VALID_DEPARTMENT_TYPES = ['residential', 'commercial', 'both'] as const;
+    type InviteDepartmentType = typeof VALID_DEPARTMENT_TYPES[number];
+    const rawDepartmentTypes =
+      body.departmentTypes && typeof body.departmentTypes === 'object'
+        ? body.departmentTypes
+        : {};
+    const departmentTypes: Partial<Record<string, InviteDepartmentType>> = {};
+    for (const key of ['technician', 'inspector']) {
+      const value = rawDepartmentTypes[key];
+      if (typeof value === 'string' && (VALID_DEPARTMENT_TYPES as readonly string[]).includes(value)) {
+        departmentTypes[key] = value as InviteDepartmentType;
+      }
+    }
+
     // Validate and sanitize input
     const userData = {
       email: sanitizeString(body.email || ''),
@@ -26,6 +40,7 @@ export async function POST(request: NextRequest) {
       company_id: sanitizeString(body.company_id || ''),
       role: sanitizeString(body.role || 'member'),
       departments: Array.isArray(body.departments) ? body.departments.map((dept: string) => sanitizeString(dept)).filter(Boolean) : [],
+      departmentTypes,
       sendEmail: body.sendEmail !== false, // default true
       password: typeof body.password === 'string' ? body.password.trim() : '',
     };
@@ -135,11 +150,36 @@ export async function POST(request: NextRequest) {
       });
 
       if (canHaveDepartments && userData.departments.length > 0) {
-        const departmentInserts = userData.departments.map((department: string) => ({
-          user_id: newUser.id,
-          company_id: userData.company_id,
-          department,
-        }));
+        // Gate department_type by company settings — server is source of truth
+        const { data: propertyTypeRows } = await supabase
+          .from('company_settings')
+          .select('setting_key, setting_value')
+          .eq('company_id', userData.company_id)
+          .in('setting_key', [
+            'technician_property_type_enabled',
+            'inspector_property_type_enabled',
+          ]);
+        const propertyTypeEnabled = { technician: false, inspector: false };
+        for (const row of propertyTypeRows ?? []) {
+          const isTrue = row.setting_value === 'true';
+          if (row.setting_key === 'technician_property_type_enabled') propertyTypeEnabled.technician = isTrue;
+          if (row.setting_key === 'inspector_property_type_enabled') propertyTypeEnabled.inspector = isTrue;
+        }
+
+        const departmentInserts = userData.departments.map((department: string) => {
+          let department_type: InviteDepartmentType | null = null;
+          if (department === 'technician' && propertyTypeEnabled.technician) {
+            department_type = userData.departmentTypes.technician ?? null;
+          } else if (department === 'inspector' && propertyTypeEnabled.inspector) {
+            department_type = userData.departmentTypes.inspector ?? null;
+          }
+          return {
+            user_id: newUser.id,
+            company_id: userData.company_id,
+            department,
+            department_type,
+          };
+        });
         const { error: departmentError } = await supabase
           .from('user_departments')
           .insert(departmentInserts);

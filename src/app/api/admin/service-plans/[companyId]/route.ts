@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import type { SpecialtyPlanLine } from '@/types/pricing';
 
 interface ServicePlan {
   id: string;
@@ -18,6 +19,7 @@ interface ServicePlan {
   display_order: number;
   highlight_badge: string | null;
   color_scheme: any;
+  tech_can_upsell: boolean;
   requires_quote: boolean;
   plan_image_url: string | null;
   plan_disclaimer: string | null;
@@ -33,6 +35,7 @@ interface ServicePlan {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  specialty_lines?: SpecialtyPlanLine[];
 }
 
 interface CreateServicePlanRequest {
@@ -50,6 +53,7 @@ interface CreateServicePlanRequest {
   display_order?: number;
   highlight_badge?: string;
   color_scheme?: any;
+  tech_can_upsell?: boolean;
   requires_quote?: boolean;
   is_featured?: boolean;
   plan_image_url?: string;
@@ -74,6 +78,13 @@ interface CreateServicePlanRequest {
   plan_products?: string[];
   recommended_addon_ids?: string[];
   plan_recommended_addons?: string[];
+  specialty_lines?: Array<{
+    line_name: string;
+    pricing_type: 'per_linear_foot' | 'flat' | 'per_hour';
+    price_per_unit: number;
+    minimum_price?: number | null;
+    display_order: number;
+  }>;
 }
 
 interface UpdateServicePlanRequest extends CreateServicePlanRequest {
@@ -119,7 +130,8 @@ export async function GET(
           )
         ),
         service_plan_products ( product_id ),
-        service_plan_recommended_addons ( addon_id )
+        service_plan_recommended_addons ( addon_id ),
+        specialty_plan_lines ( id, line_name, pricing_type, price_per_unit, minimum_price, display_order )
       `)
       .eq('company_id', companyId)
       .order('display_order', { ascending: true });
@@ -148,6 +160,8 @@ export async function GET(
       service_plan_products: undefined,
       recommended_addon_ids: plan.service_plan_recommended_addons.map((r: any) => r.addon_id as string),
       service_plan_recommended_addons: undefined,
+      specialty_lines: (plan.specialty_plan_lines ?? []).sort((a: any, b: any) => a.display_order - b.display_order),
+      specialty_plan_lines: undefined,
     }));
 
     return NextResponse.json({
@@ -191,7 +205,12 @@ export async function POST(
     const hasLinearFeetPricing = (planData as any).linear_feet_pricing !== null && (planData as any).linear_feet_pricing !== undefined;
     const hasPerUnitPricing = !!(planData as any).pricing_unit;
 
-    if (planData.plan_category === 'one-time') {
+    if (planData.plan_category === 'specialty') {
+      // Specialty plans have no base price — all pricing is from specialty lines
+      planData.initial_price = 0;
+      planData.recurring_price = 0;
+      planData.billing_frequency = null;
+    } else if (planData.plan_category === 'one-time') {
       // One-time service validation
       if (planData.recurring_price !== 0) {
         return NextResponse.json(
@@ -228,8 +247,8 @@ export async function POST(
 
     const supabase = createAdminClient();
 
-    // Extract pest coverage, product associations, and recommended addons
-    const { pest_coverage, plan_products, recommended_addon_ids, plan_recommended_addons: _planRecommendedAddons, ...planFields } = planData;
+    // Extract pest coverage, product associations, recommended addons, and specialty lines
+    const { pest_coverage, plan_products, recommended_addon_ids, plan_recommended_addons: _planRecommendedAddons, specialty_lines, ...planFields } = planData;
 
     // Create the service plan
     const { data: newPlan, error: planError } = await supabase
@@ -291,6 +310,24 @@ export async function POST(
       }
     }
 
+    // Add specialty lines if provided
+    if (specialty_lines && specialty_lines.length > 0) {
+      const { error: specialtyLinesError } = await supabase
+        .from('specialty_plan_lines')
+        .insert(specialty_lines.map((l, i) => ({
+          plan_id: newPlan.id,
+          line_name: l.line_name,
+          pricing_type: l.pricing_type,
+          price_per_unit: l.price_per_unit,
+          minimum_price: l.minimum_price ?? null,
+          display_order: l.display_order ?? i,
+        })));
+
+      if (specialtyLinesError) {
+        console.error('Error adding specialty lines:', specialtyLinesError);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       data: newPlan,
@@ -326,7 +363,12 @@ export async function PUT(
     const hasPerUnitPricing = !!(planData as any).pricing_unit;
 
     // Validate and enforce recurring field rules based on plan_category
-    if (planData.plan_category === 'one-time') {
+    if (planData.plan_category === 'specialty') {
+      // Specialty plans have no base price — all pricing is from specialty lines
+      planData.initial_price = 0;
+      planData.recurring_price = 0;
+      planData.billing_frequency = null;
+    } else if (planData.plan_category === 'one-time') {
       // Force recurring fields to correct values for one-time plans
       planData.recurring_price = 0;
       planData.billing_frequency = null;
@@ -351,8 +393,8 @@ export async function PUT(
 
     const supabase = createAdminClient();
 
-    // Extract pest coverage, product associations, and recommended addons
-    const { pest_coverage, plan_products, recommended_addon_ids, plan_recommended_addons: _planRecommendedAddons, id, ...planFields } = planData;
+    // Extract pest coverage, product associations, recommended addons, and specialty lines
+    const { pest_coverage, plan_products, recommended_addon_ids, plan_recommended_addons: _planRecommendedAddons, specialty_lines: specialty_lines_put, id, ...planFields } = planData;
 
     // Update the service plan
     const { data: updatedPlan, error: planError } = await supabase
@@ -423,6 +465,25 @@ export async function PUT(
 
       if (recommendedAddonsError) {
         console.error('Error updating recommended addons:', recommendedAddonsError);
+      }
+    }
+
+    // Update specialty lines (always replace)
+    await supabase.from('specialty_plan_lines').delete().eq('plan_id', id);
+    if (specialty_lines_put && specialty_lines_put.length > 0) {
+      const { error: specialtyLinesError } = await supabase
+        .from('specialty_plan_lines')
+        .insert(specialty_lines_put.map((l, i) => ({
+          plan_id: id,
+          line_name: l.line_name,
+          pricing_type: l.pricing_type,
+          price_per_unit: l.price_per_unit,
+          minimum_price: l.minimum_price ?? null,
+          display_order: l.display_order ?? i,
+        })));
+
+      if (specialtyLinesError) {
+        console.error('Error updating specialty lines:', specialtyLinesError);
       }
     }
 

@@ -5,6 +5,37 @@ export function formatDateForApi(date: Date): string {
   return date.toISOString().split('T')[0];
 }
 
+const DAY_NAMES = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+];
+
+/**
+ * Format a `requested_date`-style value (either a day-of-week name like
+ * "monday" or a date string) into a capitalized day-of-week name. Returns
+ * the fallback when the input is missing or unparseable.
+ */
+export function formatPreferredDay(
+  value?: string | null,
+  fallback: string = '—'
+): string {
+  if (!value) return fallback;
+  if (/^[a-zA-Z]+$/.test(value)) {
+    return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+  }
+  const ymd = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  const parsed = ymd
+    ? new Date(Date.UTC(Number(ymd[1]), Number(ymd[2]) - 1, Number(ymd[3])))
+    : new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return DAY_NAMES[ymd ? parsed.getUTCDay() : parsed.getDay()];
+}
+
 /**
  * Format a date-only string (YYYY-MM-DD) in local time without timezone shift.
  */

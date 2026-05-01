@@ -12,6 +12,7 @@ import {
 } from '@/lib/service-addresses';
 import { inngest } from '@/lib/inngest/client';
 import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
+import { resolveBranchIdByZip } from '@/lib/branch-filter';
 
 // Helper function to calculate billable duration (rounded up to nearest 30 seconds)
 function calculateBillableDuration(
@@ -376,6 +377,17 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
     ? await detectCampaignAttribution(supabase, customerId, companyId)
     : null;
 
+  // Resolve branch_id from existing customer's ZIP when available. New
+  // inbound callers without a ZIP yet land with branch_id null until later.
+  let resolvedBranchId: string | null = null;
+  if (existingCustomer?.zip_code) {
+    resolvedBranchId = await resolveBranchIdByZip(
+      supabase,
+      companyId,
+      existingCustomer.zip_code
+    );
+  }
+
   // Always create a new lead for inbound calls
   const { data: newLead, error: leadError } = await supabase
     .from('leads')
@@ -388,6 +400,7 @@ async function handleInboundCallStarted(supabase: any, callData: any) {
       format: 'call',
       lead_status: 'new', // Will be updated based on AI qualification later
       priority: 'medium',
+      branch_id: resolvedBranchId,
       comments: `📞 Inbound call started at ${new Date().toISOString()}`,
       created_at: new Date().toISOString(),
     })

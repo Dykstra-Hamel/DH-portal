@@ -21,6 +21,12 @@ import {
   type AddressComponents,
 } from '@/components/Common/AddressAutocomplete/AddressAutocomplete';
 import { createClient } from '@/lib/supabase/client';
+import {
+  DEFAULT_TIME_OPTIONS,
+  parseTimeOptions,
+  getEnabledTimeOptions,
+  type TimeOption,
+} from '@/lib/time-options';
 import styles from './NewOpportunityWizard.module.scss';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,6 +42,7 @@ type StepId =
   | 'select-site'
   | 'service-plan-select'
   | 'service-details'
+  | 'upsell-catalog'
   | 'service-today-confirm';
 
 const STEP_ID_LABELS: Record<StepId, string> = {
@@ -47,6 +54,7 @@ const STEP_ID_LABELS: Record<StepId, string> = {
   'select-site': 'Site',
   'service-plan-select': 'Plan',
   'service-details': 'Services',
+  'upsell-catalog': 'Service',
   'service-today-confirm': 'Confirm',
 };
 
@@ -121,6 +129,19 @@ interface CustomerResult {
   primary_service_address?: Array<{ service_address: ServiceAddress }>;
 }
 
+interface TodayRouteStop {
+  routeStopId: string;
+  clientName: string;
+  address: string;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressZip: string | null;
+  serviceType: string | null;
+  scheduledTime: string | null;
+  clientId: string | null;
+}
+
 interface ServicePlan {
   id: string;
   plan_name: string;
@@ -135,6 +156,25 @@ interface ServicePlan {
   requires_quote: boolean | null;
   display_order: number | null;
 }
+
+interface AddonService {
+  id: string;
+  addon_name: string;
+  addon_description: string | null;
+  addon_category: string | null;
+  initial_price: number | null;
+  recurring_price: number | null;
+  billing_frequency: string | null;
+  addon_features: string[] | null;
+  addon_terms: string | null;
+  addon_disclaimer: string | null;
+  highlight_badge: string | null;
+  display_order: number | null;
+}
+
+type UpsellSelection =
+  | { kind: 'plan'; plan: ServicePlan }
+  | { kind: 'addon'; addon: AddonService };
 
 const OTHER_PEST_OPTION_VALUE = '__other__';
 
@@ -153,6 +193,56 @@ function fileToBase64(
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+const DAY_NAME_TO_INDEX: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+function formatScheduledTime(
+  value: string | null | undefined,
+  timezone: string
+): string {
+  if (!value) return '';
+  // Accept ISO timestamps and plain HH:mm strings.
+  const iso = /T/.test(value) ? value : null;
+  try {
+    if (iso) {
+      return new Date(iso).toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: timezone,
+      });
+    }
+    const [hStr, mStr = '00'] = value.split(':');
+    const h = parseInt(hStr, 10);
+    const m = parseInt(mStr, 10);
+    if (Number.isNaN(h)) return value;
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = ((h + 11) % 12) + 1;
+    return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  } catch {
+    return value;
+  }
+}
+
+function nextOccurrenceOfDay(dayName: string): string | null {
+  const target = DAY_NAME_TO_INDEX[dayName];
+  if (target === undefined) return null;
+  const now = new Date();
+  const today = now.getDay();
+  // Pick the upcoming occurrence — same-day picks roll to next week.
+  const diff = ((target - today + 7) % 7) || 7;
+  const d = new Date(now);
+  d.setDate(now.getDate() + diff);
+  return d.toISOString().split('T')[0];
 }
 
 function getCustomerDisplayName(c: CustomerResult): string {
@@ -611,16 +701,66 @@ function StepPhotos({
   );
 }
 
+function SegmentedToggle({
+  label,
+  value,
+  onChange,
+  fieldId,
+  showError = false,
+}: {
+  label: string;
+  value: boolean | null;
+  onChange: (v: boolean) => void;
+  fieldId?: string;
+  showError?: boolean;
+}) {
+  const wrapperClass = `${styles.propertyTypeField} ${showError ? styles.propertyTypeFieldError : ''}`;
+  const groupClass = `${styles.pillGroup} ${showError ? styles.pillGroupError : ''}`;
+  return (
+    <div className={wrapperClass} id={fieldId} data-unset={value === null}>
+      <span className={styles.toggleLabel}>
+        {label} <span className={styles.requiredMark}>*</span>
+      </span>
+      <div className={groupClass} role="radiogroup">
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === true}
+          className={`${styles.pill} ${value === true ? styles.pillActive : ''}`}
+          onClick={() => onChange(true)}
+        >
+          Yes
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === false}
+          className={`${styles.pill} ${value === false ? styles.pillActive : ''}`}
+          onClick={() => onChange(false)}
+        >
+          No
+        </button>
+      </div>
+      {showError && (
+        <span className={styles.fieldErrorMsg}>Please select an answer.</span>
+      )}
+    </div>
+  );
+}
+
 function StepAIReview({
   aiResult,
   notes,
   customerMentioned,
   isHighPriority,
   techMentioned,
+  propertyType,
+  showPropertyType,
   pestOptions,
   selectedPestValue,
   otherPestValue,
   isPestOptionsLoading,
+  attempted,
   onAIResultChange,
   onPestValueChange,
   onOtherPestChange,
@@ -628,16 +768,20 @@ function StepAIReview({
   onCustomerMentionedChange,
   onHighPriorityChange,
   onTechMentionedChange,
+  onPropertyTypeChange,
 }: {
   aiResult: AIResult;
   notes: string;
-  customerMentioned: boolean;
-  isHighPriority: boolean;
-  techMentioned: boolean;
+  customerMentioned: boolean | null;
+  isHighPriority: boolean | null;
+  techMentioned: boolean | null;
+  propertyType: 'residential' | 'commercial' | null;
+  showPropertyType: boolean;
   pestOptions: PestOption[];
   selectedPestValue: string;
   otherPestValue: string;
   isPestOptionsLoading: boolean;
+  attempted: boolean;
   onAIResultChange: (result: AIResult) => void;
   onPestValueChange: (value: string) => void;
   onOtherPestChange: (value: string) => void;
@@ -645,6 +789,7 @@ function StepAIReview({
   onCustomerMentionedChange: (v: boolean) => void;
   onHighPriorityChange: (v: boolean) => void;
   onTechMentionedChange: (v: boolean) => void;
+  onPropertyTypeChange: (v: 'residential' | 'commercial') => void;
 }) {
   const [isDictating, setIsDictating] = useState(false);
   const recognitionRef = useRef<any>(null);
@@ -784,31 +929,80 @@ function StepAIReview({
         )}
       </div>
 
-      <div className={styles.checkboxGroup}>
-        <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={techMentioned}
-            onChange={e => onTechMentionedChange(e.target.checked)}
-          />
-          <span>Discussed with customer</span>
-        </label>
-        <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={customerMentioned}
-            onChange={e => onCustomerMentionedChange(e.target.checked)}
-          />
-          <span>Customer mentioned this issue</span>
-        </label>
-        <label className={styles.checkboxLabel}>
-          <input
-            type="checkbox"
-            checked={isHighPriority}
-            onChange={e => onHighPriorityChange(e.target.checked)}
-          />
-          <span>High priority</span>
-        </label>
+      <div className={styles.toggleGroup}>
+        <p className={styles.toggleGroupHint}>
+          <span className={styles.requiredMark}>*</span> All questions below
+          are required.
+        </p>
+        {attempted &&
+          (techMentioned === null ||
+            customerMentioned === null ||
+            isHighPriority === null ||
+            (showPropertyType && propertyType === null)) && (
+            <p className={styles.toggleGroupError} role="alert">
+              Please answer each question before submitting.
+            </p>
+          )}
+        <SegmentedToggle
+          label="Discussed with customer"
+          value={techMentioned}
+          onChange={onTechMentionedChange}
+          fieldId="review-tech-mentioned"
+          showError={attempted && techMentioned === null}
+        />
+        <SegmentedToggle
+          label="Customer mentioned this issue"
+          value={customerMentioned}
+          onChange={onCustomerMentionedChange}
+          fieldId="review-customer-mentioned"
+          showError={attempted && customerMentioned === null}
+        />
+        <SegmentedToggle
+          label="High priority"
+          value={isHighPriority}
+          onChange={onHighPriorityChange}
+          fieldId="review-high-priority"
+          showError={attempted && isHighPriority === null}
+        />
+        {showPropertyType && (
+          <div
+            id="review-property-type"
+            data-unset={propertyType === null}
+            className={`${styles.propertyTypeField} ${
+              attempted && propertyType === null
+                ? styles.propertyTypeFieldError
+                : ''
+            }`}
+          >
+            <span className={styles.toggleLabel}>
+              Property type <span className={styles.requiredMark}>*</span>
+            </span>
+            <div
+              className={`${styles.pillGroup} ${
+                attempted && propertyType === null ? styles.pillGroupError : ''
+              }`}
+              role="radiogroup"
+            >
+              {(['residential', 'commercial'] as const).map(option => (
+                <button
+                  key={option}
+                  type="button"
+                  role="radio"
+                  aria-checked={propertyType === option}
+                  className={`${styles.pill} ${propertyType === option ? styles.pillActive : ''}`}
+                  onClick={() => onPropertyTypeChange(option)}
+                >
+                  {option === 'residential' ? 'Residential' : 'Commercial'}
+                </button>
+              ))}
+            </div>
+            {attempted && propertyType === null && (
+              <span className={styles.fieldErrorMsg}>
+                Please select an answer.
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -818,15 +1012,147 @@ function StepNewCustomer({
   form,
   onChange,
   error,
+  companyId,
+  isPestPacEnabled,
+  onPestPacPick,
 }: {
   form: NewCustomerForm;
   onChange: (form: NewCustomerForm) => void;
   error: string | null;
+  companyId: string;
+  isPestPacEnabled: boolean;
+  onPestPacPick: (client: PestPacClientResult) => void;
 }) {
+  const [pestPacQuery, setPestPacQuery] = useState('');
+  const [pestPacResults, setPestPacResults] = useState<PestPacClientResult[]>(
+    []
+  );
+  const [isPestPacSearching, setIsPestPacSearching] = useState(false);
+  const [pestPacSearchError, setPestPacSearchError] = useState<string | null>(
+    null
+  );
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!isPestPacEnabled) return;
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+
+    const q = pestPacQuery.trim();
+    if (q.length < 2) {
+      setPestPacResults([]);
+      setPestPacSearchError(null);
+      return;
+    }
+
+    searchTimeout.current = setTimeout(async () => {
+      setIsPestPacSearching(true);
+      setPestPacSearchError(null);
+      try {
+        const res = await fetch(
+          `/api/pestpac/clients/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setPestPacResults(data.clients ?? []);
+        } else {
+          const data = await res.json().catch(() => ({}));
+          setPestPacSearchError(
+            data.error ??
+              'PestPac search failed. Check your integration settings.'
+          );
+          setPestPacResults([]);
+        }
+      } catch {
+        setPestPacSearchError('PestPac search failed.');
+      } finally {
+        setIsPestPacSearching(false);
+      }
+    }, 400);
+
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [pestPacQuery, companyId, isPestPacEnabled]);
+
   return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>New Lead</h2>
       <p className={styles.stepDesc}>Enter the customer&apos;s details</p>
+
+      {isPestPacEnabled && (
+        <div className={styles.pestPacSearchBlock}>
+          <label className={styles.fieldLabel}>
+            Search PestPac
+            <span className={styles.fieldHint}>
+              {' '}
+              — pick an existing client to autofill
+            </span>
+          </label>
+          <div className={styles.searchInputWrapper}>
+            <input
+              className={styles.searchInput}
+              type="text"
+              placeholder="Search by name, address, or phone…"
+              value={pestPacQuery}
+              onChange={e => setPestPacQuery(e.target.value)}
+            />
+            {isPestPacSearching && <span className={styles.searchSpinner} />}
+          </div>
+          {pestPacSearchError && (
+            <p className={styles.errorState}>{pestPacSearchError}</p>
+          )}
+          {pestPacQuery.trim().length >= 2 &&
+            !isPestPacSearching &&
+            !pestPacSearchError && (
+              <div className={styles.customerList}>
+                {pestPacResults.length === 0 ? (
+                  <p className={styles.emptyState}>
+                    No PestPac customers found for &quot;{pestPacQuery}&quot;
+                  </p>
+                ) : (
+                  pestPacResults.map(client => {
+                    const nameParts = [
+                      client.firstName,
+                      client.lastName,
+                    ].filter(Boolean);
+                    const displayName =
+                      nameParts.length > 0
+                        ? nameParts.join(' ')
+                        : `Client #${client.clientId}`;
+                    return (
+                      <button
+                        type="button"
+                        key={client.clientId}
+                        className={styles.customerCard}
+                        onClick={() => {
+                          onPestPacPick(client);
+                          setPestPacQuery('');
+                          setPestPacResults([]);
+                        }}
+                      >
+                        <div className={styles.customerCardName}>
+                          {displayName}
+                        </div>
+                        {client.primaryAddress && (
+                          <div className={styles.customerCardAddr}>
+                            {client.primaryAddress.street},{' '}
+                            {client.primaryAddress.city},{' '}
+                            {client.primaryAddress.state}{' '}
+                            {client.primaryAddress.zip}
+                          </div>
+                        )}
+                        <div className={styles.customerCardContact}>
+                          {client.phone && <span>{client.phone}</span>}
+                          {client.email && <span>{client.email}</span>}
+                        </div>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+        </div>
+      )}
 
       <div className={styles.newCustomerRow}>
         <div className={styles.fieldGroup}>
@@ -1293,138 +1619,52 @@ function StepSelectSite({
   companyId,
   selectedCustomer,
   onSelectCustomer,
-  isPestPacEnabled,
-  selectedPestPacClient,
-  onSelectPestPacClient,
   recentCustomers,
+  todayRouteStops,
+  isTodayRouteLoading,
+  onPickRouteStop,
+  onAddNewCustomer,
+  isSyncingCustomer,
+  routeStopPickError,
+  companyTimezone,
 }: {
   companyId: string;
   selectedCustomer: CustomerResult | null;
   onSelectCustomer: (customer: CustomerResult) => void;
-  isPestPacEnabled: boolean;
-  selectedPestPacClient: PestPacClientResult | null;
-  onSelectPestPacClient: (client: PestPacClientResult) => void;
   recentCustomers: RecentCustomer[];
+  todayRouteStops: TodayRouteStop[];
+  isTodayRouteLoading: boolean;
+  onPickRouteStop: (stop: TodayRouteStop) => void;
+  onAddNewCustomer: () => void;
+  isSyncingCustomer: boolean;
+  routeStopPickError: string | null;
+  companyTimezone: string;
 }) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<CustomerResult[]>([]);
-  const [pestPacResults, setPestPacResults] = useState<PestPacClientResult[]>(
-    []
-  );
-  const [pestPacSearchError, setPestPacSearchError] = useState<string | null>(
-    null
-  );
   const [isSearching, setIsSearching] = useState(false);
-  const [nearbyResults, setNearbyResults] = useState<PestPacClientResult[]>([]);
-  const [nearbyStreet, setNearbyStreet] = useState<string | null>(null);
-  const [isLocating, setIsLocating] = useState(true);
-  const cachedStreet = useRef<string | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // On mount: geolocate reverse geocode search PestPac by street name
-  // Re-runs when isPestPacEnabled resolves (settings fetch in parent may lag behind mount)
-  useEffect(() => {
-    if (!isPestPacEnabled) return;
-
-    setIsLocating(true);
-
-    const runSearch = async (street: string) => {
-      try {
-        const searchRes = await fetch(
-          `/api/pestpac/clients/search?q=${encodeURIComponent(street)}&companyId=${companyId}`
-        );
-        if (searchRes.ok) {
-          const data = await searchRes.json();
-          setNearbyResults(data.clients ?? []);
-          setNearbyStreet(street);
-        }
-      } catch {
-        // Silently fall back to recents
-      } finally {
-        setIsLocating(false);
-      }
-    };
-
-    // If we already reverse-geocoded, skip straight to PestPac search
-    if (cachedStreet.current) {
-      runSearch(cachedStreet.current);
-      return;
-    }
-
-    if (!navigator.geolocation) {
-      setIsLocating(false);
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      async position => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const geoRes = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`,
-            { headers: { 'Accept-Language': 'en' } }
-          );
-          if (!geoRes.ok) {
-            setIsLocating(false);
-            return;
-          }
-          const geoData = await geoRes.json();
-          const street = geoData?.address?.road;
-          if (!street) {
-            setIsLocating(false);
-            return;
-          }
-          cachedStreet.current = street;
-          await runSearch(street);
-        } catch {
-          setIsLocating(false);
-        }
-      },
-      () => setIsLocating(false),
-      { timeout: 8000, maximumAge: 0, enableHighAccuracy: false }
-    );
-  }, [companyId, isPestPacEnabled]);
 
   const doSearch = useCallback(
     async (q: string) => {
       if (!q.trim() || q.length < 2) {
         setSearchResults([]);
-        setPestPacResults([]);
-        setPestPacSearchError(null);
         return;
       }
       setIsSearching(true);
-      setPestPacSearchError(null);
       try {
-        if (isPestPacEnabled) {
-          const res = await fetch(
-            `/api/pestpac/clients/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            setPestPacResults(data.clients ?? []);
-          } else {
-            const data = await res.json().catch(() => ({}));
-            setPestPacSearchError(
-              data.error ??
-                'PestPac search failed. Check your integration settings.'
-            );
-            setPestPacResults([]);
-          }
-        } else {
-          const res = await fetch(
-            `/api/customers/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
-          );
-          if (res.ok) {
-            const data = await res.json();
-            setSearchResults(data.customers ?? []);
-          }
+        const res = await fetch(
+          `/api/customers/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setSearchResults(data.customers ?? []);
         }
       } finally {
         setIsSearching(false);
       }
     },
-    [companyId, isPestPacEnabled]
+    [companyId]
   );
 
   useEffect(() => {
@@ -1436,32 +1676,6 @@ function StepSelectSite({
   }, [query, doSearch]);
 
   const isSearchActive = query.length >= 2;
-
-  const renderPestPacCard = (client: PestPacClientResult) => {
-    const isSelected = selectedPestPacClient?.clientId === client.clientId;
-    const nameParts = [client.firstName, client.lastName].filter(Boolean);
-    const displayName =
-      nameParts.length > 0 ? nameParts.join(' ') : `Client #${client.clientId}`;
-    return (
-      <button
-        key={client.clientId}
-        className={`${styles.customerCard} ${isSelected ? styles.customerCardSelected : ''}`}
-        onClick={() => onSelectPestPacClient(client)}
-      >
-        <div className={styles.customerCardName}>{displayName}</div>
-        {client.primaryAddress && (
-          <div className={styles.customerCardAddr}>
-            {client.primaryAddress.street}, {client.primaryAddress.city},{' '}
-            {client.primaryAddress.state} {client.primaryAddress.zip}
-          </div>
-        )}
-        <div className={styles.customerCardContact}>
-          {client.phone && <span>{client.phone}</span>}
-          {client.email && <span>{client.email}</span>}
-        </div>
-      </button>
-    );
-  };
 
   const renderCustomerCard = (customer: CustomerResult) => {
     const addr = getPrimaryAddress(customer);
@@ -1527,31 +1741,71 @@ function StepSelectSite({
     );
   };
 
-  // What to show when idle (no user query)
-  const showNearby = !isLocating && nearbyResults.length > 0;
-  const showRecents = !isLocating && !showNearby && recentCustomers.length > 0;
-  const idleLabel = showNearby
-    ? `Nearby Customers${nearbyStreet ? ` on ${nearbyStreet}` : ''}`
-    : 'Recent Customers';
+  const showRecents = recentCustomers.length > 0;
+
+  const renderRouteStopCard = (stop: TodayRouteStop) => {
+    return (
+      <button
+        key={stop.routeStopId}
+        className={styles.customerCard}
+        onClick={() => onPickRouteStop(stop)}
+        disabled={isSyncingCustomer}
+      >
+        <div className={styles.customerCardName}>{stop.clientName}</div>
+        {stop.address && (
+          <div className={styles.customerCardAddr}>{stop.address}</div>
+        )}
+        {stop.scheduledTime && (
+          <div className={styles.customerCardContact}>
+            <span>{formatScheduledTime(stop.scheduledTime, companyTimezone)}</span>
+          </div>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className={styles.stepContent}>
-      <h2 className={styles.stepTitle}>Select Site</h2>
+      <h2 className={styles.stepTitle}>Select Customer</h2>
       <p className={styles.stepDesc}>
-        {isPestPacEnabled
-          ? 'Search PestPac or select a customer below'
-          : 'Link this opportunity to a customer'}
+        Pick a customer from today&apos;s route or add a new one.
       </p>
+
+      <button
+        type="button"
+        className={styles.addNewCustomerBtn}
+        onClick={onAddNewCustomer}
+      >
+        + Add New Customer
+      </button>
+
+      {routeStopPickError && (
+        <p className={styles.errorState}>{routeStopPickError}</p>
+      )}
+
+      {/* Today's route — only when not actively searching */}
+      {query.length < 2 && (
+        <div className={styles.customerList}>
+          {isTodayRouteLoading && (
+            <div className={styles.loadingState}>
+              <span className={styles.spinner} />
+              Loading today&apos;s route…
+            </div>
+          )}
+          {!isTodayRouteLoading && todayRouteStops.length > 0 && (
+            <>
+              <p className={styles.listLabel}>Today&apos;s Route</p>
+              {todayRouteStops.map(renderRouteStopCard)}
+            </>
+          )}
+        </div>
+      )}
 
       <div className={styles.searchInputWrapper}>
         <input
           className={styles.searchInput}
           type="text"
-          placeholder={
-            isPestPacEnabled
-              ? 'Search by name, address, or phone…'
-              : 'Search by name or address…'
-          }
+          placeholder="Search by name or address…"
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
@@ -1562,63 +1816,30 @@ function StepSelectSite({
         {/* Manual search results */}
         {isSearchActive && (
           <>
-            <p className={styles.listLabel}>
-              {isPestPacEnabled ? 'PestPac Results' : 'Search Results'}
-            </p>
+            <p className={styles.listLabel}>Search Results</p>
             {isSearching && (
               <div className={styles.loadingState}>
                 <span className={styles.spinner} />
-                {isPestPacEnabled ? 'Searching PestPac…' : 'Searching…'}
+                Searching…
               </div>
             )}
-            {!isSearching && isPestPacEnabled && pestPacSearchError && (
-              <p
-                className={styles.emptyState}
-                style={{ color: 'var(--color-error, #dc2626)' }}
-              >
-                {pestPacSearchError}
+            {!isSearching && searchResults.map(renderCustomerCard)}
+            {!isSearching && searchResults.length === 0 && (
+              <p className={styles.emptyState}>
+                No customers found for &quot;{query}&quot;
               </p>
             )}
-            {!isSearching &&
-              isPestPacEnabled &&
-              !pestPacSearchError &&
-              pestPacResults.map(renderPestPacCard)}
-            {!isSearching &&
-              isPestPacEnabled &&
-              !pestPacSearchError &&
-              pestPacResults.length === 0 && (
-                <p className={styles.emptyState}>
-                  No PestPac customers found for &quot;{query}&quot;
-                </p>
-              )}
-            {!isSearching &&
-              !isPestPacEnabled &&
-              searchResults.map(renderCustomerCard)}
-            {!isSearching &&
-              !isPestPacEnabled &&
-              searchResults.length === 0 && (
-                <p className={styles.emptyState}>
-                  No customers found for &quot;{query}&quot;
-                </p>
-              )}
           </>
         )}
 
-        {/* Idle state: nearby or recent */}
+        {/* Idle state: recents */}
         {!isSearchActive && (
           <>
-            {isLocating && (
-              <div className={styles.loadingState}>
-                <span className={styles.spinner} />
-                Finding nearby customers…
-              </div>
+            {showRecents && (
+              <p className={styles.listLabel}>Recent Customers</p>
             )}
-            {(showNearby || showRecents) && (
-              <p className={styles.listLabel}>{idleLabel}</p>
-            )}
-            {showNearby && nearbyResults.map(renderPestPacCard)}
             {showRecents && recentCustomers.map(renderRecentCard)}
-            {!isLocating && !showNearby && !showRecents && (
+            {!showRecents && (
               <p className={styles.emptyState}>
                 Search above to find a customer
               </p>
@@ -1836,22 +2057,309 @@ function StepServicePlanSelect({
   );
 }
 
+function StepUpsellCatalog({
+  companyId,
+  selected,
+  onSelect,
+}: {
+  companyId: string;
+  selected: UpsellSelection | null;
+  onSelect: (sel: UpsellSelection) => void;
+}) {
+  const [plans, setPlans] = useState<ServicePlan[]>([]);
+  const [addons, setAddons] = useState<AddonService[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    setIsLoading(true);
+    setError(null);
+    fetch(`/api/tech-leads/upsell-catalog/${companyId}`)
+      .then(async r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        if (data.success) {
+          setPlans(Array.isArray(data.plans) ? data.plans : []);
+          setAddons(Array.isArray(data.addons) ? data.addons : []);
+        } else {
+          setError(data.error ?? 'Failed to load catalog.');
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setError('Failed to load catalog.');
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  if (isLoading) {
+    return (
+      <div className={styles.stepContent}>
+        <h2 className={styles.stepTitle}>Choose What To Upsell</h2>
+        <div className={styles.loadingState}>
+          <span className={styles.spinner} />
+          Loading catalog…
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className={styles.stepContent}>
+        <h2 className={styles.stepTitle}>Choose What To Upsell</h2>
+        <p className={styles.submitError}>{error}</p>
+      </div>
+    );
+  }
+
+  if (plans.length === 0 && addons.length === 0) {
+    return (
+      <div className={styles.stepContent}>
+        <h2 className={styles.stepTitle}>Choose What To Upsell</h2>
+        <p className={styles.emptyState}>
+          No upsell items are currently enabled for technicians. Ask an admin
+          to mark plans or add-ons as tech-upsell-eligible.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.stepContent}>
+      <h2 className={styles.stepTitle}>Choose What To Upsell</h2>
+      <p className={styles.stepDesc}>
+        Pick a plan or add-on, then Send Quote or Sell It Now.
+      </p>
+
+      {plans.length > 0 && (
+        <>
+          <p className={styles.listLabel}>Service Plans</p>
+          <div className={styles.planCardList}>
+            {plans.map(plan => {
+              const isSelected =
+                selected?.kind === 'plan' && selected.plan.id === plan.id;
+              const features: string[] = Array.isArray(plan.plan_features)
+                ? plan.plan_features
+                : [];
+              return (
+                <button
+                  key={plan.id}
+                  type="button"
+                  className={`${styles.planCard} ${isSelected ? styles.planCardSelected : ''}`}
+                  onClick={() => onSelect({ kind: 'plan', plan })}
+                >
+                  <div className={styles.planCardHeader}>
+                    <div className={styles.planCardNameRow}>
+                      <span className={styles.planCardName}>
+                        {plan.plan_name}
+                      </span>
+                      {plan.highlight_badge && (
+                        <span className={styles.planCardBadge}>
+                          {plan.highlight_badge}
+                        </span>
+                      )}
+                    </div>
+                    <div className={styles.planCardPrice}>
+                      {plan.recurring_price != null ? (
+                        <div className={styles.planCardPriceRow}>
+                          <span className={styles.planCardPriceAmount}>
+                            {formatPrice(plan.recurring_price)}
+                          </span>
+                          <span className={styles.planCardPriceFreq}>
+                            {formatFrequency(plan.billing_frequency)}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className={styles.planCardPriceAmount}>
+                          Contact for pricing
+                        </span>
+                      )}
+                      {plan.initial_price != null && plan.initial_price > 0 && (
+                        <span className={styles.planCardInitial}>
+                          + {formatPrice(plan.initial_price)} initial
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {plan.plan_description && (
+                    <p className={styles.planCardDesc}>{plan.plan_description}</p>
+                  )}
+                  {features.length > 0 && (
+                    <ul className={styles.planCardFeatures}>
+                      {features.map((f, i) => (
+                        <li key={i} className={styles.planCardFeatureItem}>
+                          <span className={styles.planCardFeatureCheck}>✓</span>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      {addons.length > 0 && (
+        <>
+          <p className={styles.listLabel}>Add-On Services</p>
+          <div className={styles.planCardList}>
+            {addons.map(addon => {
+              const isSelected =
+                selected?.kind === 'addon' && selected.addon.id === addon.id;
+              const features: string[] = Array.isArray(addon.addon_features)
+                ? addon.addon_features
+                : [];
+              return (
+                <button
+                  key={addon.id}
+                  type="button"
+                  className={`${styles.planCard} ${isSelected ? styles.planCardSelected : ''}`}
+                  onClick={() => onSelect({ kind: 'addon', addon })}
+                >
+                  <div className={styles.planCardHeader}>
+                    <div className={styles.planCardNameRow}>
+                      <span className={styles.planCardName}>
+                        {addon.addon_name}
+                      </span>
+                      {addon.highlight_badge && (
+                        <span className={styles.planCardBadge}>
+                          {addon.highlight_badge}
+                        </span>
+                      )}
+                    </div>
+                    <div className={styles.planCardPrice}>
+                      {addon.recurring_price != null &&
+                      addon.recurring_price > 0 ? (
+                        <div className={styles.planCardPriceRow}>
+                          <span className={styles.planCardPriceAmount}>
+                            {formatPrice(addon.recurring_price)}
+                          </span>
+                          <span className={styles.planCardPriceFreq}>
+                            {formatFrequency(addon.billing_frequency)}
+                          </span>
+                        </div>
+                      ) : addon.initial_price != null ? (
+                        <span className={styles.planCardPriceAmount}>
+                          {formatPrice(addon.initial_price)}
+                        </span>
+                      ) : (
+                        <span className={styles.planCardPriceAmount}>
+                          Contact for pricing
+                        </span>
+                      )}
+                      {addon.recurring_price != null &&
+                        addon.recurring_price > 0 &&
+                        addon.initial_price != null &&
+                        addon.initial_price > 0 && (
+                          <span className={styles.planCardInitial}>
+                            + {formatPrice(addon.initial_price)} initial
+                          </span>
+                        )}
+                    </div>
+                  </div>
+                  {addon.addon_description && (
+                    <p className={styles.planCardDesc}>
+                      {addon.addon_description}
+                    </p>
+                  )}
+                  {features.length > 0 && (
+                    <ul className={styles.planCardFeatures}>
+                      {features.map((f, i) => (
+                        <li key={i} className={styles.planCardFeatureItem}>
+                          <span className={styles.planCardFeatureCheck}>✓</span>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function StepServiceTodayConfirm({
   selectedPlan,
+  upsellSelection,
   selectedCustomer,
-  techName,
+  techName: _techName,
   onSignatureChange,
+  completedToday,
+  onCompletedTodayChange,
+  requestedDay,
+  onRequestedDayChange,
+  requestedTime,
+  onRequestedTimeChange,
+  companyQuoteTerms,
+  timeOptions,
+  termsAccepted,
+  onTermsAcceptedChange,
 }: {
   selectedPlan: ServicePlan | null;
+  upsellSelection: UpsellSelection | null;
   selectedCustomer: CustomerResult | null;
   techName: string;
   onSignatureChange: (data: string | null) => void;
+  completedToday: boolean | null;
+  onCompletedTodayChange: (value: boolean) => void;
+  requestedDay: string;
+  onRequestedDayChange: (value: string) => void;
+  requestedTime: string;
+  onRequestedTimeChange: (value: string) => void;
+  companyQuoteTerms: string | null;
+  timeOptions: TimeOption[];
+  termsAccepted: boolean;
+  onTermsAcceptedChange: (value: boolean) => void;
 }) {
   const signatureRef = useRef<SignatureCanvas>(null);
+  const termsModalBodyRef = useRef<HTMLDivElement>(null);
+  const [termsModalOpen, setTermsModalOpen] = useState(false);
+  const [termsViewed, setTermsViewed] = useState(false);
+  const [termsNudge, setTermsNudge] = useState(false);
   const addr = selectedCustomer ? getPrimaryAddress(selectedCustomer) : null;
-  const features: string[] = Array.isArray(selectedPlan?.plan_features)
-    ? selectedPlan!.plan_features!
+
+  // Prefer an upsell pick (plan or addon) over the legacy selectedPlan.
+  const upsellPlan =
+    upsellSelection?.kind === 'plan' ? upsellSelection.plan : null;
+  const upsellAddon =
+    upsellSelection?.kind === 'addon' ? upsellSelection.addon : null;
+  const planForDisplay = upsellPlan ?? selectedPlan;
+  const planFeatures: string[] = Array.isArray(planForDisplay?.plan_features)
+    ? planForDisplay!.plan_features!
     : [];
+  const addonFeatures: string[] = Array.isArray(upsellAddon?.addon_features)
+    ? upsellAddon!.addon_features!
+    : [];
+  const planTermsHtml =
+    upsellAddon?.addon_terms ?? planForDisplay?.plan_terms ?? null;
+  const disclaimerHtml =
+    upsellAddon?.addon_disclaimer ?? planForDisplay?.plan_disclaimer ?? null;
+  const enabledTimeOptions = getEnabledTimeOptions(timeOptions);
+  const daysOfWeek = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
 
   const handleSignEnd = () => {
     if (signatureRef.current) {
@@ -1865,12 +2373,26 @@ function StepServiceTodayConfirm({
     onSignatureChange(null);
   };
 
-  const today = new Date().toLocaleDateString('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  const hasTermsContent = !!(companyQuoteTerms || planTermsHtml || disclaimerHtml);
+
+  // Mark terms as viewed when modal opens: immediately if content fits without
+  // scrolling, otherwise only after the user scrolls to the bottom.
+  useEffect(() => {
+    if (!termsModalOpen) return;
+    const el = termsModalBodyRef.current;
+    if (!el) return;
+    if (el.scrollHeight <= el.clientHeight) {
+      setTermsViewed(true);
+      return;
+    }
+    const handleScroll = () => {
+      if (el.scrollTop + el.clientHeight >= el.scrollHeight - 10) {
+        setTermsViewed(true);
+      }
+    };
+    el.addEventListener('scroll', handleScroll);
+    return () => el.removeEventListener('scroll', handleScroll);
+  }, [termsModalOpen]);
 
   return (
     <div className={styles.stepContent}>
@@ -1908,38 +2430,64 @@ function StepServiceTodayConfirm({
         )}
       </div>
 
-      {/* Service Date */}
-      <div className={styles.confirmSection}>
-        <h3 className={styles.confirmSectionTitle}>Service Date</h3>
-        <p className={styles.confirmValue}>{today}</p>
-        <p className={styles.confirmValueMuted}>
-          Serviced by {techName || 'technician'}
-        </p>
-      </div>
-
-      {/* Selected Plan */}
-      {selectedPlan ? (
+      {/* Selected Plan / Addon */}
+      {upsellAddon ? (
+        <div className={styles.confirmSection}>
+          <h3 className={styles.confirmSectionTitle}>Add-On Service</h3>
+          <p className={styles.confirmValue}>{upsellAddon.addon_name}</p>
+          {upsellAddon.recurring_price != null &&
+          upsellAddon.recurring_price > 0 ? (
+            <p className={styles.reviewPlanPrice}>
+              {formatPrice(upsellAddon.recurring_price)}
+              {formatFrequency(upsellAddon.billing_frequency)}
+              {upsellAddon.initial_price != null &&
+              upsellAddon.initial_price > 0
+                ? ` + ${formatPrice(upsellAddon.initial_price)} initial`
+                : ''}
+            </p>
+          ) : upsellAddon.initial_price != null ? (
+            <p className={styles.reviewPlanPrice}>
+              {formatPrice(upsellAddon.initial_price)}
+            </p>
+          ) : null}
+          {upsellAddon.addon_description && (
+            <p className={styles.confirmValueMuted}>
+              {upsellAddon.addon_description}
+            </p>
+          )}
+          {addonFeatures.length > 0 && (
+            <ul className={styles.confirmFeatureList}>
+              {addonFeatures.map((f, i) => (
+                <li key={i} className={styles.confirmFeatureItem}>
+                  <span className={styles.confirmFeatureCheck}>✓</span>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ) : planForDisplay ? (
         <div className={styles.confirmSection}>
           <h3 className={styles.confirmSectionTitle}>Service Plan</h3>
-          <p className={styles.confirmValue}>{selectedPlan.plan_name}</p>
-          {selectedPlan.recurring_price != null && (
+          <p className={styles.confirmValue}>{planForDisplay.plan_name}</p>
+          {planForDisplay.recurring_price != null && (
             <p className={styles.reviewPlanPrice}>
-              {formatPrice(selectedPlan.recurring_price)}
-              {formatFrequency(selectedPlan.billing_frequency)}
-              {selectedPlan.initial_price != null &&
-              selectedPlan.initial_price > 0
-                ? ` + ${formatPrice(selectedPlan.initial_price)} initial`
+              {formatPrice(planForDisplay.recurring_price)}
+              {formatFrequency(planForDisplay.billing_frequency)}
+              {planForDisplay.initial_price != null &&
+              planForDisplay.initial_price > 0
+                ? ` + ${formatPrice(planForDisplay.initial_price)} initial`
                 : ''}
             </p>
           )}
-          {selectedPlan.plan_description && (
+          {planForDisplay.plan_description && (
             <p className={styles.confirmValueMuted}>
-              {selectedPlan.plan_description}
+              {planForDisplay.plan_description}
             </p>
           )}
-          {features.length > 0 && (
+          {planFeatures.length > 0 && (
             <ul className={styles.confirmFeatureList}>
-              {features.map((f, i) => (
+              {planFeatures.map((f, i) => (
                 <li key={i} className={styles.confirmFeatureItem}>
                   <span className={styles.confirmFeatureCheck}>✓</span>
                   {f}
@@ -1956,50 +2504,212 @@ function StepServiceTodayConfirm({
       )}
 
       {/* Terms & Disclaimer */}
-      {(selectedPlan?.plan_terms || selectedPlan?.plan_disclaimer) && (
+      {hasTermsContent && (
         <div className={styles.confirmSection}>
-          <h3 className={styles.confirmSectionTitle}>Terms & Agreement</h3>
-          {selectedPlan.plan_terms && (
-            <div
-              className={styles.confirmTerms}
-              dangerouslySetInnerHTML={{ __html: selectedPlan.plan_terms }}
+          <h3 className={styles.confirmSectionTitle}>
+            Terms & Agreement
+            <span className={styles.requiredMark} aria-hidden="true">*</span>
+          </h3>
+          <div className={styles.viewTermsRow}>
+            <button
+              type="button"
+              className={`${styles.viewTermsButton} ${termsNudge ? styles.viewTermsNudge : ''}`}
+              onClick={() => {
+                setTermsModalOpen(true);
+                setTermsNudge(false);
+              }}
+            >
+              View Terms and Conditions
+            </button>
+            {termsViewed && (
+              <span className={styles.viewedBadge}>&#10003; Viewed</span>
+            )}
+          </div>
+          <label
+            className={styles.termsCheckboxRow}
+            onClick={e => {
+              if (!termsViewed) {
+                e.preventDefault();
+                setTermsNudge(true);
+                setTimeout(() => setTermsNudge(false), 2000);
+              }
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={termsAccepted}
+              onChange={e => {
+                if (!termsViewed) {
+                  setTermsNudge(true);
+                  setTimeout(() => setTermsNudge(false), 2000);
+                  return;
+                }
+                onTermsAcceptedChange(e.target.checked);
+              }}
             />
-          )}
-          {selectedPlan.plan_disclaimer && (
-            <div
-              className={styles.confirmDisclaimer}
-              dangerouslySetInnerHTML={{ __html: selectedPlan.plan_disclaimer }}
-            />
-          )}
+            <span className={styles.termsCheckboxLabel}>
+              I have read and accept the terms and conditions
+              {!termsViewed && termsNudge && (
+                <span className={styles.termsHint}>
+                  {' '}— You must view the terms first
+                </span>
+              )}
+            </span>
+          </label>
         </div>
       )}
 
-      {/* Signature */}
+      {/* Completed today toggle */}
       <div className={styles.confirmSection}>
-        <h3 className={styles.confirmSectionTitle}>Customer Signature</h3>
+        <h3 className={styles.confirmSectionTitle}>
+          Completed Today?
+          <span className={styles.requiredMark} aria-hidden="true">*</span>
+        </h3>
         <p className={styles.confirmValueMuted}>
-          Please sign below to acknowledge service completed today
+          Did you perform this service today?
+          <span className={styles.requiredMark} aria-hidden="true">*</span>
         </p>
-        <div className={styles.signatureWrapper}>
-          <SignatureCanvas
-            ref={signatureRef}
-            penColor="#000"
-            canvasProps={{
-              className: styles.signatureCanvas,
-              width: 500,
-              height: 150,
-            }}
-            onEnd={handleSignEnd}
-          />
+        <div className={styles.pillGroup} role="radiogroup">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={completedToday === true}
+            className={`${styles.pill} ${completedToday === true ? styles.pillActive : ''}`}
+            onClick={() => onCompletedTodayChange(true)}
+          >
+            Yes
+          </button>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={completedToday === false}
+            className={`${styles.pill} ${completedToday === false ? styles.pillActive : ''}`}
+            onClick={() => onCompletedTodayChange(false)}
+          >
+            No
+          </button>
         </div>
-        <button
-          type="button"
-          className={styles.signatureClearBtn}
-          onClick={handleClearSignature}
-        >
-          Clear Signature
-        </button>
       </div>
+
+      {/* When No: show preferred schedule picker */}
+      {completedToday === false && (
+        <div className={styles.confirmSection}>
+          <h3 className={styles.confirmSectionTitle}>Preferred Schedule</h3>
+          <div className={styles.newCustomerRow}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Day</label>
+              <select
+                className={styles.fieldInput}
+                value={requestedDay}
+                onChange={e => onRequestedDayChange(e.target.value)}
+              >
+                <option value="">Select a day…</option>
+                {daysOfWeek.map(d => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Time</label>
+              <select
+                className={styles.fieldInput}
+                value={requestedTime}
+                onChange={e => onRequestedTimeChange(e.target.value)}
+              >
+                <option value="">Select a time…</option>
+                {enabledTimeOptions.map(o => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Signature — required for both branches. For "No" it sits below the
+          preferred-schedule picker. */}
+      {completedToday !== null && (
+        <div className={styles.confirmSection}>
+          <h3 className={styles.confirmSectionTitle}>
+            Customer Signature
+            <span className={styles.requiredMark} aria-hidden="true">*</span>
+          </h3>
+          <p className={styles.confirmValueMuted}>
+            {completedToday === true
+              ? 'Please sign below to acknowledge service completed today'
+              : 'Please sign below to accept the agreement for the scheduled service'}
+          </p>
+          <div className={styles.signatureWrapper}>
+            <SignatureCanvas
+              ref={signatureRef}
+              penColor="#000"
+              canvasProps={{
+                className: styles.signatureCanvas,
+                width: 500,
+                height: 150,
+              }}
+              onEnd={handleSignEnd}
+            />
+          </div>
+          <button
+            type="button"
+            className={styles.signatureClearBtn}
+            onClick={handleClearSignature}
+          >
+            Clear Signature
+          </button>
+        </div>
+      )}
+
+      {/* Terms and Conditions Modal */}
+      {termsModalOpen && (
+        <div className={styles.termsModal}>
+          <div className={styles.termsModalContent}>
+            <div className={styles.termsModalHeader}>
+              <h3>Terms and Conditions</h3>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className={styles.termsModalClose}
+                aria-label="Close"
+              >
+                &#215;
+              </button>
+            </div>
+            <div className={styles.termsModalBody} ref={termsModalBodyRef}>
+              {companyQuoteTerms && (
+                <div dangerouslySetInnerHTML={{ __html: companyQuoteTerms }} />
+              )}
+              {planTermsHtml && (
+                <div
+                  className={styles.specificTermsBlock}
+                  dangerouslySetInnerHTML={{ __html: planTermsHtml }}
+                />
+              )}
+              {disclaimerHtml && (
+                <div
+                  className={styles.confirmDisclaimer}
+                  dangerouslySetInnerHTML={{ __html: disclaimerHtml }}
+                />
+              )}
+            </div>
+            <div className={styles.termsModalFooter}>
+              <button
+                type="button"
+                onClick={() => setTermsModalOpen(false)}
+                className={styles.termsModalCloseBtn}
+                disabled={!termsViewed}
+              >
+                {termsViewed ? 'Close' : 'Scroll to bottom to continue'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2057,7 +2767,21 @@ export function NewOpportunityWizard() {
   const [selectedPestPacClient, setSelectedPestPacClient] =
     useState<PestPacClientResult | null>(null);
 
-  // Current user display name (for "Service Today" note)
+  // Company settings — timezone, quote terms, schedule time slots — loaded
+  // alongside the PestPac flag so the Sell It Now flow can render accurate
+  // terms + preferred-schedule inputs without extra roundtrips.
+  const [companyTimezone, setCompanyTimezone] = useState<string>(
+    'America/New_York'
+  );
+  const [companyQuoteTerms, setCompanyQuoteTerms] = useState<string | null>(
+    null
+  );
+  const [companyTimeOptions, setCompanyTimeOptions] =
+    useState<TimeOption[]>(DEFAULT_TIME_OPTIONS);
+
+  // Current user's id and display name. The id pre-assigns upsell leads to
+  // the submitting tech; the name backs the "Service Today" attribution note.
+  const [techUserId, setTechUserId] = useState<string | null>(null);
   const [techName, setTechName] = useState('');
 
   // Wizard state
@@ -2074,9 +2798,20 @@ export function NewOpportunityWizard() {
     severity: null,
   });
   const [notes, setNotes] = useState('');
-  const [customerMentioned, setCustomerMentioned] = useState(false);
-  const [techMentioned, setTechMentioned] = useState(false);
-  const [isHighPriority, setIsHighPriority] = useState(false);
+  // Tri-state toggles — null means "not answered yet" so the wizard can
+  // require an explicit yes/no before advancing from the review step.
+  const [customerMentioned, setCustomerMentioned] = useState<boolean | null>(
+    null
+  );
+  const [techMentioned, setTechMentioned] = useState<boolean | null>(null);
+  const [isHighPriority, setIsHighPriority] = useState<boolean | null>(null);
+  const [propertyType, setPropertyType] = useState<
+    'residential' | 'commercial' | null
+  >(null);
+  // Tracks whether the tech has hit Refer-To-Sales with required review
+  // toggles still unanswered — lets us reveal inline errors + scroll the
+  // first unanswered field into view.
+  const [reviewAttempted, setReviewAttempted] = useState(false);
   const [selectedCustomer, setSelectedCustomer] =
     useState<CustomerResult | null>(null);
   const [pestOptions, setPestOptions] = useState<PestOption[]>([]);
@@ -2089,8 +2824,27 @@ export function NewOpportunityWizard() {
   const [selectedServicePlan, setSelectedServicePlan] =
     useState<ServicePlan | null>(null);
 
+  // Upsell catalog selection: tech picks one plan OR one addon to upsell.
+  const [upsellSelection, setUpsellSelection] =
+    useState<UpsellSelection | null>(null);
+
   // Signature data for service-today confirmation
   const [signatureData, setSignatureData] = useState<string | null>(null);
+  // Customer must explicitly accept terms after viewing the modal
+  const [termsAccepted, setTermsAccepted] = useState(false);
+
+  // Sell It Now branch state (Phase 4).
+  // completedToday: tri-state Yes/No/unset on the service-today-confirm step.
+  // requestedDay: day-of-week name picked from the dropdown (e.g. "Tuesday").
+  // requestedTime: canonical time-slot value (morning/afternoon/evening/anytime).
+  const [completedToday, setCompletedToday] = useState<boolean | null>(null);
+  const [requestedDay, setRequestedDay] = useState('');
+  const [requestedTime, setRequestedTime] = useState('');
+
+  // True once the tech clicks "Sell It Now" on the upsell-catalog step —
+  // inserts service-today-confirm as the next step. Send Quote submits
+  // directly and never sets this flag.
+  const [sellItNowFlow, setSellItNowFlow] = useState(false);
 
   // New customer form state
   const [newCustomerForm, setNewCustomerForm] = useState<NewCustomerForm>({
@@ -2106,21 +2860,57 @@ export function NewOpportunityWizard() {
     null
   );
 
+  // Tracks whether the tech chose an existing customer or "Add New Customer"
+  // on the select-site step. Controls whether `new-customer` appears in the
+  // step list. Null = not yet decided (still on select-site).
+  const [customerSource, setCustomerSource] = useState<
+    'existing' | 'new' | null
+  >(null);
+
+  // Today's route stops surfaced inside StepSelectSite as quick-pick cards.
+  const [todayRouteStops, setTodayRouteStops] = useState<TodayRouteStop[]>([]);
+  const [isTodayRouteLoading, setIsTodayRouteLoading] = useState(false);
+  const [routeStopPickError, setRouteStopPickError] = useState<string | null>(
+    null
+  );
+
   const companyId = selectedCompany?.id ?? '';
   const selectedPestOption =
     pestOptions.find(option => option.id === selectedPestValue) ?? null;
 
   const { recentCustomers, addRecent } = useRecentTechLeadCustomers(companyId);
 
-  // Computed wizard steps based on lead type.
-  // Upsells come from an existing route stop so customer info is already known;
-  // new leads still need the customer step.
+  // Computed wizard steps. Route-stop deep links pre-load the customer and
+  // skip select-site entirely. Every other entry point (dashboard "Send Lead"
+  // and "Create Upsell" buttons) starts with select-site so the tech can pick
+  // an existing customer from today's route / recents, or choose
+  // "Add New Customer" — which dynamically inserts the `new-customer` step.
+  // Upsell flows also append the `upsell-catalog` step after ai-review so the
+  // tech can pick what to upsell, then Send Quote or Sell It Now.
   const wizardSteps = useMemo((): StepId[] => {
-    if (leadType === 'upsell') {
+    const isUpsell = leadType === 'upsell';
+    if (isFromRouteStop) {
+      // Route-stop deep link pre-loads the customer; upsell skips photos/review
+      // and goes straight to the upsell catalog.
+      if (isUpsell) {
+        const steps: StepId[] = ['type-select', 'upsell-catalog'];
+        if (sellItNowFlow) steps.push('service-today-confirm');
+        return steps;
+      }
       return ['type-select', 'photos', 'ai-review'];
     }
-    return ['type-select', 'new-customer', 'photos', 'ai-review'];
-  }, [leadType]);
+    const base: StepId[] = ['type-select', 'select-site'];
+    if (customerSource === 'new') base.push('new-customer');
+    if (isUpsell) {
+      // Upsell flow skips photos + AI review — tech picks what to upsell
+      // directly after choosing the customer.
+      base.push('upsell-catalog');
+      if (sellItNowFlow) base.push('service-today-confirm');
+    } else {
+      base.push('photos', 'ai-review');
+    }
+    return base;
+  }, [isFromRouteStop, customerSource, leadType, sellItNowFlow]);
 
   const currentStepId = wizardSteps[stepIndex];
   const wizardStepsRef = useRef(wizardSteps);
@@ -2152,9 +2942,14 @@ export function NewOpportunityWizard() {
       }
       if (d.aiResult) setAIResult(d.aiResult);
       if (d.notes) setNotes(d.notes);
-      if (d.customerMentioned) setCustomerMentioned(d.customerMentioned);
-      if (d.techMentioned) setTechMentioned(d.techMentioned);
-      if (d.isHighPriority) setIsHighPriority(d.isHighPriority);
+      if (typeof d.customerMentioned === 'boolean')
+        setCustomerMentioned(d.customerMentioned);
+      if (typeof d.techMentioned === 'boolean')
+        setTechMentioned(d.techMentioned);
+      if (typeof d.isHighPriority === 'boolean')
+        setIsHighPriority(d.isHighPriority);
+      if (d.propertyType === 'residential' || d.propertyType === 'commercial')
+        setPropertyType(d.propertyType);
       if (d.selectedPestValue) setSelectedPestValue(d.selectedPestValue);
       if (d.otherPest) setOtherPest(d.otherPest);
       if (d.hasManualPestSelection)
@@ -2179,14 +2974,25 @@ export function NewOpportunityWizard() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftKey]);
 
-  // On mount: if URL has ?type=upsell or ?type=new-lead, skip type-select
+  // On mount: if URL has ?type= or ?flow=, skip type-select.
+  // `flow=send-lead` / `flow=upsell` come from the Tech dashboard buttons;
+  // `type=new-lead` / `type=upsell` are legacy deep links.
   useEffect(() => {
     const typeParam = searchParams.get('type');
-    if (typeParam === 'upsell') {
+    const flowParam = searchParams.get('flow');
+    const resolved =
+      flowParam === 'send-lead'
+        ? 'new-lead'
+        : flowParam === 'upsell'
+          ? 'upsell'
+          : typeParam === 'upsell' || typeParam === 'new-lead'
+            ? typeParam
+            : null;
+    if (resolved === 'upsell') {
       setLeadType('upsell');
       setWizardTitle('Upsell Opportunity');
       setStepIndex(1);
-    } else if (typeParam === 'new-lead') {
+    } else if (resolved === 'new-lead') {
       setLeadType('new-lead');
       setWizardTitle('New Lead');
       setStepIndex(1);
@@ -2206,6 +3012,7 @@ export function NewOpportunityWizard() {
       const data = await res.json();
       if (data.customer) {
         setSelectedCustomer(data.customer);
+        setCustomerSource('existing');
         addRecent(data.customer);
         const c = data.customer;
         const addr = c.primary_service_address?.[0]?.service_address ?? null;
@@ -2230,8 +3037,14 @@ export function NewOpportunityWizard() {
           addressInput: addressInput || prev.addressInput,
         }));
         if (c.phone) {
-          const photosIndex = wizardStepsRef.current.indexOf('photos');
-          if (photosIndex !== -1) setStepIndex(photosIndex);
+          // Upsell route-stop flow jumps to the upsell catalog; new-lead
+          // flow still lands on photos for AI analysis.
+          const steps = wizardStepsRef.current;
+          const target =
+            steps.indexOf('upsell-catalog') !== -1
+              ? steps.indexOf('upsell-catalog')
+              : steps.indexOf('photos');
+          if (target !== -1) setStepIndex(target);
         }
       } else {
         throw new Error('No customer linked to this stop');
@@ -2248,6 +3061,95 @@ export function NewOpportunityWizard() {
     isSyncFired.current = true;
     loadCustomerFromRouteStop();
   };
+
+  // Fetch today's route stops when the tech lands on the select-site step.
+  // Only runs once we have a company and the tech isn't coming in via a
+  // route-stop deep link (which pre-loads a customer already).
+  useEffect(() => {
+    if (isFromRouteStop) return;
+    if (!selectedCompany?.id) return;
+    if (currentStepId !== 'select-site') return;
+    let cancelled = false;
+    const today = new Date().toISOString().split('T')[0];
+    setIsTodayRouteLoading(true);
+    fetch(
+      `/api/field-map/route?date=${today}&companyId=${selectedCompany.id}`
+    )
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        if (cancelled) return;
+        const stops: TodayRouteStop[] = (data?.stops ?? [])
+          .filter((s: any) => s.routeStopId)
+          .map((s: any) => ({
+            routeStopId: s.routeStopId,
+            clientName: s.clientName ?? 'Unknown',
+            address: s.address ?? '',
+            addressStreet: s.addressStreet ?? null,
+            addressCity: s.addressCity ?? null,
+            addressState: s.addressState ?? null,
+            addressZip: s.addressZip ?? null,
+            serviceType: s.serviceType ?? null,
+            scheduledTime: s.scheduledTime ?? null,
+            clientId: s.clientId ?? null,
+          }));
+        setTodayRouteStops(stops);
+      })
+      .catch(() => {
+        if (!cancelled) setTodayRouteStops([]);
+      })
+      .finally(() => {
+        if (!cancelled) setIsTodayRouteLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isFromRouteStop, selectedCompany?.id, currentStepId]);
+
+  const handlePickRouteStop = useCallback(
+    async (stop: TodayRouteStop) => {
+      if (!selectedCompany?.id) return;
+      setRouteStopPickError(null);
+      setIsSyncingCustomer(true);
+      try {
+        const res = await fetch(
+          `/api/field-map/route-stops/${stop.routeStopId}?companyId=${selectedCompany.id}`
+        );
+        if (!res.ok) throw new Error(`Failed to load customer (${res.status})`);
+        const data = await res.json();
+        if (!data.customer) throw new Error('No customer on this stop');
+        setSelectedCustomer(data.customer);
+        setSelectedPestPacClient(null);
+        setCustomerSource('existing');
+        addRecent(data.customer);
+        // Tapping a route stop is a one-tap flow — advance immediately.
+        setStepIndex(i => i + 1);
+      } catch {
+        setRouteStopPickError(
+          'Could not load that customer. Try again or pick another.'
+        );
+      } finally {
+        setIsSyncingCustomer(false);
+      }
+    },
+    [selectedCompany?.id, addRecent]
+  );
+
+  const handleAddNewCustomer = useCallback(() => {
+    setSelectedCustomer(null);
+    setSelectedPestPacClient(null);
+    setCustomerSource('new');
+    setRouteStopPickError(null);
+    // Advance to the freshly-inserted new-customer step. We look it up by id
+    // after the step list recomputes, so fall back to the next index.
+    requestAnimationFrame(() => {
+      const idx = wizardStepsRef.current.indexOf('new-customer');
+      if (idx !== -1) {
+        setStepIndex(idx);
+      } else {
+        setStepIndex(i => i + 1);
+      }
+    });
+  }, []);
 
   // Load customer from route stop once selectedCompany is available
   useEffect(() => {
@@ -2272,6 +3174,7 @@ export function NewOpportunityWizard() {
           customerMentioned,
           techMentioned,
           isHighPriority,
+          propertyType,
           selectedPestValue,
           otherPest,
           hasManualPestSelection,
@@ -2300,6 +3203,7 @@ export function NewOpportunityWizard() {
     customerMentioned,
     techMentioned,
     isHighPriority,
+    propertyType,
     selectedPestValue,
     otherPest,
     hasManualPestSelection,
@@ -2317,11 +3221,12 @@ export function NewOpportunityWizard() {
     }
   };
 
-  // Fetch current user's display name for "Service Today" attribution note
+  // Fetch current user's id + display name (id used to pre-assign upsells).
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
+      setTechUserId(user.id);
       const { data: profile } = await supabase
         .from('profiles')
         .select('first_name, last_name')
@@ -2336,14 +3241,30 @@ export function NewOpportunityWizard() {
     });
   }, []);
 
-  // Detect PestPac mode on mount
+  // Detect PestPac mode and load Quote Page + timezone settings on mount
   useEffect(() => {
     if (!companyId) return;
     fetch(`/api/companies/${companyId}/settings`)
       .then(r => r.json())
       .then(data => {
-        const enabled = data.settings?.pestpac_enabled?.value;
+        const settings = data.settings ?? {};
+        const enabled = settings.pestpac_enabled?.value;
         setIsPestPacEnabled(enabled === true || enabled === 'true');
+
+        const tz = settings.company_timezone?.value;
+        if (typeof tz === 'string' && tz) setCompanyTimezone(tz);
+
+        const qt = settings.quote_terms?.value;
+        if (typeof qt === 'string' && qt.trim()) setCompanyQuoteTerms(qt);
+
+        // requested_time_options is stored as JSON — API returns it already
+        // parsed for type='json', but fall back to string parsing just in case.
+        const raw = settings.requested_time_options?.value;
+        if (Array.isArray(raw) && raw.length > 0) {
+          setCompanyTimeOptions(raw as TimeOption[]);
+        } else if (typeof raw === 'string' && raw) {
+          setCompanyTimeOptions(parseTimeOptions(raw));
+        }
       })
       .catch(() => {
         // Failed to load settings — default to disabled
@@ -2416,12 +3337,15 @@ export function NewOpportunityWizard() {
     setOtherPest('');
     setHasManualPestSelection(false);
     setNotes('');
-    setCustomerMentioned(false);
-    setIsHighPriority(false);
+    setCustomerMentioned(null);
+    setIsHighPriority(null);
+    setTechMentioned(null);
+    setPropertyType(null);
     setSelectedCustomer(null);
     setSelectedPestPacClient(null);
     setSelectedServicePlan(null);
     setSignatureData(null);
+    setTermsAccepted(false);
     setNewCustomerForm({
       firstName: '',
       lastName: '',
@@ -2433,6 +3357,14 @@ export function NewOpportunityWizard() {
     setCreateCustomerError(null);
     setSubmitError(null);
     setSyncError(null);
+    setCustomerSource(null);
+    setRouteStopPickError(null);
+    setTodayRouteStops([]);
+    setUpsellSelection(null);
+    setCompletedToday(null);
+    setRequestedDay('');
+    setRequestedTime('');
+    setSellItNowFlow(false);
   };
 
   const handleAnalyze = async () => {
@@ -2481,7 +3413,13 @@ export function NewOpportunityWizard() {
   };
 
   const handleSubmit = async (
-    mode: 'default' | 'schedule' | 'service-today' = 'default'
+    mode:
+      | 'default'
+      | 'schedule'
+      | 'service-today'
+      | 'send-quote'
+      | 'sell-it-now-today'
+      | 'sell-it-now-scheduled' = 'default'
   ) => {
     if (!companyId) return;
     setIsSubmitting(true);
@@ -2510,9 +3448,20 @@ export function NewOpportunityWizard() {
         year: 'numeric',
       });
       const serviceTodayNote =
-        mode === 'service-today'
+        mode === 'service-today' || mode === 'sell-it-now-today'
           ? `This Lead had already been Serviced by ${techName || 'the technician'} on ${formattedDate}. Please update the customer\u2019s billing and close the lead.`
           : null;
+
+      // Resolve the upsell pick (plan or addon) into a single plan-id + display
+      // name so the API can still key off selectedPlanId/recommendedPlanName.
+      // When the tech picks an addon, we use the addon id + name for now; a
+      // future enhancement can wire addon quotes through a dedicated path.
+      const upsellPlan =
+        upsellSelection?.kind === 'plan' ? upsellSelection.plan : null;
+      const upsellAddon =
+        upsellSelection?.kind === 'addon' ? upsellSelection.addon : null;
+      const upsellPlanName =
+        upsellAddon?.addon_name ?? upsellPlan?.plan_name ?? null;
 
       const trimmedTechNotes = notes.trim();
       const combinedNotes = [trimmedTechNotes, serviceTodayNote]
@@ -2520,9 +3469,9 @@ export function NewOpportunityWizard() {
         .join('\n\n');
 
       const checkboxNotes = [
-        techMentioned ? 'Discussed with customer.' : null,
-        customerMentioned ? 'Customer mentioned this issue.' : null,
-        isHighPriority ? 'High priority.' : null,
+        techMentioned === true ? 'Discussed with customer.' : null,
+        customerMentioned === true ? 'Customer mentioned this issue.' : null,
+        isHighPriority === true ? 'High priority.' : null,
       ]
         .filter(Boolean)
         .join('\n');
@@ -2536,11 +3485,19 @@ export function NewOpportunityWizard() {
         comments: commentWithOtherPest || 'TechLead opportunity',
         notes: finalNotes || undefined,
         pestType: selectedPestOption?.name ?? fallbackSuggestedPest,
-        priority: isHighPriority ? 'high' : 'medium',
+        priority: isHighPriority === true ? 'high' : 'medium',
         leadSource: 'technician',
         leadType: 'manual',
         serviceType: aiResult.service_category || undefined,
-        techDiscussed: techMentioned,
+        techDiscussed: techMentioned === true,
+        propertyType: propertyType ?? undefined,
+        // TechRoutes assignment rule:
+        //   - Upsell flow: stays with the submitting tech.
+        //   - New-lead flow: leave unset so the auto_assign_quote_lead
+        //     trigger can route to an inspector by zip + property_type.
+        ...(techUserId && leadType === 'upsell'
+          ? { assignedTo: techUserId }
+          : {}),
         ...(routeStopIdParam ? { routeStopId: routeStopIdParam } : {}),
       };
 
@@ -2550,13 +3507,42 @@ export function NewOpportunityWizard() {
 
       if (mode === 'service-today') {
         body.scheduledDate = today.toISOString().split('T')[0];
-        // Current local time as HH:MM using the user's timezone
         const hh = String(today.getHours()).padStart(2, '0');
         const mm = String(today.getMinutes()).padStart(2, '0');
         body.scheduledTime = `${hh}:${mm}`;
       }
 
-      if (selectedServicePlan) {
+      // ── Upsell modes ────────────────────────────────────────────────────
+      if (mode === 'send-quote') {
+        body.leadStatus = 'in_process';
+      }
+      if (mode === 'sell-it-now-today') {
+        body.leadStatus = 'scheduling';
+        body.scheduledDate = today.toISOString().split('T')[0];
+        const hh = String(today.getHours()).padStart(2, '0');
+        const mm = String(today.getMinutes()).padStart(2, '0');
+        body.scheduledTime = `${hh}:${mm}`;
+      }
+      if (mode === 'sell-it-now-scheduled') {
+        body.leadStatus = 'scheduling';
+        // requestedDay is a day-of-week name ("Tuesday"); translate to the
+        // next occurrence of that weekday as an ISO date for the DATE column.
+        if (requestedDay) {
+          const nextDate = nextOccurrenceOfDay(requestedDay);
+          if (nextDate) body.requestedDate = nextDate;
+        }
+        if (requestedTime) body.requestedTime = requestedTime;
+      }
+
+      // Prefer upsell pick over legacy selectedServicePlan for upsell flows.
+      if (upsellPlan) {
+        body.serviceType = upsellPlan.plan_name;
+        body.selectedPlanId = upsellPlan.id;
+        body.recommendedPlanName = upsellPlan.plan_name;
+      } else if (upsellAddon) {
+        body.serviceType = upsellAddon.addon_name;
+        body.recommendedPlanName = upsellAddon.addon_name;
+      } else if (selectedServicePlan) {
         body.serviceType = selectedServicePlan.plan_name;
         body.selectedPlanId = selectedServicePlan.id;
         body.recommendedPlanName = selectedServicePlan.plan_name;
@@ -2643,16 +3629,92 @@ export function NewOpportunityWizard() {
       const leadData = await res.json();
       const leadId = leadData?.lead?.id ?? leadData?.id;
 
-      // Create quote line item for the selected service plan
-      if (leadId && selectedServicePlan) {
-        await fetch(`/api/leads/${leadId}/quote`, {
+      // Quote creation: prefer upsell plan pick, fall back to legacy
+      // service-plan selection. Addons don't have a quote line-item path yet
+      // (the /api/leads/[id]/quote endpoint takes service_plans only) so we
+      // skip quote creation for addon upsells — the lead still carries the
+      // addon name on recommendedPlanName for sales to follow up.
+      const quotePlanId = upsellPlan?.id ?? selectedServicePlan?.id ?? null;
+      let quoteId: string | null = null;
+      if (leadId && quotePlanId) {
+        const quoteRes = await fetch(`/api/leads/${leadId}/quote`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            service_plans: [{ service_plan_id: selectedServicePlan.id }],
+            service_plans: [{ service_plan_id: quotePlanId }],
+          }),
+        });
+        if (quoteRes.ok) {
+          const quoteData = await quoteRes.json().catch(() => null);
+          // /api/leads/[id]/quote POST returns { success, data: completeQuote }
+          quoteId =
+            quoteData?.data?.id ??
+            quoteData?.quote?.id ??
+            quoteData?.id ??
+            null;
+        }
+      }
+
+      // Send Quote — email the quote to the customer so they can accept it.
+      // selectedCustomer is only populated when the tech picks an existing
+      // customer; "Add New Customer" creates the customer server-side inside
+      // /api/leads, so fall back to the new-customer form fields here.
+      if (mode === 'send-quote' && leadId && quoteId) {
+        const newCustomerName = [
+          newCustomerForm.firstName.trim(),
+          newCustomerForm.lastName.trim(),
+        ]
+          .filter(Boolean)
+          .join(' ');
+        const resolvedClientEmail =
+          selectedCustomer?.email || newCustomerForm.email.trim() || undefined;
+        const resolvedClientName =
+          (selectedCustomer && getCustomerDisplayName(selectedCustomer)) ||
+          newCustomerName ||
+          undefined;
+        await fetch('/api/field-map/send-quote', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            leadId,
+            quoteId,
+            companyId,
+            sendEmail: true,
+            clientEmail: resolvedClientEmail,
+            clientName: resolvedClientName,
+            inspectorName: techName || undefined,
           }),
         });
       }
+
+      // Sell It Now — persist the captured signature + T&C snapshot for both
+      // "performed today" and "scheduled for later" branches.
+      if (
+        (mode === 'sell-it-now-today' || mode === 'sell-it-now-scheduled') &&
+        leadId &&
+        quoteId &&
+        signatureData
+      ) {
+        const termsSnapshot =
+          upsellAddon?.addon_terms ??
+          upsellPlan?.plan_terms ??
+          selectedServicePlan?.plan_terms ??
+          null;
+        await fetch(`/api/quotes/${quoteId}/accept`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            signature_data: signatureData,
+            terms_accepted_text: termsSnapshot,
+          }),
+        }).catch(() => {
+          /* non-fatal: lead already created as won */
+        });
+      }
+
+      // Reference upsellPlanName so lint doesn't flag it; it's kept for a
+      // future addon-quote path.
+      void upsellPlanName;
 
       clearDraft();
       router.push(`/field-sales/dashboard?submitted=${leadType}`);
@@ -2677,13 +3739,26 @@ export function NewOpportunityWizard() {
       !otherPest.trim()
     )
       return false;
-    if (
-      currentStepId === 'select-site' &&
-      isPestPacEnabled &&
-      !selectedPestPacClient &&
-      !selectedCustomer
-    )
-      return false;
+    // Require explicit yes/no on the three toggles, and (for new-lead)
+    // a property-type selection before advancing past the review step.
+    if (currentStepId === 'ai-review') {
+      if (
+        techMentioned === null ||
+        customerMentioned === null ||
+        isHighPriority === null
+      ) {
+        return false;
+      }
+      if (leadType === 'new-lead' && propertyType === null) {
+        return false;
+      }
+    }
+    if (currentStepId === 'select-site') {
+      // Tech must have picked an existing customer (local or PestPac) to
+      // advance. If they want to key in a new customer, the dedicated
+      // "Add New Customer" button jumps to the new-customer step directly.
+      if (!selectedPestPacClient && !selectedCustomer) return false;
+    }
     if (currentStepId === 'new-customer') {
       return !!(
         newCustomerForm.firstName.trim() &&
@@ -2695,13 +3770,27 @@ export function NewOpportunityWizard() {
       return selectedServicePlan !== null;
     if (currentStepId === 'service-details')
       return selectedServicePlan !== null;
+    if (currentStepId === 'upsell-catalog') return upsellSelection !== null;
+    if (currentStepId === 'service-today-confirm') {
+      if (completedToday === null) return false;
+      // Signature + terms acceptance are required regardless of whether the
+      // service was performed today.
+      if (!signatureData || !termsAccepted) return false;
+      if (completedToday === false) {
+        return !!requestedDay && !!requestedTime;
+      }
+      return true;
+    }
     return true;
   };
 
   const handleNext = async () => {
-    // Upsell: PestPac sync when leaving site selection with a PestPac client selected
+    // Sync PestPac client into local DB when leaving the step where it was
+    // picked. select-site is the legacy entry; new-customer is the new one
+    // (PestPac search moved here per the Tech Leads flow updates).
     if (
-      currentStepId === 'select-site' &&
+      (currentStepId === 'select-site' ||
+        currentStepId === 'new-customer') &&
       isPestPacEnabled &&
       selectedPestPacClient
     ) {
@@ -2723,6 +3812,12 @@ export function NewOpportunityWizard() {
         const data = await res.json();
         const synced = data.customer;
         setSelectedCustomer(synced);
+        // Only flip source when coming from select-site. On new-customer,
+        // flipping would drop that step from wizardSteps and the i+1 advance
+        // below would skip 'photos' and land on 'ai-review'.
+        if (currentStepId === 'select-site') {
+          setCustomerSource('existing');
+        }
         // Save to recent customers
         const addr =
           synced.primary_service_address?.[0]?.service_address ?? null;
@@ -2791,11 +3886,18 @@ export function NewOpportunityWizard() {
     ? 'Creating customer…'
     : 'Syncing customer…';
 
-  // Steps visible in progress bar
+  // Steps visible in progress bar. service-today-confirm is hidden from the
+  // bar because it's a sub-step of the Sell It Now flow — instead, keep the
+  // upsell-catalog ("Service") step highlighted as active while the tech is
+  // confirming, so the bar doesn't reset to all-gray.
   const progressSteps: StepId[] = wizardSteps.filter(
     s => s !== 'type-select' && s !== 'service-today-confirm'
   ) as StepId[];
-  const progressIndex = progressSteps.indexOf(currentStepId);
+  const effectiveStepId: StepId =
+    currentStepId === 'service-today-confirm'
+      ? 'upsell-catalog'
+      : currentStepId;
+  const progressIndex = progressSteps.indexOf(effectiveStepId);
 
   const showRouteStopLoader = isFromRouteStop && isSyncingCustomer;
 
@@ -2860,6 +3962,8 @@ export function NewOpportunityWizard() {
                   notes={notes}
                   customerMentioned={customerMentioned}
                   isHighPriority={isHighPriority}
+                  propertyType={propertyType}
+                  showPropertyType={leadType === 'new-lead'}
                   pestOptions={pestOptions}
                   selectedPestValue={selectedPestValue}
                   otherPestValue={otherPest}
@@ -2877,10 +3981,24 @@ export function NewOpportunityWizard() {
                     setHasManualPestSelection(true);
                   }}
                   onNotesChange={setNotes}
-                  onCustomerMentionedChange={setCustomerMentioned}
-                  onHighPriorityChange={setIsHighPriority}
+                  onCustomerMentionedChange={v => {
+                    setCustomerMentioned(v);
+                    setReviewAttempted(false);
+                  }}
+                  onHighPriorityChange={v => {
+                    setIsHighPriority(v);
+                    setReviewAttempted(false);
+                  }}
                   techMentioned={techMentioned}
-                  onTechMentionedChange={setTechMentioned}
+                  onTechMentionedChange={v => {
+                    setTechMentioned(v);
+                    setReviewAttempted(false);
+                  }}
+                  onPropertyTypeChange={v => {
+                    setPropertyType(v);
+                    setReviewAttempted(false);
+                  }}
+                  attempted={reviewAttempted}
                 />
               </>
             )}
@@ -2890,6 +4008,36 @@ export function NewOpportunityWizard() {
                 form={newCustomerForm}
                 onChange={setNewCustomerForm}
                 error={createCustomerError}
+                companyId={companyId}
+                isPestPacEnabled={isPestPacEnabled}
+                onPestPacPick={client => {
+                  setSelectedPestPacClient(client);
+                  setSelectedCustomer(null);
+                  // Prefill the form so the tech can review/edit before
+                  // submitting. The client is synced on leaving this step.
+                  setNewCustomerForm(prev => ({
+                    ...prev,
+                    firstName: client.firstName ?? prev.firstName,
+                    lastName: client.lastName ?? prev.lastName,
+                    phone: client.phone ?? prev.phone,
+                    email: client.email ?? prev.email,
+                    addressInput: client.primaryAddress
+                      ? [
+                          client.primaryAddress.street,
+                          [
+                            client.primaryAddress.city,
+                            client.primaryAddress.state,
+                          ]
+                            .filter(Boolean)
+                            .join(', '),
+                          client.primaryAddress.zip,
+                        ]
+                          .filter(Boolean)
+                          .join(', ')
+                      : prev.addressInput,
+                    addressComponents: null,
+                  }));
+                }}
               />
             )}
 
@@ -2897,11 +4045,19 @@ export function NewOpportunityWizard() {
               <StepSelectSite
                 companyId={companyId}
                 selectedCustomer={selectedCustomer}
-                onSelectCustomer={setSelectedCustomer}
-                isPestPacEnabled={isPestPacEnabled}
-                selectedPestPacClient={selectedPestPacClient}
-                onSelectPestPacClient={setSelectedPestPacClient}
+                onSelectCustomer={c => {
+                  setSelectedCustomer(c);
+                  setSelectedPestPacClient(null);
+                  setCustomerSource('existing');
+                }}
                 recentCustomers={recentCustomers}
+                todayRouteStops={todayRouteStops}
+                isTodayRouteLoading={isTodayRouteLoading}
+                onPickRouteStop={handlePickRouteStop}
+                onAddNewCustomer={handleAddNewCustomer}
+                isSyncingCustomer={isSyncingCustomer}
+                routeStopPickError={routeStopPickError}
+                companyTimezone={companyTimezone}
               />
             )}
 
@@ -2931,12 +4087,31 @@ export function NewOpportunityWizard() {
               />
             )}
 
+            {currentStepId === 'upsell-catalog' && (
+              <StepUpsellCatalog
+                companyId={companyId}
+                selected={upsellSelection}
+                onSelect={setUpsellSelection}
+              />
+            )}
+
             {currentStepId === 'service-today-confirm' && (
               <StepServiceTodayConfirm
                 selectedPlan={selectedServicePlan}
+                upsellSelection={upsellSelection}
                 selectedCustomer={selectedCustomer}
                 techName={techName}
                 onSignatureChange={setSignatureData}
+                completedToday={completedToday}
+                onCompletedTodayChange={setCompletedToday}
+                requestedDay={requestedDay}
+                onRequestedDayChange={setRequestedDay}
+                requestedTime={requestedTime}
+                onRequestedTimeChange={setRequestedTime}
+                companyQuoteTerms={companyQuoteTerms}
+                timeOptions={companyTimeOptions}
+                termsAccepted={termsAccepted}
+                onTermsAcceptedChange={setTermsAccepted}
               />
             )}
           </div>
@@ -3004,6 +4179,7 @@ export function NewOpportunityWizard() {
               {currentStepId !== 'type-select' &&
                 currentStepId !== 'photos' &&
                 currentStepId !== 'ai-review' &&
+                currentStepId !== 'upsell-catalog' &&
                 currentStepId !== 'service-today-confirm' && (
                   <button
                     className={styles.nextBtn}
@@ -3021,11 +4197,74 @@ export function NewOpportunityWizard() {
                   </button>
                 )}
 
-              {currentStepId === 'ai-review' && (
+              {currentStepId === 'upsell-catalog' && (
+                <>
+                  <button
+                    className={styles.sendQuoteBtn}
+                    onClick={() => {
+                      if (!upsellSelection) return;
+                      handleSubmit('send-quote');
+                    }}
+                    disabled={!upsellSelection || isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <span className={styles.spinner} />
+                        Sending…
+                      </>
+                    ) : (
+                      'Send Quote'
+                    )}
+                  </button>
+                  <button
+                    className={styles.scheduleBtn}
+                    onClick={() => {
+                      if (!upsellSelection) return;
+                      setSellItNowFlow(true);
+                      setStepIndex(i => i + 1);
+                    }}
+                    disabled={!upsellSelection || isSubmitting}
+                  >
+                    Sell It Now
+                  </button>
+                </>
+              )}
+
+              {currentStepId === 'ai-review' && leadType === 'new-lead' && (
                 <button
                   className={styles.scheduleBtn}
-                  onClick={() => handleSubmit('default')}
-                  disabled={!canGoNext() || isSubmitting}
+                  onClick={() => {
+                    if (!canGoNext()) {
+                      setReviewAttempted(true);
+                      // Scroll to the first unanswered required toggle so the
+                      // tech sees what's missing — matches the visual
+                      // top-to-bottom order on screen.
+                      const orderedIds = [
+                        'review-tech-mentioned',
+                        'review-customer-mentioned',
+                        'review-high-priority',
+                        'review-property-type',
+                      ];
+                      if (typeof document !== 'undefined') {
+                        for (const id of orderedIds) {
+                          const el = document.getElementById(id);
+                          if (
+                            el &&
+                            el.getAttribute('data-unset') === 'true'
+                          ) {
+                            el.scrollIntoView({
+                              behavior: 'smooth',
+                              block: 'center',
+                            });
+                            break;
+                          }
+                        }
+                      }
+                      return;
+                    }
+                    handleSubmit('default');
+                  }}
+                  disabled={isSubmitting}
                 >
                   {isSubmitting ? (
                     <>
@@ -3038,11 +4277,41 @@ export function NewOpportunityWizard() {
                 </button>
               )}
 
+              {currentStepId === 'ai-review' && leadType === 'upsell' && (
+                <button
+                  className={styles.nextBtn}
+                  onClick={handleNext}
+                  disabled={!canGoNext() || isNextLoading}
+                >
+                  {isNextLoading ? (
+                    <>
+                      <span className={styles.spinner} />
+                      {nextLoadingLabel}
+                    </>
+                  ) : (
+                    'Next'
+                  )}
+                </button>
+              )}
+
               {currentStepId === 'service-today-confirm' && (
                 <button
                   className={styles.submitBtn}
-                  onClick={() => handleSubmit('service-today')}
-                  disabled={isSubmitting || !signatureData}
+                  onClick={() => {
+                    // Upsell Sell It Now branches depend on "Completed Today?":
+                    // Yes → won + signature/T&C; No → scheduling + preferred date.
+                    // Legacy non-upsell path still uses 'service-today'.
+                    if (sellItNowFlow) {
+                      handleSubmit(
+                        completedToday === true
+                          ? 'sell-it-now-today'
+                          : 'sell-it-now-scheduled'
+                      );
+                    } else {
+                      handleSubmit('service-today');
+                    }
+                  }}
+                  disabled={isSubmitting || !canGoNext()}
                 >
                   {isSubmitting ? (
                     <>

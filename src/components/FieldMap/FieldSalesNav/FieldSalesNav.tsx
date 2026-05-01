@@ -3,17 +3,24 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
+import { UserPlus, TrendingUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
 import styles from './FieldSalesNav.module.scss';
 
-export function FieldSalesNav() {
+interface FieldSalesNavProps {
+  disableNew?: boolean;
+}
+
+export function FieldSalesNav({ disableNew = false }: FieldSalesNavProps = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const { selectedCompany, isAdmin } = useCompany();
   const [userId, setUserId] = useState<string | null>(null);
+  const [companyRole, setCompanyRole] = useState<string | null>(null);
   const [showPopup, setShowPopup] = useState(false);
+  const [showLeadTypePicker, setShowLeadTypePicker] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -21,6 +28,30 @@ export function FieldSalesNav() {
       setUserId(data.user?.id ?? null);
     });
   }, []);
+
+  // Mirror the role check used by SecondarySideNav: admins/managers/owners
+  // get team reporting inline on the dashboard, so the bottom-bar Reports
+  // tab is disabled for them.
+  useEffect(() => {
+    if (!selectedCompany?.id || !userId) {
+      setCompanyRole(null);
+      return;
+    }
+    const supabase = createClient();
+    supabase
+      .from('user_companies')
+      .select('role')
+      .eq('user_id', userId)
+      .eq('company_id', selectedCompany.id)
+      .maybeSingle()
+      .then(({ data }) => setCompanyRole((data?.role as string | null) ?? null));
+  }, [selectedCompany?.id, userId]);
+
+  const reportsDisabled =
+    isAdmin ||
+    companyRole === 'owner' ||
+    companyRole === 'admin' ||
+    companyRole === 'manager';
 
   const { departments } = useUserDepartments(
     userId ?? '',
@@ -30,6 +61,10 @@ export function FieldSalesNav() {
   const isTechnician = departments.includes('technician');
   const isInspector = departments.includes('inspector');
   const showBothOptions = isAdmin || (isTechnician && isInspector);
+  // Dashboard keeps the existing inspection-vs-lead picker. Every other page
+  // (Routes, My Opportunities, Reports, etc.) needs the lead-type picker
+  // (New Lead vs Upsell Opportunity) instead.
+  const isDashboard = pathname === '/field-sales/dashboard';
 
   const isActive = (href: string) => {
     if (href === '/field-sales/dashboard') {
@@ -39,13 +74,28 @@ export function FieldSalesNav() {
   };
 
   const handleNewPress = () => {
+    // Off-dashboard pages always go through the lead-type picker so techs can
+    // pick New Lead vs Upsell from anywhere in the app.
+    if (!isDashboard) {
+      setShowLeadTypePicker(true);
+      return;
+    }
+    // On the dashboard, dual-role users (admin or inspector+technician) still
+    // see the inspection-vs-lead picker first. Pure inspectors jump straight
+    // to a new inspection. Pure technicians get the lead-type picker so they
+    // can choose New Lead or Upsell instead of being forced into New Lead.
     if (showBothOptions) {
       setShowPopup(true);
     } else if (isInspector) {
       router.push('/field-sales/field-map/new');
     } else {
-      router.push('/field-sales/tech-leads/new?type=new-lead');
+      setShowLeadTypePicker(true);
     }
+  };
+
+  const goToNewLeadType = (type: 'new-lead' | 'upsell') => {
+    setShowLeadTypePicker(false);
+    router.push(`/field-sales/tech-leads/new?type=${type}`);
   };
 
   const thirdHref = '/field-sales/reports';
@@ -53,6 +103,50 @@ export function FieldSalesNav() {
 
   return (
     <>
+      {showLeadTypePicker && (
+        <div
+          className={styles.overlay}
+          onClick={() => setShowLeadTypePicker(false)}
+        >
+          <div className={styles.sheet} onClick={e => e.stopPropagation()}>
+            <p className={styles.sheetTitle}>What would you like to create?</p>
+            <button
+              type="button"
+              className={styles.sheetOption}
+              onClick={() => goToNewLeadType('new-lead')}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <UserPlus size={22} />
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>New Lead</strong>
+                <span>Capture a brand-new opportunity</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.sheetOption}
+              onClick={() => goToNewLeadType('upsell')}
+            >
+              <span className={styles.sheetOptionIcon}>
+                <TrendingUp size={22} />
+              </span>
+              <span className={styles.sheetOptionText}>
+                <strong>Upsell Opportunity</strong>
+                <span>Add to an existing customer&apos;s service</span>
+              </span>
+            </button>
+            <button
+              type="button"
+              className={styles.sheetCancel}
+              onClick={() => setShowLeadTypePicker(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {showPopup && (
         <div className={styles.overlay} onClick={() => setShowPopup(false)}>
           <div className={styles.sheet} onClick={e => e.stopPropagation()}>
@@ -155,8 +249,10 @@ export function FieldSalesNav() {
           {/* New — raised center button */}
           <button
             type="button"
-            className={styles.newItem}
+            className={`${styles.newItem} ${disableNew ? styles.newItemDisabled : ''}`}
             onClick={handleNewPress}
+            disabled={disableNew}
+            aria-disabled={disableNew}
           >
             <div className={styles.newBtn}>
               <svg
@@ -196,54 +292,107 @@ export function FieldSalesNav() {
             <span className={styles.newLabel}>New</span>
           </button>
 
-          {/* Third item: Reports */}
-          <Link
-            href={thirdHref}
-            className={`${styles.navItem} ${isActive(thirdHref) ? styles.active : ''}`}
-          >
-            <svg
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
+          {/* Third item: Reports — disabled for admins/managers/owners,
+              who get team reports inline on the dashboard. */}
+          {reportsDisabled ? (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              className={`${styles.navItem} ${styles.navItemDisabled ?? ''}`}
             >
-              <path
-                d="M3 20h18"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-              <rect
-                x="5"
-                y="11"
-                width="3"
-                height="6"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <rect
-                x="10.5"
-                y="7"
-                width="3"
-                height="10"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-              <rect
-                x="16"
-                y="4"
-                width="3"
-                height="13"
-                rx="1"
-                stroke="currentColor"
-                strokeWidth="2"
-              />
-            </svg>
-            <span className={styles.label}>{thirdLabel}</span>
-          </Link>
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 20h18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <rect
+                  x="5"
+                  y="11"
+                  width="3"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="10.5"
+                  y="7"
+                  width="3"
+                  height="10"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="16"
+                  y="4"
+                  width="3"
+                  height="13"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+              <span className={styles.label}>{thirdLabel}</span>
+            </button>
+          ) : (
+            <Link
+              href={thirdHref}
+              className={`${styles.navItem} ${isActive(thirdHref) ? styles.active : ''}`}
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <path
+                  d="M3 20h18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+                <rect
+                  x="5"
+                  y="11"
+                  width="3"
+                  height="6"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="10.5"
+                  y="7"
+                  width="3"
+                  height="10"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+                <rect
+                  x="16"
+                  y="4"
+                  width="3"
+                  height="13"
+                  rx="1"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                />
+              </svg>
+              <span className={styles.label}>{thirdLabel}</span>
+            </Link>
+          )}
         </div>
       </nav>
     </>

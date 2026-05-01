@@ -7,6 +7,8 @@ import styles from './WidgetConfig.module.scss';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { calculateIntervalCount, getIntervalLabel } from '@/lib/pricing-calculations';
 import ProductModal from '@/components/Admin/ProductModal';
+import type { SpecialtyPlanLine } from '@/types/pricing';
+import ServicePlanImagePicker from './ServicePlanImagePicker/ServicePlanImagePicker';
 
 interface ServicePlan {
   id: string;
@@ -32,6 +34,7 @@ interface ServicePlan {
   pricing_unit: 'sqft' | 'linear_feet' | 'acres' | null;
   price_per_unit: number | null;
   minimum_price: number | null;
+  default_variant_label: string | null;
   is_active: boolean;
   variants?: Array<{
     label: string;
@@ -92,6 +95,7 @@ interface ServicePlanModalProps {
   onSave: (planData: Partial<ServicePlan>) => void;
   availablePestTypes: PestType[];
   companyId: string;
+  companySlug?: string;
 }
 
 // Custom Interval Pricing Input Component
@@ -345,6 +349,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   onSave,
   availablePestTypes,
   companyId,
+  companySlug,
 }) => {
   const [formData, setFormData] = useState({
     plan_name: '',
@@ -360,6 +365,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     plan_faqs: [{ question: '', answer: '' }],
     display_order: 1,
     highlight_badge: '',
+    tech_can_upsell: false,
     requires_quote: false,
     plan_image_url: '',
     plan_disclaimer: '',
@@ -371,6 +377,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     pricing_unit: null as 'sqft' | 'linear_feet' | 'acres' | null,
     price_per_unit: null as number | null,
     minimum_price: null as number | null,
+    default_variant_label: null as string | null,
     variants: [] as Array<{
       label: string;
       initial_price?: number;
@@ -406,6 +413,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     },
     yard_sqft_pricing_enabled: false,
     linear_feet_pricing: null,
+    specialty_lines: [] as SpecialtyPlanLine[],
   });
 
   const [activeTab, setActiveTab] = useState('basic');
@@ -432,6 +440,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_faqs: plan.plan_faqs.length > 0 ? plan.plan_faqs : [{ question: '', answer: '' }],
         display_order: plan.display_order,
         highlight_badge: plan.highlight_badge || '',
+        tech_can_upsell: (plan as any).tech_can_upsell ?? false,
         requires_quote: plan.requires_quote,
         plan_image_url: plan.plan_image_url || '',
         plan_disclaimer: plan.plan_disclaimer || '',
@@ -443,6 +452,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         pricing_unit: (plan as any).pricing_unit ?? null,
         price_per_unit: (plan as any).price_per_unit ?? null,
         minimum_price: (plan as any).minimum_price ?? null,
+        default_variant_label: (plan as any).default_variant_label ?? null,
         variants: (plan as any).variants ?? [],
         pest_coverage: plan.pest_coverage?.map(pc => ({
           pest_id: pc.pest_id,
@@ -473,6 +483,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         },
         yard_sqft_pricing_enabled: !!(plan as any).yard_sqft_pricing,
         linear_feet_pricing: (plan as any).linear_feet_pricing || null,
+        specialty_lines: (plan as any).specialty_lines ?? [],
       });
     } else {
       // Reset form for new plan
@@ -490,6 +501,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         plan_faqs: [{ question: '', answer: '' }],
         display_order: 1,
         highlight_badge: '',
+        tech_can_upsell: false,
         requires_quote: false,
         plan_image_url: '',
         plan_disclaimer: '',
@@ -528,6 +540,8 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         },
         yard_sqft_pricing_enabled: false,
         linear_feet_pricing: null,
+        specialty_lines: [],
+        default_variant_label: null,
       });
     }
   }, [plan]);
@@ -672,7 +686,10 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
   ) => {
     const file = event.target.files?.[0];
     if (!file) return;
+    await handleImageUploadFile(file);
+  };
 
+  const handleImageUploadFile = async (file: File) => {
     setIsUploadingImage(true);
 
     try {
@@ -681,15 +698,12 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
         await deleteFileFromStorage(formData.plan_image_url);
       }
 
-      const url = await uploadFile(file, 'brand-assets', 'service-plans');
+      const url = await uploadFile(file, 'brand-assets', `${companySlug ?? companyId}/service-plans`);
       if (url) {
         handleInputChange('plan_image_url', url);
-        // Clear the input so the same file can be selected again if needed
-        event.target.value = '';
       }
     } catch (error) {
       console.error('Error uploading image:', error);
-      // Could add error state handling here if needed
     } finally {
       setIsUploadingImage(false);
     }
@@ -715,7 +729,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       if (formData.plan_video_url) {
         await deleteFileFromStorage(formData.plan_video_url);
       }
-      const url = await uploadFile(file, 'brand-assets', 'service-plans');
+      const url = await uploadFile(file, 'brand-assets', `${companySlug ?? companyId}/service-plans`);
       if (url) {
         handleInputChange('plan_video_url', url);
         event.target.value = '';
@@ -756,38 +770,45 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
     const hasLinearFeetPricing = formData.linear_feet_pricing !== null && formData.linear_feet_pricing !== undefined;
     const hasPerUnitPricing = !!formData.pricing_unit;
 
-    if (formData.initial_price === null || formData.initial_price === undefined || formData.initial_price < 0) {
-      alert('Initial price is required and cannot be negative');
-      return;
-    }
-
-    if (!hasLinearFeetPricing && !hasPerUnitPricing && formData.initial_price === 0 && !(formData.recurring_price > 0)) {
-      alert('Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured');
-      return;
-    }
-
-    // Validate one-time plans
-    if (formData.plan_category === 'one-time') {
-      if (formData.recurring_price !== 0) {
-        alert('One-time service plans must have a recurring price of $0');
+    if (formData.plan_category === 'specialty') {
+      // Specialty plans: force $0 base pricing, all pricing from service lines
+      formData.initial_price = 0;
+      formData.recurring_price = 0;
+      formData.billing_frequency = null;
+    } else {
+      if (formData.initial_price === null || formData.initial_price === undefined || formData.initial_price < 0) {
+        alert('Initial price is required and cannot be negative');
         return;
       }
-      if (formData.billing_frequency !== null) {
-        alert('One-time service plans should not have a billing frequency');
-        return;
-      }
-    }
 
-    // Validate subscription plans
-    if (formData.plan_category !== 'one-time') {
-      // Allow $0 recurring price if linear feet pricing is configured
-      if (!hasLinearFeetPricing && (!formData.recurring_price || formData.recurring_price <= 0)) {
-        alert('Recurring price is required for subscription plans and must be greater than 0 unless linear feet or per-unit pricing is configured');
+      if (!hasLinearFeetPricing && !hasPerUnitPricing && formData.initial_price === 0 && !(formData.recurring_price > 0)) {
+        alert('Initial price must be greater than 0 unless linear feet, per-unit pricing, or a recurring price is configured');
         return;
       }
-      if (!formData.billing_frequency) {
-        alert('Billing frequency is required for subscription plans');
-        return;
+
+      // Validate one-time plans
+      if (formData.plan_category === 'one-time') {
+        if (formData.recurring_price !== 0) {
+          alert('One-time service plans must have a recurring price of $0');
+          return;
+        }
+        if (formData.billing_frequency !== null) {
+          alert('One-time service plans should not have a billing frequency');
+          return;
+        }
+      }
+
+      // Validate subscription plans
+      if (formData.plan_category !== 'one-time') {
+        // Allow $0 recurring price if linear feet pricing is configured
+        if (!hasLinearFeetPricing && (!formData.recurring_price || formData.recurring_price <= 0)) {
+          alert('Recurring price is required for subscription plans and must be greater than 0 unless linear feet or per-unit pricing is configured');
+          return;
+        }
+        if (!formData.billing_frequency) {
+          alert('Billing frequency is required for subscription plans');
+          return;
+        }
       }
     }
 
@@ -811,6 +832,9 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
       pest_coverage: enrichedPestCoverage,
       recommended_addon_ids: formData.plan_recommended_addons,
       yard_sqft_pricing: yard_sqft_pricing_enabled ? formData.yard_sqft_pricing : null,
+      specialty_lines: formData.plan_category === 'specialty'
+        ? (formData.specialty_lines as SpecialtyPlanLine[]).filter(l => l.line_name.trim() !== '').map((l, i) => ({ ...l, display_order: i }))
+        : [],
     };
 
     onSave(cleanedData);
@@ -910,15 +934,16 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   <select
                     value={formData.plan_category}
                     onChange={(e) => {
-                      const newCategory = e.target.value as 'basic' | 'standard' | 'premium' | 'one-time';
+                      const newCategory = e.target.value as 'basic' | 'standard' | 'premium' | 'one-time' | 'specialty';
+                      const isNoRecurring = newCategory === 'one-time' || newCategory === 'specialty';
 
                       let updatedLinearFeetPricing: any = null;
                       if (formData.linear_feet_pricing && typeof formData.linear_feet_pricing === 'object') {
                         const linearFeet: any = formData.linear_feet_pricing;
                         updatedLinearFeetPricing = {
                           ...(linearFeet as any),
-                          recurring_price_per_foot: newCategory === 'one-time' ? [] : (linearFeet as any).recurring_price_per_foot,
-                          recurring_flat_price: newCategory === 'one-time' ? [] : (linearFeet as any).recurring_flat_price,
+                          recurring_price_per_foot: isNoRecurring ? [] : (linearFeet as any).recurring_price_per_foot,
+                          recurring_flat_price: isNoRecurring ? [] : (linearFeet as any).recurring_flat_price,
                         };
                       }
 
@@ -926,23 +951,24 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                         ...formData,
                         plan_category: newCategory,
                         // Force recurring fields to appropriate values based on category
-                        recurring_price: newCategory === 'one-time' ? 0 : formData.recurring_price,
-                        billing_frequency: newCategory === 'one-time' ? null : (formData.billing_frequency || 'monthly'),
-                        // Clear interval recurring pricing for one-time plans
+                        initial_price: newCategory === 'specialty' ? 0 : formData.initial_price,
+                        recurring_price: isNoRecurring ? 0 : formData.recurring_price,
+                        billing_frequency: isNoRecurring ? null : (formData.billing_frequency || 'monthly'),
+                        // Clear interval recurring pricing for non-subscription plans
                         home_size_pricing: {
                           ...formData.home_size_pricing,
-                          recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.home_size_pricing.recurring_cost_per_interval,
-                          custom_recurring_prices: newCategory === 'one-time' ? [] : formData.home_size_pricing.custom_recurring_prices,
+                          recurring_cost_per_interval: isNoRecurring ? 0 : formData.home_size_pricing.recurring_cost_per_interval,
+                          custom_recurring_prices: isNoRecurring ? [] : formData.home_size_pricing.custom_recurring_prices,
                         },
                         yard_size_pricing: {
                           ...formData.yard_size_pricing,
-                          recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.yard_size_pricing.recurring_cost_per_interval,
-                          custom_recurring_prices: newCategory === 'one-time' ? [] : formData.yard_size_pricing.custom_recurring_prices,
+                          recurring_cost_per_interval: isNoRecurring ? 0 : formData.yard_size_pricing.recurring_cost_per_interval,
+                          custom_recurring_prices: isNoRecurring ? [] : formData.yard_size_pricing.custom_recurring_prices,
                         },
                         yard_sqft_pricing: {
                           ...formData.yard_sqft_pricing,
-                          recurring_cost_per_interval: newCategory === 'one-time' ? 0 : formData.yard_sqft_pricing.recurring_cost_per_interval,
-                          custom_recurring_prices: newCategory === 'one-time' ? [] : formData.yard_sqft_pricing.custom_recurring_prices,
+                          recurring_cost_per_interval: isNoRecurring ? 0 : formData.yard_sqft_pricing.recurring_cost_per_interval,
+                          custom_recurring_prices: isNoRecurring ? [] : formData.yard_sqft_pricing.custom_recurring_prices,
                         },
                         linear_feet_pricing: updatedLinearFeetPricing,
                       });
@@ -952,6 +978,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     <option value="standard">Standard</option>
                     <option value="premium">Premium</option>
                     <option value="one-time">One-Time Service</option>
+                    <option value="specialty">Specialty Services</option>
                   </select>
                 </div>
                 <div className={styles.formGroup}>
@@ -965,6 +992,11 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 </div>
               </div>
 
+              {formData.plan_category === 'specialty' ? (
+                <div className={styles.specialtyPricingNote}>
+                  Specialty Services plans have $0 base pricing. All pricing is defined by service lines on the Pricing tab.
+                </div>
+              ) : (
               <div className={styles.formRow}>
                 <div className={styles.formGroup}>
                   <label>Initial Price ($)</label>
@@ -991,9 +1023,10 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   </small>
                 </div>
               </div>
+              )}
 
-              {/* Only show recurring price and billing frequency for non-one-time services */}
-              {formData.plan_category !== 'one-time' && (
+              {/* Only show recurring price and billing frequency for non-one-time, non-specialty services */}
+              {formData.plan_category !== 'one-time' && formData.plan_category !== 'specialty' && (
                 <>
                   <div className={styles.formRow}>
                     <div className={styles.formGroup}>
@@ -1054,47 +1087,13 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
               <div className={styles.formGroup}>
                 <label>Plan Image</label>
-                <div className={styles.fileUploadSection}>
-                  <div className={styles.fileUploadInfo}>
-                    <small>
-                      Upload an image to display with this plan. Images are stored in{' '}
-                      <code>
-                        /brand-assets/service-plans/
-                      </code>
-                    </small>
-                  </div>
-                  
-                  {isUploadingImage ? (
-                    <div className={styles.uploadingIndicator}>
-                      <div className={styles.spinner}></div>
-                      <span>Uploading image...</span>
-                    </div>
-                  ) : (
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleImageUpload}
-                      className={styles.fileInput}
-                    />
-                  )}
-                  
-                  {formData.plan_image_url && formData.plan_image_url.trim() && (
-                    <div className={`${styles.imagePreview} ${isUploadingImage ? styles.uploading : ''}`}>
-                      <Image
-                        src={formData.plan_image_url}
-                        alt="Plan Image"
-                        width={200}
-                        height={120}
-                        style={{ objectFit: 'cover', borderRadius: '8px' }}
-                      />
-                      {isUploadingImage && (
-                        <div className={styles.imageOverlay}>
-                          <div className={styles.overlaySpinner}></div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+                <ServicePlanImagePicker
+                  value={formData.plan_image_url || null}
+                  onChange={(url) => handleInputChange('plan_image_url', url ?? '')}
+                  isUploading={isUploadingImage}
+                  onUpload={handleImageUploadFile}
+                  companyId={companyId}
+                />
               </div>
 
               <div className={styles.formGroup}>
@@ -1102,8 +1101,7 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                 <div className={styles.fileUploadSection}>
                   <div className={styles.fileUploadInfo}>
                     <small>
-                      Upload a video to display with this plan. Videos are stored in{' '}
-                      <code>/brand-assets/service-plans/</code>
+                      Upload a video to display with this plan. Videos are stored in your company&apos;s service-plans folder.
                     </small>
                   </div>
                   {isUploadingVideo ? (
@@ -1175,6 +1173,17 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                     onChange={(e) => handleInputChange('includes_inspection', e.target.checked)}
                   />
                   Includes initial inspection
+                </label>
+              </div>
+
+              <div className={styles.checkboxGroup}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={formData.tech_can_upsell}
+                    onChange={(e) => handleInputChange('tech_can_upsell', e.target.checked)}
+                  />
+                  Tech can upsell
                 </label>
               </div>
 
@@ -1303,6 +1312,107 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
 
           {activeTab === 'pricing' && (
             <div className={styles.tabContent}>
+              {formData.plan_category === 'specialty' ? (
+                <div className={styles.specialtyLinesSection}>
+                  <h4>Service Lines</h4>
+                  <p>Define the measurement-based line items for this specialty plan. Inspectors will enter quantities in the field to compute the quote total.</p>
+                  {(formData.specialty_lines as SpecialtyPlanLine[]).map((line, idx) => (
+                    <div key={idx} className={styles.specialtyLineRow}>
+                      <div className={styles.formGroup}>
+                        <label>Line Name</label>
+                        <input
+                          type="text"
+                          value={line.line_name}
+                          onChange={(e) => {
+                            const updated = [...formData.specialty_lines as SpecialtyPlanLine[]];
+                            updated[idx] = { ...updated[idx], line_name: e.target.value };
+                            handleInputChange('specialty_lines', updated);
+                          }}
+                          placeholder="e.g. Bird Spikes"
+                        />
+                      </div>
+                      <div className={styles.formGroup}>
+                        <label>Pricing Type</label>
+                        <select
+                          value={line.pricing_type}
+                          onChange={(e) => {
+                            const updated = [...formData.specialty_lines as SpecialtyPlanLine[]];
+                            updated[idx] = { ...updated[idx], pricing_type: e.target.value as SpecialtyPlanLine['pricing_type'] };
+                            handleInputChange('specialty_lines', updated);
+                          }}
+                        >
+                          <option value="per_linear_foot">Per Linear Foot</option>
+                          <option value="per_sq_ft">Per Sq Ft</option>
+                          <option value="flat">Flat Rate</option>
+                          <option value="per_hour">Per Hour</option>
+                        </select>
+                      </div>
+                      <div className={styles.formGroup}>
+                        <label>{line.pricing_type === 'flat' ? 'Price ($)' : 'Price Per Unit ($)'}</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={line.price_per_unit}
+                          onChange={(e) => {
+                            const updated = [...formData.specialty_lines as SpecialtyPlanLine[]];
+                            updated[idx] = { ...updated[idx], price_per_unit: parseFloat(e.target.value) || 0 };
+                            handleInputChange('specialty_lines', updated);
+                          }}
+                          placeholder="0.00"
+                        />
+                      </div>
+                      {line.pricing_type !== 'flat' && (
+                        <div className={styles.formGroup}>
+                          <label>Minimum Price ($)</label>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={line.minimum_price ?? ''}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value);
+                              const updated = [...formData.specialty_lines as SpecialtyPlanLine[]];
+                              updated[idx] = { ...updated[idx], minimum_price: Number.isFinite(val) && val > 0 ? val : null };
+                              handleInputChange('specialty_lines', updated);
+                            }}
+                            placeholder="Optional"
+                          />
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        className={styles.removeBtn}
+                        onClick={() => {
+                          const updated = (formData.specialty_lines as SpecialtyPlanLine[]).filter((_, i) => i !== idx);
+                          handleInputChange('specialty_lines', updated);
+                        }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className={styles.addButton}
+                    onClick={() => {
+                      const newLine: SpecialtyPlanLine = {
+                        id: '',
+                        plan_id: '',
+                        line_name: '',
+                        pricing_type: 'per_linear_foot',
+                        price_per_unit: 0,
+                        minimum_price: null,
+                        display_order: (formData.specialty_lines as SpecialtyPlanLine[]).length,
+                      };
+                      handleInputChange('specialty_lines', [...formData.specialty_lines as SpecialtyPlanLine[], newLine]);
+                    }}
+                  >
+                    + Add Service Line
+                  </button>
+                </div>
+              ) : (
+              <>
               <h4>Pricing Per Interval</h4>
               <p>Set pricing increases for each size interval above the base size defined in company settings.</p>
 
@@ -1799,6 +1909,8 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
                   </div>
                 </label>
               </div>
+              </>
+              )}
 
             </div>
           )}
@@ -1809,6 +1921,21 @@ const ServicePlanModal: React.FC<ServicePlanModalProps> = ({
               <p style={{ fontSize: '14px', color: '#666', marginBottom: '16px' }}>
                 Variants let sales reps choose a named option (e.g. &quot;Bi-Monthly&quot;, &quot;Quarterly&quot;) with different pricing or frequency when building a quote. Leave any field blank to inherit the plan&apos;s default.
               </p>
+
+              {formData.variants.length > 0 && (
+                <div className={styles.formGroup} style={{ marginBottom: '20px' }}>
+                  <label>Default Option Label</label>
+                  <input
+                    type="text"
+                    value={formData.default_variant_label ?? ''}
+                    onChange={(e) => handleInputChange('default_variant_label', e.target.value || null)}
+                    placeholder="e.g. Under 3k sq ft"
+                  />
+                  <small style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px', display: 'block' }}>
+                    Names the base plan option in the dropdown (shown as &quot;— Plan Default —&quot; if left blank).
+                  </small>
+                </div>
+              )}
 
               {formData.variants.map((variant, index) => (
                 <div key={index} className={styles.pricingSection} style={{ position: 'relative', paddingTop: '16px' }}>

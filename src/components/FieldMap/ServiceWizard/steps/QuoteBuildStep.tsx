@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Pencil, Trash2 } from 'lucide-react';
 import {
   MAP_ELEMENT_STAMP_OPTIONS,
   MAP_PEST_STAMP_OPTIONS,
@@ -15,6 +15,7 @@ import styles from './QuoteBuildStep.module.scss';
 import type {
   CompanyPricingSettings,
   ServicePlanPricing,
+  SpecialtyPlanLine,
 } from '@/types/pricing';
 import {
   generateHomeSizeOptions,
@@ -29,7 +30,7 @@ export interface QuoteLineItem {
   id: string;
   type: 'plan-addon' | 'custom';
   // Catalog item (plan-addon type)
-  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product';
+  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product' | 'specialty-line';
   catalogItemId?: string;
   catalogItemName?: string;
   // Custom type
@@ -56,6 +57,10 @@ export interface QuoteLineItem {
   isRecommended?: boolean;
   // DB-persisted selection state; undefined for freshly-built in-memory items
   isSelected?: boolean;
+  // Specialty line fields
+  specialtyLinePricingType?: 'per_linear_foot' | 'per_sq_ft' | 'flat' | 'per_hour';
+  specialtyLinePricePerUnit?: number;
+  specialtyLineMinimumPrice?: number | null;
 }
 
 export interface PlottedPest {
@@ -106,17 +111,20 @@ interface CatalogItem {
   pricingUnit: 'sqft' | 'linear_feet' | 'acres' | null;
   additionalUnitPrice: number | null;
   variants: CatalogVariant[];
+  defaultVariantLabel: string | null;
   percentagePricing: CatalogPercentagePricing | null;
   homeSizePricing: ServicePlanPricing['home_size_pricing'] | null;
   yardSqftPricing: ServicePlanPricing['yard_sqft_pricing'] | null;
   eligibilityMode: 'all' | 'specific';
   eligiblePlanIds: string[];
   recommendedAddonIds: string[];
+  specialtyLines: SpecialtyPlanLine[];
 }
 
 interface Product {
   id: string;
   product_name: string;
+  product_description: string | null;
   unit_price: number;
   recurring_price: number;
   unit_type: string;
@@ -259,6 +267,9 @@ interface QuoteBuildStepProps {
   pestIconMap?: Record<string, string>;
   selectedDiscount?: AvailableDiscount | null;
   onDiscountChange?: (discount: AvailableDiscount | null) => void;
+  onEditPests?: () => void;
+  pricingReadOnly?: boolean;
+  onReady?: () => void;
 }
 
 // ── Line item card ─────────────────────────────────────────────────────────
@@ -1043,8 +1054,16 @@ export function QuoteBuildStep({
   pestIconMap = {},
   selectedDiscount,
   onDiscountChange,
+  onEditPests,
+  pricingReadOnly = false,
+  onReady,
 }: QuoteBuildStepProps) {
   const baseId = useId();
+  const onReadyRef = useRef(onReady);
+  const hasFiredReadyRef = useRef(false);
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  });
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [pricingSettings, setPricingSettings] =
@@ -1067,6 +1086,7 @@ export function QuoteBuildStep({
   const [modalFrequency, setModalFrequency] = useState<string | null>(null);
   const [modalQuantity, setModalQuantity] = useState<number | null>(null);
   const [modalVariantLabel, setModalVariantLabel] = useState<string | null>(null);
+  const [modalSpecialtyQtys, setModalSpecialtyQtys] = useState<Record<string, number>>({});
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   const modalBodyRef = useRef<HTMLDivElement>(null);
@@ -1093,6 +1113,7 @@ export function QuoteBuildStep({
     setModalFrequency(null);
     setModalQuantity(null);
     setModalVariantLabel(null);
+    setModalSpecialtyQtys({});
     setServiceSearch('');
     setServiceDropdownOpen(false);
   }, [pestModal, editingItemId]);
@@ -1214,12 +1235,14 @@ export function QuoteBuildStep({
           pricingUnit: p.pricing_unit ?? null,
           additionalUnitPrice: null,
           variants: Array.isArray(p.variants) ? p.variants : [],
+          defaultVariantLabel: p.default_variant_label ?? null,
           percentagePricing: null,
           homeSizePricing: p.home_size_pricing ?? null,
           yardSqftPricing: p.yard_sqft_pricing ?? null,
           eligibilityMode: 'all' as const,
           eligiblePlanIds: [],
           recommendedAddonIds: p.recommended_addon_ids ?? [],
+          specialtyLines: Array.isArray(p.specialty_lines) ? p.specialty_lines : [],
         }));
 
         // Add-ons don't have a pest_coverage table — coverage is always empty
@@ -1246,12 +1269,14 @@ export function QuoteBuildStep({
           pricingUnit: null,
           additionalUnitPrice: a.additional_unit_price ?? null,
           variants: Array.isArray(a.variants) ? a.variants : [],
+          defaultVariantLabel: null,
           percentagePricing: a.percentage_pricing ?? null,
           homeSizePricing: null,
           yardSqftPricing: null,
           eligibilityMode: (a.eligibility_mode ?? 'all') as 'all' | 'specific',
           eligiblePlanIds: a.eligible_plan_ids ?? [],
           recommendedAddonIds: [],
+          specialtyLines: [],
         }));
 
         // Bundles reference plan IDs in bundled_service_plans JSONB — resolve coverage
@@ -1289,18 +1314,26 @@ export function QuoteBuildStep({
             pricingUnit: null,
             additionalUnitPrice: null,
             variants: [],
+            defaultVariantLabel: null,
             percentagePricing: null,
             homeSizePricing: null,
             yardSqftPricing: null,
             eligibilityMode: 'all' as const,
             eligiblePlanIds: [],
             recommendedAddonIds: [],
+            specialtyLines: [],
           };
         });
 
         setCatalog([...plans, ...addons, ...bundles]);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (!hasFiredReadyRef.current) {
+          hasFiredReadyRef.current = true;
+          onReadyRef.current?.();
+        }
+      });
   }, [companyId]);
 
   const [availableDiscounts, setAvailableDiscounts] = useState<
@@ -1317,22 +1350,27 @@ export function QuoteBuildStep({
       .catch(() => {});
   }, [companyId]);
 
-  // Reconcile coveredPestIds for line items loaded from DB (they come back with [])
+  // Reconcile coveredPestIds for line items loaded from DB (they come back with []).
+  // Runs whenever catalog or lineItems change so it works regardless of which
+  // arrives first. The predicate skips items whose catalog has no coverage
+  // (addons), preventing an infinite loop on those.
   useEffect(() => {
     if (catalog.length === 0) return;
-    const needsReconcile = lineItems.some(
-      i => i.catalogItemId && i.coveredPestIds.length === 0
-    );
+    const needsReconcile = lineItems.some(i => {
+      if (!i.catalogItemId || i.coveredPestIds.length > 0) return false;
+      const ci = catalog.find(c => c.id === i.catalogItemId);
+      return ci != null && ci.pestCoverageIds.length > 0;
+    });
     if (!needsReconcile) return;
     const updated = lineItems.map(item => {
       if (!item.catalogItemId || item.coveredPestIds.length > 0) return item;
       const ci = catalog.find(c => c.id === item.catalogItemId);
-      if (!ci) return item;
+      if (!ci || ci.pestCoverageIds.length === 0) return item;
       return { ...item, coveredPestIds: ci.pestCoverageIds };
     });
     onChange(updated);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [catalog]); // Intentionally omit lineItems/onChange — only runs when catalog first loads
+  }, [catalog, lineItems]);
 
   // All covered pest IDs: plan-addon items carry the plan's pest_coverage IDs
   // (written at selection time), custom items carry manually-checked IDs.
@@ -1644,16 +1682,11 @@ export function QuoteBuildStep({
 
   const modalServiceChips = useMemo(() => {
     if (!pestModal) return [];
-    // When editing, only show the single selected plan as a chip
-    if (editingItemId) {
-      const editingItem = lineItems.find(i => i.id === editingItemId);
-      if (editingItem?.catalogItemId) {
-        const ci = catalog.find(c => c.id === editingItem.catalogItemId);
-        return ci ? [ci] : [];
-      }
-      return [];
+    // When editing an existing item, only show the plan that's currently selected
+    if (editingItemId && modalServiceId) {
+      return catalog.filter(c => c.id === modalServiceId);
     }
-    // "Add Additional Service" — show all plans/bundles with no pest filter
+    // "Edit Service" / "Add Additional Service" — show all plans/bundles
     if (pestModal.id === '__all__') {
       return catalog.filter(c => c.kind === 'plan' || c.kind === 'bundle');
     }
@@ -1662,7 +1695,7 @@ export function QuoteBuildStep({
         (c.kind === 'plan' || c.kind === 'bundle') &&
         c.pestCoverageIds.includes(pestModal.id)
     );
-  }, [catalog, pestModal, editingItemId, lineItems]);
+  }, [catalog, pestModal, editingItemId, modalServiceId]);
 
   const filteredServiceChips = useMemo(() => {
     if (!serviceSearch.trim()) return modalServiceChips;
@@ -1683,6 +1716,10 @@ export function QuoteBuildStep({
 
   const modalIsPerHour = modalSelectedService?.pricingType === 'per_hour';
   const modalIsPerRoom = modalSelectedService?.pricingType === 'per_room';
+  const modalIsSpecialtyPlan = modalSelectedService?.planCategory === 'specialty';
+  const modalIsOneTime =
+    modalSelectedService?.planCategory === 'one-time' ||
+    modalSelectedService?.billingFrequency === 'one-time';
   const modalNeedsQty = modalIsPerUnit || modalIsPerHour || modalIsPerRoom;
 
   // true for flat/per_hour/per_room (not per-unit) AND for per_sqft plans
@@ -1739,13 +1776,18 @@ export function QuoteBuildStep({
     return PER_UNIT_LABEL_MODAL[modalSelectedService.pricingType] ?? 'Units';
   }
 
-  function handleModalQuantityChange(qty: number) {
+  function handleModalQuantityChange(qty: number, variantOverride?: { price_per_unit?: number; minimum_price?: number | null } | null) {
     if (!modalSelectedService) return;
     let computed = 0;
-    const min = modalSelectedService.minimumPrice;
+    const activeVariant = variantOverride !== undefined
+      ? variantOverride
+      : (modalVariantLabel
+          ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
+          : null);
+    const min = activeVariant?.minimum_price ?? modalSelectedService.minimumPrice;
 
     if (modalIsPerUnit) {
-      const rate = modalSelectedService.pricePerUnit ?? 0;
+      const rate = activeVariant?.price_per_unit ?? modalSelectedService.pricePerUnit ?? 0;
       computed = qty * rate;
     } else if (modalIsPerHour) {
       const rate = modalSelectedService.initialPrice ?? 0;
@@ -1761,7 +1803,10 @@ export function QuoteBuildStep({
     setModalInitialPrice(final);
   }
 
-  function computeModalPriceFromSqft(sqft: number) {
+  function computeModalPriceFromSqft(
+    sqft: number,
+    variantOverride?: { initial_price?: number | null; recurring_price?: number | null; minimum_price?: number | null } | null,
+  ) {
     setModalQuantity(sqft);
     if (!modalSelectedService || !pricingSettings) return;
 
@@ -1784,9 +1829,13 @@ export function QuoteBuildStep({
     const match = findSizeOptionByValue(sqft, options);
     if (!match) return;
 
-    const activeVariant = modalVariantLabel
-      ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
-      : null;
+    // Use explicit override when provided (e.g. from variant onChange to avoid stale state),
+    // otherwise fall back to the current modalVariantLabel from state.
+    const activeVariant = variantOverride !== undefined
+      ? variantOverride
+      : (modalVariantLabel
+          ? modalSelectedService.variants?.find(v => v.label === modalVariantLabel) ?? null
+          : null);
     const baseInitial = activeVariant?.initial_price ?? modalSelectedService.initialPrice ?? 0;
     const baseRecurring = activeVariant?.recurring_price ?? modalSelectedService.recurringPrice ?? 0;
     const min = activeVariant?.minimum_price ?? modalSelectedService.minimumPrice;
@@ -1867,17 +1916,40 @@ export function QuoteBuildStep({
       }
     }
 
+    const catalogServiceForEdit = catalog.find(s => s.id === primary.catalogItemId);
+    const specialtyQtys: Record<string, number> = {};
+    for (const child of lineItems.filter(
+      i => i.catalogItemKind === 'specialty-line' && i.parentLineItemId === primaryItemId
+    )) {
+      if (child.quantity == null) continue;
+      const sLineId =
+        child.catalogItemId ??
+        catalogServiceForEdit?.specialtyLines?.find(
+          (sl: SpecialtyPlanLine) => sl.line_name === child.catalogItemName
+        )?.id;
+      if (sLineId) {
+        specialtyQtys[sLineId] = child.quantity;
+      }
+    }
+
     setEditingItemId(primaryItemId);
     setModalServiceId(primary.catalogItemId ?? null);
     setModalAddonIds(addonIds);
     setModalAddonQuantities(addonQtys);
     setModalProductQtys(productQtys);
+    setModalSpecialtyQtys(specialtyQtys);
     setModalInitialPrice(primary.initialCost);
     setModalRecurringPrice(primary.recurringCost);
     setModalFrequency(primary.frequency);
     setModalQuantity(primary.quantity ?? null);
     setModalVariantLabel(primary.selectedVariantLabel ?? null);
-    setPestModal({ id: '__all__', label: 'Edit Service' });
+    const pestIds = catalogServiceForEdit?.pestCoverageIds ?? [];
+    const pestNames = catalogServiceForEdit?.pestCoverageNames ?? [];
+    if (pestIds.length === 1 && pestNames.length === 1) {
+      setPestModal({ id: pestIds[0], label: pestNames[0] });
+    } else {
+      setPestModal({ id: '__all__', label: 'Edit Service' });
+    }
   }
 
   function handleModalSave() {
@@ -1928,6 +2000,69 @@ export function QuoteBuildStep({
     };
     newItems.push(primaryItem);
 
+    // Specialty line items — generate child items for specialty plans
+    const modalIsSpecialty = service.planCategory === 'specialty';
+    if (modalIsSpecialty && service.specialtyLines.length > 0) {
+      for (const sLine of service.specialtyLines) {
+        const qty = modalSpecialtyQtys[sLine.id] ?? 0;
+        if (qty === 0 && sLine.pricing_type !== 'flat') continue;
+        const raw = sLine.pricing_type === 'flat' ? sLine.price_per_unit : qty * sLine.price_per_unit;
+        const computed = sLine.minimum_price != null ? Math.max(raw, sLine.minimum_price) : raw;
+        newItems.push({
+          id: crypto.randomUUID(),
+          type: 'plan-addon',
+          catalogItemKind: 'specialty-line',
+          catalogItemId: sLine.id,
+          catalogItemName: sLine.line_name,
+          isPrimary: false,
+          coveredPestIds: service.pestCoverageIds,
+          coveredPestLabels: [],
+          initialCost: qty > 0 || sLine.pricing_type === 'flat' ? computed : null,
+          recurringCost: null,
+          frequency: null,
+          quantity: sLine.pricing_type !== 'flat' ? qty : null,
+          parentLineItemId: primaryItem.id,
+          isSelected: true,
+          specialtyLinePricingType: sLine.pricing_type,
+          specialtyLinePricePerUnit: sLine.price_per_unit,
+          specialtyLineMinimumPrice: sLine.minimum_price,
+        });
+      }
+    }
+
+    // Calculate effective initial cost for percentage-based add-on pricing.
+    // Includes: primary plan cost + specialty lines + products + flat/per-unit addons.
+    const specialtyTotal = newItems
+      .filter(i => i.catalogItemKind === 'specialty-line' && i.parentLineItemId === primaryItem.id)
+      .reduce((sum, i) => sum + (i.initialCost ?? 0), 0);
+
+    const productTotal = Object.entries(modalProductQtys).reduce((sum, [productId, qty]) => {
+      if (qty <= 0) return sum;
+      const product = products.find(p => p.id === productId);
+      return sum + (product ? qty * product.unit_price : 0);
+    }, 0);
+
+    const allAddonIds = [...new Set([...service.recommendedAddonIds, ...Array.from(modalAddonIds)])];
+    const addonSubtotal = allAddonIds.reduce((sum, addonId) => {
+      const addon = addonCatalog.find(a => a.id === addonId);
+      if (!addon || addon.percentagePricing) return sum; // exclude %-based addons (circular)
+      const qty = modalAddonQuantities[addonId] ?? null;
+      let cost = addon.initialPrice ?? 0;
+      if (qty != null && addon.pricingType !== 'flat') {
+        if (addon.pricingType === 'per_room') {
+          const raw = qty <= 0 ? 0 : (addon.initialPrice ?? 0) + Math.max(0, qty - 1) * (addon.additionalUnitPrice ?? 0);
+          cost = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        } else {
+          const raw = qty * (addon.pricePerUnit ?? 0);
+          cost = addon.minimumPrice != null ? Math.max(raw, addon.minimumPrice) : raw;
+        }
+      }
+      return sum + cost;
+    }, 0);
+
+    const effectivePrimaryInitialCost =
+      (primaryItem.initialCost ?? 0) + specialtyTotal + productTotal + addonSubtotal;
+
     // Recommended add-on line items — add ALL of them, flagging which ones the inspector selected
     const recommendedIdSet = new Set(service.recommendedAddonIds);
     for (const addonId of service.recommendedAddonIds) {
@@ -1943,9 +2078,9 @@ export function QuoteBuildStep({
       let addonIsCustomPriced = false;
       let addonCustomInitialPrice: number | null = null;
 
-      if (addon.percentagePricing && (primaryItem.initialCost ?? 0) > 0) {
+      if (addon.percentagePricing && effectivePrimaryInitialCost > 0) {
         const { percentage, years = 1, minimum = 0 } = addon.percentagePricing;
-        const jobCost = primaryItem.initialCost!;
+        const jobCost = effectivePrimaryInitialCost;
         const computed = Math.max((percentage / 100) * jobCost * years, minimum);
         resolvedInitial = computed;
         addonPercentageJobCost = jobCost;
@@ -2009,9 +2144,9 @@ export function QuoteBuildStep({
       let addonIsCustomPriced = false;
       let addonCustomInitialPrice: number | null = null;
 
-      if (addon.percentagePricing && (primaryItem.initialCost ?? 0) > 0) {
+      if (addon.percentagePricing && effectivePrimaryInitialCost > 0) {
         const { percentage, years = 1, minimum = 0 } = addon.percentagePricing;
-        const jobCost = primaryItem.initialCost!;
+        const jobCost = effectivePrimaryInitialCost;
         const computed = Math.max((percentage / 100) * jobCost * years, minimum);
         resolvedInitial = computed;
         addonPercentageJobCost = jobCost;
@@ -2102,6 +2237,7 @@ export function QuoteBuildStep({
     setModalAddonIds(new Set());
     setModalAddonQuantities({});
     setModalProductQtys({});
+    setModalSpecialtyQtys({});
     setModalInitialPrice(null);
     setModalRecurringPrice(null);
     setModalFrequency(null);
@@ -2112,7 +2248,11 @@ export function QuoteBuildStep({
   // Only render plan/bundle/custom items as compact summary cards; addons and products
   // are managed through the modal and should not appear at the top level.
   const serviceCards = lineItems.filter(
-    i => i.catalogItemKind !== 'addon' && i.catalogItemKind !== 'product'
+    i =>
+      i.catalogItemKind !== 'addon' &&
+      i.catalogItemKind !== 'product' &&
+      i.catalogItemKind !== 'specialty-line' &&
+      !i.parentLineItemId
   );
 
   // ── Drag-to-reorder (pointer events — works on touch + mouse) ────────────
@@ -2220,8 +2360,23 @@ export function QuoteBuildStep({
   return (
     <div className={styles.root}>
       {/* ── Pest Concern Coverage (top) ── */}
-      {plottedPests.length > 0 && (
+      {(plottedPests.length > 0 || onEditPests) && (
         <div className={styles.coverageSection}>
+          {onEditPests && (
+            <div className={styles.editPestsRow}>
+              <button
+                type="button"
+                className={styles.editPestsBtn}
+                onClick={onEditPests}
+              >
+                <Pencil size={14} />
+                {plottedPests.length > 0
+                  ? 'Edit pest issues'
+                  : 'Add pest issues'}
+              </button>
+            </div>
+          )}
+          {plottedPests.length > 0 && (
           <div className={styles.pestIconRow}>
             {plottedPests.map(pest => {
               const covered = coveredPestIds.has(pest.id);
@@ -2280,6 +2435,7 @@ export function QuoteBuildStep({
               );
             })}
           </div>
+          )}
         </div>
       )}
 
@@ -2292,9 +2448,13 @@ export function QuoteBuildStep({
             </p>
           ) : (
             <>
-              <p className={styles.emptyTitle}>No line items yet</p>
+              <p className={styles.emptyTitle}>
+                No pest issues added to this lead yet
+              </p>
               <p className={styles.emptyHint}>
-                Add a line item to start building the quote.
+                {onEditPests
+                  ? 'Click Edit pest issues above to add the customer\u2019s pest concerns.'
+                  : 'Add the customer\u2019s pest concerns to start building the quote.'}
               </p>
             </>
           )}
@@ -2566,7 +2726,10 @@ export function QuoteBuildStep({
 
       {/* ── Pest Service Selection Modal ── */}
       {pestModal && (
-        <div className={styles.modalOverlay} onClick={closeModal}>
+        <div
+          className={`${styles.modalOverlay} ${pricingReadOnly ? styles.modalOverlayWorkspaceOffset : ''}`}
+          onClick={closeModal}
+        >
           <div className={styles.modalSheetWrapper}>
             {/* Pest icon circle — overlaps top edge of the sheet */}
             <div className={styles.modalPestCircleWrapper}>
@@ -2629,7 +2792,7 @@ export function QuoteBuildStep({
                   <p className={styles.modalNoServices}>
                     No services configured for this pest yet.
                   </p>
-                ) : pestModal?.id === '__all__' ? (
+                ) : pestModal?.id === '__all__' && !editingItemId ? (
                   /* Searchable dropdown for "Add Additional Service" */
                   <div className={styles.serviceDropdownWrapper} ref={serviceDropdownRef}>
                     <div
@@ -2789,16 +2952,25 @@ export function QuoteBuildStep({
                           onChange={e => {
                             const label = e.target.value || null;
                             setModalVariantLabel(label);
-                            const variant = modalSelectedService.variants.find(v => v.label === label);
-                            if (variant) {
+                            const variant = modalSelectedService.variants.find(v => v.label === label) ?? null;
+                            // Recompute price using the new variant, passing it directly to avoid
+                            // reading stale modalVariantLabel state from the closure.
+                            if (modalQuantity && modalIsPerUnit) {
+                              handleModalQuantityChange(modalQuantity, variant);
+                            } else if (modalQuantity && (modalWantsSqFt || modalWantsLinFt)) {
+                              computeModalPriceFromSqft(modalQuantity, variant);
+                            } else if (variant) {
                               if (variant.initial_price !== undefined) setModalInitialPrice(variant.initial_price);
                               if (variant.recurring_price !== undefined) setModalRecurringPrice(variant.recurring_price);
-                              const freq = variant.treatment_frequency ?? variant.billing_frequency;
-                              if (freq) setModalFrequency(freq);
                             } else {
                               // Cleared — reset to plan defaults
                               setModalInitialPrice(modalSelectedService.initialPrice);
                               setModalRecurringPrice(modalSelectedService.recurringPrice);
+                            }
+                            if (variant) {
+                              const freq = variant.treatment_frequency ?? variant.billing_frequency;
+                              if (freq) setModalFrequency(freq);
+                            } else {
                               const isOneTime = modalSelectedService.planCategory === 'one-time' || modalSelectedService.billingFrequency === 'one-time';
                               setModalFrequency(
                                 isOneTime
@@ -2808,7 +2980,7 @@ export function QuoteBuildStep({
                             }
                           }}
                         >
-                          <option value="">— Plan Default —</option>
+                          <option value="">{modalSelectedService.defaultVariantLabel ?? '— Plan Default —'}</option>
                           {modalSelectedService.variants.map(v => (
                             <option key={v.label} value={v.label}>{v.label}</option>
                           ))}
@@ -2816,8 +2988,8 @@ export function QuoteBuildStep({
                       </div>
                     )}
 
-                    {/* Two-column measurement row — shown for all non-per-hour, non-per-room plans */}
-                    {!modalIsPerHour && !modalIsPerRoom && (
+                    {/* Two-column measurement row — shown for all non-per-hour, non-per-room, non-specialty plans */}
+                    {!modalIsPerHour && !modalIsPerRoom && !modalIsSpecialtyPlan && (
                       <div className={styles.measurementRow}>
                         {/* Square Feet column */}
                         <div
@@ -2943,7 +3115,7 @@ export function QuoteBuildStep({
                     )}
 
                     {/* Per-hour / per-room single input */}
-                    {(modalIsPerHour || modalIsPerRoom) && (
+                    {(modalIsPerHour || modalIsPerRoom) && !modalIsSpecialtyPlan && (
                       <div className={styles.fieldGroup}>
                         <label className={styles.fieldLabel}>
                           {modalIsPerRoom ? 'Rooms' : 'Hours'}
@@ -2966,63 +3138,108 @@ export function QuoteBuildStep({
                     )}
 
                     {/* Pricing row */}
-                    <div className={styles.modalPricingRow}>
+                    {modalIsSpecialtyPlan && modalSelectedService.specialtyLines.length > 0 ? (
+                      <div className={styles.specialtyLinesInput}>
+                        <p className={styles.fieldLabel}>Enter Measurements</p>
+                        {modalSelectedService.specialtyLines.map(sLine => {
+                          const qty = modalSpecialtyQtys[sLine.id] ?? 0;
+                          const raw = sLine.pricing_type === 'flat' ? sLine.price_per_unit : qty * sLine.price_per_unit;
+                          const computed = sLine.minimum_price != null ? Math.max(raw, sLine.minimum_price) : raw;
+                          return (
+                            <div key={sLine.id} className={styles.specialtyLineInput}>
+                              <label className={styles.fieldLabel}>{sLine.line_name}</label>
+                              {sLine.pricing_type !== 'flat' && (
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  className={styles.textInput}
+                                  value={modalSpecialtyQtys[sLine.id] ?? ''}
+                                  onChange={e => {
+                                    const v = parseFloat(e.target.value);
+                                    setModalSpecialtyQtys(prev => ({
+                                      ...prev,
+                                      [sLine.id]: Number.isFinite(v) && v >= 0 ? v : 0,
+                                    }));
+                                  }}
+                                  placeholder={
+                                    sLine.pricing_type === 'per_linear_foot' ? 'Linear feet' :
+                                    sLine.pricing_type === 'per_sq_ft' ? 'Square feet' :
+                                    'Hours'
+                                  }
+                                />
+                              )}
+                              <span className={styles.pricingHint}>
+                                {sLine.pricing_type !== 'flat' && (
+                                  <>@ {formatCurrency(sLine.price_per_unit)}/{sLine.pricing_type === 'per_linear_foot' ? 'ln ft' : sLine.pricing_type === 'per_sq_ft' ? 'sq ft' : 'hr'}&nbsp;&nbsp;</>
+                                )}
+                                {sLine.pricing_type === 'flat'
+                                  ? formatCurrency(qty === 0 ? raw : computed)
+                                  : `= ${formatCurrency(qty === 0 ? raw : computed)}`}
+                                {sLine.minimum_price != null && raw < sLine.minimum_price && (
+                                  <> (min {formatCurrency(sLine.minimum_price)})</>
+                                )}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                    <div className={`${styles.modalPricingRow}${modalIsOneTime ? ` ${styles.modalPricingRowSingle}` : ''}`}>
                       <div className={styles.modalPricingField}>
                         <span className={styles.fieldLabel}>Initial Price</span>
-                        <div className={styles.currencyWrap}>
-                          <span className={styles.currencySign}>$</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            className={styles.numberInput}
-                            value={modalInitialPrice ?? ''}
-                            onChange={e =>
-                              setModalInitialPrice(parseCost(e.target.value))
-                            }
-                            placeholder="0.00"
-                          />
+                        {pricingReadOnly ? (
+                          <span className={styles.readOnlyValue}>
+                            {formatCurrency(modalInitialPrice ?? 0)}
+                          </span>
+                        ) : (
+                          <div className={styles.currencyWrap}>
+                            <span className={styles.currencySign}>$</span>
+                            <input
+                              type="number"
+                              inputMode="decimal"
+                              min="0"
+                              step="0.01"
+                              className={styles.numberInput}
+                              value={modalInitialPrice ?? ''}
+                              onChange={e =>
+                                setModalInitialPrice(parseCost(e.target.value))
+                              }
+                              placeholder="0.00"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      {!modalIsOneTime && (
+                        <div className={styles.modalPricingField}>
+                          <span className={styles.fieldLabel}>
+                            Recurring Price
+                          </span>
+                          {pricingReadOnly ? (
+                            <span className={styles.readOnlyValue}>
+                              {formatCurrency(modalRecurringPrice ?? 0)}
+                            </span>
+                          ) : (
+                            <div className={styles.currencyWrap}>
+                              <span className={styles.currencySign}>$</span>
+                              <input
+                                type="number"
+                                inputMode="decimal"
+                                min="0"
+                                step="0.01"
+                                className={styles.numberInput}
+                                value={modalRecurringPrice ?? ''}
+                                onChange={e =>
+                                  setModalRecurringPrice(parseCost(e.target.value))
+                                }
+                                placeholder="0.00"
+                              />
+                            </div>
+                          )}
                         </div>
-                      </div>
-                      <div className={styles.modalPricingField}>
-                        <span className={styles.fieldLabel}>
-                          Recurring Price
-                        </span>
-                        <div className={styles.currencyWrap}>
-                          <span className={styles.currencySign}>$</span>
-                          <input
-                            type="number"
-                            inputMode="decimal"
-                            min="0"
-                            step="0.01"
-                            className={styles.numberInput}
-                            value={modalRecurringPrice ?? ''}
-                            onChange={e =>
-                              setModalRecurringPrice(parseCost(e.target.value))
-                            }
-                            placeholder="0.00"
-                          />
-                        </div>
-                      </div>
-                      <div className={styles.modalPricingField}>
-                        <span className={styles.fieldLabel}>Frequency</span>
-                        <select
-                          className={styles.selectInput}
-                          value={modalFrequency ?? ''}
-                          onChange={e =>
-                            setModalFrequency(e.target.value || null)
-                          }
-                        >
-                          <option value="">— Select —</option>
-                          {FREQUENCY_OPTIONS.map(opt => (
-                            <option key={opt.value} value={opt.value}>
-                              {opt.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
+                      )}
                     </div>
+                    )}
                   </div>
 
                   {/* Add-on chips — Recommended Options */}
@@ -3045,8 +3262,9 @@ export function QuoteBuildStep({
                               onClick={() => {
                                 setModalAddonIds(prev => {
                                   const next = new Set(prev);
-                                  if (next.has(addon.id)) next.delete(addon.id);
-                                  else next.add(addon.id);
+                                  // Recommended options are mutually exclusive — clear all others first
+                                  modalRecommendedAddons.forEach(a => next.delete(a.id));
+                                  if (!prev.has(addon.id)) next.add(addon.id);
                                   return next;
                                 });
                               }}
@@ -3298,25 +3516,30 @@ export function QuoteBuildStep({
                                 key={product.id}
                                 className={styles.modalProductRow}
                               >
-                                <span
+                                <div
                                   className={`${styles.modalProductName}${qty > 0 ? ` ${styles.modalProductNameActive}` : ''}`}
                                 >
-                                  {product.product_name}
-                                </span>
+                                  <span className={styles.modalProductNameText}>{product.product_name}</span>
+                                  {product.product_description && (
+                                    <span className={styles.modalProductDescription}>{product.product_description}</span>
+                                  )}
+                                </div>
                                 <input
                                   type="number"
                                   inputMode="decimal"
                                   min="0"
+                                  max={product.max_quantity ?? undefined}
                                   step="1"
                                   className={`${styles.modalProductQtyInput}${qty > 0 ? ` ${styles.modalProductQtyInputActive}` : ''}`}
                                   value={qty === 0 ? '' : qty}
                                   onChange={e => {
                                     const v = parseInt(e.target.value, 10);
-                                    setModalProductQtys(prev => ({
-                                      ...prev,
-                                      [product.id]:
-                                        Number.isFinite(v) && v >= 0 ? v : 0,
-                                    }));
+                                    if (!Number.isFinite(v) || v < 0) {
+                                      setModalProductQtys(prev => ({ ...prev, [product.id]: 0 }));
+                                      return;
+                                    }
+                                    const clamped = product.max_quantity != null ? Math.min(v, product.max_quantity) : v;
+                                    setModalProductQtys(prev => ({ ...prev, [product.id]: clamped }));
                                   }}
                                   placeholder="0"
                                 />

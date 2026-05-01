@@ -84,6 +84,7 @@ export const adminAPI = {
     company_id: string;
     role: string;
     departments?: string[];
+    departmentTypes?: Record<string, string>;
     sendEmail?: boolean;
     password?: string;
   }) {
@@ -556,6 +557,7 @@ export const adminAPI = {
         includeArchived?: boolean;
         dateFrom?: string;
         dateTo?: string;
+        branchId?: string;
       } = {}
     ) {
       const queryParams = new URLSearchParams();
@@ -569,6 +571,7 @@ export const adminAPI = {
         queryParams.append('includeArchived', 'true');
       if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+      if (filters.branchId) queryParams.append('branchId', filters.branchId);
 
       const url = `/api/support-cases${queryParams.toString() ? `?${queryParams}` : ''}`;
       return authenticatedFetch(url);

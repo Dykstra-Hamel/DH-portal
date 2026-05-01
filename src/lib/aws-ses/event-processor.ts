@@ -8,6 +8,7 @@
 import { SesEvent, ProcessedSesEvent } from '@/types/ses-events';
 import { addToSuppressionList } from '@/lib/suppression';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { resolveBranchForServiceAddress } from '@/lib/branch-filter';
 
 /**
  * Process a bounce event
@@ -387,6 +388,13 @@ async function handleLeadCreationFromClick(
 
   const serviceAddressId = customer?.customer_service_addresses?.[0]?.service_address?.id || null;
 
+  // Resolve branch via cache-aware helper. Returns null when the company
+  // hasn't tagged any service_area covering this address (cached after
+  // the first lookup so repeat events don't re-resolve).
+  const sesBranchId = serviceAddressId
+    ? await resolveBranchForServiceAddress(supabase, companyId, serviceAddressId)
+    : null;
+
   // Build lead comments
   const leadComments = 'Lead has viewed the campaign landing page but did not submit the form yet.';
 
@@ -397,6 +405,7 @@ async function handleLeadCreationFromClick(
       company_id: companyId,
       customer_id: customerId,
       service_address_id: serviceAddressId,
+      branch_id: sesBranchId,
       campaign_id: campaignId,
       lead_source: 'campaign',
       lead_status: 'quoted',

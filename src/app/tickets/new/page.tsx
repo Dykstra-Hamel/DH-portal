@@ -15,6 +15,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
+import { useUser } from '@/hooks/useUser';
+import { BranchFilterDropdown } from '@/components/Common/BranchFilter/BranchFilterDropdown';
 import { CallRecord } from '@/types/call-record';
 import { TicketReviewModal } from '@/components/Tickets/TicketReviewModal';
 import {
@@ -99,8 +101,18 @@ function TicketsPageContent() {
   const currentChannelRef = useRef<any>(null);
   const isFetchingRef = useRef(false);
 
-  // Use global company context
+  // Use global company context + current user (for branch filter default)
   const { selectedCompany, isLoading: companyLoading } = useCompany();
+  const { user } = useUser();
+  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const selectedBranchIdRef = useRef('');
+  useEffect(() => {
+    selectedBranchIdRef.current = selectedBranchId;
+  }, [selectedBranchId]);
+  // Reset on company change so the dropdown reapplies the user's default.
+  useEffect(() => {
+    setSelectedBranchId('');
+  }, [selectedCompany?.id]);
 
   // Keep company ref in sync to prevent stale closures in broadcast callback
   const selectedCompanyRef = useRef(selectedCompany);
@@ -166,8 +178,11 @@ function TicketsPageContent() {
     if (!companyId) return;
 
     try {
+      const branchSuffix = selectedBranchIdRef.current
+        ? `&branchId=${selectedBranchIdRef.current}`
+        : '';
       const response = await fetch(
-        `/api/tickets?companyId=${companyId}&countOnly=true`
+        `/api/tickets?companyId=${companyId}&countOnly=true${branchSuffix}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -217,6 +232,10 @@ function TicketsPageContent() {
 
           if (searchQueryRef.current) {
             params.append('search', searchQueryRef.current);
+          }
+
+          if (selectedBranchIdRef.current) {
+            params.append('branchId', selectedBranchIdRef.current);
           }
 
           const response = await fetch(`/api/tickets?${params}`);
@@ -1024,6 +1043,22 @@ function TicketsPageContent() {
 
   return (
     <div style={{ width: '100%' }}>
+      {selectedCompany && (
+        <div style={{ padding: '0 0 12px' }}>
+          <BranchFilterDropdown
+            companyId={selectedCompany.id}
+            userId={user?.id}
+            value={selectedBranchId}
+            onChange={value => {
+              setSelectedBranchId(value);
+              selectedBranchIdRef.current = value;
+              if (selectedCompany?.id) {
+                fetchTickets(selectedCompany.id, { page: 1, append: false });
+              }
+            }}
+          />
+        </div>
+      )}
       {selectedCompany && (
         <Suspense fallback={<TicketsListSkeleton />}>
           <TicketsList

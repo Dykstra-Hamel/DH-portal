@@ -15,6 +15,7 @@ import {
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
 import { AddLeadModal } from '@/components/Leads/AddLeadModal/AddLeadModal';
+import { BranchFilterDropdown } from '@/components/Common/BranchFilter/BranchFilterDropdown';
 
 interface Profile {
   id: string;
@@ -24,12 +25,6 @@ interface Profile {
   role?: string;
 }
 
-interface Branch {
-  id: string;
-  name: string;
-  is_active: boolean;
-}
-
 export default function LeadsPage() {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -37,7 +32,6 @@ export default function LeadsPage() {
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
-  const [branches, setBranches] = useState<Branch[]>([]);
   const [selectedBranchId, setSelectedBranchId] = useState('');
   const router = useRouter();
 
@@ -131,14 +125,11 @@ export default function LeadsPage() {
     router.push(`/tickets/leads/${lead.id}?edit=true`);
   };
 
-  // Fetch branches when company changes
+  // Reset branch filter when company changes; the BranchFilterDropdown
+  // will then re-apply the user's default branch for the new company.
   useEffect(() => {
     if (!selectedCompany?.id) return;
     setSelectedBranchId('');
-    fetch(`/api/branches?companyId=${selectedCompany.id}`)
-      .then(r => r.json())
-      .then(d => setBranches((d.branches ?? []).filter((b: Branch) => b.is_active)))
-      .catch(() => setBranches([]));
   }, [selectedCompany?.id]);
 
   // Fetch leads when selectedCompany changes or isAdmin changes
@@ -249,19 +240,14 @@ export default function LeadsPage() {
 
   return (
     <div style={{ width: '100%' }}>
-      {selectedCompany && branches.length > 0 && (
-        <div style={{ padding: '0 0 12px', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>Branch:</label>
-          <select
+      {selectedCompany && (
+        <div style={{ padding: '0 0 12px' }}>
+          <BranchFilterDropdown
+            companyId={selectedCompany.id}
+            userId={user?.id}
             value={selectedBranchId}
-            onChange={e => setSelectedBranchId(e.target.value)}
-            style={{ fontSize: 13, padding: '4px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff' }}
-          >
-            <option value="">All Branches</option>
-            {branches.map(b => (
-              <option key={b.id} value={b.id}>{b.name}</option>
-            ))}
-          </select>
+            onChange={setSelectedBranchId}
+          />
         </div>
       )}
       {selectedCompany && (

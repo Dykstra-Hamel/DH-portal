@@ -10,7 +10,12 @@ import {
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { logCreation } from '@/lib/activity-logger';
-import { getUserBranchFilter } from '@/lib/branch-filter';
+import {
+  getUserBranchFilter,
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+  resolveDefaultBranchForUser,
+} from '@/lib/branch-filter';
 import { startDefaultCadenceForStage } from '@/lib/cadence/start-default-cadence';
 
 export async function GET(request: NextRequest) {
@@ -131,9 +136,13 @@ export async function GET(request: NextRequest) {
         .or('archived.is.null,archived.eq.false');
     }
 
-    // Apply branch filter: explicit branchId param OR user restriction
+    // Branch filter: when an explicit branchId is selected, show that
+    // branch's records PLUS unassigned (null) records — null-branch
+    // records are always visible regardless of the picked filter so users
+    // can spot/claim mis-routed leads. When no explicit branchId, fall
+    // back to the user-restriction filter (user's branches + null).
     if (branchId) {
-      query = query.eq('branch_id', branchId);
+      query = query.or(`branch_id.is.null,branch_id.eq.${branchId}`);
     } else {
       const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
       if (branchFilter) query = query.or(branchFilter);
@@ -377,11 +386,38 @@ export async function POST(request: NextRequest) {
       branchId,
       routeStopId,
       techDiscussed,
+      propertyType: _propertyType,
     } = body;
+
+    // Validate optional property_type
+    const propertyType: 'residential' | 'commercial' | null =
+      _propertyType === 'residential' || _propertyType === 'commercial'
+        ? _propertyType
+        : null;
 
     // Mutable assignment variables — may be updated by auto-assignment logic below
     let assignedTo: string | null | undefined = _assignedTo;
     const leadStatus: string | null | undefined = _leadStatus;
+
+    // Field-source rules:
+    //   - 'inspector' submissions are owned by the inspector themselves
+    //     (they're at the address and will work the lead).
+    //   - 'technician' submissions: TechRoutes upsells stay with the
+    //     submitting tech (client sends assignedTo); TechRoutes new-leads
+    //     come in unassigned and get routed to an inspector by the
+    //     auto_assign_quote_lead trigger via zip_code_groups + property_type.
+    //     Whatever the client sends, force assignedTo to user.id when set so
+    //     a tech can't assign to another user.
+    //   - 'technician' and 'inspector' both happen physically at the
+    //     customer's address, so allow geocoding when the ZIP fast-path
+    //     misses (e.g., polygon-only service area coverage).
+    if (leadSource === 'inspector') {
+      assignedTo = user.id;
+    } else if (leadSource === 'technician') {
+      assignedTo = assignedTo ? user.id : null;
+    }
+    const allowGeocode =
+      leadSource === 'technician' || leadSource === 'inspector';
 
     const normalizedLeadNotes = typeof notes === 'string' ? notes.trim() : '';
     const normalizedMapPlotData = (() => {
@@ -570,6 +606,7 @@ export async function POST(request: NextRequest) {
             city: city || '',
             state: state || '',
             zip_code: zip || '', // DB uses zip_code, not zip
+            ...(propertyType ? { address_type: propertyType } : {}),
           },
         ])
         .select('id')
@@ -593,6 +630,86 @@ export async function POST(request: NextRequest) {
           // Continue with lead creation even if linking fails
         }
       }
+    }
+
+    // Fall back to the customer's existing primary service_address when the
+    // caller did not pass address fields (typical for techleads new-lead
+    // against an existing customer). Has to happen before the leads INSERT so
+    // the auto_assign_quote_lead trigger can resolve a ZIP from the linked
+    // address — running this after the insert (as a post-update) is too late.
+    if (!serviceAddressId && customerId) {
+      const { data: existingPrimary, error: existingPrimaryErr } = await supabase
+        .from('customer_service_addresses')
+        .select('service_address_id, is_primary_address, created_at')
+        .eq('customer_id', customerId)
+        .order('is_primary_address', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (existingPrimaryErr) {
+        console.error('[leads POST] primary service_address lookup failed:', existingPrimaryErr);
+      }
+
+      if (existingPrimary?.service_address_id) {
+        serviceAddressId = existingPrimary.service_address_id;
+      }
+    }
+
+    // Branch resolution order:
+    //   1. Explicit branchId in body (caller override).
+    //   2. service_address-aware resolver (cache -> ZIP -> coords-validate).
+    //      skipGeocode: don't add Google API latency to a user submission.
+    //   3. Customer ZIP fast-path when no service_address.
+    //   4. Assignee's default branch when assignedTo is set.
+    //   5. Submitter's default branch as final fallback.
+    let resolvedBranchId: string | null = branchId ?? null;
+
+    // Step 2: service-address aware (uses + populates the address-level cache).
+    // Field flows ('technician', 'inspector') happen at the customer's
+    // address — allow geocoding fallback so polygon/radius service areas
+    // also match. Desk flows skip the Google call.
+    if (!resolvedBranchId && serviceAddressId) {
+      resolvedBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        companyId,
+        serviceAddressId,
+        { skipGeocode: !allowGeocode }
+      );
+    }
+
+    // Step 3: ZIP fast-path against customer ZIP when no service_address
+    if (!resolvedBranchId && !serviceAddressId) {
+      let candidateZip: string | null = (typeof zip === 'string' ? zip.trim() : '') || null;
+      if (!candidateZip && customerId) {
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('zip_code')
+          .eq('id', customerId)
+          .maybeSingle();
+        candidateZip = cust?.zip_code?.trim() || null;
+      }
+      if (candidateZip) {
+        resolvedBranchId = await resolveBranchIdByZip(supabase, companyId, candidateZip);
+      }
+    }
+
+    // Step 4: assignee's default branch
+    if (!resolvedBranchId && assignedTo) {
+      resolvedBranchId = await resolveDefaultBranchForUser(
+        supabase,
+        assignedTo,
+        companyId
+      );
+    }
+
+    // Step 5: submitter's default branch
+    if (!resolvedBranchId) {
+      resolvedBranchId = await resolveDefaultBranchForUser(
+        supabase,
+        user.id,
+        companyId
+      );
     }
 
     // Create lead
@@ -621,9 +738,10 @@ export async function POST(request: NextRequest) {
           estimated_value: estimatedValue,
           assigned_to: assignedTo || null,
           submitted_by: submittedBy,
-          branch_id: branchId ?? null,
+          branch_id: resolvedBranchId,
           tech_discussed:
             leadSource === 'technician' ? !!techDiscussed : null,
+          property_type: propertyType,
           created_at: new Date().toISOString(),
         },
       ])
@@ -736,34 +854,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Auto-link service address to quote if customer has one and lead doesn't
-    if (!serviceAddressId && customerId) {
-      try {
-        const { data: customerAddress } = await supabase
-          .from('customer_service_addresses')
-          .select('service_address_id')
-          .eq('customer_id', customerId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single();
-
-        if (customerAddress?.service_address_id) {
-          // Update lead with service address
-          await supabase
-            .from('leads')
-            .update({ service_address_id: customerAddress.service_address_id })
-            .eq('id', newLead.id);
-
-          // Update auto-created quote with service address
-          await supabase
-            .from('quotes')
-            .update({ service_address_id: customerAddress.service_address_id })
-            .eq('lead_id', newLead.id);
-        }
-      } catch (error) {
-        console.error('Error auto-linking service address:', error);
-        // Don't fail the request if this fails
-      }
+    // Mirror the lead's service_address_id onto its auto-created quote so the
+    // quote stays in sync with whatever address the lead resolved to (either
+    // a freshly-created one or the customer's existing primary).
+    if (serviceAddressId) {
+      await supabase
+        .from('quotes')
+        .update({ service_address_id: serviceAddressId })
+        .eq('lead_id', newLead.id);
     }
 
     // Send lead creation notification (non-blocking)

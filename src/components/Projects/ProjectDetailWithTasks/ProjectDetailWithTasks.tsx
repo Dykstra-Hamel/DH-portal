@@ -1030,12 +1030,28 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
             <ArrowLeft size={16} />
           </button>
         ),
-        description: `
-          <div style="display: flex; gap: 12px;">
-            <div style="height: 16px; width: 180px; background: var(--gray-200, #e5e7eb); border-radius: 4px; animation: pulse 1.5s ease-in-out infinite;"></div>
-            <div style="height: 16px; width: 120px; background: var(--gray-200, #e5e7eb); border-radius: 4px; animation: pulse 1.5s ease-in-out infinite;"></div>
+        description: (
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <div
+              style={{
+                height: '16px',
+                width: '180px',
+                background: 'var(--gray-200, #e5e7eb)',
+                borderRadius: '4px',
+                animation: 'pulse 1.5s ease-in-out infinite',
+              }}
+            />
+            <div
+              style={{
+                height: '16px',
+                width: '120px',
+                background: 'var(--gray-200, #e5e7eb)',
+                borderRadius: '4px',
+                animation: 'pulse 1.5s ease-in-out infinite',
+              }}
+            />
           </div>
-        `,
+        ),
         customActions: (
           <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div style={{
@@ -1104,7 +1120,16 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
           <ArrowLeft size={16} />
         </button>
       ),
-      description: `<span style="margin-right: 12px; color: ${dueDateColor};">Due Date: ${formatHeaderDate(project.due_date)} ${daysText}</span><span class="${headerStyles.updatedText}">Updated: ${formatHeaderDate(project.updated_at)}</span>`,
+      description: (
+        <>
+          <span style={{ marginRight: '12px', color: dueDateColor }}>
+            Due Date: {formatHeaderDate(project.due_date)} {daysText}
+          </span>
+          <span className={headerStyles.updatedText}>
+            Updated: {formatHeaderDate(project.updated_at)}
+          </span>
+        </>
+      ),
       customActions: (
         <>
           <div className={headerStyles.controlGroup} ref={headerStatusRef}>

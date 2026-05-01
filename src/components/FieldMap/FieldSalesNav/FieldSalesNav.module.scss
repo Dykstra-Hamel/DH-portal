@@ -50,6 +50,20 @@
   color: var(--blue-500);
 }
 
+.navItemDisabled {
+  cursor: not-allowed;
+  pointer-events: none;
+  opacity: 0.4;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+
+  &:hover {
+    color: var(--gray-400);
+  }
+}
+
 .label {
   font-size: 11px;
   font-family: var(--font-default);
@@ -75,19 +89,32 @@
   padding: 0;
 }
 
+.newItemDisabled {
+  cursor: not-allowed;
+  pointer-events: none;
+
+  .newBtn {
+    background: var(--gray-300);
+    box-shadow: none;
+    color: var(--gray-100);
+  }
+
+  .newLabel {
+    color: var(--gray-300);
+  }
+}
+
 .newBtn {
   width: 52px;
   height: 52px;
   border-radius: 14px;
-  background: var(--blue-500);
+  background: var(--blue-600);
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
   box-shadow: 0 4px 12px rgba(0, 117, 222, 0.4);
-  transition:
-    transform 0.1s ease,
-    background 0.15s ease;
+  transition: all 0.15s ease;
 
   &:active {
     transform: scale(0.95);

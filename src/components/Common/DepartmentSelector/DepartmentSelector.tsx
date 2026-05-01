@@ -3,6 +3,7 @@
 import React from 'react';
 import {
   Department,
+  DepartmentType,
   DEPARTMENT_CONFIG,
   getDepartmentLabel,
   getDepartmentColor,
@@ -10,6 +11,12 @@ import {
   validateDepartments
 } from '@/types/user';
 import styles from './DepartmentSelector.module.scss';
+
+const PROPERTY_TYPE_OPTIONS: { value: DepartmentType; label: string }[] = [
+  { value: 'residential', label: 'Residential' },
+  { value: 'commercial', label: 'Commercial' },
+  { value: 'both', label: 'Both' },
+];
 
 interface DepartmentSelectorProps {
   selectedDepartments: Department[];
@@ -19,6 +26,10 @@ interface DepartmentSelectorProps {
   showLabels?: boolean;
   layout?: 'vertical' | 'horizontal';
   size?: 'small' | 'medium' | 'large';
+  departmentTypes?: Partial<Record<Department, DepartmentType | null>>;
+  onDepartmentTypeChange?: (department: Department, type: DepartmentType) => void;
+  propertyTypeEnabled?: { technician: boolean; inspector: boolean };
+  departmentTypeErrors?: Partial<Record<Department, string>>;
 }
 
 export function DepartmentSelector({
@@ -28,7 +39,11 @@ export function DepartmentSelector({
   error,
   showLabels = true,
   layout = 'vertical',
-  size = 'medium'
+  size = 'medium',
+  departmentTypes,
+  onDepartmentTypeChange,
+  propertyTypeEnabled,
+  departmentTypeErrors,
 }: DepartmentSelectorProps) {
   const handleDepartmentToggle = (department: Department) => {
     if (disabled) return;
@@ -42,6 +57,13 @@ export function DepartmentSelector({
 
   const validation = validateDepartments(selectedDepartments);
 
+  const requiresPropertyType = (department: Department): boolean => {
+    if (!propertyTypeEnabled) return false;
+    if (department === 'technician') return Boolean(propertyTypeEnabled.technician);
+    if (department === 'inspector') return Boolean(propertyTypeEnabled.inspector);
+    return false;
+  };
+
   return (
     <div className={`${styles.container} ${styles[layout]} ${styles[size]}`}>
       <div className={styles.departmentGrid}>
@@ -49,43 +71,84 @@ export function DepartmentSelector({
           const department = key as Department;
           const isSelected = selectedDepartments.includes(department);
 
+          const showPropertyType = isSelected && requiresPropertyType(department);
+          const selectedPropertyType = departmentTypes?.[department] ?? null;
+          const propertyTypeError = departmentTypeErrors?.[department];
+
           return (
-            <label
-              key={department}
-              className={`${styles.departmentOption} ${isSelected ? styles.selected : ''} ${disabled ? styles.disabled : ''}`}
-            >
-              <input
-                type="checkbox"
-                checked={isSelected}
-                onChange={() => handleDepartmentToggle(department)}
-                disabled={disabled}
-                className={styles.checkbox}
-              />
+            <div key={department} className={styles.departmentOptionWrapper}>
+              <label
+                className={`${styles.departmentOption} ${isSelected ? styles.selected : ''} ${disabled ? styles.disabled : ''}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => handleDepartmentToggle(department)}
+                  disabled={disabled}
+                  className={styles.checkbox}
+                />
 
-              <div className={styles.departmentContent}>
-                <div
-                  className={styles.departmentIcon}
-                  style={{
-                    backgroundColor: isSelected ? getDepartmentColor(department) : '#f3f4f6'
-                  }}
-                >
-                  <span className={styles.icon}>
-                    {getDepartmentIcon(department)}
-                  </span>
-                </div>
-
-                {showLabels && (
-                  <div className={styles.departmentInfo}>
-                    <div className={styles.departmentLabel}>
-                      {getDepartmentLabel(department)}
-                    </div>
-                    <div className={styles.departmentDescription}>
-                      {config.description}
-                    </div>
+                <div className={styles.departmentContent}>
+                  <div
+                    className={styles.departmentIcon}
+                    style={{
+                      backgroundColor: isSelected ? getDepartmentColor(department) : '#f3f4f6'
+                    }}
+                  >
+                    <span className={styles.icon}>
+                      {getDepartmentIcon(department)}
+                    </span>
                   </div>
-                )}
-              </div>
-            </label>
+
+                  {showLabels && (
+                    <div className={styles.departmentInfo}>
+                      <div className={styles.departmentLabel}>
+                        {getDepartmentLabel(department)}
+                      </div>
+                      <div className={styles.departmentDescription}>
+                        {config.description}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </label>
+
+              {showPropertyType && (
+                <div className={styles.propertyTypeRow}>
+                  <span className={styles.propertyTypeLabel}>Property type:</span>
+                  <div
+                    role="radiogroup"
+                    aria-label={`${getDepartmentLabel(department)} property type`}
+                    className={styles.propertyTypeOptions}
+                  >
+                    {PROPERTY_TYPE_OPTIONS.map((option) => {
+                      const checked = selectedPropertyType === option.value;
+                      return (
+                        <label
+                          key={option.value}
+                          className={`${styles.propertyTypeOption} ${checked ? styles.propertyTypeSelected : ''} ${disabled ? styles.disabled : ''}`}
+                        >
+                          <input
+                            type="radio"
+                            name={`${department}-property-type`}
+                            value={option.value}
+                            checked={checked}
+                            disabled={disabled}
+                            onChange={() =>
+                              onDepartmentTypeChange?.(department, option.value)
+                            }
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  {propertyTypeError && (
+                    <div className={styles.propertyTypeError}>{propertyTypeError}</div>
+                  )}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

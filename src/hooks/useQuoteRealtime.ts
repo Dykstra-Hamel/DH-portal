@@ -19,6 +19,7 @@ interface UseQuoteRealtimeOptions {
 interface UseQuoteRealtimeReturn {
   quote: Quote | null;
   isUpdating: boolean;
+  isLoading: boolean;
   broadcastUpdate: (quote: Quote) => Promise<void>;
 }
 
@@ -35,37 +36,35 @@ export function useQuoteRealtime({
 }: UseQuoteRealtimeOptions): UseQuoteRealtimeReturn {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Callback to handle incoming quote updates
-  const handleQuoteUpdate = useCallback(
-    (payload: QuoteUpdatePayload) => {
-      console.log('Received quote update:', payload);
+  // Stash the latest onQuoteUpdate in a ref so the channel subscription
+  // doesn't tear down/rebuild every time the parent passes a new inline fn.
+  const onQuoteUpdateRef = useRef(onQuoteUpdate);
+  useEffect(() => {
+    onQuoteUpdateRef.current = onQuoteUpdate;
+  });
 
-      // Show updating indicator briefly
-      setIsUpdating(true);
+  // Stable across renders — does not depend on onQuoteUpdate identity.
+  const handleQuoteUpdate = useCallback((payload: QuoteUpdatePayload) => {
+    console.log('Received quote update:', payload);
 
-      // Clear any existing timeout
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
+    setIsUpdating(true);
 
-      // Update quote state
-      setQuote(payload.quote);
+    if (updateTimeoutRef.current) {
+      clearTimeout(updateTimeoutRef.current);
+    }
 
-      // Call external callback if provided
-      if (onQuoteUpdate) {
-        onQuoteUpdate(payload.quote);
-      }
+    setQuote(payload.quote);
 
-      // Hide updating indicator after 500ms
-      updateTimeoutRef.current = setTimeout(() => {
-        setIsUpdating(false);
-      }, 500);
-    },
-    [onQuoteUpdate]
-  );
+    onQuoteUpdateRef.current?.(payload.quote);
+
+    updateTimeoutRef.current = setTimeout(() => {
+      setIsUpdating(false);
+    }, 500);
+  }, []);
 
   // Function to broadcast quote update
   const broadcastUpdate = useCallback(
@@ -95,8 +94,11 @@ export function useQuoteRealtime({
   useEffect(() => {
     if (!enabled || !leadId) {
       setQuote(null);
+      setIsLoading(false);
       return;
     }
+
+    setIsLoading(true);
 
     const fetchInitialQuote = async () => {
       try {
@@ -111,6 +113,8 @@ export function useQuoteRealtime({
       } catch (error) {
         console.error('Error fetching initial quote:', error);
         setQuote(null);
+      } finally {
+        setIsLoading(false);
       }
     };
 
@@ -146,6 +150,7 @@ export function useQuoteRealtime({
   return {
     quote,
     isUpdating,
+    isLoading,
     broadcastUpdate,
   };
 }

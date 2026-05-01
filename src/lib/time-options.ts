@@ -11,10 +11,13 @@ export const DEFAULT_TIME_OPTIONS: TimeOption[] = [
   { value: 'anytime',   label: 'Anytime',               enabled: true },
 ];
 
-export function parseTimeOptions(raw: string | null | undefined): TimeOption[] {
+export function parseTimeOptions(raw: string | TimeOption[] | null | undefined): TimeOption[] {
   if (!raw) return DEFAULT_TIME_OPTIONS;
+  if (Array.isArray(raw)) {
+    return raw.length > 0 ? (raw as TimeOption[]) : DEFAULT_TIME_OPTIONS;
+  }
   try {
-    const parsed = JSON.parse(raw);
+    const parsed = JSON.parse(raw as string);
     if (Array.isArray(parsed) && parsed.length > 0) return parsed;
   } catch {}
   return DEFAULT_TIME_OPTIONS;

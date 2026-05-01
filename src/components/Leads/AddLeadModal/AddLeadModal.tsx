@@ -113,12 +113,16 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
     setSelectedCustomer(customer);
   };
 
-  // Default to current user when modal opens
+  // Default to the current user every time the modal opens. Resets prior
+  // session's pick (e.g., 'sales_team') so the assignee always starts as
+  // self unless the user changes it.
   useEffect(() => {
-    if (isOpen && user?.id && !selectedAssignee) {
+    if (isOpen && user?.id) {
       setSelectedAssignee(user.id);
+    } else if (!isOpen) {
+      setSelectedAssignee('');
     }
-  }, [isOpen, user?.id, selectedAssignee]);
+  }, [isOpen, user?.id]);
 
   // Close assignment dropdown when clicking outside
   useEffect(() => {

@@ -1,0 +1,35 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.loadingState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 64px 16px;
+  color: var(--gray-500);
+  font-size: 14px;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 2px solid var(--gray-200);
+  border-top-color: var(--blue-500);
+  animation: leadQuoteBuilderSpin 0.8s linear infinite;
+  flex-shrink: 0;
+}
+
+.loadingText {
+  font-weight: 500;
+}
+
+@keyframes leadQuoteBuilderSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

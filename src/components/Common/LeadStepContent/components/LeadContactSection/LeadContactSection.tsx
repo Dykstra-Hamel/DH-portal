@@ -142,6 +142,7 @@ export function LeadContactSection({
   const { users: assignableUsers, loading: loadingUsers } = useAssignableUsers({
     companyId: lead.company_id,
     departmentType: 'sales',
+    branchId: lead.branch_id ?? null,
     enabled: isNewUnassigned,
   });
 

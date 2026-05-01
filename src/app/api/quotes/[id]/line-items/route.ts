@@ -111,7 +111,7 @@ export async function POST(
       })
       .eq('id', quoteId);
 
-    return NextResponse.json({ success: true, lineItemId: newId });
+    return NextResponse.json({ success: true, id: newId, lineItemId: newId });
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }

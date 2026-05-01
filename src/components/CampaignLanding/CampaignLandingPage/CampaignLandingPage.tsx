@@ -259,12 +259,25 @@ export default function CampaignLandingPage({
         language: navigator.language,
       };
 
+      const dayNames = [
+        'sunday',
+        'monday',
+        'tuesday',
+        'wednesday',
+        'thursday',
+        'friday',
+        'saturday',
+      ];
+      const preferredDayOfWeek = data?.startDate
+        ? dayNames[data.startDate.getDay()]
+        : null;
+
       const response = await fetch(`/api/campaigns/${campaign.campaign_id}/redeem`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           customerId: customer.id,
-          requested_date: data?.startDate?.toISOString(),
+          requested_date: preferredDayOfWeek,
           requested_time: data?.serviceTime || null,
           phone_number: data?.phoneNumber || customer.phone_number,
           selected_addon_ids: data?.selectedAddonIds || [],

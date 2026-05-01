@@ -225,7 +225,7 @@ function StepMapPlot({
   // Fetch company-configured pest options to populate the dynamic picker
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/pest-options/${encodeURIComponent(companyId)}`)
+    fetch(`/api/pest-options/${encodeURIComponent(companyId)}?context=fieldmap`)
       .then(r => r.json())
       .then(data => {
         if (data.success && Array.isArray(data.data)) {
@@ -1243,7 +1243,15 @@ function StepMapPlot({
       stampLongPressRef.current = null;
     }
 
-    // Arm drag only after a hold — short taps will trigger onClick instead
+    // Mouse/pen: arm drag immediately so click-and-drag works without a hold.
+    // A click without movement still fires onClick (dragMovedRef stays false).
+    // Touch: require a brief hold so casual taps during map panning don't drag.
+    if (event.pointerType === 'mouse' || event.pointerType === 'pen') {
+      stampDragArmedRef.current = true;
+      setDraggingStampId(stampId);
+      return;
+    }
+
     const timerId = setTimeout(() => {
       stampDragArmedRef.current = true;
       stampLongPressRef.current = null;
@@ -2191,7 +2199,7 @@ function StepMapPlot({
                     : null;
                 const selectedSegmentLabel = selectedSegment ? `${Math.round(selectedSegment.feet)} ft` : '';
                 const selectedSegmentBubbleWidth = selectedSegmentLabel
-                  ? Math.max(50, selectedSegmentLabel.length * 8 + 18)
+                  ? Math.max(34, selectedSegmentLabel.length * 6.5 + 10)
                   : 0;
                 const W = canvasSize.width;
                 const H = canvasSize.height;
@@ -2350,7 +2358,7 @@ function StepMapPlot({
                     {canRenderDimensions && outline.isClosed && (outline.type === 'house' || outline.type === 'garage' || outline.type === 'yard') &&
                       getOutlineSegmentDimensions(outline).map((seg, i) => {
                         const label = `${Math.round(seg.feet)} ft`;
-                        const bubbleW = Math.max(46, label.length * 8 + 18);
+                        const bubbleW = Math.max(32, label.length * 6.5 + 10);
                         return (
                           <g
                             key={`dim-${outline.id}-${i}`}
@@ -2360,11 +2368,11 @@ function StepMapPlot({
                           >
                             <rect
                               x={-bubbleW / 2}
-                              y={-11}
+                              y={-9}
                               width={bubbleW}
-                              height={22}
-                              rx="9"
-                              ry="9"
+                              height={18}
+                              rx="7"
+                              ry="7"
                               className={styles.mapDimensionBubble}
                             />
                             <text
@@ -2411,11 +2419,11 @@ function StepMapPlot({
                         >
                           <rect
                             x={-selectedSegmentBubbleWidth / 2}
-                            y={-11}
+                            y={-9}
                             width={selectedSegmentBubbleWidth}
-                            height={22}
-                            rx="9"
-                            ry="9"
+                            height={18}
+                            rx="7"
+                            ry="7"
                             className={styles.mapDimensionBubble}
                           />
                           <text
@@ -2820,7 +2828,11 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const handleRoWheel = (e: React.WheelEvent<HTMLDivElement>) => {
     e.preventDefault();
     setRoAnimating(false);
-    const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    // Scale by actual deltaY so trackpads (many small events) don't compound
+    // wildly and mouse wheels (large per-click delta) stay tame. Clamp to
+    // keep a single oversized event from jumping multiple zoom levels.
+    const clampedDelta = Math.max(-50, Math.min(50, e.deltaY));
+    const factor = Math.exp(-clampedDelta * 0.005);
     setRoTransform(prev => {
       const newScale = Math.max(1, Math.min(8, prev.scale * factor));
       const maxTx = previewSize.width * (newScale - 1) / 2;
@@ -2867,7 +2879,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
 
   useEffect(() => {
     if (!companyId) return;
-    fetch(`/api/pest-options/${companyId}`)
+    fetch(`/api/pest-options/${companyId}?context=fieldmap`)
       .then(r => r.ok ? r.json() : null)
       .then((d: { data?: Array<{ id: string; icon_svg?: string | null }> } | null) => {
         if (!d?.data) return;

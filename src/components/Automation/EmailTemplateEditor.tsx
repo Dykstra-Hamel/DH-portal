@@ -43,6 +43,7 @@ const TEMPLATE_TYPES = [
   { value: 'follow_up', label: 'Follow-up Email' },
   { value: 'nurture', label: 'Nurture Email' },
   { value: 'quote', label: 'Quote Email' },
+  { value: 'service_confirmation', label: 'Service Confirmation Email' },
   { value: 'reminder', label: 'Reminder Email' },
   { value: 'custom', label: 'Custom Email' },
 ];

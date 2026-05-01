@@ -484,12 +484,790 @@
       font-style: italic;
     }
 
+    .propertyTypeSection {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid #e5e7eb;
+
+      .leadAssignmentHeader {
+        margin-bottom: 8px;
+      }
+    }
+
     .leadAssignmentFooter {
       display: flex;
       justify-content: flex-end;
       padding-top: 16px;
       border-top: 1px solid #f3f4f6;
       margin-top: 20px;
+    }
+  }
+
+  .safetyChecklistCard {
+    background: white;
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+
+    .safetyChecklistHeader {
+      margin-bottom: 20px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #171717;
+        margin: 0 0 6px 0;
+      }
+
+      p {
+        font-size: 14px;
+        color: #6A7282;
+        margin: 0;
+      }
+    }
+
+    .toggleRow {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 0;
+      border-top: 1px solid #f3f4f6;
+
+      .toggleLabel {
+        font-size: 14px;
+        font-weight: 500;
+        color: #171717;
+      }
+    }
+
+    .toggleSwitch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      background-color: #d1d5db;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      flex-shrink: 0;
+      padding: 0;
+
+      &.toggleOn {
+        background-color: #005194;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      .toggleThumb {
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 18px;
+        height: 18px;
+        background-color: white;
+        border-radius: 50%;
+        transition: transform 0.2s;
+        pointer-events: none;
+      }
+
+      &.toggleOn .toggleThumb {
+        transform: translateX(20px);
+      }
+    }
+
+    .questionsSection {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+
+      .questionsSectionTitle {
+        font-size: 12px;
+        font-weight: 700;
+        color: #005194;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin: 0 0 12px 0;
+      }
+
+      .questionsEmpty {
+        font-size: 14px;
+        color: #9ca3af;
+        margin: 0 0 16px 0;
+        font-style: italic;
+      }
+
+      .questionsList {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 16px;
+
+        // Wrapper for each root question + its conditional zone
+        .questionGroupWrapper {
+          display: flex;
+          flex-direction: column;
+          gap: 0;
+        }
+
+        .dropInsertLine {
+          height: 3px;
+          background: #005194;
+          border-radius: 2px;
+          margin: 2px 0;
+        }
+
+        .questionGroup {
+          display: flex;
+          flex-direction: column;
+          border: 1px solid #e5e7eb;
+          border-radius: 6px;
+          overflow: hidden;
+          background: white;
+          transition: opacity 0.15s;
+
+          &.dragging {
+            opacity: 0.4;
+          }
+        }
+
+        .dragHandle {
+          color: #d1d5db;
+          cursor: grab;
+          flex-shrink: 0;
+
+          &:active {
+            cursor: grabbing;
+          }
+        }
+
+        .questionRow {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 12px;
+          background: #f9fafb;
+
+          .questionRowIndex {
+            font-size: 13px;
+            font-weight: 600;
+            color: #005194;
+            flex-shrink: 0;
+          }
+
+          .questionRowLabel {
+            flex: 1;
+            font-size: 14px;
+            color: #171717;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .questionRowActions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+          }
+        }
+
+        // The "If Yes, ask:" conditional zone inside a Yes/No question
+        .conditionalZone {
+          border-top: 1px dashed #bfdbfe;
+          background: #f0f7ff;
+          padding: 8px 12px 10px 28px;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+          transition: background-color 0.15s, border-color 0.15s;
+          min-height: 52px;
+
+          &.conditionalZoneActive {
+            background: #dbeafe;
+            border-top-color: #005194;
+          }
+
+          .conditionalZoneLabel {
+            font-size: 11px;
+            font-weight: 700;
+            color: #1d4ed8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0 0 2px 0;
+          }
+
+          .conditionalDropHint {
+            font-size: 12px;
+            color: #93c5fd;
+            margin: 0;
+            font-style: italic;
+          }
+        }
+
+        // Each nested question row inside the conditional zone
+        .nestedQuestionRow {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 6px 8px;
+          background: white;
+          border: 1px solid #bfdbfe;
+          border-radius: 4px;
+          transition: opacity 0.15s;
+
+          &.dragging {
+            opacity: 0.4;
+          }
+
+          .nestedQuestionText {
+            flex: 1;
+            font-size: 13px;
+            color: #1e3a5f;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .nestedQuestionActions {
+            display: flex;
+            gap: 2px;
+            flex-shrink: 0;
+          }
+        }
+
+        // Inline edit row for nested questions
+        .nestedEditRow {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          flex: 1;
+          flex-wrap: wrap;
+
+          .addQuestionInput {
+            flex: 1;
+            min-width: 140px;
+          }
+        }
+
+        .questionEditRow {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          padding: 14px 16px;
+          background: #f0f7ff;
+
+          .questionEditFields {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+          }
+
+          .questionEditTop {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+
+            .addQuestionSelect {
+              align-self: flex-start;
+              width: auto;
+              min-width: 130px;
+            }
+          }
+
+          .questionEditActions {
+            display: flex;
+            gap: 8px;
+            justify-content: flex-end;
+          }
+
+          .editSaveBtn {
+            padding: 6px 16px;
+            background: #005194;
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s;
+
+            &:hover:not(:disabled) {
+              background: #003d73;
+            }
+
+            &:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          }
+
+          .editCancelBtn {
+            padding: 6px 16px;
+            background: white;
+            color: #6a7282;
+            border: 1px solid #d1d5db;
+            border-radius: var(--border-radius);
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+
+            &:hover {
+              background: #f3f4f6;
+              color: #171717;
+            }
+          }
+        }
+      }
+
+      .questionTypeBadge {
+        font-size: 11px;
+        font-weight: 500;
+        padding: 2px 8px;
+        background: #eff6ff;
+        color: #005194;
+        border-radius: 10px;
+        flex-shrink: 0;
+      }
+
+      .addQuestionFormWrapper {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .numberConfig {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+
+        label {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          font-size: 0.8rem;
+          color: #6A7282;
+
+          input {
+            width: 72px;
+            padding: 4px 6px;
+            border: 1px solid #d1d5db;
+            border-radius: var(--border-radius);
+            font-size: 0.9rem;
+            color: #171717;
+            transition: border-color 0.2s;
+
+            &:focus {
+              outline: none;
+              border-color: #005194;
+            }
+
+            &:disabled {
+              background: #f3f4f6;
+              cursor: not-allowed;
+            }
+          }
+        }
+      }
+
+      .dropdownOptionsEditor {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 8px;
+      }
+
+      .dropdownOptionsList {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-height: 28px;
+      }
+
+      .dropdownOptionsEmpty {
+        font-size: 12px;
+        color: #9ca3af;
+        font-style: italic;
+        align-self: center;
+      }
+
+      .dropdownOptionChip {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 3px 8px;
+        background: #eff6ff;
+        border: 1px solid #bfdbfe;
+        border-radius: 12px;
+        font-size: 13px;
+        color: #1d4ed8;
+
+        button {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #93c5fd;
+          font-size: 14px;
+          padding: 0;
+          line-height: 1;
+          &:hover { color: #1d4ed8; }
+        }
+      }
+
+      .dropdownOptionAdd {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+
+        input {
+          flex: 1;
+          max-width: 220px;
+          padding: 5px 8px;
+          border: 1px solid #d1d5db;
+          border-radius: var(--border-radius);
+          font-size: 13px;
+          color: #171717;
+          &:focus { outline: none; border-color: #005194; }
+          &:disabled { background: #f3f4f6; cursor: not-allowed; }
+        }
+
+        button {
+          padding: 5px 12px;
+          background: #005194;
+          color: white;
+          border: none;
+          border-radius: var(--border-radius);
+          font-size: 13px;
+          cursor: pointer;
+          &:disabled { opacity: 0.5; cursor: not-allowed; }
+          &:hover:not(:disabled) { background: #003d73; }
+        }
+      }
+
+      .addQuestionForm {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+
+        .addQuestionInput {
+          flex: 1;
+          padding: 8px 12px;
+          border: 1px solid #d1d5db;
+          border-radius: var(--border-radius);
+          font-size: 14px;
+          color: #171717;
+          transition: border-color 0.2s;
+
+          &::placeholder {
+            color: #9ca3af;
+          }
+
+          &:focus {
+            outline: none;
+            border-color: #005194;
+          }
+
+          &:disabled {
+            background: #f3f4f6;
+            cursor: not-allowed;
+          }
+        }
+
+        .addQuestionSelect {
+          padding: 8px 10px;
+          border: 1px solid #d1d5db;
+          border-radius: var(--border-radius);
+          font-size: 14px;
+          color: #171717;
+          background: white;
+          cursor: pointer;
+          transition: border-color 0.2s;
+          flex-shrink: 0;
+
+          &:focus {
+            outline: none;
+            border-color: #005194;
+          }
+
+          &:disabled {
+            background: #f3f4f6;
+            cursor: not-allowed;
+          }
+        }
+
+        .addQuestionBtn {
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          padding: 8px 14px;
+          background: #005194;
+          color: white;
+          border: none;
+          border-radius: var(--border-radius);
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          flex-shrink: 0;
+
+          &:hover:not(:disabled) {
+            background: #003d73;
+          }
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+        }
+      }
+    }
+
+    .safetyChecklistFooter {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+      margin-top: 20px;
+    }
+
+    .salesChecklistListHeader {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+      gap: 16px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #171717;
+        margin: 0 0 6px 0;
+      }
+
+      p {
+        font-size: 14px;
+        color: #6A7282;
+        margin: 0;
+      }
+
+      .saveButton {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+    }
+
+    .checklistRows {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .checklistRow {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 12px 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      background: #f9fafb;
+
+      .checklistRowInfo {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+
+        .checklistRowName {
+          font-size: 14px;
+          font-weight: 600;
+          color: #171717;
+        }
+
+        .checklistRowMeta {
+          font-size: 12px;
+          color: #6A7282;
+        }
+      }
+
+      .checklistRowActions {
+        display: flex;
+        gap: 4px;
+        flex-shrink: 0;
+      }
+    }
+
+    .activeBadge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      background: #dcfce7;
+      color: #16a34a;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .inactiveBadge {
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 8px;
+      background: #f3f4f6;
+      color: #6A7282;
+      border-radius: 10px;
+      flex-shrink: 0;
+    }
+
+    .editPanelHeader {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+
+      h3 {
+        font-size: 18px;
+        font-weight: 600;
+        color: #171717;
+        margin: 0;
+      }
+    }
+
+    .backButton {
+      background: none;
+      border: none;
+      font-size: 14px;
+      color: #005194;
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      text-decoration: underline;
+
+      &:hover {
+        color: #003d73;
+      }
+    }
+
+    .editPanelForm {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .editPanelField {
+      margin-bottom: 16px;
+
+      input[type="text"] {
+        width: 100%;
+        padding: 8px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: var(--border-radius);
+        font-size: 14px;
+        color: #171717;
+        box-sizing: border-box;
+        transition: border-color 0.2s;
+
+        &::placeholder {
+          color: #9ca3af;
+        }
+
+        &:focus {
+          outline: none;
+          border-color: #005194;
+        }
+
+        &:disabled {
+          background: #f3f4f6;
+          cursor: not-allowed;
+        }
+      }
+    }
+
+    .editPanelLabel {
+      display: block;
+      font-size: 14px;
+      font-weight: 500;
+      color: #171717;
+      margin-bottom: 6px;
+    }
+
+    .editPanelSection {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #f3f4f6;
+    }
+
+    .planCheckboxList {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .planCheckboxLabel {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: #171717;
+      cursor: pointer;
+
+      input[type="checkbox"] {
+        cursor: pointer;
+        accent-color: #005194;
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .editCancelBtn {
+      padding: 10px 20px;
+      background: white;
+      color: #6a7282;
+      border: 1px solid #d1d5db;
+      border-radius: var(--border-radius);
+      font-size: 14px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover:not(:disabled) {
+        background: #f3f4f6;
+        color: #171717;
+      }
+
+      &:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+    }
+
+    .iconButton {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      cursor: pointer;
+      color: #6a7282;
+      transition: all 0.2s;
+
+      &:hover:not(:disabled) {
+        background: #f3f4f6;
+        color: #171717;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
     }
   }
 

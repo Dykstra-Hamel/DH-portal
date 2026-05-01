@@ -1,9 +1,8 @@
-import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Lead } from '@/types/lead';
 import { TimeOption, DEFAULT_TIME_OPTIONS, parseTimeOptions } from '@/lib/time-options';
 import { CompleteTaskModal } from '@/components/Common/CompleteTaskModal/CompleteTaskModal';
 import { useUser } from '@/hooks/useUser';
-import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { useQuoteRealtime } from '@/hooks/useQuoteRealtime';
 import { authenticatedFetch, adminAPI } from '@/lib/api-client';
 import {
@@ -22,12 +21,18 @@ import {
 } from '@/lib/realtime/automation-execution-channel';
 import { ActiveSectionProvider } from '@/contexts/ActiveSectionContext';
 import styles from './LeadStepContent.module.scss';
-import { LeadDetailsSidebar } from './components/LeadDetailsSidebar/LeadDetailsSidebar';
-import { LeadSchedulingSection } from './components/LeadSchedulingSection';
+import { ChevronRight, ExternalLink, Mail } from 'lucide-react';
 import { LeadContactSection } from './components/LeadContactSection';
-import { LeadQuoteSection } from './components/LeadQuoteSection';
+import { LeadPestPicker, type SelectedPest } from './components/LeadPestPicker';
+import { LeadQuoteBuilder } from './components/LeadQuoteBuilder';
 import { LeadQuickInfo } from '@/components/Common/LeadQuickInfo/LeadQuickInfo';
 import { CommunicationLog } from '@/components/Common/CommunicationLog/CommunicationLog';
+import { LeadTabs, LeadTabDef } from './components/LeadTabs';
+import { LeadCallFormInfo } from './components/LeadCallFormInfo';
+import { LeadContactDetailsPanel } from './components/LeadContactDetailsPanel';
+import { LeadActivityNotesPanel } from './components/LeadActivityNotesPanel';
+import { ScheduleServiceModal } from '@/components/Common/ScheduleServiceModal/ScheduleServiceModal';
+import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
 
 interface LeadStepContentProps {
   lead: Lead;
@@ -40,6 +45,7 @@ interface LeadStepContentProps {
   onFinalizeSale?: (handler: () => void) => void;
   onNotInterested?: () => void;
   onReadyToSchedule?: () => void;
+  onLineItemsSaved?: (itemCount: number) => void;
 }
 
 export function LeadStepContent({
@@ -53,12 +59,15 @@ export function LeadStepContent({
   onFinalizeSale,
   onNotInterested,
   onReadyToSchedule,
+  onLineItemsSaved,
 }: LeadStepContentProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
-  const [isSidebarExpanded, setIsSidebarExpanded] = useState(false);
   const [isCommunicationExpanded, setIsCommunicationExpanded] = useState(true);
-  const [shouldExpandActivity, setShouldExpandActivity] = useState(false);
   const [showCompleteTaskModal, setShowCompleteTaskModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<
+    'summary' | 'quote' | 'graph' | 'contact' | 'activity'
+  >(lead.lead_status === 'new' ? 'summary' : 'quote');
   const [pendingActivity, setPendingActivity] = useState<{
     type: string;
     notes: string;
@@ -79,23 +88,29 @@ export function LeadStepContent({
   const customerChannelRef = useRef<any>(null);
   const taskChannelRef = useRef<any>(null);
   const executionChannelRef = useRef<any>(null);
-  const serviceLocationCardRef = useRef<HTMLDivElement | null>(null);
   const quotingSectionRef = useRef<HTMLDivElement>(null);
-  const schedulingSectionRef = useRef<HTMLDivElement>(null);
   const leadRef = useRef(lead);
   const onLeadUpdateRef = useRef(onLeadUpdate);
 
-  const [homeSize, setHomeSize] = useState<number | ''>('');
-  const [yardSize, setYardSize] = useState<number | ''>('');
-  const [linearFeet, setLinearFeet] = useState<number | ''>('');
-  const [selectedHomeSizeOption, setSelectedHomeSizeOption] =
-    useState<string>('');
-  const [selectedYardSizeOption, setSelectedYardSizeOption] =
-    useState<string>('');
+  // Quote step state — SelectedPest[] from the picker feeds the quote builder
+  const [pestSelections, setPestSelections] = useState<SelectedPest[]>([]);
+  const [isPestModalOpen, setIsPestModalOpen] = useState(false);
+  const [isQuoteTabReady, setIsQuoteTabReady] = useState(false);
 
-  // Quote step state
-  const [selectedPests, setSelectedPests] = useState<string[]>([]);
-  const [additionalPests, setAdditionalPests] = useState<string[]>([]);
+  const handlePestSelectionChange = useCallback(
+    (selected: SelectedPest[]) => {
+      setPestSelections(selected);
+    },
+    []
+  );
+
+  const handleQuoteTabReady = useCallback(() => setIsQuoteTabReady(true), []);
+
+  const handleQuoteRealtimeUpdate = useCallback(() => {
+    if (onLeadUpdateRef.current) {
+      onLeadUpdateRef.current();
+    }
+  }, []);
 
   const [preferredDate, setPreferredDate] = useState<string>('');
   const [preferredTime, setPreferredTime] = useState<string>('');
@@ -117,31 +132,19 @@ export function LeadStepContent({
   const [selectedCadenceId, setSelectedCadenceId] = useState<string | null>(
     null
   );
-  const [shouldExpandServiceLocation, setShouldExpandServiceLocation] =
-    useState(false);
-
   const { user } = useUser();
-  const { settings: pricingSettings } = usePricingSettings(lead.company_id);
 
   // Real-time quote updates - single source of truth
   // Enable for all statuses to allow quote building at any stage
   const {
     quote,
-    isUpdating: isQuoteUpdating,
+    isLoading: isQuoteLoading,
     broadcastUpdate: broadcastQuoteUpdate,
   } = useQuoteRealtime({
     leadId: lead.id,
     userId: user?.id,
     enabled: true,
-    onQuoteUpdate: updatedQuote => {
-      console.log(
-        '[LeadStepContent] Quote updated via realtime, refreshing lead data'
-      );
-      // When quote updates, refresh the lead to get updated service_address
-      if (onLeadUpdate) {
-        onLeadUpdate();
-      }
-    },
+    onQuoteUpdate: handleQuoteRealtimeUpdate,
   });
 
   // Set default assignee to current user when component loads
@@ -391,45 +394,6 @@ export function LeadStepContent({
   }, [lead.requested_date, lead.requested_time]);
   // Removed preferredDate and preferredTime from dependencies to prevent re-run loops
 
-  const handlePreferredDateChange = useCallback(
-    async (date: string) => {
-      setPreferredDate(date);
-      try {
-        await adminAPI.updateLead(lead.id, { requested_date: date });
-        onShowToast?.('Preferred date saved', 'success');
-      } catch (error) {
-        console.error('Error saving preferred date:', error);
-        onShowToast?.('Failed to save preferred date', 'error');
-      }
-    },
-    [lead.id, onShowToast]
-  );
-
-  const handlePreferredTimeChange = useCallback(
-    async (time: string) => {
-      setPreferredTime(time);
-      try {
-        await adminAPI.updateLead(lead.id, { requested_time: time });
-        onShowToast?.('Preferred time saved', 'success');
-      } catch (error) {
-        console.error('Error saving preferred time:', error);
-        onShowToast?.('Failed to save preferred time', 'error');
-      }
-    },
-    [lead.id, onShowToast]
-  );
-
-  const currentUser = user
-    ? {
-        id: user.id,
-        name:
-          `${user.user_metadata?.first_name || ''} ${user.user_metadata?.last_name || ''}`.trim() ||
-          user.email?.split('@')[0] ||
-          'Unknown',
-        avatar: user.user_metadata?.avatar_url,
-      }
-    : null;
-
   const handleCompleteTaskConfirm = async () => {
     if (!pendingActivity) return;
 
@@ -624,9 +588,6 @@ export function LeadStepContent({
       }
 
       onShowToast?.('Sale finalized successfully!', 'success');
-
-      // Redirect to All Leads page
-      window.location.href = '/tickets/leads';
     } catch (error) {
       console.error('Failed to finalize sale:', error);
       onShowToast?.('Failed to finalize sale', 'error');
@@ -634,47 +595,43 @@ export function LeadStepContent({
     }
   };
 
-  // Handle finalizing sale directly without modal
-  const handleFinalizeSale = () => {
-    handleConfirmAndFinalize(scheduledDate, scheduledTime, confirmationNote);
-  };
-
   // Handle emailing quote to customer - triggers parent modal
   const handleEmailQuote = () => {
     onEmailQuote?.();
   };
 
-  // Handle edit address button click - expand sidebar and scroll to Service Location card
-  const handleEditAddress = () => {
-    // Expand sidebar if collapsed
-    setIsSidebarExpanded(true);
-
-    // Set flag to expand Service Location card
-    setShouldExpandServiceLocation(true);
-
-    // Scroll to Service Location card after a brief delay to allow sidebar expansion
-    setTimeout(() => {
-      serviceLocationCardRef.current?.scrollIntoView({
-        behavior: 'smooth',
-        block: 'center',
-      });
-
-      // Reset the flag after expansion
-      setTimeout(() => {
-        setShouldExpandServiceLocation(false);
-      }, 500);
-    }, 300);
-  };
-
-  // Collapse communication panel and scroll to scheduling section
-  const handleScheduleService = useCallback(() => {
-    setIsCommunicationExpanded(false);
-    setTimeout(() => {
-      schedulingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 50);
+  // Open the Schedule Service modal (from top section button or Quote tab Ready to Schedule)
+  const handleOpenScheduleModal = useCallback(() => {
+    setShowScheduleModal(true);
   }, []);
 
-  // Collapse communication panel and scroll to quoting section, logging a "connected" activity
+  // Expose the modal trigger to the parent so its header "Finalize Sale" path can open it too
+  useEffect(() => {
+    onFinalizeSale?.(handleOpenScheduleModal);
+  }, [onFinalizeSale, handleOpenScheduleModal]);
+
+  const handleScheduleModalConfirm = useCallback(async () => {
+    await handleConfirmAndFinalize(scheduledDate, scheduledTime, confirmationNote);
+    try {
+      await authenticatedFetch(`/api/leads/${lead.id}/service-confirmation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId: quote?.id ?? null }),
+      });
+    } catch (emailErr) {
+      console.error('Service confirmation email failed:', emailErr);
+      onShowToast?.(
+        'Sale finalized, but confirmation email failed to send',
+        'error'
+      );
+    }
+    setShowScheduleModal(false);
+    window.location.href = '/tickets/leads';
+  // handleConfirmAndFinalize is declared above and is stable within this render
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scheduledDate, scheduledTime, confirmationNote, lead.id, quote?.id]);
+
+  // Switch to the Quote tab, log a "connected" activity, and scroll into view
   const handleStartQuoting = useCallback(async () => {
     try {
       await authenticatedFetch(`/api/leads/${lead.id}/activities`, {
@@ -690,21 +647,84 @@ export function LeadStepContent({
       console.error('Error logging activity before quoting:', err);
     }
     setIsCommunicationExpanded(false);
+    setActiveTab('quote');
     setTimeout(() => {
       quotingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 50);
   }, [activityNotes, lead.id, nextTask?.action_type]);
 
-  const isReadyToSchedule = lead.lead_status === 'scheduling';
+  const tabs: ReadonlyArray<LeadTabDef<'summary' | 'quote' | 'graph' | 'contact' | 'activity'>> = [
+    { id: 'summary', label: 'Summary' },
+    { id: 'quote', label: 'Quote' },
+    { id: 'graph', label: 'Graphing Tool' },
+    { id: 'contact', label: 'Contact Details' },
+    { id: 'activity', label: 'Record History' },
+  ];
 
-  // Render content based on lead status
+  const renderQuoteTab = () => (
+    <div ref={quotingSectionRef} className={styles.quoteTabWrapper}>
+      <LeadPestPicker
+        lead={lead}
+        isOpen={isPestModalOpen}
+        onClose={() => setIsPestModalOpen(false)}
+        onSelectionChange={handlePestSelectionChange}
+        onShowToast={onShowToast}
+      />
+      <LeadQuoteBuilder
+        lead={lead}
+        selectedPests={pestSelections}
+        quote={quote}
+        isQuoteLoading={isQuoteLoading}
+        broadcastQuoteUpdate={broadcastQuoteUpdate}
+        onShowToast={onShowToast}
+        onEditPests={() => setIsPestModalOpen(true)}
+        onReady={handleQuoteTabReady}
+        onLineItemsSaved={onLineItemsSaved}
+      />
+      {isQuoteTabReady && (
+      <div className={styles.quoteTabActions}>
+        <button
+          type="button"
+          onClick={handleEmailQuote}
+          className={styles.emailQuoteButton}
+        >
+          <Mail size={18} />
+          Email Quote
+        </button>
+        {lead.company?.slug && quote?.id && quote?.quote_token && (
+          <a
+            href={`/${lead.company.slug}/quote/${quote.id}?token=${quote.quote_token}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={styles.viewQuoteLink}
+          >
+            <ExternalLink size={16} />
+            View Quote
+          </a>
+        )}
+        <button
+          type="button"
+          onClick={onNotInterested || (() => {})}
+          className={styles.notInterestedButton}
+        >
+          Not Interested
+        </button>
+        <button
+          type="button"
+          onClick={handleOpenScheduleModal}
+          className={styles.readyToScheduleButton}
+        >
+          Ready to Schedule
+          <ChevronRight size={16} />
+        </button>
+      </div>
+      )}
+    </div>
+  );
+
   const renderContent = () => {
-    // Show all sections simultaneously instead of conditionally based on status
     return (
-      <div
-        className={styles.leadContentWrapper}
-        data-sidebar-expanded={isSidebarExpanded}
-      >
+      <div className={styles.leadContentWrapper}>
         {/* Full-width communication section */}
         <LeadQuickInfo
           lead={lead}
@@ -735,10 +755,10 @@ export function LeadStepContent({
                     loadCadenceData();
                   }}
                   onStartQuoting={handleStartQuoting}
-                  onScheduleService={handleScheduleService}
+                  onScheduleService={handleOpenScheduleModal}
                   onShowToast={onShowToast}
                   onLeadUpdate={onLeadUpdate}
-                  isSidebarExpanded={isSidebarExpanded}
+                  isSidebarExpanded={false}
                 />
               </div>
               <div className={styles.communicationRight}>
@@ -751,140 +771,40 @@ export function LeadStepContent({
           </div>
         )}
 
-        {/* Two-column ticket details */}
-        <div className={styles.ticketDetailsSection}>
-          <div className={styles.contentLeft}>
-            {isReadyToSchedule ? (
-              <>
-                <div ref={schedulingSectionRef}>
-                  <LeadSchedulingSection
-                    lead={lead}
-                    quote={quote}
-                    isQuoteUpdating={isQuoteUpdating}
-                    scheduledDate={scheduledDate}
-                    scheduledTime={scheduledTime}
-                    confirmationNote={confirmationNote}
-                    customerComment={quote?.customer_comments}
-                    onScheduledDateChange={setScheduledDate}
-                    onScheduledTimeChange={setScheduledTime}
-                    onConfirmationNoteChange={setConfirmationNote}
-                    onFinalizeSale={handleFinalizeSale}
-                    onEmailQuote={handleEmailQuote}
-                    isSidebarExpanded={isSidebarExpanded}
-                    timeOptions={timeOptions}
-                  />
-                </div>
-                <div ref={quotingSectionRef}>
-                  <LeadQuoteSection
-                    lead={lead}
-                    quote={quote}
-                    isQuoteUpdating={isQuoteUpdating}
-                    pricingSettings={pricingSettings}
-                    selectedPests={selectedPests}
-                    additionalPests={additionalPests}
-                    homeSize={homeSize}
-                    yardSize={yardSize}
-                    linearFeet={linearFeet}
-                    selectedHomeSizeOption={selectedHomeSizeOption}
-                    selectedYardSizeOption={selectedYardSizeOption}
-                    preferredDate={preferredDate}
-                    preferredTime={preferredTime}
-                    onEmailQuote={handleEmailQuote}
-                    onEditAddress={handleEditAddress}
-                    onShowToast={onShowToast}
-                    onRequestUndo={onRequestUndo}
-                    onLeadFieldUpdate={onLeadFieldUpdate}
-                    broadcastQuoteUpdate={broadcastQuoteUpdate}
-                    setSelectedPests={setSelectedPests}
-                    setAdditionalPests={setAdditionalPests}
-                    setHomeSize={setHomeSize}
-                    setYardSize={setYardSize}
-                    setLinearFeet={setLinearFeet}
-                    setSelectedHomeSizeOption={setSelectedHomeSizeOption}
-                    setSelectedYardSizeOption={setSelectedYardSizeOption}
-                    onPreferredDateChange={handlePreferredDateChange}
-                    onPreferredTimeChange={handlePreferredTimeChange}
-                    onNotInterested={onNotInterested || (() => {})}
-                    onReadyToSchedule={onReadyToSchedule || (() => {})}
-                    isSidebarExpanded={isSidebarExpanded}
-                    startExpanded={false}
-                    forceCollapse={true}
-                    timeOptions={timeOptions}
-                  />
-                </div>
-              </>
-            ) : (
-              <>
-                <div ref={quotingSectionRef}>
-                  <LeadQuoteSection
-                    lead={lead}
-                    quote={quote}
-                    isQuoteUpdating={isQuoteUpdating}
-                    pricingSettings={pricingSettings}
-                    selectedPests={selectedPests}
-                    additionalPests={additionalPests}
-                    homeSize={homeSize}
-                    yardSize={yardSize}
-                    linearFeet={linearFeet}
-                    selectedHomeSizeOption={selectedHomeSizeOption}
-                    selectedYardSizeOption={selectedYardSizeOption}
-                    preferredDate={preferredDate}
-                    preferredTime={preferredTime}
-                    onEmailQuote={handleEmailQuote}
-                    onEditAddress={handleEditAddress}
-                    onShowToast={onShowToast}
-                    onRequestUndo={onRequestUndo}
-                    onLeadFieldUpdate={onLeadFieldUpdate}
-                    broadcastQuoteUpdate={broadcastQuoteUpdate}
-                    setSelectedPests={setSelectedPests}
-                    setAdditionalPests={setAdditionalPests}
-                    setHomeSize={setHomeSize}
-                    setYardSize={setYardSize}
-                    setLinearFeet={setLinearFeet}
-                    setSelectedHomeSizeOption={setSelectedHomeSizeOption}
-                    setSelectedYardSizeOption={setSelectedYardSizeOption}
-                    onPreferredDateChange={handlePreferredDateChange}
-                    onPreferredTimeChange={handlePreferredTimeChange}
-                    onNotInterested={onNotInterested || (() => {})}
-                    onReadyToSchedule={onReadyToSchedule || (() => {})}
-                    isSidebarExpanded={isSidebarExpanded}
-                    timeOptions={timeOptions}
-                  />
-                </div>
-                <div ref={schedulingSectionRef}>
-                  <LeadSchedulingSection
-                    lead={lead}
-                    quote={quote}
-                    isQuoteUpdating={isQuoteUpdating}
-                    scheduledDate={scheduledDate}
-                    scheduledTime={scheduledTime}
-                    confirmationNote={confirmationNote}
-                    customerComment={quote?.customer_comments}
-                    onScheduledDateChange={setScheduledDate}
-                    onScheduledTimeChange={setScheduledTime}
-                    onConfirmationNoteChange={setConfirmationNote}
-                    onFinalizeSale={handleFinalizeSale}
-                    onEmailQuote={handleEmailQuote}
-                    isSidebarExpanded={isSidebarExpanded}
-                    timeOptions={timeOptions}
-                  />
-                </div>
-              </>
+        <LeadTabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} />
+
+        <div className={styles.tabPanel}>
+          <div className={styles.tabPanelInner}>
+            {activeTab === 'summary' && <LeadCallFormInfo lead={lead} quote={quote} />}
+            {activeTab === 'quote' && renderQuoteTab()}
+            {activeTab === 'graph' && (
+              lead.map_plot_data ? (
+                <MapPlotCanvas
+                  mapPlotData={lead.map_plot_data}
+                  onChange={() => {}}
+                  isReadOnly
+                  companyId={lead.company_id}
+                />
+              ) : (
+                <div className={styles.noMapState}>No map available for this lead.</div>
+              )
+            )}
+            {activeTab === 'contact' && (
+              <LeadContactDetailsPanel
+                lead={lead}
+                onShowToast={onShowToast}
+                onRequestUndo={onRequestUndo}
+                onLeadUpdate={onLeadUpdate}
+                customerChannelRef={customerChannelRef}
+              />
+            )}
+            {activeTab === 'activity' && (
+              <LeadActivityNotesPanel
+                lead={lead}
+                customerComment={quote?.customer_comments}
+              />
             )}
           </div>
-          <LeadDetailsSidebar
-            lead={lead}
-            onShowToast={onShowToast}
-            onLeadUpdate={onLeadUpdate}
-            onRequestUndo={onRequestUndo}
-            customerChannelRef={customerChannelRef}
-            isSidebarExpanded={isSidebarExpanded}
-            setIsSidebarExpanded={setIsSidebarExpanded}
-            serviceLocationCardRef={serviceLocationCardRef}
-            shouldExpandServiceLocation={shouldExpandServiceLocation}
-            shouldExpandActivity={shouldExpandActivity}
-            customerComment={quote?.customer_comments}
-          />
         </div>
       </div>
     );
@@ -910,6 +830,18 @@ export function LeadStepContent({
         onConfirm={handleCompleteTaskConfirm}
         onSkip={handleCompleteTaskSkip}
         onCancel={handleCompleteTaskCancel}
+      />
+      <ScheduleServiceModal
+        isOpen={showScheduleModal}
+        lead={lead}
+        quote={quote}
+        scheduledDate={scheduledDate}
+        scheduledTime={scheduledTime}
+        timeOptions={timeOptions}
+        onScheduledDateChange={setScheduledDate}
+        onScheduledTimeChange={setScheduledTime}
+        onConfirm={handleScheduleModalConfirm}
+        onClose={() => setShowScheduleModal(false)}
       />
     </ActiveSectionProvider>
   );

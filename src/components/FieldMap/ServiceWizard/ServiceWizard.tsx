@@ -20,11 +20,12 @@ import {
 } from './steps/MapPlotStep';
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem, AvailableDiscount } from './steps/QuoteBuildStep';
+import { SalesChecklistStep } from './steps/SalesChecklistStep';
+import type { SalesChecklist, ChecklistResponseGroup } from './steps/SalesChecklistStep';
 import { ReviewStep } from './steps/ReviewStep';
 import styles from './ServiceWizard.module.scss';
 
-const STEP_LABELS = ['Address', 'Photos', 'Map', 'Quote', 'Review'];
-const STEP_COUNT = STEP_LABELS.length;
+const BASE_STEP_LABELS = ['Address', 'Photos', 'Map', 'Quote', 'Review'];
 
 interface ServiceWizardProps {
   stopId?: string;
@@ -41,6 +42,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [routeStopId, setRouteStopId] = useState<string | null>(
     routeStopIdParam
   );
+  const [serviceAddressId, setServiceAddressId] = useState<string | null>(null);
   const leadIdParam = searchParams.get('leadId') ?? null;
 
   const [clientInfo, setClientInfo] = useState({
@@ -55,6 +57,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     'Inspector';
   const inspectorAvatarUrl = getAvatarUrl() ?? null;
   const inspectorTitle = profile?.title ?? null;
+  const inspectorPhone = profile?.phone ?? null;
+  const inspectorEmail = profile?.contact_email ?? null;
+  const companyPhone = selectedCompany?.phone ?? null;
   const companyName = selectedCompany?.name ?? 'DH Portal';
 
   const initialStep = stopId || leadIdParam ? 1 : 0;
@@ -72,6 +77,20 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   >(undefined);
 
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
+  const [salesChecklists, setSalesChecklists] = useState<SalesChecklist[]>([]);
+  const [checklistResponseGroups, setChecklistResponseGroups] = useState<ChecklistResponseGroup[]>([]);
+
+  // Fetch sales checklists
+  useEffect(() => {
+    const companyId = selectedCompany?.id;
+    if (!companyId) return;
+    fetch(`/api/companies/${companyId}/sales-checklists`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: SalesChecklist[] | null) => {
+        setSalesChecklists(data ?? []);
+      })
+      .catch(() => {});
+  }, [selectedCompany?.id]);
 
   // Fetch brand primary color for stamp icons
   useEffect(() => {
@@ -100,7 +119,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   // Fetch pest icon map as soon as company is known
   useEffect(() => {
     if (!selectedCompany?.id) return;
-    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}`)
+    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}?context=fieldmap`)
       .then(r => r.json())
       .then(
         (data: {
@@ -139,6 +158,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         const fullName =
           [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
           '';
+
+        if (typeof lead.service_address_id === 'string' && lead.service_address_id) {
+          setServiceAddressId(lead.service_address_id);
+        }
         const addressFromCustomer = [
           customer.address,
           customer.city,
@@ -250,6 +273,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (quoteData?.data?.applied_discount) {
           setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
         }
+        if (
+          Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+          quoteData.data.safety_checklist_responses.length > 0 &&
+          Array.isArray(quoteData.data.safety_checklist_responses[0]?.responses)
+        ) {
+          setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
+        }
         setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
         setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
         setLeadId(directLeadId);
@@ -276,6 +306,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
         if (!routeStopIdParam && stopData.routeStopId) {
           setRouteStopId(stopData.routeStopId);
+        }
+
+        if (stopData.serviceAddressId) {
+          setServiceAddressId(stopData.serviceAddressId);
         }
 
         setClientInfo({
@@ -357,25 +391,36 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
             setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
 
+            if (
+              Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+              quoteData.data.safety_checklist_responses.length > 0
+            ) {
+              setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
+            }
+
             if (lineItems.length > 0) {
               setQuoteLineItems(
                 lineItems.map((item: any): QuoteLineItem => {
+                  const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+                    item.service_plan_id && !item.parent_line_item_id
+                      ? 'plan'
+                      : item.service_plan_id && item.parent_line_item_id
+                        ? 'specialty-line'
+                        : item.addon_service_id
+                          ? 'addon'
+                          : item.bundle_plan_id
+                            ? 'bundle'
+                            : item.product_id
+                              ? 'product'
+                              : item.parent_line_item_id
+                                ? 'specialty-line'
+                                : undefined;
                   const catalogItemId =
-                    item.service_plan_id ??
+                    (item.service_plan_id && !item.parent_line_item_id ? item.service_plan_id : null) ??
                     item.addon_service_id ??
                     item.bundle_plan_id ??
                     item.product_id ??
                     undefined;
-                  const catalogItemKind: QuoteLineItem['catalogItemKind'] =
-                    item.service_plan_id
-                      ? 'plan'
-                      : item.addon_service_id
-                        ? 'addon'
-                        : item.bundle_plan_id
-                          ? 'bundle'
-                          : item.product_id
-                            ? 'product'
-                            : undefined;
                   return {
                     id: item.id,
                     type: catalogItemId ? 'plan-addon' : 'custom',
@@ -442,6 +487,29 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   const [showExitConfirm, setShowExitConfirm] = useState(false);
 
+  // Checklists whose linked plans match the current quote
+  const applicableChecklists = useMemo(() => {
+    const planIds = new Set(
+      quoteLineItems
+        .filter(li => li.catalogItemKind === 'plan' && li.catalogItemId)
+        .map(li => li.catalogItemId as string)
+    );
+    return salesChecklists.filter(
+      cl => cl.isActive && cl.linkedPlanIds.some(id => planIds.has(id))
+    );
+  }, [salesChecklists, quoteLineItems]);
+
+  // Dynamic step configuration based on sales checklists
+  const hasChecklists = applicableChecklists.length > 0;
+  const STEP_LABELS = hasChecklists
+    ? ['Address', 'Photos', 'Map', 'Quote', 'Sales Checklist', 'Review']
+    : BASE_STEP_LABELS;
+  const STEP_COUNT = STEP_LABELS.length;
+  // Step indices
+  const QUOTE_STEP = 3;
+  const CHECKLIST_STEP = hasChecklists ? 4 : -1;
+  const REVIEW_STEP = hasChecklists ? 5 : 4;
+
   const selectedAddressFromComponents =
     mapPlotData.addressComponents &&
     typeof mapPlotData.addressComponents.formatted_address === 'string'
@@ -486,12 +554,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           clientEmail: clientInfo.email,
           clientPhone: clientInfo.phone,
           address: inspectionAddress,
+          addressComponents: mapPlotData.addressComponents ?? undefined,
           pestTypes,
           mapPlotData,
           companyId: selectedCompany?.id ?? '',
           leadId,
           stopId: stopId ?? undefined,
           routeStopId: routeStopId ?? undefined,
+          serviceAddressId: serviceAddressId ?? undefined,
         }),
       }).catch(() => {});
     }, 1500);
@@ -549,9 +619,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         return mapPlotData.isViewSet;
       case 3:
         return true;
-      case 4:
-        return true;
       default:
+        if (currentStep === CHECKLIST_STEP) {
+          // Allow advance if no applicable checklists (will be auto-skipped in handleNext)
+          if (applicableChecklists.length === 0) return true;
+          const allResponses = checklistResponseGroups.flatMap(g => Array.isArray(g.responses) ? g.responses : []);
+          return allResponses.length > 0 && allResponses.every(r => r != null && r.answer !== '');
+        }
+        if (currentStep === REVIEW_STEP) return true;
         return false;
     }
   }
@@ -584,12 +659,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             clientEmail: clientInfo.email,
             clientPhone: clientInfo.phone,
             address: inspectionAddress,
+            addressComponents: mapPlotData.addressComponents ?? undefined,
             pestTypes: [],
             mapPlotData,
             companyId: selectedCompany?.id ?? '',
             leadId: leadId ?? undefined,
             stopId: stopId ?? undefined,
             routeStopId: routeStopId ?? undefined,
+            serviceAddressId: serviceAddressId ?? undefined,
           }),
         });
         const data = await res.json();
@@ -617,12 +694,14 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             clientEmail: clientInfo.email,
             clientPhone: clientInfo.phone,
             address: inspectionAddress,
+            addressComponents: mapPlotData.addressComponents ?? undefined,
             pestTypes,
             mapPlotData,
             companyId: selectedCompany?.id ?? '',
             leadId: leadId ?? undefined,
             stopId: stopId ?? undefined,
             routeStopId: routeStopId ?? undefined,
+            serviceAddressId: serviceAddressId ?? undefined,
           }),
         });
         const data = await res.json();
@@ -658,7 +737,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       setIsSavingStep(false);
 
       if (returnToReviewAfterMapEdit) {
-        advanceStep(4);
+        advanceStep(REVIEW_STEP);
         setReturnToReviewAfterMapEdit(false);
         return;
       }
@@ -667,7 +746,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     }
 
     // After Quote step — save quote (creates/updates quote + line items)
-    if (currentStep === 3) {
+    if (currentStep === QUOTE_STEP) {
       if (!leadId) {
         setStepSaveError('No lead found. Please go back to the photos step.');
         return;
@@ -711,12 +790,50 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       return;
     }
 
+    // After Checklist step — save checklist responses to the quote (or skip if none applicable)
+    if (currentStep === CHECKLIST_STEP) {
+      if (applicableChecklists.length === 0) {
+        advanceStep(REVIEW_STEP);
+        return;
+      }
+      if (quoteId) {
+        setIsSavingStep(true);
+        try {
+          await fetch('/api/field-map/save-quote', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              leadId,
+              companyId: selectedCompany?.id ?? '',
+              quoteLineItems,
+              discountTarget: appliedDiscount?.applies_to_price ?? 'initial',
+              discountAmount: appliedDiscount?.discount_value ?? null,
+              discountType:
+                appliedDiscount?.discount_type === 'percentage' ? '%' : '$',
+              discountId: appliedDiscount?.id ?? null,
+              checklistResponses: checklistResponseGroups,
+            }),
+          });
+        } catch {
+          // Non-critical — continue even if save fails
+        } finally {
+          setIsSavingStep(false);
+        }
+      }
+      advanceStep(currentStep + 1);
+      return;
+    }
+
     if (currentStep < STEP_COUNT - 1) advanceStep(currentStep + 1);
+  }
+
+  function handleAddLineItem(item: QuoteLineItem) {
+    setQuoteLineItems(prev => [...prev, item]);
   }
 
   function handleBack() {
     if (currentStep === 2 && returnToReviewAfterMapEdit) {
-      setCurrentStep(4);
+      setCurrentStep(REVIEW_STEP);
       setReturnToReviewAfterMapEdit(false);
       return;
     }
@@ -750,6 +867,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             onClientPhoneChange={v =>
               setClientInfo(prev => ({ ...prev, phone: v }))
             }
+            onServiceAddressIdChange={setServiceAddressId}
             companyId={selectedCompany?.id ?? ''}
           />
         );
@@ -795,34 +913,52 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
             />
           </div>
         );
-      case 4:
-        return (
-          <ReviewStep
-            clientName={clientInfo.name}
-            clientEmail={clientInfo.email}
-            clientPhone={clientInfo.phone}
-            address={inspectionAddress}
-            pestTypes={pestTypes}
-            quoteLineItems={quoteLineItems}
-            notes={notes}
-            mapPlotData={mapPlotData}
-            inspectorName={inspectorName}
-            inspectorAvatarUrl={inspectorAvatarUrl}
-            inspectorTitle={inspectorTitle}
-            companyName={companyName}
-            companyId={selectedCompany?.id ?? ''}
-            leadId={leadId}
-            quoteId={quoteId}
-            pestIconMap={pestIconMap}
-            plottedPests={plottedPests}
-            appliedDiscount={appliedDiscount}
-            quoteSubtotalInitial={quoteSubtotalInitial}
-            quoteTotalInitial={quoteTotalInitial}
-            onBack={handleBack}
-          />
-        );
-      default:
+      default: {
+        if (currentStep === CHECKLIST_STEP) {
+          return (
+            <div className={styles.stepScrollable}>
+              <SalesChecklistStep
+                checklists={applicableChecklists}
+                responseGroups={checklistResponseGroups}
+                onChange={setChecklistResponseGroups}
+              />
+            </div>
+          );
+        }
+        if (currentStep === REVIEW_STEP) {
+          return (
+            <ReviewStep
+              clientName={clientInfo.name}
+              clientEmail={clientInfo.email}
+              clientPhone={clientInfo.phone}
+              address={inspectionAddress}
+              pestTypes={pestTypes}
+              quoteLineItems={quoteLineItems}
+              notes={notes}
+              mapPlotData={mapPlotData}
+              inspectorName={inspectorName}
+              inspectorAvatarUrl={inspectorAvatarUrl}
+              inspectorTitle={inspectorTitle}
+              inspectorPhone={inspectorPhone}
+              inspectorEmail={inspectorEmail}
+              companyPhone={companyPhone}
+              companyName={companyName}
+              companyId={selectedCompany?.id ?? ''}
+              leadId={leadId}
+              quoteId={quoteId}
+              pestIconMap={pestIconMap}
+              plottedPests={plottedPests}
+              appliedDiscount={appliedDiscount}
+              quoteSubtotalInitial={quoteSubtotalInitial}
+              quoteTotalInitial={quoteTotalInitial}
+              checklistResponses={checklistResponseGroups}
+              onBack={handleBack}
+              onAddLineItem={handleAddLineItem}
+            />
+          );
+        }
         return null;
+      }
     }
   }
 
@@ -921,7 +1057,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
               {currentStep === 0 && 'Saving address\u2026'}
               {currentStep === 1 && 'Saving photos\u2026'}
               {currentStep === 2 && 'Saving inspection\u2026'}
-              {currentStep === 3 && 'Saving quote\u2026'}
+              {currentStep === QUOTE_STEP && 'Saving quote\u2026'}
             </p>
           </div>
         ) : (

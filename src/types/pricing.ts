@@ -77,6 +77,17 @@ export interface SizeOption {
   rangeEnd: number | null; // Numeric end of the range (null for "max+")
 }
 
+// Specialty plan service lines (e.g. Bird Exclusion: Bird Spikes per linear foot)
+export interface SpecialtyPlanLine {
+  id: string;
+  plan_id: string;
+  line_name: string;
+  pricing_type: 'per_linear_foot' | 'per_sq_ft' | 'flat' | 'per_hour';
+  price_per_unit: number;
+  minimum_price: number | null;
+  display_order: number;
+}
+
 // Pricing calculation result
 export interface PricingCalculation {
   baseInitialPrice: number;

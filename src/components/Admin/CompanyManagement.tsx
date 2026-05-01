@@ -351,7 +351,7 @@ export default function CompanyManagement({
                 description: 'Which brand color is used as the primary accent on the public quote page',
               },
               requested_time_options: {
-                value: JSON.stringify(updatedData.requested_time_options || DEFAULT_TIME_OPTIONS),
+                value: updatedData.requested_time_options || DEFAULT_TIME_OPTIONS,
                 type: 'json',
                 description: 'Time slot options shown on scheduling forms',
               },
@@ -704,7 +704,7 @@ export default function CompanyManagement({
           )}
           {activeSection === 'pest-management' && <CompanyPestSelector companyId={companyId} />}
           {activeSection === 'service-plans' && (
-            <ServicePlansManager companyId={companyId} />
+            <ServicePlansManager companyId={companyId} companySlug={company?.slug ?? ''} />
           )}
           {activeSection === 'service-areas' && (
             <ServiceAreasManager companyId={companyId} />

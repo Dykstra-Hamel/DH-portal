@@ -1,6 +1,10 @@
 import { inngest } from '../client';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 import type { NormalizedLeadData } from '@/lib/gemini/csv-parser';
 
 export const bulkLeadUploadHandler = inngest.createFunction(
@@ -147,12 +151,30 @@ export const bulkLeadUploadHandler = inngest.createFunction(
             }
           }
 
+          // Resolve branch via cache-aware helper when the row produced
+          // a service_address; otherwise fall back to ZIP-only matching.
+          let bulkBranchId: string | null = null;
+          if (serviceAddressId) {
+            bulkBranchId = await resolveBranchForServiceAddress(
+              supabase,
+              companyId,
+              serviceAddressId
+            );
+          } else if (leadData.zip) {
+            bulkBranchId = await resolveBranchIdByZip(
+              supabase,
+              companyId,
+              leadData.zip
+            );
+          }
+
           // Create lead
           const { data: newLead, error: leadError } = await supabase.from('leads').insert([
             {
               company_id: companyId,
               customer_id: customerId,
               service_address_id: serviceAddressId,
+              branch_id: bulkBranchId,
               lead_type: 'bulk_add',
               lead_source: (leadData.lead_source as any) || 'other',
               lead_status: 'new',

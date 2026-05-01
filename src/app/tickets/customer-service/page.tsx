@@ -8,6 +8,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { AddSupportCaseModal } from '@/components/SupportCases/AddSupportCaseModal/AddSupportCaseModal';
+import { BranchFilterDropdown } from '@/components/Common/BranchFilter/BranchFilterDropdown';
+import { useUser } from '@/hooks/useUser';
 import {
   createSupportCaseChannel,
   subscribeToSupportCaseUpdates,
@@ -19,34 +21,46 @@ export default function CustomerServicePage() {
   const [supportCases, setSupportCases] = useState<SupportCase[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [selectedBranchId, setSelectedBranchId] = useState('');
 
   // Use global company context
   const { selectedCompany, isLoading: companyLoading } = useCompany();
   const { registerPageAction, unregisterPageAction } = usePageActions();
+  const { user } = useUser();
 
-  const fetchSupportCases = useCallback(async (companyId: string) => {
-    if (!companyId) return;
+  const fetchSupportCases = useCallback(
+    async (companyId: string, branchId?: string) => {
+      if (!companyId) return;
 
-    setLoading(true);
-    try {
-      const supportCasesData = await adminAPI.supportCases.list({
-        companyId,
-        includeArchived: false,
-      });
+      setLoading(true);
+      try {
+        const supportCasesData = await adminAPI.supportCases.list({
+          companyId,
+          includeArchived: false,
+          ...(branchId ? { branchId } : {}),
+        });
 
-      setSupportCases(supportCasesData);
-    } catch (error) {
-      console.error('Error fetching support cases:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+        setSupportCases(supportCasesData);
+      } catch (error) {
+        console.error('Error fetching support cases:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
+
+  // Reset branch when company changes; the dropdown re-applies the user's
+  // default branch.
+  useEffect(() => {
+    setSelectedBranchId('');
+  }, [selectedCompany?.id]);
 
   useEffect(() => {
     if (selectedCompany?.id) {
-      fetchSupportCases(selectedCompany.id);
+      fetchSupportCases(selectedCompany.id, selectedBranchId || undefined);
     }
-  }, [selectedCompany?.id, fetchSupportCases]);
+  }, [selectedCompany?.id, selectedBranchId, fetchSupportCases]);
 
   // Register the Add Case button action
   useEffect(() => {
@@ -184,11 +198,21 @@ export default function CustomerServicePage() {
   return (
     <div className={styles.container}>
       {selectedCompany && (
+        <div style={{ padding: '0 0 12px' }}>
+          <BranchFilterDropdown
+            companyId={selectedCompany.id}
+            userId={user?.id}
+            value={selectedBranchId}
+            onChange={setSelectedBranchId}
+          />
+        </div>
+      )}
+      {selectedCompany && (
         <SupportCasesList
           supportCases={supportCases}
           loading={loading}
           onSupportCaseUpdated={() => {
-            fetchSupportCases(selectedCompany.id);
+            fetchSupportCases(selectedCompany.id, selectedBranchId || undefined);
           }}
         />
       )}

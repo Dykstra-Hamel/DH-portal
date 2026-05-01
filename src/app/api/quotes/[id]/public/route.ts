@@ -49,12 +49,14 @@ export async function GET(
             plan_disclaimer,
             plan_name,
             plan_terms,
-            plan_video_url
+            plan_video_url,
+            plan_pest_coverage(pest_id)
           ),
           addon_service:add_on_services(
             addon_description,
             addon_name,
-            addon_terms
+            addon_terms,
+            addon_faqs
           ),
           bundle_plan:bundle_plans(
             bundle_features,
@@ -89,7 +91,9 @@ export async function GET(
           service_type,
           comments,
           requested_date,
-          requested_time
+          requested_time,
+          map_plot_data,
+          assigned_to
         ),
         company:companies(
           id,
@@ -175,7 +179,6 @@ export async function GET(
               .in('id', bundledServicePlanIds);
 
             if (bundledPlans) {
-              // Attach the full plan data (with FAQs) to the bundle
               lineItem.bundle_plan.bundled_plans_with_faqs = bundledPlans;
             }
           }
@@ -183,47 +186,166 @@ export async function GET(
       }
     }
 
-    // Fetch available add-ons eligible for the service plans in this quote
-    const servicePlanIds = (quote.line_items || [])
-      .filter((item: any) => item.service_plan_id && !item.addon_service_id)
-      .map((item: any) => item.service_plan_id);
+    // Transform line items from DB format to QuoteLineItem format with embedded planContent
+    const transformedLineItems = (quote.line_items || []).map((item: any) => {
+      let catalogItemKind: 'plan' | 'addon' | 'bundle' | 'product' | 'specialty-line' | 'custom' = 'custom';
+      let catalogItemId: string | undefined;
 
-    let availableAddons: any[] = [];
-    if (servicePlanIds.length > 0) {
-      // Find addon IDs linked to these specific service plans
-      const { data: eligibilityRows } = await supabase
-        .from('addon_service_plan_eligibility')
-        .select('addon_id')
-        .in('service_plan_id', servicePlanIds);
-
-      const specificAddonIds = eligibilityRows?.map((r: any) => r.addon_id) || [];
-
-      // Fetch all active addons for this company that are eligible
-      let query = supabase
-        .from('add_on_services')
-        .select(
-          'id, addon_name, addon_description, initial_price, recurring_price, billing_frequency, addon_terms, addon_faqs'
-        )
-        .eq('company_id', quote.company_id)
-        .eq('is_active', true)
-        .order('display_order')
-        .order('addon_name');
-
-      if (specificAddonIds.length > 0) {
-        query = query.or(
-          `eligibility_mode.eq.all,id.in.(${specificAddonIds.join(',')})`
-        );
-      } else {
-        query = query.eq('eligibility_mode', 'all');
+      if (item.product_id) {
+        catalogItemKind = 'product';
+        catalogItemId = item.product_id;
+      } else if (item.addon_service_id) {
+        catalogItemKind = 'addon';
+        catalogItemId = item.addon_service_id;
+      } else if (item.bundle_plan_id) {
+        catalogItemKind = 'bundle';
+        catalogItemId = item.bundle_plan_id;
+      } else if (item.service_plan_id && item.parent_line_item_id) {
+        // Specialty-line: inherits parent plan's service_plan_id but has a parent pointer
+        catalogItemKind = 'specialty-line';
+        catalogItemId = item.service_plan_id;
+      } else if (item.parent_line_item_id) {
+        // Fallback: child item with a parent pointer but service_plan_id was not saved.
+        // Mirrors the ServiceWizard.tsx fallback: item.parent_line_item_id ? 'specialty-line'
+        catalogItemKind = 'specialty-line';
+      } else if (item.service_plan_id) {
+        catalogItemKind = 'plan';
+        catalogItemId = item.service_plan_id;
       }
 
-      const { data: addons } = await query;
-      availableAddons = addons || [];
+      let planContent: Record<string, any> | null = null;
+      if (item.service_plan) {
+        planContent = {
+          plan_name: item.service_plan.plan_name,
+          plan_features: item.service_plan.plan_features ?? [],
+          plan_faqs: item.service_plan.plan_faqs ?? [],
+          plan_image_url: item.service_plan.plan_image_url ?? null,
+          plan_video_url: item.service_plan.plan_video_url ?? null,
+          plan_disclaimer: item.service_plan.plan_disclaimer ?? null,
+          plan_terms: item.service_plan.plan_terms ?? null,
+          pest_coverage: (item.service_plan.plan_pest_coverage ?? []).map(
+            (c: any) => ({ pest_id: c.pest_id })
+          ),
+        };
+      } else if (item.addon_service) {
+        planContent = {
+          plan_name: item.addon_service.addon_name,
+          addon_description: item.addon_service.addon_description ?? null,
+          addon_terms: item.addon_service.addon_terms ?? null,
+          addon_faqs: item.addon_service.addon_faqs ?? [],
+        };
+      } else if (item.bundle_plan) {
+        planContent = {
+          plan_name: item.plan_name,
+          bundle_description: item.bundle_plan.bundle_description ?? null,
+          bundle_features: item.bundle_plan.bundle_features ?? [],
+          bundle_image_url: item.bundle_plan.bundle_image_url ?? null,
+          bundled_plans_with_faqs: item.bundle_plan.bundled_plans_with_faqs ?? [],
+        };
+      }
+
+      return {
+        id: item.id,
+        type: 'plan-addon' as const,
+        catalogItemKind,
+        catalogItemId,
+        catalogItemName: item.plan_name,
+        coveredPestIds: [] as string[],
+        coveredPestLabels: [] as string[],
+        initialCost: item.initial_price ?? 0,
+        recurringCost: item.recurring_price ?? 0,
+        frequency: item.billing_frequency ?? 'monthly',
+        isPrimary: item.is_primary ?? true,
+        isSelected: item.is_selected ?? true,
+        isRecommended: item.is_recommended ?? undefined,
+        parentLineItemId: item.parent_line_item_id ?? null,
+        planContent,
+        // Keep service_plan reference for terms modal backward compat
+        service_plan: item.service_plan ?? null,
+        addon_service: item.addon_service ?? null,
+      };
+    });
+
+    // Fetch inspector profile if the lead has an assigned user
+    let inspector: { name: string; title: string | null; avatar_url: string | null; contact_phone: string | null; contact_email: string | null } | null = null;
+    const assignedTo = (quote.lead as any)?.assigned_to;
+    if (assignedTo) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('first_name, last_name, title, uploaded_avatar_url, avatar_url, phone, contact_email')
+        .eq('id', assignedTo)
+        .single();
+      if (profile) {
+        inspector = {
+          name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Inspector',
+          title: profile.title ?? null,
+          avatar_url: profile.uploaded_avatar_url ?? profile.avatar_url ?? null,
+          contact_phone: profile.phone ?? null,
+          contact_email: profile.contact_email ?? null,
+        };
+      }
+    }
+
+    // Fetch featured plans not already in the quote
+    const quotedPlanIds = new Set(
+      (quote.line_items || [])
+        .filter((i: any) => i.service_plan_id && !i.parent_line_item_id)
+        .map((i: any) => i.service_plan_id as string)
+    );
+
+    // Robustly extract company ID — prefer the join object (verified working at line 160)
+    // then fall back to the raw FK column on the quotes row.
+    const companyId: string | undefined =
+      (quote.company as any)?.id ?? (quote as any).company_id;
+
+    if (!companyId) {
+      console.error('[public quote] Could not resolve company_id for quote', id);
+    }
+
+    const { data: featuredPlans, error: featuredPlansError } = companyId
+      ? await supabase
+          .from('service_plans')
+          .select('id, plan_name, billing_frequency, initial_price, recurring_price, plan_description, plan_features, plan_image_url, pricing_unit, price_per_unit, minimum_price, yard_sqft_pricing, home_size_pricing, yard_size_pricing')
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+          .eq('is_featured', true)
+      : { data: [], error: null };
+
+    if (featuredPlansError) {
+      console.error('[public quote] Error fetching featured plans:', featuredPlansError);
+    }
+
+    console.log(`[public quote] companyId=${companyId} featuredPlans count=${featuredPlans?.length ?? 0} filteredQuotedPlanIds=${quotedPlanIds.size}`);
+
+    const UNIT_TO_TYPE: Record<string, string> = {
+      sqft: 'per_sqft',
+      acres: 'per_acre',
+      linear_feet: 'per_linear_foot',
+    };
+
+    const filteredFeaturedPlans = (featuredPlans ?? [])
+      .filter((p: any) => !quotedPlanIds.has(p.id))
+      .map((p: any) => ({
+        ...p,
+        pricing_type: p.pricing_unit ? (UNIT_TO_TYPE[p.pricing_unit] ?? null) : null,
+      }));
+
+    // Fetch company pricing settings so the client can calculate accurate featured plan prices
+    const { data: pricingSettings, error: pricingSettingsError } = companyId
+      ? await supabase
+          .from('company_pricing_settings')
+          .select('*')
+          .eq('company_id', companyId)
+          .single()
+      : { data: null, error: null };
+
+    if (pricingSettingsError && pricingSettingsError.code !== 'PGRST116') {
+      console.error('[public quote] Error fetching pricing settings:', pricingSettingsError);
     }
 
     return NextResponse.json({
       success: true,
-      data: { ...quote, available_addons: availableAddons },
+      data: { ...quote, line_items: transformedLineItems, featured_plans: filteredFeaturedPlans, inspector, pricing_settings: pricingSettings ?? null },
     });
   } catch (error) {
     console.error('Error in public quote GET:', error);

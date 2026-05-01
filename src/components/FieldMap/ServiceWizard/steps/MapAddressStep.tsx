@@ -23,6 +23,7 @@ interface CustomerResult {
   zip?: string | null;
   latitude?: number | null;
   longitude?: number | null;
+  serviceAddressId?: string | null;
 }
 
 interface MapAddressStepProps {
@@ -35,6 +36,7 @@ interface MapAddressStepProps {
   onClientNameChange?: (v: string) => void;
   onClientEmailChange?: (v: string) => void;
   onClientPhoneChange?: (v: string) => void;
+  onServiceAddressIdChange?: (id: string | null) => void;
   companyId?: string;
 }
 
@@ -48,6 +50,7 @@ export function MapAddressStep({
   onClientNameChange,
   onClientEmailChange,
   onClientPhoneChange,
+  onServiceAddressIdChange,
   companyId,
 }: MapAddressStepProps) {
   const [isLocating, setIsLocating] = useState(false);
@@ -133,6 +136,7 @@ export function MapAddressStep({
           }
 
           const street = `${components.street_number ? `${components.street_number} ` : ''}${components.route ?? ''}`.trim();
+          onServiceAddressIdChange?.(null);
           applyAddressSelection(components, street || components.formatted_address);
           setManualMode(false);
         } catch (error: any) {
@@ -223,10 +227,18 @@ export function MapAddressStep({
       if (dbRes.ok) {
         const data = await dbRes.json();
         const results: CustomerResult[] = (data.customers ?? []).map((c: any) => {
-          const street = c.address ?? null;
-          const city = c.city ?? null;
-          const state = c.state ?? null;
-          const zip = c.zip_code ?? null;
+          // The customers/search route returns the primary service_address
+          // nested under primary_service_address[0].service_address. Prefer
+          // those structured fields when present; fall back to the customer's
+          // own address columns otherwise.
+          const psa = Array.isArray(c.primary_service_address)
+            ? c.primary_service_address[0]
+            : null;
+          const sa = psa?.service_address ?? null;
+          const street = sa?.street_address ?? c.address ?? null;
+          const city = sa?.city ?? c.city ?? null;
+          const state = sa?.state ?? c.state ?? null;
+          const zip = sa?.zip_code ?? c.zip_code ?? null;
           const display = [street, city, [state, zip].filter(Boolean).join(' ')]
             .filter(Boolean)
             .join(', ') || null;
@@ -242,6 +254,7 @@ export function MapAddressStep({
             zip,
             latitude: null,
             longitude: null,
+            serviceAddressId: sa?.id ?? null,
           };
         });
         setCustomerResults(results);
@@ -264,6 +277,7 @@ export function MapAddressStep({
     onClientNameChange?.(result.displayName);
     onClientEmailChange?.(result.email ?? '');
     onClientPhoneChange?.(result.phone ?? '');
+    onServiceAddressIdChange?.(result.serviceAddressId ?? null);
     setCustomerQuery(result.displayName);
     setShowResults(false);
     setCustomerAddressError(null);
@@ -391,6 +405,10 @@ export function MapAddressStep({
             }
             onAddressSelect={components => {
               const street = `${components.street_number ? `${components.street_number} ` : ''}${components.route ?? ''}`.trim();
+              // Brand-new address — clear any prior customer service-address
+              // selection so the backend creates/finds a fresh one from these
+              // components.
+              onServiceAddressIdChange?.(null);
               applyAddressSelection(components, street || components.formatted_address || mapPlotData.addressInput);
             }}
             placeholder="Start typing address..."

@@ -54,6 +54,7 @@ import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { AnnouncementsModal } from '@/components/Common/AnnouncementsModal/AnnouncementsModal';
 import ActionsTasksQuickView from '@/components/Common/ActionsTasksQuickView/ActionsTasksQuickView';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
+import { BranchFilterDropdown } from '@/components/Common/BranchFilter/BranchFilterDropdown';
 import { getCustomerDisplayName, getPhoneDisplay } from '@/lib/display-utils';
 import { ChevronRight, Search, Loader2, Truck } from 'lucide-react';
 import { RealtimeChannel } from '@supabase/supabase-js';
@@ -2559,43 +2560,21 @@ function TicketsDashboardContent() {
         </h2>
 
         {/* Branch filter */}
-        {selectedCompany && branches.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 8,
-              marginBottom: 12,
-            }}
-          >
-            <label style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
-              Branch:
-            </label>
-            <select
+        {selectedCompany && (
+          <div style={{ marginBottom: 12 }}>
+            <BranchFilterDropdown
+              companyId={selectedCompany.id}
+              userId={user?.id}
               value={selectedBranchId}
-              onChange={e => {
-                setSelectedBranchId(e.target.value);
-                selectedBranchIdRef.current = e.target.value;
+              onChange={value => {
+                setSelectedBranchId(value);
+                selectedBranchIdRef.current = value;
                 if (selectedCompany?.id) {
                   fetchTickets(selectedCompany.id, { showLoading: true });
                   fetchLeads(selectedCompany.id);
                 }
               }}
-              style={{
-                fontSize: 13,
-                padding: '4px 8px',
-                borderRadius: 6,
-                border: '1px solid #d1d5db',
-                background: '#fff',
-              }}
-            >
-              <option value="">All Branches</option>
-              {branches.map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         )}
 

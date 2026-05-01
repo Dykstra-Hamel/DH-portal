@@ -55,15 +55,27 @@ export async function sendEmailRouted(
 
   const settings = await getEmailProviderSettings(companyId);
 
-  if (
+  const useMailerSend =
     settings.provider === 'mailersend' &&
-    settings.mailersendApiKey &&
-    settings.mailersendFromEmail
-  ) {
+    !!settings.mailersendApiKey &&
+    !!settings.mailersendFromEmail;
+
+  console.log('[email-router] routing', {
+    companyId,
+    provider: settings.provider,
+    useMailerSend,
+    hasMailersendApiKey: !!settings.mailersendApiKey,
+    hasMailersendFromEmail: !!settings.mailersendFromEmail,
+    mailersendFromEmail: settings.mailersendFromEmail,
+    to: params.to,
+    subject: params.subject,
+  });
+
+  if (useMailerSend) {
     return sendEmailViaMailerSend({
       ...params,
-      apiKey: settings.mailersendApiKey,
-      fromOverride: settings.mailersendFromEmail,
+      apiKey: settings.mailersendApiKey!,
+      fromOverride: settings.mailersendFromEmail!,
       fromNameOverride: settings.mailersendFromName || undefined,
     });
   }

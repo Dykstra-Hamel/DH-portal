@@ -12,7 +12,7 @@
 .loadingSpinner {
   width: 44px;
   height: 44px;
-  border: 4px solid #e5e7eb;
+  border: 4px solid var(--gray-300);
   border-top-color: var(--brand-primary);
   border-radius: 50%;
   animation: spin 0.75s linear infinite;
@@ -38,7 +38,7 @@
 }
 
 .reviewHeaderScrolled {
-  box-shadow: 0 4px 6px color-mix(in srgb, #d1d5db 60%, transparent);
+  box-shadow: 0 4px 6px color-mix(in srgb, var(--gray-300) 60%, transparent);
 }
 
 .backBtn {
@@ -111,7 +111,8 @@
   border-radius: 8px;
   background: #f4f5f8;
   padding: 20px 34px;
-  margin-top: 8px;
+  margin: 8px auto;
+  max-width: 530px;
 
   @media (max-width: 768px) {
     justify-content: center;
@@ -176,6 +177,16 @@
   font-family: var(--secondary-font, var(--primary-font));
 }
 
+.inspectorPhone,
+.inspectorEmail {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 22px;
+  color: var(--gray-700);
+  font-family: var(--secondary-font, var(--primary-font));
+}
+
 .inspectorSeparator {
   width: 1px;
   align-self: stretch;
@@ -210,7 +221,7 @@
     display: block;
     width: 1px;
     align-self: stretch;
-    background: #b8b8b8;
+    background: var(--gray-300);
     flex-shrink: 0;
   }
 }
@@ -257,7 +268,7 @@
   text-transform: uppercase;
   letter-spacing: 0.07em;
   color: var(--gray-700);
-  margin: 0 0 10px;
+  margin: 0 0 16px;
 }
 
 /* Pest icon row — mirrors QuoteBuildStep layout */
@@ -274,6 +285,7 @@
   align-items: center;
   gap: 6px;
   color: var(--brand-secondary);
+  width: 100px;
 }
 
 .heroPestIconCircle {
@@ -341,7 +353,7 @@
   border-radius: 8px;
   border: none;
   background: transparent;
-  color: #5c5c5c;
+  color: var(--gray-600);
   font-size: 14px;
   font-weight: 600;
   line-height: 16px;
@@ -441,9 +453,9 @@
   height: 32px;
   padding: 0 14px;
   border-radius: 8px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   background: var(--gray-25);
-  color: #374151;
+  color: var(--gray-700);
   font-size: 13px;
   font-weight: 600;
   font-family: var(--secondary-font, var(--primary-font));
@@ -452,7 +464,7 @@
   transition: all 0.15s ease;
 
   &:hover {
-    background: #f3f4f6;
+    background: var(--gray-25);
   }
 }
 
@@ -475,7 +487,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #9ca3af;
+  color: var(--gray-400);
   text-align: center;
   font-family: var(--secondary-font, var(--primary-font));
 }
@@ -484,7 +496,7 @@
   display: flex;
   align-items: center;
   gap: 2px;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   border-radius: 6px;
   overflow: hidden;
   background: var(--gray-25);
@@ -500,7 +512,7 @@
   padding: 0 3px 0 7px;
   font-size: 12px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--gray-400);
   flex-shrink: 0;
 }
 
@@ -511,7 +523,7 @@
   background: transparent;
   font-size: 13px;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #111827;
+  color: var(--gray-700) 7;
   text-align: right;
 
   &:focus {
@@ -527,14 +539,14 @@
 .priceEditSuffix {
   padding: 0 6px 0 2px;
   font-size: 11px;
-  color: #6b7280;
+  color: var(--gray-500);
   flex-shrink: 0;
 }
 
 /* ── Discount $ / % toggle ── */
 .discountTypeToggle {
   display: flex;
-  border: 1px solid #d1d5db;
+  border: 1px solid var(--gray-300);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -547,12 +559,12 @@
   font-size: 13px;
   font-weight: 600;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #6b7280;
+  color: var(--gray-500);
   cursor: pointer;
   transition: all 0.15s ease;
 
   &:first-child {
-    border-right: 1px solid #d1d5db;
+    border-right: 1px solid var(--gray-300);
   }
 }
 
@@ -563,7 +575,7 @@
 
 /* ── Discount item in the list ── */
 .discountItem {
-  color: #16a34a !important;
+  color: var(--green-500) !important;
 }
 
 /* ── Discount controls (inside totalPricing card) ── */
@@ -578,7 +590,7 @@
 
 .discountLabel {
   font-size: 14px;
-  color: #6b7280;
+  color: var(--gray-500);
   font-family: var(--secondary-font, var(--primary-font));
   margin: 0;
 }
@@ -595,7 +607,7 @@
   border-radius: 8px;
   font-size: 13px;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #374151;
+  color: var(--gray-700);
   background: var(--gray-25);
   appearance: auto;
 
@@ -628,7 +640,7 @@
   padding: 0 4px 0 10px;
   font-size: 13px;
   font-weight: 600;
-  color: #9ca3af;
+  color: var(--gray-400);
   flex-shrink: 0;
 }
 
@@ -640,10 +652,10 @@
   background: transparent;
   font-size: 13px;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #111827;
+  color: var(--gray-700) 7;
 
   &::placeholder {
-    color: #d1d5db;
+    color: var(--gray-300);
   }
   &:focus {
     outline: none;
@@ -659,9 +671,9 @@
 .notesSection {
   margin-top: 24px;
   padding: 16px 20px;
-  background: #f9fafb;
+  background: var(--gray-25);
   border: 1px solid var(--gray-300);
-  border-radius: 12px;
+  border-radius: 8px;
 }
 
 .notesLabel {
@@ -669,18 +681,42 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #9ca3af;
+  color: var(--gray-400);
   margin: 0 0 8px;
   font-family: var(--secondary-font, var(--primary-font));
 }
 
 .notesText {
   font-size: 14px;
-  color: #374151;
+  color: var(--gray-700);
   line-height: 1.6;
   margin: 0;
   white-space: pre-wrap;
   font-family: var(--secondary-font, var(--primary-font));
+}
+
+.notesTextarea {
+  width: 100%;
+  font-size: 14px;
+  color: var(--gray-700);
+  line-height: 1.6;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: 6px;
+  background: var(--white);
+  resize: vertical;
+  font-family: var(--secondary-font, var(--primary-font));
+  box-sizing: border-box;
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+  }
+
+  &::placeholder {
+    color: var(--gray-400);
+  }
 }
 
 /* ── Spacer for sticky bar ── */
@@ -775,9 +811,9 @@
   padding: 12px 14px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  border-radius: 10px;
+  border-radius: 4px;
   font-size: 13px;
-  color: #dc2626;
+  color: var(--error-600);
   font-family: var(--secondary-font, var(--primary-font));
 }
 
@@ -787,14 +823,53 @@
   margin-bottom: 12px;
 }
 
+.emailModalSheet {
+  width: 100%;
+  max-width: 480px;
+  background: var(--gray-25);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.emailModalBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.emailModalActions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.emailModalCancel {
+  padding: 11px 18px;
+  background: transparent;
+  color: var(--gray-700);
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  font-family: var(--secondary-font, var(--primary-font));
+  cursor: pointer;
+
+  &:hover {
+    background: var(--gray-50);
+  }
+}
+
 .emailInput {
   flex: 1;
   padding: 11px 14px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
   font-size: 14px;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #111827;
+  color: var(--gray-700) 7;
   background: var(--gray-25);
 
   &:focus {
@@ -804,7 +879,7 @@
       color-mix(in srgb, var(--brand-primary) 12%, transparent);
   }
   &::placeholder {
-    color: #9ca3af;
+    color: var(--gray-400);
   }
 }
 
@@ -813,7 +888,7 @@
   background: var(--brand-primary);
   color: var(--gray-25);
   border: none;
-  border-radius: 12px;
+  border-radius: 4px;
   font-size: 14px;
   font-weight: 700;
   font-family: var(--secondary-font, var(--primary-font));
@@ -844,7 +919,7 @@
   height: 64px;
   border-radius: 50%;
   background: #dcfce7;
-  color: #16a34a;
+  color: var(--green-500);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -862,7 +937,7 @@
 .successSub {
   margin: 0;
   font-size: 16px;
-  color: #6b7280;
+  color: var(--gray-500);
   line-height: 1.5;
   max-width: 320px;
 }
@@ -886,10 +961,10 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.5);
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
   z-index: 10001;
-  padding: 0;
+  padding: 16px;
 }
 
 .sigSheet {
@@ -898,8 +973,8 @@
   max-height: 90vh;
   overflow-y: auto;
   background: var(--gray-25);
-  border-radius: 20px 20px 0 0;
-  padding: 20px 20px calc(20px + env(safe-area-inset-bottom, 0px));
+  border-radius: 16px;
+  padding: 20px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -909,14 +984,14 @@
   margin: 0;
   font-size: 18px;
   font-weight: 800;
-  color: #111827;
+  color: var(--gray-700) 7;
   font-family: var(--primary-font);
 }
 
 .sigSub {
   margin: -8px 0 0;
   font-size: 13px;
-  color: #6b7280;
+  color: var(--gray-500);
   font-family: var(--secondary-font, var(--primary-font));
 }
 
@@ -925,7 +1000,7 @@
   font-weight: 700;
   letter-spacing: 0.07em;
   text-transform: uppercase;
-  color: #6b7280;
+  color: var(--gray-500);
   font-family: var(--secondary-font, var(--primary-font));
   display: block;
   margin-bottom: 6px;
@@ -934,11 +1009,11 @@
 .sigNameInput {
   width: 100%;
   padding: 11px 14px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
   font-size: 15px;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #111827;
+  color: var(--gray-700) 7;
   box-sizing: border-box;
 
   &:focus {
@@ -950,16 +1025,17 @@
 }
 
 .sigCanvasWrap {
-  border: 1.5px solid #d1d5db;
-  border-radius: 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
   overflow: hidden;
   background: var(--gray-25);
+  margin-top: 4px;
 }
 
 .sigClear {
   font-size: 13px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--gray-600);
   background: none;
   border: none;
   cursor: pointer;
@@ -970,7 +1046,7 @@
 
 .sigDate {
   font-size: 12px;
-  color: #9ca3af;
+  color: var(--gray-400);
   font-family: var(--secondary-font, var(--primary-font));
   margin: 0;
 }
@@ -983,10 +1059,10 @@
 
 .sigCancelBtn {
   padding: 11px 20px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 12px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
   background: var(--gray-25);
-  color: #374151;
+  color: var(--gray-700);
   font-size: 14px;
   font-weight: 600;
   font-family: var(--secondary-font, var(--primary-font));
@@ -998,7 +1074,7 @@
   background: var(--brand-primary);
   color: var(--gray-25);
   border: none;
-  border-radius: 12px;
+  border-radius: 4px;
   font-size: 14px;
   font-weight: 700;
   font-family: var(--secondary-font, var(--primary-font));
@@ -1013,7 +1089,7 @@
 .sigError {
   margin: 0;
   font-size: 13px;
-  color: #dc2626;
+  color: var(--error-600);
   font-family: var(--secondary-font, var(--primary-font));
 }
 
@@ -1071,12 +1147,12 @@
 .sigTimeSelect {
   width: 100%;
   padding: 10px 12px;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
   font-size: 14px;
   font-family: var(--secondary-font, var(--primary-font));
-  color: #111827;
-  background: #f9fafb;
+  color: var(--gray-700) 7;
+  background: var(--gray-25);
   outline: none;
   box-sizing: border-box;
 
@@ -1089,13 +1165,13 @@
 .termsBody {
   max-height: 200px;
   overflow-y: auto;
-  border: 1.5px solid #d1d5db;
-  border-radius: 10px;
+  border: 1.5px solid var(--gray-300);
+  border-radius: 4px;
   padding: 12px;
-  background: #f9fafb;
+  background: var(--gray-25);
   font-size: 13px;
   line-height: 1.6;
-  color: #374151;
+  color: var(--gray-700);
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
   font-family: var(--secondary-font, var(--primary-font));
@@ -1121,7 +1197,7 @@
 .specificTermsBlock {
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--gray-300);
 
   h4 {
     margin: 0 0 6px;
@@ -1129,7 +1205,7 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #6b7280;
+    color: var(--gray-500);
   }
 }
 
@@ -1138,7 +1214,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #374151;
+  color: var(--gray-700);
   font-family: var(--secondary-font, var(--primary-font));
   cursor: pointer;
 
@@ -1169,7 +1245,7 @@
 .viewedBadge {
   font-size: 11px;
   font-weight: 700;
-  color: #16a34a;
+  color: var(--green-500);
   white-space: nowrap;
   flex-shrink: 0;
 }
@@ -1178,12 +1254,12 @@
   display: inline-block;
   margin-top: 2px;
   padding: 1px 8px;
-  border-radius: 10px;
-  background: #f3f4f6;
-  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  background: var(--gray-25);
+  border: 1px solid var(--gray-300);
   font-size: 11px;
   font-weight: 600;
-  color: #6b7280;
+  color: var(--gray-500);
   letter-spacing: 0.02em;
 }
 
@@ -1210,7 +1286,7 @@
 
 /* ── Inline add-ons inside plan card ── */
 .planCardAddons {
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--gray-300);
   padding: 12px 0 16px;
   display: flex;
   flex-direction: column;
@@ -1236,14 +1312,14 @@
   flex: 1;
   font-size: 13px;
   font-weight: 500;
-  color: #374151;
+  color: var(--gray-700);
   font-family: var(--secondary-font, var(--primary-font));
 }
 
 .planCardAddonPrice {
   font-size: 13px;
   font-weight: 600;
-  color: #374151;
+  color: var(--gray-700);
   font-family: var(--secondary-font, var(--primary-font));
   white-space: nowrap;
 }
@@ -1251,7 +1327,7 @@
 .planCardAddonRecommended {
   font-size: 12px;
   font-weight: 600;
-  color: #2563eb; // blue-600
+  color: var(--blue-600);
   font-family: var(--secondary-font, var(--primary-font));
   white-space: nowrap;
   flex-shrink: 0;
@@ -1300,7 +1376,7 @@
   align-items: center;
   width: 100%;
   margin-top: 12px;
-  border-radius: 10px;
+  border-radius: 4px;
   background: #e8edf7;
   border: none;
   cursor: pointer;
@@ -1347,7 +1423,7 @@
   display: flex;
   position: relative;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
 }
 
 .planCardAddonRecommendedLabel {
@@ -1432,6 +1508,7 @@
   font-weight: 400;
   color: var(--gray-500);
   font-family: var(--secondary-font, var(--primary-font));
+  margin-top: 4px;
 }
 
 .discountAppliedRow {

@@ -59,6 +59,7 @@ export default function AdditionalTasksPanel({
   const [tasksSearchQuery, setTasksSearchQuery] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [formData, setFormData] = useState<TaskFormData | null>(null);
 
@@ -261,7 +262,7 @@ export default function AdditionalTasksPanel({
         <button
           type="button"
           className={styles.viewBtn}
-          onClick={() => router.push(`/tickets/tasks/${task.id}`)}
+          onClick={() => setViewingTask(task)}
         >
           View
           <ChevronRight size={16} />
@@ -302,7 +303,7 @@ export default function AdditionalTasksPanel({
 
   const handleTaskAction = (action: string, task: Task) => {
     if (action === 'edit') setEditingTask(task);
-    else if (action === 'view') router.push(`/tickets/tasks/${task.id}`);
+    else if (action === 'view') setViewingTask(task);
     else if (action === 'complete') handleCompleteTask(task.id);
   };
 
@@ -359,15 +360,140 @@ export default function AdditionalTasksPanel({
   const handleCancelForm = () => {
     setShowCreateForm(false);
     setEditingTask(null);
+    setViewingTask(null);
     setFormData(null);
   };
 
   const isFormOpen = showCreateForm || !!editingTask;
 
+  // ── Detail modal helpers ──────────────────────────────────────────────────
+
+  const statusLabels: Record<string, string> = {
+    new: 'New',
+    pending: 'Pending',
+    in_progress: 'In Progress',
+    completed: 'Completed',
+  };
+
+  const statusBadgeClass: Record<string, string> = {
+    new: styles.badgeNew,
+    pending: styles.badgePending,
+    in_progress: styles.badgeInProgress,
+    completed: styles.badgeCompleted,
+  };
+
+  const priorityLabels: Record<string, string> = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    urgent: 'Urgent',
+  };
+
+  const priorityBadgeClass: Record<string, string> = {
+    low: styles.badgeLow,
+    medium: styles.badgeMedium,
+    high: styles.badgeHigh,
+    urgent: styles.badgeUrgent,
+  };
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <>
+      {/* Task detail view modal */}
+      <Modal isOpen={!!viewingTask} onClose={() => setViewingTask(null)}>
+        <ModalTop
+          title={viewingTask?.title ?? 'Task Details'}
+          onClose={() => setViewingTask(null)}
+        />
+        <ModalMiddle>
+          {viewingTask && (
+            <div className={styles.detailGrid}>
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Status &amp; Priority</span>
+                <div className={styles.detailBadges}>
+                  <span
+                    className={`${styles.badge} ${statusBadgeClass[viewingTask.status] ?? ''}`}
+                  >
+                    {statusLabels[viewingTask.status] ?? viewingTask.status}
+                  </span>
+                  {viewingTask.priority && (
+                    <span
+                      className={`${styles.badge} ${priorityBadgeClass[viewingTask.priority] ?? ''}`}
+                    >
+                      {priorityLabels[viewingTask.priority] ?? viewingTask.priority}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.detailRow}>
+                <span className={styles.detailLabel}>Due Date</span>
+                <span className={styles.detailValue}>
+                  {formatTaskDueDateTime(viewingTask.due_date, viewingTask.due_time) || '—'}
+                </span>
+              </div>
+
+              {viewingTask.assigned_user && (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Assigned To</span>
+                  <span className={styles.detailValue}>
+                    {viewingTask.assigned_user.first_name}{' '}
+                    {viewingTask.assigned_user.last_name}
+                  </span>
+                </div>
+              )}
+
+              {viewingTask.description && (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Description</span>
+                  <span className={styles.detailValue}>{viewingTask.description}</span>
+                </div>
+              )}
+
+              {viewingTask.notes && (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Notes</span>
+                  <span className={styles.detailValue}>{viewingTask.notes}</span>
+                </div>
+              )}
+
+              {viewingTask.related_entity && (
+                <div className={styles.detailRow}>
+                  <span className={styles.detailLabel}>Related</span>
+                  <span className={styles.detailValue}>
+                    {viewingTask.related_entity.title ||
+                      viewingTask.related_entity.name ||
+                      viewingTask.related_entity.id}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </ModalMiddle>
+        <ModalBottom>
+          <ModalActionButtons
+            showBackButton={true}
+            isFirstStep={true}
+            onBack={() => setViewingTask(null)}
+            showSecondaryButton={true}
+            secondaryButtonText="Edit"
+            onSecondaryAction={() => {
+              const task = viewingTask;
+              setViewingTask(null);
+              if (task) setEditingTask(task);
+            }}
+            onPrimaryAction={async () => {
+              if (!viewingTask) return;
+              await handleCompleteTask(viewingTask.id);
+              setViewingTask(null);
+            }}
+            primaryButtonText="Mark Complete"
+            primaryButtonDisabled={false}
+          />
+        </ModalBottom>
+      </Modal>
+
       <Modal isOpen={isFormOpen} onClose={handleCancelForm}>
         <ModalTop
           title={editingTask ? 'Edit Task' : 'Create New Task'}

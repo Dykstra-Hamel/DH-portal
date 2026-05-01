@@ -7,7 +7,7 @@ import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
 interface QuoteLineItem {
   id: string;
   type: 'plan-addon' | 'custom';
-  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product';
+  catalogItemKind?: 'plan' | 'addon' | 'bundle' | 'product' | 'specialty-line';
   catalogItemId?: string;
   catalogItemName?: string;
   customName?: string;
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       discountType,
       discountId,
       quoteStatus,
+      checklistResponses,
     } = body;
 
     if (!leadId) {
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
           total_recurring_price: adjustedRecurring,
           applied_discount_id: discountId ?? null,
           ...(quoteStatus != null ? { quote_status: quoteStatus } : {}),
+          ...(checklistResponses !== undefined ? { safety_checklist_responses: checklistResponses } : {}),
         })
         .eq('id', existingQuote.id);
 
@@ -165,6 +167,7 @@ export async function POST(request: NextRequest) {
           applied_discount_id: discountId ?? null,
           quote_status: quoteStatus ?? 'draft',
           quote_token: quoteToken,
+          safety_checklist_responses: checklistResponses ?? [],
         })
         .select('id')
         .single();
@@ -195,6 +198,8 @@ export async function POST(request: NextRequest) {
           const servicePlanId =
             item.type === 'plan-addon' && item.catalogItemKind === 'plan'
               ? (item.catalogItemId ?? null)
+              : item.type === 'plan-addon' && item.catalogItemKind === 'specialty-line'
+              ? (lineItems.find(p => p.id === item.parentLineItemId)?.catalogItemId ?? null)
               : null;
           const addonServiceId =
             item.type === 'plan-addon' && item.catalogItemKind === 'addon'
@@ -244,7 +249,7 @@ export async function POST(request: NextRequest) {
             discount_amount: discountType === '$' ? lineDiscountInitial + lineDiscountRecurring : 0,
             // All recommended add-on slots (isRecommended true or false) are optional and start unselected
             is_optional: item.isRecommended != null,
-            is_selected: item.isRecommended == null,
+            is_selected: item.isSelected ?? (item.isRecommended == null),
             is_recommended: item.isRecommended ?? null,
             display_order: idx,
             parent_line_item_id: item.parentLineItemId ?? null,

@@ -74,6 +74,7 @@ export interface LeadSchedulingSectionProps {
   onEmailQuote: () => void;
   isSidebarExpanded?: boolean;
   timeOptions?: TimeOption[];
+  unwrapped?: boolean;
 }
 
 // Lead Contact Section Props
@@ -136,4 +137,5 @@ export interface LeadQuoteSectionProps {
   startExpanded?: boolean;
   forceCollapse?: boolean;
   timeOptions?: TimeOption[];
+  unwrapped?: boolean;
 }

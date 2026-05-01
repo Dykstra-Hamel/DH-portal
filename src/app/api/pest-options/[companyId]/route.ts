@@ -26,6 +26,7 @@ export async function GET(
         pest_id,
         custom_label,
         display_order,
+        settings,
         pest_types (
           id,
           name,
@@ -46,16 +47,27 @@ export async function GET(
       );
     }
 
-    // Transform the data for the frontend
-    const transformedOptions = (pestOptions || []).map((option: any) => ({
-      id: option.pest_id,
-      name: option.pest_types.name,
-      slug: option.pest_types.slug,
-      custom_label: option.custom_label || option.pest_types.name,
-      description: option.pest_types.description,
-      icon_svg: option.pest_types.icon_svg ?? null,
-      display_order: option.display_order,
-    }));
+    const url = new URL(request.url);
+    const context = url.searchParams.get('context');
+
+    // Transform the data for the frontend, filtering based on context
+    const transformedOptions = (pestOptions || [])
+      .filter((option: any) => {
+        const settings = (option.settings as Record<string, unknown>) ?? {};
+        if (context === 'fieldmap') {
+          return settings?.show_in_mapping_tool !== false;
+        }
+        return settings?.show_in_widget !== false;
+      })
+      .map((option: any) => ({
+        id: option.pest_id,
+        name: option.pest_types.name,
+        slug: option.pest_types.slug,
+        custom_label: option.custom_label || option.pest_types.name,
+        description: option.pest_types.description,
+        icon_svg: option.pest_types.icon_svg ?? null,
+        display_order: option.display_order,
+      }));
 
     return NextResponse.json({
       success: true,

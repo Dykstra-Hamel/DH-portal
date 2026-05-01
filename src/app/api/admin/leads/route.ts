@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
 import { linkCustomerToServiceAddress } from '@/lib/service-addresses';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 export async function GET(request: NextRequest) {
   try {
@@ -215,6 +219,40 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Resolve branch_id from ZIP when not explicitly provided. Returns null
+    // for companies without branch-tagged service_areas (today's behavior).
+    let resolvedBranchId: string | null = leadData.branch_id ?? null;
+
+    // Step 1: cache-aware helper when we have a service_address.
+    if (!resolvedBranchId && serviceAddressId) {
+      resolvedBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        company_id,
+        serviceAddressId
+      );
+    }
+
+    // Step 2: ZIP fallback when there's no service_address yet.
+    if (!resolvedBranchId && !serviceAddressId) {
+      let candidateZip: string | null =
+        (typeof zip === 'string' ? zip.trim() : '') || null;
+      if (!candidateZip && customer_id) {
+        const { data: cust } = await supabase
+          .from('customers')
+          .select('zip_code')
+          .eq('id', customer_id)
+          .maybeSingle();
+        candidateZip = cust?.zip_code?.trim() || null;
+      }
+      if (candidateZip) {
+        resolvedBranchId = await resolveBranchIdByZip(
+          supabase,
+          company_id,
+          candidateZip
+        );
+      }
+    }
+
     // Create lead with service_address_id
     const { data: lead, error } = await supabase
       .from('leads')
@@ -224,6 +262,7 @@ export async function POST(request: NextRequest) {
           customer_id,
           company_id,
           service_address_id: serviceAddressId,
+          branch_id: resolvedBranchId,
         },
       ])
       .select()

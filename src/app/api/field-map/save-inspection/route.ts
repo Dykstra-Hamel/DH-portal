@@ -1,6 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import {
+  createOrFindServiceAddress,
+  linkCustomerToServiceAddress,
+  type ServiceAddressData,
+} from '@/lib/service-addresses';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
+
+interface IncomingAddressComponents {
+  street_number?: string;
+  route?: string;
+  locality?: string;
+  administrative_area_level_1?: string;
+  postal_code?: string;
+  formatted_address?: string;
+  latitude?: number;
+  longitude?: number;
+}
+
+function buildStructuredAddressData(
+  components: IncomingAddressComponents | null | undefined
+): ServiceAddressData | null {
+  if (!components) return null;
+  const street = [components.street_number, components.route]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+  const city = (components.locality ?? '').trim();
+  const state = (components.administrative_area_level_1 ?? '').trim();
+  const zip = (components.postal_code ?? '').trim();
+  if (!street && !city && !state && !zip) return null;
+  return {
+    street_address: street,
+    city,
+    state,
+    zip_code: zip,
+    latitude: components.latitude,
+    longitude: components.longitude,
+  };
+}
 
 function splitName(fullName: string): { firstName: string; lastName: string } {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -30,13 +72,28 @@ export async function POST(request: NextRequest) {
       clientEmail,
       clientPhone,
       address,
+      addressComponents,
+      serviceAddressId: providedServiceAddressId,
       pestTypes,
       mapPlotData,
       companyId: bodyCompanyId,
       leadId: existingLeadId,
       stopId,
       routeStopId,
-    } = body;
+    } = body as {
+      clientName?: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      address?: string;
+      addressComponents?: IncomingAddressComponents | null;
+      serviceAddressId?: string | null;
+      pestTypes?: unknown;
+      mapPlotData?: unknown;
+      companyId?: string;
+      leadId?: string;
+      stopId?: string | number;
+      routeStopId?: string;
+    };
 
     if (!clientName || !address) {
       return NextResponse.json({ error: 'Client name and address are required' }, { status: 400 });
@@ -65,10 +122,12 @@ export async function POST(request: NextRequest) {
     const companyId = userCompany.company_id;
     const { firstName, lastName } = splitName(clientName);
 
-    const pestSummary =
-      Array.isArray(pestTypes) && pestTypes.length > 0
-        ? pestTypes.join(', ')
-        : 'General pest control';
+    const pestList: string[] =
+      Array.isArray(pestTypes)
+        ? pestTypes.filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
+        : [];
+    const primaryPest = pestList[0] ?? 'General pest control';
+    const additionalPests = pestList.slice(1);
 
     // ── Customer find / upsert ─────────────────────────────────────────────
     let customerId: string | null = null;
@@ -123,25 +182,72 @@ export async function POST(request: NextRequest) {
       customerId = newCustomer.id;
     }
 
-    // ── Service address find / upsert ─────────────────────────────────────
+    // ── Service address resolution ────────────────────────────────────────
+    // Priority: (1) caller-provided id, (2) structured Google Places
+    // components → createOrFindServiceAddress dedupes & creates, (3) legacy
+    // single-string fallback when nothing structured is available.
     let serviceAddressId: string | null = null;
 
-    const { data: existingAddress } = await adminClient
-      .from('service_addresses')
-      .select('id')
-      .eq('company_id', companyId)
-      .ilike('street_address', address)
-      .maybeSingle();
-
-    if (existingAddress?.id) {
-      serviceAddressId = existingAddress.id;
-    } else {
-      const { data: newAddress } = await adminClient
+    if (providedServiceAddressId) {
+      const { data: existing } = await adminClient
         .from('service_addresses')
-        .insert({ company_id: companyId, street_address: address })
         .select('id')
-        .single();
-      serviceAddressId = newAddress?.id ?? null;
+        .eq('id', providedServiceAddressId)
+        .eq('company_id', companyId)
+        .maybeSingle();
+      if (existing?.id) serviceAddressId = existing.id;
+    }
+
+    if (!serviceAddressId) {
+      const structured = buildStructuredAddressData(addressComponents);
+      if (structured) {
+        const result = await createOrFindServiceAddress(companyId, structured);
+        if (result.success && result.serviceAddressId) {
+          serviceAddressId = result.serviceAddressId;
+        }
+      }
+    }
+
+    if (!serviceAddressId && address) {
+      // Last-resort fallback: legacy single-string match. Used only when no
+      // structured components were sent (e.g. older clients).
+      const { data: existingAddress } = await adminClient
+        .from('service_addresses')
+        .select('id')
+        .eq('company_id', companyId)
+        .ilike('street_address', address)
+        .maybeSingle();
+
+      if (existingAddress?.id) {
+        serviceAddressId = existingAddress.id;
+      } else {
+        const { data: newAddress } = await adminClient
+          .from('service_addresses')
+          .insert({ company_id: companyId, street_address: address })
+          .select('id')
+          .single();
+        serviceAddressId = newAddress?.id ?? null;
+      }
+    }
+
+    // Maintain the customer ↔ service_address junction so the field-sales
+    // lead list query (which joins via customer_service_addresses) can show
+    // the address. Mark as primary only if the customer doesn't already have
+    // one — don't stomp an existing primary. Skip silently on failure — the
+    // lead still saves.
+    if (customerId && serviceAddressId) {
+      const { data: existingPrimary } = await adminClient
+        .from('customer_service_addresses')
+        .select('id')
+        .eq('customer_id', customerId)
+        .eq('is_primary_address', true)
+        .maybeSingle();
+      await linkCustomerToServiceAddress(
+        customerId,
+        serviceAddressId,
+        'owner',
+        !existingPrimary
+      );
     }
 
     // ── Resolve lead ID — check route_stops to avoid duplicates ──────────
@@ -198,7 +304,8 @@ export async function POST(request: NextRequest) {
         .update({
           customer_id: customerId,
           service_address_id: serviceAddressId,
-          pest_type: pestSummary,
+          pest_type: primaryPest,
+          additional_pests: additionalPests,
           map_plot_data: mapPlotData ?? null,
           ...(stopId ? { pestpac_stop_id: String(stopId) } : {}),
         })
@@ -210,6 +317,28 @@ export async function POST(request: NextRequest) {
       }
       leadId = resolvedLeadId as string;
     } else {
+      // Resolve branch via cache-aware helper when we have a persisted
+      // service_address (gets cache + geocoding fallback). For the rare
+      // path where the address wasn't created yet, fall back to ZIP-only
+      // matching against the structured address components.
+      let inspectionBranchId: string | null = null;
+      if (serviceAddressId) {
+        inspectionBranchId = await resolveBranchForServiceAddress(
+          adminClient,
+          companyId,
+          serviceAddressId
+        );
+      } else {
+        const candidateZip = addressComponents?.postal_code?.trim() || null;
+        if (candidateZip) {
+          inspectionBranchId = await resolveBranchIdByZip(
+            adminClient,
+            companyId,
+            candidateZip
+          );
+        }
+      }
+
       const { data: newLead, error: leadError } = await adminClient
         .from('leads')
         .insert({
@@ -220,11 +349,14 @@ export async function POST(request: NextRequest) {
           lead_type: 'manual',
           lead_source: 'inspector',
           lead_status: 'in_process',
-          pest_type: pestSummary,
+          branch_id: inspectionBranchId,
+          pest_type: primaryPest,
+          additional_pests: additionalPests,
           map_plot_data: mapPlotData ?? null,
           pestpac_stop_id: stopId ? String(stopId) : null,
           estimated_value: null,
           submitted_by: user.id,
+          assigned_to: user.id,
           priority: 'medium',
         })
         .select('id')

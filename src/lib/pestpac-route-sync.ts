@@ -1,4 +1,13 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/lib/supabase/server-admin';
+import { getOAuthToken } from '@/lib/pestpac-auth';
+
+const PESTPAC_BASE_URL = 'https://api.workwave.com/pestpac/v1';
+
+export interface UserCompany {
+  company_id: string;
+  pestpac_employee_id: string | null;
+}
 
 interface EnrichedStop {
   stopId: string | null;
@@ -335,10 +344,11 @@ export async function syncPestPacRoute({
         }
 
         // Preserve locally-owned fields that the app writes but PestPac doesn't know about:
-        // terminal statuses (set by Send Quote / Schedule Service) and lead_id (set by save-inspection).
+        // terminal statuses (set by Send Quote / Schedule Service), lead_id (set by save-inspection),
+        // and route_id/stop_order when manually_reassigned is set by a manager.
         const { data: existingStop } = await adminSupabase
           .from('route_stops')
-          .select('status, lead_id')
+          .select('status, lead_id, manually_reassigned, route_id, stop_order')
           .eq('company_id', companyId)
           .eq('pestpac_stop_id', stop.stopId)
           .maybeSingle();
@@ -350,13 +360,19 @@ export async function syncPestPacRoute({
 
         const nextLeadId = existingStop?.lead_id ?? stop.leadId ?? null;
 
+        const nextRouteId =
+          existingStop?.manually_reassigned ? existingStop.route_id : routeId;
+
+        const nextStopOrder =
+          existingStop?.manually_reassigned ? existingStop.stop_order : i + 1;
+
         const { error: stopErr } = await adminSupabase
           .from('route_stops')
           .upsert(
             {
-              route_id: routeId,
+              route_id: nextRouteId,
               company_id: companyId,
-              stop_order: i + 1,
+              stop_order: nextStopOrder,
               pestpac_stop_id: stop.stopId,
               pestpac_service_order_id: stop.stopId,
               address_display: stop.address ?? null,
@@ -384,4 +400,352 @@ export async function syncPestPacRoute({
   } catch (err) {
     console.error('[pestpac-route-sync] unexpected error:', err);
   }
+}
+
+// ── Helpers used by fetchAndSyncFromPestPac ──────────────────────────────────
+
+function toTitleCase(str: string): string {
+  return str.replace(/\w\S*/g, w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+}
+
+function normalizeComparable(value: unknown): string {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function matchesEmployee(record: any, employeeId: string): boolean {
+  const target = normalizeComparable(employeeId);
+  if (!target) return false;
+
+  const arrayCandidates = [
+    record?.technicians,
+    record?.Technicians,
+    record?.employees,
+    record?.Employees,
+    record?.assignees,
+    record?.Assignees,
+    record?.employeeAssignments,
+    record?.EmployeeAssignments,
+  ];
+
+  for (const arr of arrayCandidates) {
+    if (!Array.isArray(arr)) continue;
+
+    const hasMatch = arr.some(item => {
+      const scalarCandidates = [
+        item?.employeeID,
+        item?.EmployeeID,
+        item?.employeeCode,
+        item?.EmployeeCode,
+        item?.technicianID,
+        item?.TechnicianID,
+        item?.assignedEmployeeID,
+        item?.AssignedEmployeeID,
+        item?.userID,
+        item?.UserID,
+        item?.username,
+        item?.Username,
+        item?.userName,
+        item?.UserName,
+        item?.code,
+        item?.Code,
+        item?.id,
+        item?.ID,
+      ];
+
+      return scalarCandidates.some(candidate => normalizeComparable(candidate) === target);
+    });
+
+    if (hasMatch) return true;
+  }
+
+  const scalarCandidates = [
+    record?.employeeID,
+    record?.EmployeeID,
+    record?.employeeCode,
+    record?.EmployeeCode,
+    record?.technicianID,
+    record?.TechnicianID,
+    record?.assignedEmployeeID,
+    record?.AssignedEmployeeID,
+    record?.inspectorID,
+    record?.InspectorID,
+    record?.userID,
+    record?.UserID,
+    record?.username,
+    record?.Username,
+    record?.userName,
+    record?.UserName,
+    record?.code,
+    record?.Code,
+    record?.employee?.employeeID,
+    record?.employee?.EmployeeID,
+    record?.employee?.username,
+    record?.employee?.Username,
+    record?.technician?.employeeID,
+    record?.technician?.EmployeeID,
+    record?.technician?.username,
+    record?.technician?.Username,
+  ];
+
+  return scalarCandidates.some(candidate => normalizeComparable(candidate) === target);
+}
+
+export interface FetchAndSyncOptions {
+  awaitSync?: boolean;
+}
+
+export interface FetchedEnrichedStop {
+  stopId: string | null;
+  routeId: string | null;
+  clientId: string | null;
+  locationId: string | null;
+  clientName: string | null;
+  phone: string | null;
+  email: string | null;
+  address: string;
+  addressStreet: string | null;
+  addressCity: string | null;
+  addressState: string | null;
+  addressZip: string | null;
+  scheduledTime: string | null;
+  serviceStatus: string;
+  serviceType: string;
+  serviceNotes: string;
+  accessInstructions: string;
+  lat: number | null;
+  lng: number | null;
+  inspectionStatus: 'not_started' | 'in_progress' | 'done';
+  leadId: string | null;
+  leadStatus?: string | null;
+  referredToSales?: boolean;
+  routeStopId?: string | null;
+  housePhotoUrl?: string | null;
+  lineItems?: any[] | null;
+  pestpacRawData?: any;
+}
+
+export async function fetchAndSyncFromPestPac(
+  adminSupabase: ReturnType<typeof createAdminClient>,
+  userCompany: UserCompany,
+  date: string,
+  userId: string,
+  options: FetchAndSyncOptions = {}
+): Promise<FetchedEnrichedStop[] | null> {
+  if (!userCompany.pestpac_employee_id) return null;
+
+  const { data: settingsRows } = await adminSupabase
+    .from('company_settings')
+    .select('setting_key, setting_value')
+    .eq('company_id', userCompany.company_id)
+    .in('setting_key', [
+      'pestpac_enabled',
+      'pestpac_api_key',
+      'pestpac_tenant_id',
+      'pestpac_oauth_client_id',
+      'pestpac_oauth_client_secret',
+      'pestpac_wwid_username',
+      'pestpac_wwid_password',
+    ]);
+
+  const s: Record<string, string> = {};
+  settingsRows?.forEach((row: any) => { s[row.setting_key] = row.setting_value ?? ''; });
+
+  if (s.pestpac_enabled !== 'true') return null;
+
+  const {
+    pestpac_api_key: apiKey,
+    pestpac_tenant_id: tenantId,
+    pestpac_oauth_client_id: clientId,
+    pestpac_oauth_client_secret: clientSecret,
+    pestpac_wwid_username: wwUsername,
+    pestpac_wwid_password: wwPassword,
+  } = s;
+
+  if (!apiKey || !tenantId || !clientId || !clientSecret || !wwUsername || !wwPassword) return null;
+
+  let token: string;
+  try {
+    token = await getOAuthToken(clientId, clientSecret, wwUsername, wwPassword);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Unknown OAuth error';
+    console.error('FieldMap route OAuth error:', { companyId: userCompany.company_id, detail });
+    return null;
+  }
+
+  const headers = {
+    Authorization: `Bearer ${token}`,
+    apikey: apiKey,
+    'tenant-id': tenantId,
+    'Content-Type': 'application/json',
+  } as const;
+
+  const employeeCode = String(userCompany.pestpac_employee_id);
+
+  // Step 1: Resolve employee code → numeric techId
+  let techId: number | null = null;
+  const empRes = await fetch(
+    `${PESTPAC_BASE_URL}/lookups/Employees?username=${encodeURIComponent(employeeCode)}`,
+    { headers }
+  );
+  if (empRes.ok) {
+    try {
+      const empData = await empRes.json();
+      const employees: any[] = Array.isArray(empData) ? empData : (empData?.value ?? []);
+      const match = employees.find(e =>
+        String(e.Username ?? e.username ?? e.UserName ?? '').toLowerCase() === employeeCode.toLowerCase()
+      );
+      if (match) {
+        const rawId = match.TechnicianID ?? match.technicianID ?? match.TechID ?? match.techID ??
+          match.EmployeeID ?? match.employeeID ?? match.ID ?? match.id;
+        techId = rawId != null ? Number(rawId) : null;
+      }
+    } catch { /* ignore parse error */ }
+  }
+
+  // Step 2: Fetch service orders for the date
+  const soPath = techId != null
+    ? `/ServiceOrders?startWorkDate=${date}&endWorkDate=${date}&techId=${techId}`
+    : `/ServiceOrders?startWorkDate=${date}&endWorkDate=${date}`;
+
+  const soRes = await fetch(`${PESTPAC_BASE_URL}${soPath}`, { headers });
+
+  if (!soRes.ok) {
+    console.error('FieldMap ServiceOrders failed:', { path: soPath, status: soRes.status });
+    return null;
+  }
+
+  const soData = await soRes.json();
+  const allOrders: any[] = Array.isArray(soData) ? soData : (soData?.value ?? []);
+
+  const allStops = techId != null
+    ? allOrders
+    : allOrders.filter(o => matchesEmployee(o, employeeCode));
+
+  if (allStops.length === 0) return [];
+
+  // Enrich stops with client/location data
+  const enrichedStops: FetchedEnrichedStop[] = [];
+
+  for (const stop of allStops) {
+    try {
+      const stopId = stop.OrderID ?? stop.orderID ?? stop.ServiceOrderID ?? stop.serviceOrderID ?? stop.id;
+      const routeId = stop.RouteID ?? stop.routeID ?? stop.RouteId ?? stop.routeId;
+      const stopClientId = stop.BillToID ?? stop.billToID ?? stop.ClientID ?? stop.clientID;
+      const locationId = stop.LocationID ?? stop.locationID;
+
+      let clientName =
+        stop.ClientName ?? stop.clientName ??
+        stop.Company ?? stop.company ??
+        `${stop.FirstName ?? stop.firstName ?? ''} ${stop.LastName ?? stop.lastName ?? ''}`.trim();
+
+      let addressStreet = stop.Address ?? stop.Street ?? stop.address ?? stop.street ?? '';
+      let addressCity   = stop.City  ?? stop.city  ?? '';
+      let addressState  = stop.State ?? stop.state ?? '';
+      let addressZip    = stop.Zip   ?? stop.zip   ?? '';
+      let address = [addressStreet, addressCity, addressState, addressZip].filter(Boolean).join(', ');
+      let lat = (stop.Latitude ?? stop.latitude ?? null) as number | null;
+      let lng = (stop.Longitude ?? stop.longitude ?? null) as number | null;
+      let phone: string | null = stop.Phone ?? stop.phone ?? null;
+      let email: string | null = stop.Email ?? stop.email ?? null;
+      let serviceNotes =
+        stop.ServiceInstructions ?? stop.serviceInstructions ??
+        stop.OrderInstructions ?? stop.orderInstructions ??
+        stop.Notes ?? stop.notes ?? '';
+      let accessInstructions =
+        stop.LocationInstructions ?? stop.locationInstructions ??
+        stop.AccessInstructions ?? stop.accessInstructions ?? '';
+
+      if (stopClientId && !clientName) {
+        const res = await fetch(`${PESTPAC_BASE_URL}/BillTos/${encodeURIComponent(String(stopClientId))}`, { headers });
+        if (res.ok) {
+          const c = await res.json();
+          clientName =
+            c.CompanyName ?? c.companyName ??
+            `${c.FirstName ?? c.firstName ?? ''} ${c.LastName ?? c.lastName ?? ''}`.trim();
+        }
+      }
+
+      let loc: any;
+      if (locationId) {
+        const res = await fetch(`${PESTPAC_BASE_URL}/Locations/${encodeURIComponent(String(locationId))}`, { headers });
+        if (res.ok) {
+          loc = await res.json();
+          if (!addressStreet) addressStreet = loc.Address ?? loc.Street ?? loc.address ?? loc.street ?? '';
+          if (!addressCity)   addressCity   = loc.City  ?? loc.city  ?? '';
+          if (!addressState)  addressState  = loc.State ?? loc.state ?? '';
+          if (!addressZip)    addressZip    = loc.Zip   ?? loc.zip   ?? '';
+          address = address || [addressStreet, addressCity, addressState, addressZip].filter(Boolean).join(', ');
+          lat = lat ?? (loc.Latitude ?? loc.latitude ?? null);
+          lng = lng ?? (loc.Longitude ?? loc.longitude ?? null);
+          phone = phone ?? (loc.Phone ?? loc.phone ?? null);
+          email = email ?? (loc.Email ?? loc.email ?? null);
+          if (!clientName) {
+            const locName = `${loc.FirstName ?? loc.firstName ?? ''} ${loc.LastName ?? loc.lastName ?? ''}`.trim();
+            clientName = loc.Company ?? loc.company ?? locName;
+          }
+          serviceNotes = serviceNotes || (loc.ServiceInstructions ?? loc.serviceInstructions ?? '');
+          accessInstructions = accessInstructions || (loc.LocationInstructions ?? loc.locationInstructions ?? '');
+        }
+      }
+
+      enrichedStops.push({
+        stopId: stopId ? String(stopId) : null,
+        routeId: routeId ? String(routeId) : null,
+        clientId: stopClientId ? String(stopClientId) : null,
+        locationId: locationId ? String(locationId) : null,
+        clientName: clientName ? toTitleCase(clientName) : clientName,
+        phone: phone ? String(phone).trim() || null : null,
+        email: email ? String(email).trim() || null : null,
+        address,
+        addressStreet: addressStreet || null,
+        addressCity: addressCity || null,
+        addressState: addressState || null,
+        addressZip: addressZip || null,
+        scheduledTime:
+          stop.WorkDate ?? stop.workDate ??
+          stop.ServiceDate ?? stop.serviceDate ??
+          stop.ScheduledDate ?? stop.scheduledDate ??
+          stop.StartTime ?? stop.startTime ?? null,
+        serviceStatus: stop.Status ?? stop.status ?? stop.ServiceStatus ?? stop.serviceStatus ?? 'Scheduled',
+        serviceType:
+          stop.ServiceType ?? stop.serviceType ??
+          stop.ServiceTypeName ?? stop.serviceTypeName ??
+          stop.OrderType ?? stop.orderType ?? '',
+        serviceNotes,
+        accessInstructions,
+        lat,
+        lng,
+        inspectionStatus: 'not_started',
+        leadId: null,
+        leadStatus: null,
+        housePhotoUrl: null,
+        lineItems: (stop.lineItems ?? stop.LineItems ?? stop.lineitem ?? stop.LineItem ?? null) as any[] | null,
+        pestpacRawData: {
+          ...stop,
+          ...(loc != null ? {
+            LocationType: loc.LocationType ?? loc.locationType ?? null,
+            LocationNotes: loc.Notes ?? loc.notes ?? null,
+          } : {}),
+        },
+      });
+    } catch {
+      // Skip problematic rows
+    }
+  }
+
+  const syncPromise = syncPestPacRoute({
+    adminSupabase,
+    companyId: userCompany.company_id,
+    routeDate: date,
+    assignedUserId: userId,
+    stops: enrichedStops,
+  });
+
+  if (options.awaitSync) {
+    await syncPromise;
+  } else {
+    syncPromise.catch(() => {});
+  }
+
+  return enrichedStops;
 }

@@ -83,6 +83,7 @@ export interface AddOnService {
 
   // Status
   is_active: boolean;
+  tech_can_upsell: boolean;
   requires_quote: boolean;
 
   // Metadata
@@ -108,6 +109,7 @@ export interface AddOnServiceFormData {
   eligibility_mode: 'all' | 'specific';
   eligible_plan_ids: string[];
   is_active: boolean;
+  tech_can_upsell: boolean;
   requires_quote: boolean;
   pricing_type: 'flat' | 'per_sqft' | 'per_linear_foot' | 'per_acre' | 'per_hour' | 'per_room';
   price_per_unit: number | null;

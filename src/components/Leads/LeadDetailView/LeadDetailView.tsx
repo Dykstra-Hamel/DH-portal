@@ -36,9 +36,10 @@ import { ReadyToScheduleModal } from '@/components/Common/ReadyToScheduleModal/R
 import { EmailQuoteModal } from '@/components/Common/EmailQuoteModal/EmailQuoteModal';
 import { ConvertToSupportModal } from '@/components/Common/ConvertToSupportModal/ConvertToSupportModal';
 import { MarkAsJunkModal } from '@/components/Common/MarkAsJunkModal/MarkAsJunkModal';
+import { CustomerCardModal } from '@/components/Common/CustomerCardModal/CustomerCardModal';
+import { StatusChangeConfirmModal } from '@/components/Common/StatusChangeConfirmModal/StatusChangeConfirmModal';
 import { Toast } from '@/components/Common/Toast';
 import { usePageActions } from '@/contexts/PageActionsContext';
-import { formatHeaderDate } from '@/lib/date-utils';
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import { useBranches } from '@/hooks/useBranches';
@@ -81,6 +82,12 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   const [showConvertToSupportModal, setShowConvertToSupportModal] =
     useState(false);
   const [showMarkAsJunkModal, setShowMarkAsJunkModal] = useState(false);
+  const [showCustomerCardModal, setShowCustomerCardModal] = useState(false);
+  const [pendingStatusChange, setPendingStatusChange] = useState<{
+    target: 'new' | 'in_process' | 'quoted' | 'scheduling';
+    title: string;
+    message: string;
+  } | null>(null);
   const router = useRouter();
   const { setPageHeader } = usePageActions();
 
@@ -94,6 +101,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   const { users: assignableUsers } = useAssignableUsers({
     companyId: lead?.company_id,
     departmentType: ticketType === 'support' ? 'support' : 'sales',
+    branchId: lead?.branch_id ?? null,
     enabled: ticketType !== 'junk',
   });
   const { branches: availableBranches } = useBranches(lead?.company_id);
@@ -960,6 +968,70 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
     [leadId, lead, isAdmin, handleShowToast]
   );
 
+  const leadStatusRef = useRef<string | null>(lead?.lead_status ?? null);
+  useEffect(() => {
+    leadStatusRef.current = lead?.lead_status ?? null;
+  });
+
+  const handleStatusChangeRef = useRef(handleStatusChange);
+  useEffect(() => {
+    handleStatusChangeRef.current = handleStatusChange;
+  });
+
+  const handleLineItemsSaved = useCallback((itemCount: number) => {
+    if (itemCount <= 0) return;
+    if (leadStatusRef.current !== 'new') return;
+    handleStatusChangeRef.current('in_process');
+  }, []);
+
+  const handleProgressBarStatusClick = useCallback(
+    (target: 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost') => {
+      if (!lead) return;
+      if (target === 'won' || target === 'lost') return;
+      if (target === lead.lead_status) return;
+
+      const STATUS_ORDER = ['new', 'in_process', 'quoted', 'scheduling'];
+      const currentIndex = STATUS_ORDER.indexOf(lead.lead_status as string);
+      const targetIndex = STATUS_ORDER.indexOf(target);
+      const isBackward = targetIndex < currentIndex;
+
+      let confirm: { title: string; message: string } | null = null;
+
+      if (target === 'quoted') {
+        confirm = {
+          title: 'Move lead to Quoted?',
+          message:
+            'Make sure a quote with line items has been built for this lead. Quote-followup automations will reference it — without a real quote, those emails will look broken to the customer.',
+        };
+      } else if (target === 'scheduling') {
+        confirm = {
+          title: 'Move lead to Ready To Schedule?',
+          message:
+            'This stops the current cadence. The scheduling cadence will start once a scheduler is assigned.',
+        };
+      } else if (target === 'new' && isBackward) {
+        confirm = {
+          title: 'Reset lead to New?',
+          message:
+            'This unassigns all users from the lead. Any active cadence will keep running and must be ended manually from the cadence panel.',
+        };
+      } else if (target === 'in_process' && isBackward) {
+        confirm = {
+          title: 'Move lead back to Working The Lead?',
+          message:
+            'Any active cadence on the current stage will keep running and must be ended manually from the cadence panel.',
+        };
+      }
+
+      if (confirm) {
+        setPendingStatusChange({ target, ...confirm });
+      } else {
+        handleStatusChange(target);
+      }
+    },
+    [lead, handleStatusChange]
+  );
+
   // Sync branch state when lead loads
   useEffect(() => {
     if (lead?.branch_id !== undefined) {
@@ -994,10 +1066,15 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
         `${lead.customer.first_name || ''} ${lead.customer.last_name || ''}`.trim() ||
         'Lead Details';
 
-      // Format timestamps with HTML formatting
-      const createdDate = formatHeaderDate(lead.created_at, true);
-      const updatedDate = formatHeaderDate(lead.updated_at, true);
-      const description = `Created: <span>${createdDate}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Last update: <span>${updatedDate}</span>`;
+      const description = (
+        <button
+          type="button"
+          className={styles.viewCustomerCardButton}
+          onClick={() => setShowCustomerCardModal(true)}
+        >
+          View Full Customer Card
+        </button>
+      );
 
       setPageHeader({
         title: customerName,
@@ -1366,6 +1443,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
       <div className="container">
         <LeadProgressBar
           leadStatus={lead.lead_status as 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost'}
+          onStatusChange={handleProgressBarStatusClick}
         />
         <div className={styles.content}>
           <LeadStepContent
@@ -1381,6 +1459,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
             }}
             onNotInterested={handleNotInterested}
             onReadyToSchedule={handleReadyToSchedule}
+            onLineItemsSaved={handleLineItemsSaved}
           />
         </div>
 
@@ -1407,6 +1486,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
           customerPhone={lead.customer?.phone}
           companyId={lead.company_id}
           currentAssigneeId={lead.assigned_to}
+          branchId={lead.branch_id ?? null}
           type="lead"
         />
 
@@ -1473,6 +1553,26 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
               ? `${lead.customer.first_name} ${lead.customer.last_name}`
               : 'this lead'
           }
+        />
+
+        <CustomerCardModal
+          isOpen={showCustomerCardModal}
+          onClose={() => setShowCustomerCardModal(false)}
+          lead={lead}
+        />
+
+        <StatusChangeConfirmModal
+          isOpen={!!pendingStatusChange}
+          title={pendingStatusChange?.title || ''}
+          message={pendingStatusChange?.message || ''}
+          onConfirm={async () => {
+            const target = pendingStatusChange?.target;
+            setPendingStatusChange(null);
+            if (target) {
+              await handleStatusChange(target);
+            }
+          }}
+          onCancel={() => setPendingStatusChange(null)}
         />
       </div>
     </>

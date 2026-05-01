@@ -15,6 +15,10 @@ import {
   linkCustomerToServiceAddress,
 } from '@/lib/service-addresses';
 import { deriveSource } from '@/lib/taxonomy/derive-source';
+import {
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 
 export async function OPTIONS(request: NextRequest) {
@@ -365,6 +369,23 @@ export async function POST(request: NextRequest) {
       isWidget: true,
     });
 
+    // Resolve branch via cache-aware helper. Uses service_address_id when
+    // available; falls back to a ZIP-only lookup otherwise.
+    let widgetTicketBranchId: string | null = null;
+    if (serviceAddressId) {
+      widgetTicketBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        submission.companyId,
+        serviceAddressId
+      );
+    } else if (submission.addressDetails?.zip) {
+      widgetTicketBranchId = await resolveBranchIdByZip(
+        supabase,
+        submission.companyId,
+        submission.addressDetails.zip
+      );
+    }
+
     // Create ticket with enhanced attribution data
     const { data: ticket, error: ticketError } = await supabase
       .from('tickets')
@@ -377,6 +398,7 @@ export async function POST(request: NextRequest) {
           format: 'form',
           status: status,
           priority,
+          branch_id: widgetTicketBranchId,
           description: notes,
           estimated_value: submission.estimatedPrice
             ? (submission.estimatedPrice.min + submission.estimatedPrice.max) / 2

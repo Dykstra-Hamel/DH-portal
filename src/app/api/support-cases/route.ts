@@ -7,7 +7,11 @@ import {
   verifyCompanyAccess,
   getSupabaseClient
 } from '@/lib/api-utils';
-import { getUserBranchFilter } from '@/lib/branch-filter';
+import {
+  getUserBranchFilter,
+  resolveBranchIdByZip,
+  resolveBranchForServiceAddress,
+} from '@/lib/branch-filter';
 
 export async function GET(request: NextRequest) {
   try {
@@ -95,10 +99,12 @@ export async function GET(request: NextRequest) {
     if (companyId) {
       query = query.eq('company_id', companyId);
 
-      // Branch filtering: restrict to user's assigned branches (server-side)
+      // Branch filter: explicit branchId always shows that branch + null
+      // records (so unassigned-branch cases stay visible). Without an
+      // explicit pick, fall back to user-restriction (user's branches + null).
       const branchId = searchParams.get('branchId');
       if (branchId) {
-        query = query.eq('branch_id', branchId);
+        query = query.or(`branch_id.is.null,branch_id.eq.${branchId}`);
       } else {
         const branchFilter = await getUserBranchFilter(supabase, user.id, companyId, isGlobalAdmin);
         if (branchFilter) query = query.or(branchFilter);
@@ -307,11 +313,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Branch resolution:
+    //   1. Explicit branch_id in body.
+    //   2. Inherit from linked ticket (covers most cases — support cases
+    //      almost always come from tickets).
+    //   3. service_address-aware via the linked ticket's service_address_id.
+    //      skipGeocode: don't add Google API latency to user submissions.
+    //   4. Customer ZIP fast-path (last-ditch when there's no ticket).
+    const supportCaseCompanyId = (supportCaseData as { company_id?: string })
+      .company_id;
+    let resolvedBranchId: string | null = supportCaseData.branch_id ?? null;
+
+    let ticketServiceAddressId: string | null = null;
+    if (!resolvedBranchId && supportCaseData.ticket_id && supportCaseCompanyId) {
+      const { data: ticket } = await supabase
+        .from('tickets')
+        .select('branch_id, service_address_id')
+        .eq('id', supportCaseData.ticket_id)
+        .maybeSingle();
+      resolvedBranchId = ticket?.branch_id ?? null;
+      ticketServiceAddressId = ticket?.service_address_id ?? null;
+    }
+
+    if (!resolvedBranchId && ticketServiceAddressId && supportCaseCompanyId) {
+      resolvedBranchId = await resolveBranchForServiceAddress(
+        supabase,
+        supportCaseCompanyId,
+        ticketServiceAddressId,
+        { skipGeocode: true }
+      );
+    }
+
+    if (!resolvedBranchId && supportCaseData.customer_id && supportCaseCompanyId) {
+      const { data: cust } = await supabase
+        .from('customers')
+        .select('zip_code')
+        .eq('id', supportCaseData.customer_id)
+        .maybeSingle();
+      const candidateZip = cust?.zip_code?.trim() || null;
+      if (candidateZip) {
+        resolvedBranchId = await resolveBranchIdByZip(
+          supabase,
+          supportCaseCompanyId,
+          candidateZip
+        );
+      }
+    }
+
     // Insert the support case
     const { data: newSupportCase, error: insertError } = await supabase
       .from('support_cases')
       .insert([{
         ...supportCaseData,
+        branch_id: resolvedBranchId,
         status: supportCaseData.status || 'unassigned',
         priority: supportCaseData.priority || 'medium',
         archived: false,

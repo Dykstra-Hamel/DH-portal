@@ -10,6 +10,16 @@ export interface PlanVariant {
   treatment_frequency?: string;
 }
 
+export interface AppliedQuoteDiscount {
+  id: string;
+  discount_name: string;
+  discount_type: 'percentage' | 'fixed_amount';
+  discount_value: number;
+  applies_to_price: 'initial' | 'recurring' | 'both';
+  recurring_discount_type?: 'percentage' | 'fixed_amount' | null;
+  recurring_discount_value?: number | null;
+}
+
 export interface Quote {
   id: string;
   lead_id: string;
@@ -25,9 +35,20 @@ export interface Quote {
   home_size_range?: string;
   yard_size_range?: string;
 
-  // Pricing totals
+  // Map-measured yard area (sq ft) — persisted from ServiceWizard map outlines
+  yard_sq_ft?: number | null;
+
+  // Pricing subtotals (pre-discount)
+  subtotal_initial_price?: number;
+  subtotal_recurring_price?: number;
+
+  // Pricing totals (post-discount)
   total_initial_price: number;
   total_recurring_price: number;
+
+  // Applied discount (joined from company_discounts via applied_discount_id)
+  applied_discount_id?: string | null;
+  applied_discount?: AppliedQuoteDiscount | null;
 
   // Status and validity
   quote_status: QuoteStatus;
@@ -43,8 +64,11 @@ export interface Quote {
   signature_data?: string;
   device_data?: any;
 
-  // Customer feedback
+  // Customer feedback / inspector notes
   customer_comments?: string;
+
+  // FieldMap wizard data
+  safety_checklist_responses?: unknown;
 
   // Timestamps
   created_at: string;

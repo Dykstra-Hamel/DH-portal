@@ -12,19 +12,29 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useUserDepartments } from '@/hooks/useUserDepartments';
+import { useCompanyRole } from '@/hooks/useCompanyRole';
 import { useUser } from '@/hooks/useUser';
+import { useViewAs } from '@/hooks/useViewAs';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
 import { FieldMapDashboard } from '@/components/FieldMap/FieldMapDashboard/FieldMapDashboard';
 import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsDashboard/FieldSalesLeadsDashboard';
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
+import { FieldSalesAdminDashboard } from '@/components/FieldSalesAdminDashboard/FieldSalesAdminDashboard';
 import { TechLeadsOpportunities } from '@/components/TechLeads/TechLeadsOpportunities/TechLeadsOpportunities';
+import { TechDashboardHome } from '@/components/TechLeads/TechDashboardHome/TechDashboardHome';
 import ActionsAutomationsPanel from '@/components/Tasks/ActionsAutomationsPanel/ActionsAutomationsPanel';
 import AdditionalTasksPanel from '@/components/Tasks/AdditionalTasksPanel/AdditionalTasksPanel';
 import { Toast } from '@/components/Common/Toast';
 import styles from './dashboard.module.scss';
 
-type DashboardTab = 'route' | 'leads' | 'opportunities' | 'actions' | 'tasks';
+type DashboardTab =
+  | 'home'
+  | 'route'
+  | 'leads'
+  | 'opportunities'
+  | 'actions'
+  | 'tasks';
 
 export default function FieldSalesDashboard() {
   return (
@@ -39,16 +49,29 @@ function FieldSalesDashboardInner() {
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState<string | null>(null);
   const { selectedCompany, isAdmin } = useCompany();
-  const { departments } = useUserDepartments(
+  const { departments, isLoading: isDepartmentsLoading } = useUserDepartments(
     userId ?? '',
     selectedCompany?.id ?? ''
   );
+  const { isCompanyAdmin, role: companyRole } = useCompanyRole(selectedCompany?.id);
   const { profile, user } = useUser();
+  const { viewAs } = useViewAs();
+  const [defaultManagerBranchId, setDefaultManagerBranchId] = useState<
+    string | null
+  >(null);
+
+  // A global admin can preview the dashboard as a different role/user via
+  // the ViewAsDropdown in the header. The override only changes which
+  // branch of the routing tree we render — data access is unchanged.
+  const viewAsActive =
+    isAdmin && !!viewAs && viewAs.companyId === selectedCompany?.id;
+  const effectiveDashboardRole: 'admin' | 'manager' | 'inspector' | 'tech' | null =
+    viewAsActive ? viewAs!.role : null;
   const { setPageHeader } = usePageActions();
   const { counts, newItemIndicators, clearNewItemIndicator } =
     useRealtimeCounts();
 
-  const [activeTab, setActiveTab] = useState<DashboardTab>('route');
+  const [activeTab, setActiveTab] = useState<DashboardTab>('home');
   const [routeStops, setRouteStops] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
   const [sliderStyle, setSliderStyle] = useState<{
@@ -84,30 +107,122 @@ function FieldSalesDashboardInner() {
     });
   }, []);
 
-  const isTechnicianOnly =
+  // Resolve a manager's default branch: their first user_branch_assignments
+  // row for this company, falling back to the company's primary branch.
+  // Also fired when a global admin is impersonating a manager — in that
+  // case we look up the impersonated user's branches.
+  useEffect(() => {
+    const isManagerContext =
+      effectiveDashboardRole === 'manager' || companyRole === 'manager';
+    const targetUserId =
+      effectiveDashboardRole === 'manager' && viewAs ? viewAs.userId : userId;
+    if (!isManagerContext || !targetUserId || !selectedCompany?.id) {
+      setDefaultManagerBranchId(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/users/${targetUserId}/branches?companyId=${selectedCompany.id}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          const first = (data.assignments ?? [])[0];
+          if (first?.branch_id) {
+            if (!cancelled) setDefaultManagerBranchId(first.branch_id);
+            return;
+          }
+        }
+        const branchesRes = await fetch(
+          `/api/branches?companyId=${selectedCompany.id}`
+        );
+        if (branchesRes.ok && !cancelled) {
+          const data = await branchesRes.json();
+          const primary = (data.branches ?? []).find(
+            (b: any) => b.is_primary
+          );
+          setDefaultManagerBranchId(primary?.id ?? null);
+        }
+      } catch {
+        if (!cancelled) setDefaultManagerBranchId(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    companyRole,
+    userId,
+    selectedCompany?.id,
+    effectiveDashboardRole,
+    viewAs,
+  ]);
+
+  const baseTechnicianOnly =
     !isAdmin &&
     departments.includes('technician') &&
     !departments.includes('inspector');
-  const isInspector = isAdmin || departments.includes('inspector');
+  const baseInspector = isAdmin || departments.includes('inspector');
+
+  // Apply view-as overrides for the inspector/tech tab views.
+  const isTechnicianOnly =
+    effectiveDashboardRole === 'tech'
+      ? true
+      : effectiveDashboardRole === 'inspector'
+      ? false
+      : baseTechnicianOnly;
+  const isInspector =
+    effectiveDashboardRole === 'inspector'
+      ? true
+      : effectiveDashboardRole === 'tech'
+      ? false
+      : baseInspector;
+
+  // Per-user data scope. When viewing as a specific inspector/tech, swap in
+  // their user_id where supported (FieldSalesLeadsDashboard, etc.). Panels
+  // that read useUser() internally will still see the actual signed-in user.
+  const effectiveUserId =
+    viewAsActive &&
+    (effectiveDashboardRole === 'inspector' ||
+      effectiveDashboardRole === 'tech')
+      ? viewAs!.userId
+      : userId;
 
   const TAB_ORDER = useMemo<DashboardTab[]>(
     () =>
       isTechnicianOnly
-        ? ['route', 'opportunities']
+        ? ['home', 'route', 'opportunities']
         : ['route', 'leads', 'actions', 'tasks'],
     [isTechnicianOnly]
   );
 
+  // If the current tab isn't valid for this user (e.g. 'home' default for a
+  // non-tech user), snap to the first tab in the current order. Wait for
+  // userId *and* the departments fetch to finish — TAB_ORDER depends on
+  // `isTechnicianOnly`, which is false while departments are still loading,
+  // so running earlier would bump technicians off the 'home' default.
+  useEffect(() => {
+    if (!userId || isDepartmentsLoading) return;
+    if (!TAB_ORDER.includes(activeTab)) {
+      setActiveTab(TAB_ORDER[0]);
+    }
+  }, [TAB_ORDER, activeTab, userId, isDepartmentsLoading]);
+
   // Set page header
   useEffect(() => {
     if (!profile) return;
-    const firstName = `${profile.first_name}'s` || 'Your';
-    const title = `${firstName} Dashboard`;
+    const firstName = profile.first_name || 'Your';
+    const title = isCompanyAdmin
+      ? `${firstName}'s Team Dashboard`
+      : isTechnicianOnly
+        ? `${firstName}'s Tech Dashboard`
+        : `${firstName}'s Sales Dashboard`;
     setPageHeader({ title, description: '' });
     return () => {
       setPageHeader(null);
     };
-  }, [profile, isTechnicianOnly, setPageHeader]);
+  }, [profile, isTechnicianOnly, isCompanyAdmin, setPageHeader]);
 
   // Fetch route stops count
   useEffect(() => {
@@ -191,6 +306,7 @@ function FieldSalesDashboardInner() {
     DashboardTab,
     { label: string; count: number; isNew?: boolean }
   > = {
+    home: { label: 'Dashboard', count: 0 },
     route: { label: 'My Route', count: routeStops },
     leads: {
       label: 'My Leads & Sales',
@@ -213,6 +329,60 @@ function FieldSalesDashboardInner() {
     },
   };
 
+  // Company admin/owner — aggregated team reports dashboard (all branches).
+  // Company manager — same component but scoped to direct reports + default branch.
+  // Global admin (no view-as override) — admin dashboard, even if they don't
+  // have a user_companies row for the selected company.
+  // Global admin (with override) — preview as the chosen role.
+  const renderAdminOrManagerDashboard =
+    !!selectedCompany?.id &&
+    !!userId &&
+    ((!viewAsActive && (isCompanyAdmin || isAdmin)) ||
+      (viewAsActive &&
+        (effectiveDashboardRole === 'admin' ||
+          effectiveDashboardRole === 'manager')));
+
+  if (renderAdminOrManagerDashboard && selectedCompany?.id) {
+    let dashboardRole: 'admin' | 'manager';
+    let managerUserIdForDashboard: string | undefined;
+
+    if (viewAsActive && effectiveDashboardRole === 'manager') {
+      dashboardRole = 'manager';
+      managerUserIdForDashboard = viewAs!.userId;
+    } else if (viewAsActive && effectiveDashboardRole === 'admin') {
+      dashboardRole = 'admin';
+      managerUserIdForDashboard = undefined;
+    } else {
+      dashboardRole = companyRole === 'manager' ? 'manager' : 'admin';
+      managerUserIdForDashboard =
+        dashboardRole === 'manager' ? userId ?? undefined : undefined;
+    }
+
+    return (
+      <div className={styles.wrapperInspector}>
+        <div className={styles.contentArea}>
+          <FieldSalesAdminDashboard
+            companyId={selectedCompany.id}
+            greetingName={profile?.first_name ?? undefined}
+            scopeRole={dashboardRole}
+            managerUserId={managerUserIdForDashboard}
+            defaultBranchId={
+              dashboardRole === 'manager' ? defaultManagerBranchId : null
+            }
+          />
+        </div>
+        <FieldSalesNav />
+        <Toast
+          message={successToast ?? ''}
+          isVisible={!!successToast}
+          onClose={() => setSuccessToast(null)}
+          type="success"
+          centered
+        />
+      </div>
+    );
+  }
+
   // Inspector / Admin / Technician view (with tabs)
   if (isTechnicianOnly || isInspector) {
     return (
@@ -226,6 +396,19 @@ function FieldSalesDashboardInner() {
                 className={styles.tabSlider}
                 style={{ left: sliderStyle.left, width: sliderStyle.width }}
               />
+            )}
+
+            {isTechnicianOnly && (
+              <button
+                ref={el => {
+                  tabRefs.current[TAB_ORDER.indexOf('home')] = el;
+                }}
+                type="button"
+                className={`${styles.tab} ${activeTab === 'home' ? styles.tabActive : ''}`}
+                onClick={() => handleTabClick('home')}
+              >
+                <span className={styles.tabLabel}>Dashboard</span>
+              </button>
             )}
 
             <button
@@ -321,11 +504,13 @@ function FieldSalesDashboardInner() {
               <span className={styles.tabLabel}>
                 {tabConfig[activeTab].label}
               </span>
-              <span
-                className={`${styles.tabCount} ${tabConfig[activeTab].isNew ? styles.tabCountNew : ''}`}
-              >
-                {tabConfig[activeTab].count}
-              </span>
+              {activeTab !== 'home' && (
+                <span
+                  className={`${styles.tabCount} ${tabConfig[activeTab].isNew ? styles.tabCountNew : ''}`}
+                >
+                  {tabConfig[activeTab].count}
+                </span>
+              )}
               <span
                 className={`${styles.mobileTabChevron} ${mobileDropdownOpen ? styles.mobileTabChevronOpen : ''}`}
                 aria-hidden="true"
@@ -362,11 +547,13 @@ function FieldSalesDashboardInner() {
                     <span className={styles.tabLabel}>
                       {tabConfig[tab].label}
                     </span>
-                    <span
-                      className={`${styles.tabCount} ${tabConfig[tab].isNew ? styles.tabCountNew : ''}`}
-                    >
-                      {tabConfig[tab].count}
-                    </span>
+                    {tab !== 'home' && (
+                      <span
+                        className={`${styles.tabCount} ${tabConfig[tab].isNew ? styles.tabCountNew : ''}`}
+                      >
+                        {tabConfig[tab].count}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -376,6 +563,10 @@ function FieldSalesDashboardInner() {
 
         {/* Main content area */}
         <div className={styles.contentArea}>
+          {activeTab === 'home' && isTechnicianOnly && (
+            <TechDashboardHome />
+          )}
+
           {activeTab === 'route' && (
             <FieldMapDashboard
               companyId={selectedCompany?.id ?? ''}
@@ -394,7 +585,7 @@ function FieldSalesDashboardInner() {
             <div className={styles.leadsSection}>
               <FieldSalesLeadsDashboard
                 companyId={selectedCompany?.id ?? ''}
-                userId={userId ?? ''}
+                userId={effectiveUserId ?? ''}
               />
             </div>
           )}
@@ -434,7 +625,7 @@ function FieldSalesDashboardInner() {
             )}
         </div>
 
-        <FieldSalesNav />
+        <FieldSalesNav disableNew={activeTab === 'home'} />
         <Toast
           message={successToast ?? ''}
           isVisible={!!successToast}

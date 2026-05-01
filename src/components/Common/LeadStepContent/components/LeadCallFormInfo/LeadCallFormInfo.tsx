@@ -5,38 +5,35 @@ import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import { Pencil, X, ChevronLeft, ChevronRight, Truck, MapPin } from 'lucide-react';
 import { Lead, LeadSource } from '@/types/lead';
+import { Quote } from '@/types/quote';
 import AudioPlayer from '@/components/Common/AudioPlayer/AudioPlayer';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
 import { authenticatedFetch } from '@/lib/api-client';
-import { MapPlotCanvas } from '@/components/FieldMap/MapPlot/MapPlotCanvas/MapPlotCanvas';
-import type { MapPlotData } from '@/components/FieldMap/MapPlot/types';
+import { formatPreferredDay } from '@/lib/date-utils';
 import styles from './LeadCallFormInfo.module.scss';
 import cardStyles from '@/components/Common/InfoCard/InfoCard.module.scss';
 
-// Renders a read-only MapPlotCanvas from map_plot_data stored on the lead
-function FieldMapPlotSection({ mapPlotData, companyId }: { mapPlotData: MapPlotData | null; companyId?: string }) {
-  if (!mapPlotData) return null;
+// Types for checklist responses stored in quote.safety_checklist_responses
+interface ChecklistResponse {
+  questionId: string;
+  questionText: string;
+  answerType: 'yes_no' | 'text';
+  answer: string;
+  parentQuestionId?: string | null;
+}
 
-  return (
-    <div className={styles.transcriptSection}>
-      <div className={styles.transcriptHeader}>
-        <h4 className={cardStyles.dataLabel}>Field Map Plot</h4>
-      </div>
-      <MapPlotCanvas
-        mapPlotData={mapPlotData}
-        onChange={() => {}}
-        isReadOnly
-        companyId={companyId}
-      />
-    </div>
-  );
+interface ChecklistResponseGroup {
+  checklistId: string;
+  checklistName: string;
+  responses: ChecklistResponse[];
 }
 
 interface LeadCallFormInfoProps {
   lead: Lead;
+  quote?: Quote | null;
 }
 
-export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
+export function LeadCallFormInfo({ lead, quote }: LeadCallFormInfoProps) {
   const [showCallSummary, setShowCallSummary] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [portalContainer, setPortalContainer] = useState<Element | null>(null);
@@ -167,6 +164,82 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
     );
   };
 
+  const renderQuoteNotes = () => {
+    if (!quote?.customer_comments) return null;
+    return (
+      <div className={styles.transcriptSection}>
+        <div className={styles.transcriptHeader}>
+          <h4 className={cardStyles.dataLabel}>Quote Notes</h4>
+        </div>
+        <div className={styles.summaryPlainContent}>
+          <span className={cardStyles.transcriptText}>{quote.customer_comments}</span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderChecklistAnswers = () => {
+    const raw = quote?.safety_checklist_responses;
+    if (!Array.isArray(raw) || raw.length === 0) return null;
+
+    // Validate it's the new grouped format (not legacy flat format)
+    const groups = raw as ChecklistResponseGroup[];
+    if (!groups[0]?.checklistName) return null;
+
+    return (
+      <div className={styles.transcriptSection}>
+        <div className={styles.transcriptHeader}>
+          <h4 className={cardStyles.dataLabel}>Checklist Answers</h4>
+        </div>
+        <div className={styles.checklistAnswers}>
+          {groups.map(group => {
+            const topLevel = group.responses.filter(r => !r.parentQuestionId);
+            return (
+              <div key={group.checklistId} className={styles.checklistGroup}>
+                <p className={styles.checklistGroupName}>{group.checklistName}</p>
+                {topLevel.map(resp => {
+                  const children = group.responses.filter(r => r.parentQuestionId === resp.questionId);
+                  return (
+                    <div key={resp.questionId} className={styles.checklistItem}>
+                      <div className={styles.checklistQuestion}>
+                        <span className={styles.checklistQuestionText}>{resp.questionText}</span>
+                        {resp.answerType === 'yes_no' ? (
+                          <span className={`${styles.checklistBadge} ${resp.answer === 'yes' ? styles.checklistBadgeYes : styles.checklistBadgeNo}`}>
+                            {resp.answer === 'yes' ? 'Yes' : 'No'}
+                          </span>
+                        ) : (
+                          <span className={styles.checklistAnswerText}>{resp.answer}</span>
+                        )}
+                      </div>
+                      {children.length > 0 && (
+                        <div className={styles.checklistChildren}>
+                          {children.map(child => (
+                            <div key={child.questionId} className={styles.checklistItem}>
+                              <div className={styles.checklistQuestion}>
+                                <span className={styles.checklistQuestionText}>{child.questionText}</span>
+                                {child.answerType === 'yes_no' ? (
+                                  <span className={`${styles.checklistBadge} ${child.answer === 'yes' ? styles.checklistBadgeYes : styles.checklistBadgeNo}`}>
+                                    {child.answer === 'yes' ? 'Yes' : 'No'}
+                                  </span>
+                                ) : (
+                                  <span className={styles.checklistAnswerText}>{child.answer}</span>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   const handleSaveAttribution = async () => {
     setIsSaving(true);
     try {
@@ -287,7 +360,8 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
               </div>
             </div>
           )}
-          <FieldMapPlotSection mapPlotData={lead.map_plot_data ?? null} companyId={lead.company_id} />
+          {renderQuoteNotes()}
+          {renderChecklistAnswers()}
         </div>
       ) : lead.format === 'form' || lead.lead_type === 'web_form' || lead.lead_type === 'website_form' || lead.lead_type === 'widget_form' ? (
         <>
@@ -325,11 +399,9 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
                   </span>
                 </div>
                 <div className={styles.callDetailItem}>
-                  <span className={cardStyles.dataLabel}>Requested Date</span>
+                  <span className={cardStyles.dataLabel}>Preferred Day</span>
                   <span className={cardStyles.dataText}>
-                    {lead.requested_date
-                      ? new Date(lead.requested_date).toLocaleDateString()
-                      : 'Not specified'}
+                    {formatPreferredDay(lead.requested_date, 'Not specified')}
                   </span>
                 </div>
                 <div className={styles.callDetailItem}>
@@ -517,116 +589,125 @@ export function LeadCallFormInfo({ lead }: LeadCallFormInfoProps) {
           )}
         </div>
       ) : lead.call_record ? (
-        <>
-          {/* Call Insights Section */}
-          <div className={styles.cardContent}>
-            <div className={styles.callInsightsSection}>
-              <h4 className={cardStyles.defaultText}>Call Insights:</h4>
+        <div className={styles.summaryGrid}>
+          <div className={styles.summaryCol}>
+            {/* Call Insights Section */}
+            <div className={styles.cardContent}>
+              <div className={styles.callInsightsSection}>
+                <h4 className={cardStyles.defaultText}>Call Insights:</h4>
+              </div>
+              <div className={styles.callInsightsGrid}>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Method</span>
+                  <span className={cardStyles.dataText}>{getCallMethod()}</span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Source</span>
+                  <span className={cardStyles.dataText}>
+                    {getLeadSourceDisplay(lead.lead_source)}
+                  </span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>AI Qualification</span>
+                  <span className={cardStyles.dataText}>
+                    {getAIQualification(lead.lead_status)}
+                  </span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Caller Sentiment</span>
+                  <span className={cardStyles.dataText}>
+                    {capitalizeFirst(lead.call_record.sentiment)}
+                  </span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Primary Pest Issue</span>
+                  <span className={cardStyles.dataText}>
+                    {capitalizeFirst(lead.call_record.pest_issue)}
+                  </span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>
+                    Preferred Service Time
+                  </span>
+                  <span className={cardStyles.dataText}>
+                    {capitalizeFirst(lead.call_record.preferred_service_time)}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className={styles.callInsightsGrid}>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Method</span>
-                <span className={cardStyles.dataText}>{getCallMethod()}</span>
+
+            {/* Call Details Section */}
+            <div className={styles.callDetailsSection}>
+              <div className={styles.callDetailsHeader}>
+                <h4 className={cardStyles.defaultText}>Call Details:</h4>
               </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Source</span>
-                <span className={cardStyles.dataText}>
-                  {getLeadSourceDisplay(lead.lead_source)}
-                </span>
-              </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>AI Qualification</span>
-                <span className={cardStyles.dataText}>
-                  {getAIQualification(lead.lead_status)}
-                </span>
-              </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Caller Sentiment</span>
-                <span className={cardStyles.dataText}>
-                  {capitalizeFirst(lead.call_record.sentiment)}
-                </span>
-              </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Primary Pest Issue</span>
-                <span className={cardStyles.dataText}>
-                  {capitalizeFirst(lead.call_record.pest_issue)}
-                </span>
-              </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>
-                  Preferred Service Time
-                </span>
-                <span className={cardStyles.dataText}>
-                  {capitalizeFirst(lead.call_record.preferred_service_time)}
-                </span>
+              <div className={styles.callInsightsGrid}>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Call Started</span>
+                  <span className={cardStyles.dataText}>
+                    {formatCallTimestamp(lead.call_record.start_timestamp)}
+                  </span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Call Ended</span>
+                  <span className={cardStyles.dataText}>
+                    {formatCallTimestamp(lead.call_record.end_timestamp)}
+                  </span>
+                </div>
+                <div className={styles.callDetailItem}>
+                  <span className={cardStyles.dataLabel}>Disconnect Reason</span>
+                  <span className={cardStyles.dataText}>
+                    {capitalizeFirst(lead.call_record.disconnect_reason)}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Call Details Section */}
-          <div className={styles.callDetailsSection}>
-            <div className={styles.callDetailsHeader}>
-              <h4 className={cardStyles.defaultText}>Call Details:</h4>
-            </div>
-            <div className={styles.callInsightsGrid}>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Call Started</span>
-                <span className={cardStyles.dataText}>
-                  {formatCallTimestamp(lead.call_record.start_timestamp)}
-                </span>
+          <div className={styles.summaryCol}>
+            {/* Call Recording Section */}
+            {lead.call_record.recording_url && (
+              <div className={styles.recordingSection}>
+                <h4 className={cardStyles.dataLabel}>Call Recording</h4>
+                <AudioPlayer src={lead.call_record.recording_url} />
               </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Call Ended</span>
-                <span className={cardStyles.dataText}>
-                  {formatCallTimestamp(lead.call_record.end_timestamp)}
-                </span>
+            )}
+
+            {/* Call Transcript Section */}
+            {lead.call_record.transcript && (
+              <div className={styles.transcriptSection}>
+                <div className={styles.transcriptHeader}>
+                  {lead.call_record.call_analysis?.call_summary ? (
+                    <div className={styles.toggleContainer}>
+                      <span className={styles.toggleLabel}>
+                        Conversation Details
+                      </span>
+                      <button
+                        className={`${styles.toggle} ${showCallSummary ? styles.active : ''}`}
+                        onClick={() => setShowCallSummary(!showCallSummary)}
+                      >
+                        <div className={styles.toggleCircle}></div>
+                      </button>
+                      <span className={styles.toggleLabel}>Call Summary</span>
+                    </div>
+                  ) : (
+                    <h4 className={cardStyles.dataLabel}>
+                      Conversation Details
+                    </h4>
+                  )}
+                </div>
+                <div className={styles.transcriptContent}>
+                  <span className={cardStyles.transcriptText}>
+                    {showCallSummary
+                      ? lead.call_record.call_analysis?.call_summary
+                      : lead.call_record.transcript}
+                  </span>
+                </div>
               </div>
-              <div className={styles.callDetailItem}>
-                <span className={cardStyles.dataLabel}>Disconnect Reason</span>
-                <span className={cardStyles.dataText}>
-                  {capitalizeFirst(lead.call_record.disconnect_reason)}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
 
-          {/* Call Recording Section */}
-          {lead.call_record.recording_url && (
-            <div className={styles.recordingSection}>
-              <h4 className={cardStyles.dataLabel}>Call Recording</h4>
-              <AudioPlayer src={lead.call_record.recording_url} />
-            </div>
-          )}
-
-          {/* Call Transcript Section */}
-          {lead.call_record.transcript && (
-            <div className={styles.transcriptSection}>
-              <div className={styles.transcriptHeader}>
-                <h4 className={cardStyles.dataLabel}>
-                  {showCallSummary ? 'Call Summary' : 'Transcript'}
-                </h4>
-                {lead.call_record.call_analysis?.call_summary && (
-                  <div className={styles.toggleContainer}>
-                    <button
-                      className={`${styles.toggle} ${showCallSummary ? styles.active : ''}`}
-                      onClick={() => setShowCallSummary(!showCallSummary)}
-                    >
-                      <div className={styles.toggleCircle}></div>
-                    </button>
-                    <span className={styles.toggleLabel}>Call Summary</span>
-                  </div>
-                )}
-              </div>
-              <div className={styles.transcriptContent}>
-                <span className={cardStyles.transcriptText}>
-                  {showCallSummary
-                    ? lead.call_record.call_analysis?.call_summary
-                    : lead.call_record.transcript}
-                </span>
-              </div>
-            </div>
-          )}
-        </>
+        </div>
       ) : (
         <div className={styles.noCallData}>
           <p>No call data available for this lead.</p>

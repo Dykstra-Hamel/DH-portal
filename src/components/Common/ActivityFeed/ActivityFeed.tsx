@@ -114,6 +114,28 @@ export function ActivityFeed({
       return statusMap[value.toLowerCase()] || value;
     }
 
+    // Render JSON-stringified arrays as a comma-separated list (or "None")
+    const trimmed = value.trim();
+    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          if (parsed.length === 0) return 'None';
+          return parsed
+            .map(item =>
+              typeof item === 'string'
+                ? item
+                : item && typeof item === 'object'
+                  ? item.name || item.label || JSON.stringify(item)
+                  : String(item)
+            )
+            .join(', ');
+        }
+      } catch {
+        // Fall through to raw value
+      }
+    }
+
     return value;
   };
 
@@ -129,6 +151,9 @@ export function ActivityFeed({
         const fieldName = activity.field_name || '';
         const formattedOldValue = formatFieldValue(fieldName, activity.old_value || null);
         const formattedNewValue = formatFieldValue(fieldName, activity.new_value || null);
+        const hasChange =
+          (formattedOldValue || formattedNewValue) &&
+          formattedOldValue !== formattedNewValue;
 
         return {
           main: (
@@ -137,9 +162,9 @@ export function ActivityFeed({
               <strong>{getFieldLabel(fieldName)}</strong>
             </span>
           ),
-          detail: formattedOldValue && formattedNewValue && (
+          detail: hasChange && (
             <div className={styles.changeDetail}>
-              {formattedOldValue} → {formattedNewValue}
+              {formattedOldValue || 'None'} → {formattedNewValue || 'None'}
             </div>
           ),
         };
