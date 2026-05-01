@@ -93,6 +93,23 @@
   font-weight: 700;
 }
 
+.savedBtnDisabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+
+  &:hover {
+    border-color: var(--border-color);
+    color: var(--gray-800);
+  }
+}
+
+.savedComingSoon {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--gray-500);
+  margin-left: 2px;
+}
+
 // ── Filter bar ──────────────────────────────────────────────────────────────
 
 .filterBar {
@@ -412,6 +429,93 @@
   gap: 6px;
 }
 
+.popoverHelp {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: var(--gray-500);
+}
+
+.popoverMemberRowLabel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.popoverMemberRowSubtitle {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--gray-500);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compareStrip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--blue-50, #eff6ff);
+  color: var(--blue-700, #1d4ed8);
+  font-size: 12px;
+  width: fit-content;
+}
+
+.compareStripLabel {
+  font-weight: 500;
+  color: var(--gray-600);
+}
+
+.compareStripKind {
+  font-weight: 600;
+}
+
+.compareStripCount {
+  color: var(--gray-600);
+}
+
+.compareStripClear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(37, 99, 235, 0.12);
+  }
+}
+
+.compareSelectionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px 16px;
+
+  .filterChip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+.teamGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 12px 16px 16px;
+}
+
 // ── Loading / error ─────────────────────────────────────────────────────────
 
 .loading,
@@ -617,6 +721,23 @@
 
   &:active {
     transform: scale(0.98);
+  }
+}
+
+.kpiClickable {
+  appearance: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+
+  &:hover {
+    border-color: var(--blue-400);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.08);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--blue-500);
+    outline-offset: 2px;
   }
 }
 
@@ -1249,5 +1370,94 @@
   to {
     opacity: 1;
     transform: translate(-50%, 0);
+  }
+}
+
+// ── KPI drill-down modal ────────────────────────────────────────────────
+
+.metricModalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 8vh 16px;
+  z-index: 1100;
+  animation: fadeIn 0.12s ease-out;
+}
+
+.metricModalCard {
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100vh - 16vh);
+  background: var(--white);
+  border-radius: var(--border-radius-lg);
+  box-shadow:
+    0 20px 50px rgba(0, 0, 0, 0.18),
+    0 6px 18px rgba(0, 0, 0, 0.06);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.metricModalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.metricModalTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.metricModalHeaderRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metricModalClose {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--gray-500);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  &:hover {
+    background: var(--gray-100);
+    color: var(--gray-700);
+  }
+}
+
+.metricModalBody {
+  overflow-y: auto;
+  padding: 8px 16px 16px;
+}
+
+.metricModalEmpty {
+  padding: 32px 12px;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 13px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
   }
 }

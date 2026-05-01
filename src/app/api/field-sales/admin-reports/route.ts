@@ -15,8 +15,12 @@ function parseCsv(value: string | null): string[] | null {
   return parts.length > 0 ? parts : null;
 }
 
-function parseCompare(value: string | null): 'users' | 'branches' | null {
-  if (value === 'users' || value === 'branches') return value;
+function parseCompare(
+  value: string | null
+): 'users' | 'branches' | 'managers' | null {
+  if (value === 'users' || value === 'branches' || value === 'managers') {
+    return value;
+  }
   return null;
 }
 
@@ -48,47 +52,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: access.reason }, { status: access.status });
     }
 
+    // Managers and admins/owners share the same data access. The dashboard
+    // chooses different *defaults* per role (manager defaults to their own
+    // team via managerId; admin defaults to all-company), but neither role
+    // is restricted from inspecting any branch, user, or team.
+
     const userIds = parseCsv(searchParams.get('userIds'));
     const compare = parseCompare(searchParams.get('compare'));
     const entityIds = parseCsv(searchParams.get('entityIds'));
     const branchId = searchParams.get('branchId');
-
-    // Manager-scope guard: a manager-role caller (not admin/owner/global)
-    // can only request reports for their direct reports. They cannot fudge
-    // the URL with someone else's user_id.
-    if (
-      !isGlobalAdmin &&
-      access.ok &&
-      access.role === 'manager'
-    ) {
-      const { data: reports } = await admin
-        .from('user_companies')
-        .select('user_id')
-        .eq('company_id', companyId)
-        .eq('manager_user_id', user.id);
-      const allowed = new Set((reports ?? []).map(r => r.user_id as string));
-
-      const requestedUsers: string[] = [];
-      if (userIds) requestedUsers.push(...userIds);
-      if (compare === 'users' && entityIds) requestedUsers.push(...entityIds);
-
-      for (const uid of requestedUsers) {
-        if (!allowed.has(uid)) {
-          return NextResponse.json(
-            { error: 'User is not one of your direct reports' },
-            { status: 403 }
-          );
-        }
-      }
-
-      // Managers compare branches? Disallowed by design.
-      if (compare === 'branches') {
-        return NextResponse.json(
-          { error: 'Branch comparison is admin-only' },
-          { status: 403 }
-        );
-      }
-    }
+    const managerId = searchParams.get('managerId');
 
     const report = await getAdminFieldSalesReport(admin, {
       companyId,
@@ -98,6 +71,7 @@ export async function GET(request: NextRequest) {
       leadSource: parseCsv(searchParams.get('leadSource')),
       leadStatus: parseCsv(searchParams.get('leadStatus')),
       branchId: branchId || null,
+      managerId: managerId || null,
       compare,
       entityIds,
     });

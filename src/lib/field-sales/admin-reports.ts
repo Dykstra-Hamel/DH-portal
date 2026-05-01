@@ -8,7 +8,11 @@ export interface AdminReportFilters {
   leadSource?: string[] | null;
   leadStatus?: string[] | null;
   branchId?: string | null;
-  compare?: 'users' | 'branches' | null;
+  // Single-mode "scope to a manager's team": filters the global leads/totals
+  // query to users with user_companies.manager_user_id = managerId. The
+  // manager themselves is NOT included (matches My-Team-Overview semantics).
+  managerId?: string | null;
+  compare?: 'users' | 'branches' | 'managers' | null;
   entityIds?: string[] | null;
 }
 
@@ -38,11 +42,18 @@ export interface TeamMember {
   id: string;
   fullName: string;
   email: string | null;
+  avatarUrl: string | null;
+  uploadedAvatarUrl: string | null;
+  departments: string[];
 }
 
 export interface TeamBreakdownRow {
   userId: string;
   fullName: string;
+  email: string | null;
+  avatarUrl: string | null;
+  uploadedAvatarUrl: string | null;
+  departments: string[];
   submitted: number;
   won: number;
   lost: number;
@@ -50,6 +61,9 @@ export interface TeamBreakdownRow {
   wonRevenue: number;
   techDiscussedCount: number;
   stopsCompleted: number;
+  leadsFromStops: number;
+  winRate: number;
+  pipelineValue: number;
 }
 
 export interface AdminRecentLead {
@@ -75,7 +89,8 @@ export interface AdminReportData {
     leadSource: string[] | null;
     leadStatus: string[] | null;
     branchId: string | null;
-    compare: 'users' | 'branches' | null;
+    managerId: string | null;
+    compare: 'users' | 'branches' | 'managers' | null;
     entityIds: string[] | null;
   };
   totals: {
@@ -92,6 +107,7 @@ export interface AdminReportData {
     stopsCompleted: number;
     routesCompleted: number;
     referredToSales: number;
+    leadsFromTechs: number;
   };
   sparkline: { date: string; count: number }[];
   leadsByStatus: { status: string; count: number }[];
@@ -148,9 +164,34 @@ export async function getAdminFieldSalesReport(
     leadSource,
     leadStatus,
     branchId,
+    managerId,
     compare,
     entityIds,
   } = filters;
+
+  // ── Manager → direct-reports lookup ────────────────────────────────────
+  // Used in two places: single-mode `managerId` filter (scope global leads
+  // to that manager's team) and `compare='managers'` (group leads per
+  // manager's team). One query covers both. Returns Map<managerId, userIds[]>.
+  const managerIdsToResolve = new Set<string>();
+  if (managerId) managerIdsToResolve.add(managerId);
+  if (compare === 'managers' && entityIds) {
+    for (const eid of entityIds) managerIdsToResolve.add(eid);
+  }
+  const reportsByManager = new Map<string, string[]>();
+  if (managerIdsToResolve.size > 0) {
+    const { data: reportRows } = await admin
+      .from('user_companies')
+      .select('user_id, manager_user_id')
+      .eq('company_id', companyId)
+      .in('manager_user_id', Array.from(managerIdsToResolve));
+    for (const r of reportRows ?? []) {
+      const mid = r.manager_user_id as string;
+      const uid = r.user_id as string;
+      if (!reportsByManager.has(mid)) reportsByManager.set(mid, []);
+      reportsByManager.get(mid)!.push(uid);
+    }
+  }
 
   const fromDate = filters.from ? new Date(filters.from) : defaultFromDate();
   const toDate = filters.to ? new Date(filters.to) : defaultToDate();
@@ -158,22 +199,38 @@ export async function getAdminFieldSalesReport(
   const toIso = toIsoDate(toDate);
 
   // ── Pull team members (for filter options + display) ────────────────────
-  const { data: teamRows } = await admin
-    .from('user_companies')
-    .select(
-      `
+  const [teamRowsResult, deptRowsResult] = await Promise.all([
+    admin
+      .from('user_companies')
+      .select(
+        `
       user_id,
       profiles:profiles!user_companies_user_id_fkey (
         id,
         first_name,
         last_name,
-        email
+        email,
+        avatar_url,
+        uploaded_avatar_url
       )
       `
-    )
-    .eq('company_id', companyId);
+      )
+      .eq('company_id', companyId),
+    admin
+      .from('user_departments')
+      .select('user_id, department')
+      .eq('company_id', companyId),
+  ]);
 
-  const teamMembers: TeamMember[] = (teamRows ?? [])
+  const deptByUser = new Map<string, string[]>();
+  for (const row of deptRowsResult.data ?? []) {
+    const uid = row.user_id as string;
+    const dept = row.department as string;
+    if (!deptByUser.has(uid)) deptByUser.set(uid, []);
+    deptByUser.get(uid)!.push(dept);
+  }
+
+  const teamMembers: TeamMember[] = (teamRowsResult.data ?? [])
     .map(row => {
       const p = Array.isArray(row.profiles) ? row.profiles[0] : row.profiles;
       if (!p?.id) return null;
@@ -185,6 +242,9 @@ export async function getAdminFieldSalesReport(
           p.email as string | null
         ),
         email: (p.email as string | null) ?? null,
+        avatarUrl: (p.avatar_url as string | null) ?? null,
+        uploadedAvatarUrl: (p.uploaded_avatar_url as string | null) ?? null,
+        departments: deptByUser.get(p.id as string) ?? [],
       } satisfies TeamMember;
     })
     .filter((m): m is TeamMember => m !== null)
@@ -227,6 +287,16 @@ export async function getAdminFieldSalesReport(
   }
   if (branchId) {
     leadsQuery = leadsQuery.eq('branch_id', branchId);
+  }
+  // Single-mode "scope to manager's team" — narrow submitted_by to that
+  // manager's direct reports. If the manager has zero reports, force an
+  // empty result (in() with [] returns nothing).
+  if (managerId) {
+    const teamUserIds = reportsByManager.get(managerId) ?? [];
+    leadsQuery = leadsQuery.in(
+      'submitted_by',
+      teamUserIds.length > 0 ? teamUserIds : ['__no_reports__']
+    );
   }
 
   const { data: leadsData } = await leadsQuery;
@@ -301,6 +371,7 @@ export async function getAdminFieldSalesReport(
     .reduce((sum, l) => sum + leadValue(l), 0);
 
   const techDiscussedCount = leads.filter(l => l.tech_discussed === true).length;
+  const leadsFromTechs = leads.filter(l => l.lead_source === 'technician').length;
 
   // ── Sparkline (daily count across filter window, capped to 30 days) ─────
   const rangeDays = Math.min(
@@ -339,13 +410,15 @@ export async function getAdminFieldSalesReport(
 
   // ── Team breakdown (per-user aggregates) ─────────────────────────────────
   const perUser = new Map<string, TeamBreakdownRow>();
-  for (const l of leads) {
-    const uid = (l.submitted_by as string | null) ?? null;
-    if (!uid) continue;
+  const blankPerUserRow = (uid: string): TeamBreakdownRow => {
     const member = memberById.get(uid);
-    const row = perUser.get(uid) ?? {
+    return {
       userId: uid,
       fullName: member?.fullName ?? 'Unknown',
+      email: member?.email ?? null,
+      avatarUrl: member?.avatarUrl ?? null,
+      uploadedAvatarUrl: member?.uploadedAvatarUrl ?? null,
+      departments: member?.departments ?? [],
       submitted: 0,
       won: 0,
       lost: 0,
@@ -353,8 +426,17 @@ export async function getAdminFieldSalesReport(
       wonRevenue: 0,
       techDiscussedCount: 0,
       stopsCompleted: 0,
+      leadsFromStops: 0,
+      winRate: 0,
+      pipelineValue: 0,
     };
+  };
+  for (const l of leads) {
+    const uid = (l.submitted_by as string | null) ?? null;
+    if (!uid) continue;
+    const row = perUser.get(uid) ?? blankPerUserRow(uid);
     row.submitted += 1;
+    if (l.lead_source === 'technician') row.leadsFromStops += 1;
     if (l.lead_status === 'won') {
       row.won += 1;
       row.wonRevenue += Number(l.estimated_value ?? 0);
@@ -362,6 +444,13 @@ export async function getAdminFieldSalesReport(
     if (l.lead_status === 'lost') row.lost += 1;
     if (l.lead_status === 'new' || l.lead_status === 'in_process') {
       row.inProcess += 1;
+    }
+    if (
+      ['new', 'in_process', 'quoted', 'scheduling'].includes(
+        l.lead_status as string
+      )
+    ) {
+      row.pipelineValue += leadValue(l);
     }
     if (l.tech_discussed === true) row.techDiscussedCount += 1;
     perUser.set(uid, row);
@@ -377,6 +466,15 @@ export async function getAdminFieldSalesReport(
 
   if (userIds && userIds.length > 0) {
     routesQuery = routesQuery.in('assigned_to', userIds);
+  }
+  // Single-mode "scope to manager's team" — match the leads query so stops
+  // totals/sparkline reflect only that team's routes.
+  if (managerId) {
+    const teamUserIds = reportsByManager.get(managerId) ?? [];
+    routesQuery = routesQuery.in(
+      'assigned_to',
+      teamUserIds.length > 0 ? teamUserIds : ['__no_reports__']
+    );
   }
 
   const { data: routeRows } = await routesQuery;
@@ -400,18 +498,7 @@ export async function getAdminFieldSalesReport(
         stopsCompleted += 1;
         const uid = routeIdToUser.get(s.route_id as string);
         if (uid) {
-          const member = memberById.get(uid);
-          const row = perUser.get(uid) ?? {
-            userId: uid,
-            fullName: member?.fullName ?? 'Unknown',
-            submitted: 0,
-            won: 0,
-            lost: 0,
-            inProcess: 0,
-            wonRevenue: 0,
-            techDiscussedCount: 0,
-            stopsCompleted: 0,
-          };
+          const row = perUser.get(uid) ?? blankPerUserRow(uid);
           row.stopsCompleted += 1;
           perUser.set(uid, row);
         }
@@ -421,6 +508,12 @@ export async function getAdminFieldSalesReport(
   }
 
   const routesCompleted = routes.filter(r => r.status === 'completed').length;
+
+  for (const row of perUser.values()) {
+    const decided = row.won + row.lost;
+    row.winRate = decided > 0 ? Math.round((row.won / decided) * 100) : 0;
+    row.pipelineValue = Math.round(row.pipelineValue);
+  }
 
   const teamBreakdown = Array.from(perUser.values()).sort(
     (a, b) => b.submitted - a.submitted || b.stopsCompleted - a.stopsCompleted
@@ -455,14 +548,15 @@ export async function getAdminFieldSalesReport(
   });
 
   // ── Compare series (multi-entity per-day breakdown) ─────────────────────
-  // When `compare` is set, build one series per requested entity. For
-  // compare='users' we attribute leads via submitted_by and stops via the
-  // route's assigned_to. For compare='branches' we attribute leads via
-  // leads.branch_id; stops aren't branch-tagged today so we surface 0 there.
+  // When `compare` is set, build one series per requested entity:
+  //   compare='users':    attribute leads via submitted_by, stops via routes.assigned_to.
+  //   compare='branches': attribute leads via leads.branch_id; stops not branch-tagged today.
+  //   compare='managers': attribute leads via submitted_by → manager (reportsByManager
+  //                       reverse lookup); stops summed across each report's routes.
   let compareSeries: CompareSeries[] | null = null;
   if (compare && entityIds && entityIds.length > 0) {
     const labels = new Map<string, string>();
-    if (compare === 'users') {
+    if (compare === 'users' || compare === 'managers') {
       for (const eid of entityIds) {
         labels.set(eid, memberById.get(eid)?.fullName ?? 'Unknown');
       }
@@ -476,6 +570,15 @@ export async function getAdminFieldSalesReport(
       }
       for (const eid of entityIds) {
         if (!labels.has(eid)) labels.set(eid, 'Branch');
+      }
+    }
+
+    // For compare='managers' we need a submitter → manager_id reverse lookup
+    // so each lead can be attributed to the correct team.
+    const submitterToManager = new Map<string, string>();
+    if (compare === 'managers') {
+      for (const [mid, uids] of reportsByManager.entries()) {
+        for (const uid of uids) submitterToManager.set(uid, mid);
       }
     }
 
@@ -506,10 +609,15 @@ export async function getAdminFieldSalesReport(
       const day = (l.created_at as string).slice(0, 10);
       const status = (l.lead_status as string) ?? '';
       const value = leadValue(l);
+      const submittedBy = (l.submitted_by as string | null) ?? null;
       const eid =
         compare === 'users'
-          ? ((l.submitted_by as string | null) ?? null)
-          : ((l.branch_id as string | null) ?? null);
+          ? submittedBy
+          : compare === 'managers'
+            ? submittedBy
+              ? submitterToManager.get(submittedBy) ?? null
+              : null
+            : ((l.branch_id as string | null) ?? null);
       if (!eid) continue;
       const days = perEntity.get(eid);
       if (!days) continue;
@@ -525,37 +633,47 @@ export async function getAdminFieldSalesReport(
       }
     }
 
-    if (compare === 'users') {
-      // Stops by user via routes.assigned_to → route_stops
-      const userIdsSet = new Set(entityIds);
-      const userRoutes = routes.filter(r =>
-        userIdsSet.has(r.assigned_to as string | null as string)
-      );
-      const userRouteIds = userRoutes.map(r => r.id as string);
-      if (userRouteIds.length > 0) {
+    if (compare === 'users' || compare === 'managers') {
+      // For users: route.assigned_to is the entity. For managers: route.assigned_to
+      // is one of the manager's direct reports — bucket those stops to the manager.
+      const routeOwnerToBucket = new Map<string, string>();
+      if (compare === 'users') {
+        for (const eid of entityIds) routeOwnerToBucket.set(eid, eid);
+      } else {
+        for (const [mid, uids] of reportsByManager.entries()) {
+          for (const uid of uids) routeOwnerToBucket.set(uid, mid);
+        }
+      }
+      const relevantRoutes = routes.filter(r => {
+        const assignedTo = r.assigned_to as string | null;
+        return assignedTo ? routeOwnerToBucket.has(assignedTo) : false;
+      });
+      const relevantRouteIds = relevantRoutes.map(r => r.id as string);
+      if (relevantRouteIds.length > 0) {
         const { data: stopsForCompare } = await admin
           .from('route_stops')
           .select('route_id, status, actual_departure')
-          .in('route_id', userRouteIds);
-        const routeIdToUserId = new Map<string, string | null>();
+          .in('route_id', relevantRouteIds);
+        const routeIdToBucket = new Map<string, string>();
         const routeIdToDate = new Map<string, string>();
-        for (const r of userRoutes) {
-          routeIdToUserId.set(
-            r.id as string,
-            (r.assigned_to as string | null) ?? null
-          );
+        for (const r of relevantRoutes) {
+          const owner = r.assigned_to as string | null;
+          if (owner) {
+            const bucketKey = routeOwnerToBucket.get(owner);
+            if (bucketKey) routeIdToBucket.set(r.id as string, bucketKey);
+          }
           routeIdToDate.set(r.id as string, (r.route_date as string) ?? '');
         }
         for (const s of stopsForCompare ?? []) {
           if (s.status !== 'completed') continue;
           const rid = s.route_id as string;
-          const uid = routeIdToUserId.get(rid) ?? null;
-          if (!uid) continue;
+          const bucketKey = routeIdToBucket.get(rid);
+          if (!bucketKey) continue;
           // Attribute the stop to its actual_departure day; fall back to
           // the route's date when the stop has no completion timestamp.
           const dep = (s.actual_departure as string | null) ?? null;
           const day = (dep ?? routeIdToDate.get(rid) ?? '').slice(0, 10);
-          const days = perEntity.get(uid);
+          const days = perEntity.get(bucketKey);
           const bucket = days?.get(day);
           if (bucket) bucket.stops += 1;
         }
@@ -609,6 +727,7 @@ export async function getAdminFieldSalesReport(
       leadSource: leadSource && leadSource.length > 0 ? leadSource : null,
       leadStatus: leadStatus && leadStatus.length > 0 ? leadStatus : null,
       branchId: branchId ?? null,
+      managerId: managerId ?? null,
       compare: compare ?? null,
       entityIds: entityIds && entityIds.length > 0 ? entityIds : null,
     },
@@ -626,6 +745,7 @@ export async function getAdminFieldSalesReport(
       stopsCompleted,
       routesCompleted,
       referredToSales,
+      leadsFromTechs,
     },
     sparkline,
     leadsByStatus,
@@ -635,6 +755,147 @@ export async function getAdminFieldSalesReport(
     teamMembers,
     compareSeries,
   };
+}
+
+// ── Drill-down: leads contributing to a single dashboard metric ───────────
+// Returns an AdminRecentLead[] (same shape the dashboard's Recent Leads list
+// already renders) filtered to a specific KPI. Reuses the same filter set as
+// `getAdminFieldSalesReport` so the modal stays consistent with whatever the
+// user has filtered the dashboard to.
+//
+// "submitted" returns every lead that matched the dashboard filters in the
+// date window. "won_revenue" mirrors "won" — it's the same lead set that
+// produced the revenue number, sorted by estimated_value descending.
+
+export type AdminMetricKey =
+  | 'submitted'
+  | 'won'
+  | 'won_revenue'
+  | 'pipeline'
+  | 'tech_discussed'
+  | 'leads_from_techs';
+
+export async function getAdminFieldSalesLeadsForMetric(
+  admin: SupabaseClient,
+  filters: AdminReportFilters,
+  metric: AdminMetricKey
+): Promise<AdminRecentLead[]> {
+  const {
+    companyId,
+    userIds,
+    leadSource,
+    leadStatus,
+    branchId,
+    managerId,
+  } = filters;
+
+  const fromDate = filters.from ? new Date(filters.from) : defaultFromDate();
+  const toDate = filters.to ? new Date(filters.to) : defaultToDate();
+  const fromIso = toIsoDate(fromDate);
+  const toIso = toIsoDate(toDate);
+
+  // If a managerId is set, expand to that manager's direct reports.
+  let teamUserIds: string[] | null = null;
+  if (managerId) {
+    const { data: reportRows } = await admin
+      .from('user_companies')
+      .select('user_id')
+      .eq('company_id', companyId)
+      .eq('manager_user_id', managerId);
+    teamUserIds = (reportRows ?? []).map(r => r.user_id as string);
+    if (teamUserIds.length === 0) return [];
+  }
+
+  let leadsQuery = admin
+    .from('leads')
+    .select(
+      `
+      id,
+      lead_status,
+      lead_source,
+      service_type,
+      pest_type,
+      estimated_value,
+      created_at,
+      submitted_by,
+      tech_discussed,
+      branch_id,
+      customers ( first_name, last_name, city, state )
+      `
+    )
+    .eq('company_id', companyId)
+    .gte('created_at', startOfDayIso(fromIso))
+    .lte('created_at', endOfDayIso(toIso))
+    .limit(500);
+
+  if (teamUserIds) {
+    leadsQuery = leadsQuery.in('submitted_by', teamUserIds);
+  } else if (userIds && userIds.length > 0) {
+    leadsQuery = leadsQuery.in('submitted_by', userIds);
+  }
+  if (leadSource && leadSource.length > 0) {
+    leadsQuery = leadsQuery.in('lead_source', leadSource);
+  }
+  if (leadStatus && leadStatus.length > 0) {
+    leadsQuery = leadsQuery.in('lead_status', leadStatus);
+  }
+  if (branchId) {
+    leadsQuery = leadsQuery.eq('branch_id', branchId);
+  }
+
+  // Metric-specific narrowing
+  if (metric === 'won' || metric === 'won_revenue') {
+    leadsQuery = leadsQuery.eq('lead_status', 'won');
+  } else if (metric === 'pipeline') {
+    leadsQuery = leadsQuery
+      .in('lead_status', [...PIPELINE_STATUSES])
+      // Pipeline KPI is a dollar value, so the modal should only show leads
+      // that actually contribute value. Drops leads with null/zero
+      // estimated_value (gt against null is null → row excluded).
+      .gt('estimated_value', 0);
+  } else if (metric === 'tech_discussed') {
+    leadsQuery = leadsQuery.eq('tech_discussed', true);
+  } else if (metric === 'leads_from_techs') {
+    leadsQuery = leadsQuery.eq('lead_source', 'technician');
+  }
+
+  // Value-driven metrics sort by value descending so the heaviest
+  // contributors top the list. Everything else: most recent first.
+  if (metric === 'won_revenue' || metric === 'pipeline') {
+    leadsQuery = leadsQuery.order('estimated_value', {
+      ascending: false,
+      nullsFirst: false,
+    });
+  } else {
+    leadsQuery = leadsQuery.order('created_at', { ascending: false });
+  }
+
+  const { data: leadsData } = await leadsQuery;
+  const leads = leadsData ?? [];
+
+  return leads.map(l => {
+    const customer = Array.isArray(l.customers) ? l.customers[0] : l.customers;
+    const customerName = formatName(
+      (customer?.first_name as string | null) ?? null,
+      (customer?.last_name as string | null) ?? null,
+      null
+    );
+    return {
+      id: l.id as string,
+      status: (l.lead_status as string) ?? 'unknown',
+      customerName: customerName || 'Unknown',
+      city: (customer?.city as string | null) ?? null,
+      state: (customer?.state as string | null) ?? null,
+      serviceType: (l.service_type as string | null) ?? null,
+      pestType: (l.pest_type as string | null) ?? null,
+      estimatedValue:
+        l.estimated_value == null ? null : Number(l.estimated_value),
+      createdAt: l.created_at as string,
+      submittedBy: (l.submitted_by as string | null) ?? null,
+      submittedByName: null,
+      leadSource: (l.lead_source as string | null) ?? null,
+    };
+  });
 }
 
 // ── Broad dataset for AI reports ──────────────────────────────────────────

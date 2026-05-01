@@ -11,39 +11,48 @@ import { authenticatedFetch } from '@/lib/api-client';
 // authenticatedFetch attaches the Supabase session's Bearer token —
 // the underlying endpoint (`/api/users/[id]/default-branch`) requires
 // it via verifyAuth.
+//
+// `loading` is derived from a comparison of the current (userId, companyId)
+// inputs against the pair the cached `resolved` value was fetched for.
+// Storing loading as plain state caused a stale-render race: when userId
+// arrived asynchronously after companyId, the hook returned `loading=false,
+// branchId=null` for one render before its effect fired — long enough for
+// downstream apply-default logic to read the stale snapshot and lock in
+// "no default" before the real fetch ever started.
 export function useDefaultBranch(
   userId: string | null | undefined,
   companyId: string | null | undefined
 ): { branchId: string | null; loading: boolean } {
-  const [branchId, setBranchId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [resolved, setResolved] = useState<{
+    key: string;
+    branchId: string | null;
+  } | null>(null);
 
   useEffect(() => {
     if (!userId || !companyId) {
-      setBranchId(null);
-      setLoading(false);
+      setResolved({ key: '', branchId: null });
       return;
     }
+    const key = `${userId}:${companyId}`;
     let cancelled = false;
-    setLoading(true);
     (async () => {
       try {
-        // authenticatedFetch returns the parsed JSON body directly (not
-        // a Response). It throws if the request fails, which we catch.
         const data = await authenticatedFetch(
           `/api/users/${userId}/default-branch?companyId=${companyId}`
         );
-        if (!cancelled) setBranchId(data?.branchId ?? null);
+        if (!cancelled) setResolved({ key, branchId: data?.branchId ?? null });
       } catch {
-        if (!cancelled) setBranchId(null);
-      } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) setResolved({ key, branchId: null });
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [userId, companyId]);
+
+  const expectedKey = userId && companyId ? `${userId}:${companyId}` : '';
+  const loading = expectedKey !== '' && resolved?.key !== expectedKey;
+  const branchId = loading ? null : resolved?.branchId ?? null;
 
   return { branchId, loading };
 }

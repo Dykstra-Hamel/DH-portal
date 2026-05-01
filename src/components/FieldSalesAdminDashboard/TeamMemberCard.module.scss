@@ -1,0 +1,110 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--gray-200, #e4e4e7);
+  background: white;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 120ms ease, box-shadow 120ms ease,
+    transform 120ms ease;
+  width: 100%;
+  font-family: inherit;
+}
+
+.card:hover {
+  border-color: var(--gray-300, #d4d4d8);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.cardActive {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900, #18181b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleChip {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+.roleChip-inspector {
+  color: #1d4ed8;
+  background: #dbeafe;
+}
+
+.roleChip-technician {
+  color: #b45309;
+  background: #fef3c7;
+}
+
+.roleChip-member {
+  color: #52525b;
+  background: #f4f4f5;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.stat {
+  display: grid;
+  grid-template-columns: 14px 1fr auto;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.statIcon {
+  color: var(--gray-400, #a1a1aa);
+}
+
+.stat dt {
+  font-size: 11px;
+  color: var(--gray-500, #71717a);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat dd {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900, #18181b);
+  margin: 0;
+}
