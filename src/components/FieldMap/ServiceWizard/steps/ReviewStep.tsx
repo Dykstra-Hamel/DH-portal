@@ -24,7 +24,11 @@ import {
   DEFAULT_TIME_OPTIONS,
   getEnabledTimeOptions,
 } from '@/lib/time-options';
-import { toMonthlyEquivalent } from '@/lib/pricing-calculations';
+import {
+  toMonthlyEquivalent,
+  calculateFeaturedPlanPrice,
+} from '@/lib/pricing-calculations';
+import type { CompanyPricingSettings } from '@/types/pricing';
 import QuoteServicePanel from '@/components/Quote/QuoteServicePanel/QuoteServicePanel';
 
 // ── FAQ item (same as PlanDetails) ────────────────────────────────────────
@@ -123,6 +127,13 @@ interface FeaturedPlan {
   plan_image_url?: string | null;
   plan_video_url?: string | null;
   plan_terms?: string | null;
+  // Pricing configuration fields (from service_plans table)
+  pricing_type?: string | null;
+  price_per_unit?: number | null;
+  minimum_price?: number | null;
+  yard_sqft_pricing?: any;
+  home_size_pricing?: any;
+  yard_size_pricing?: any;
 }
 
 // ── Props ──────────────────────────────────────────────────────────────────
@@ -139,6 +150,9 @@ interface ReviewStepProps {
   inspectorName: string;
   inspectorAvatarUrl?: string | null;
   inspectorTitle?: string | null;
+  inspectorPhone?: string | null;
+  inspectorEmail?: string | null;
+  companyPhone?: string | null;
   companyName: string;
   companyId: string;
   leadId: string | null;
@@ -177,6 +191,9 @@ export function ReviewStep({
   inspectorName,
   inspectorAvatarUrl,
   inspectorTitle,
+  inspectorPhone,
+  inspectorEmail,
+  companyPhone,
   companyName,
   companyId,
   leadId,
@@ -251,6 +268,18 @@ export function ReviewStep({
   const [additionalLineItems, setAdditionalLineItems] = useState<
     QuoteLineItem[]
   >([]);
+  const [companyPricingSettings, setCompanyPricingSettings] =
+    useState<CompanyPricingSettings | null>(null);
+
+  // Total yard sq ft from map outlines (only 'yard'-type areas, not structures)
+  const yardSqFt = mapPlotData.outlines
+    .filter(o => o.type === 'yard')
+    .reduce((sum, o) => sum + (o.sqft ?? 0), 0);
+
+  // Total home sq ft from map outlines (only 'house'-type areas)
+  const homeSqFt = mapPlotData.outlines
+    .filter(o => o.type === 'house')
+    .reduce((sum, o) => sum + (o.sqft ?? 0), 0);
   // ── Fetch branding ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!companyId) {
@@ -269,6 +298,37 @@ export function ReviewStep({
       .catch(() => {})
       .finally(() => setBrandingLoaded(true));
   }, [companyId]);
+
+  // ── Fetch company pricing settings (needed for accurate featured plan pricing) ──
+  useEffect(() => {
+    if (!companyId) return;
+    fetch(`/api/companies/${companyId}/pricing-settings`)
+      .then(r => (r.ok ? r.json() : null))
+      .then((data: any) => {
+        if (data?.data) setCompanyPricingSettings(data.data);
+      })
+      .catch(() => {});
+  }, [companyId]);
+
+  // ── Save yard_sq_ft to the quote so the public page can use it ─────────
+  useEffect(() => {
+    if (!quoteId || yardSqFt <= 0) return;
+    fetch(`/api/quotes/${quoteId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ yard_sq_ft: Math.round(yardSqFt) }),
+    }).catch(() => {});
+  }, [quoteId, yardSqFt]);
+
+  // ── Save home_sq_ft to the quote so the public page can use it ─────────
+  useEffect(() => {
+    if (!quoteId || homeSqFt <= 0) return;
+    fetch(`/api/quotes/${quoteId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ home_sq_ft: Math.round(homeSqFt) }),
+    }).catch(() => {});
+  }, [quoteId, homeSqFt]);
 
   // ── Fetch featured plans for "Additional Services We Offer" section ────
   useEffect(() => {
@@ -912,6 +972,14 @@ export function ReviewStep({
   async function handleAddFeaturedPlan(plan: FeaturedPlan) {
     if (!quoteId) return;
 
+    // Calculate accurate price based on map measurements and pricing config
+    const { initialPrice: calcInitial, recurringPrice: calcRecurring } =
+      calculateFeaturedPlanPrice(plan, {
+        yardSqFt: yardSqFt > 0 ? yardSqFt : null,
+        homeSqFt: homeSqFt > 0 ? homeSqFt : null,
+        companySettings: companyPricingSettings,
+      });
+
     const newId = crypto.randomUUID();
     const newItem: QuoteLineItem = {
       id: newId,
@@ -921,8 +989,8 @@ export function ReviewStep({
       catalogItemName: plan.plan_name,
       coveredPestIds: [],
       coveredPestLabels: [],
-      initialCost: plan.initial_price,
-      recurringCost: plan.recurring_price,
+      initialCost: calcInitial,
+      recurringCost: calcRecurring,
       frequency: plan.billing_frequency,
       isPrimary: true,
       isSelected: true,
@@ -941,8 +1009,8 @@ export function ReviewStep({
       body: JSON.stringify({
         service_plan_id: plan.id,
         plan_name: plan.plan_name,
-        initial_price: plan.initial_price ?? 0,
-        recurring_price: plan.recurring_price ?? 0,
+        initial_price: calcInitial,
+        recurring_price: calcRecurring,
         billing_frequency: plan.billing_frequency ?? 'monthly',
         display_order: displayOrder,
       }),
@@ -1236,6 +1304,16 @@ export function ReviewStep({
                     <p className={styles.inspectorTitle}>
                       {inspectorTitle || 'Lead Sales Inspector'}
                     </p>
+                    {(inspectorPhone || companyPhone) && (
+                      <p className={styles.inspectorPhone}>
+                        {inspectorPhone || companyPhone}
+                      </p>
+                    )}
+                    {inspectorEmail && (
+                      <p className={styles.inspectorEmail}>
+                        {inspectorEmail}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className={styles.inspectorSeparator} />
@@ -1399,8 +1477,16 @@ export function ReviewStep({
                       description || imageUrl || videoUrl || features.length > 0
                     );
                     const isExpanded = expandedItemId === plan.id;
-                    const recurringPrice = plan.recurring_price ?? 0;
-                    const initialPrice = plan.initial_price ?? 0;
+                    // Calculate accurate price using map measurements
+                    const {
+                      initialPrice,
+                      recurringPrice,
+                      isExact: priceIsExact,
+                    } = calculateFeaturedPlanPrice(plan, {
+                      yardSqFt: yardSqFt > 0 ? yardSqFt : null,
+                      homeSqFt: homeSqFt > 0 ? homeSqFt : null,
+                      companySettings: companyPricingSettings,
+                    });
                     // Treat as one-time when billing_frequency is explicitly 'one-time'
                     // OR when there is no recurring price (initial-only charge)
                     const isOneTime =
@@ -1443,6 +1529,7 @@ export function ReviewStep({
                           </div>
                           <div className={qcStyles.addonHeaderRight}>
                             {(() => {
+                              const prefix = priceIsExact ? '' : 'From\u00a0';
                               if (
                                 isOneTime ||
                                 (!isOneTime &&
@@ -1453,7 +1540,7 @@ export function ReviewStep({
                                   <span
                                     className={styles.additionalServicePrice}
                                   >
-                                    From&nbsp;<sup>$</sup>
+                                    {prefix}<sup>$</sup>
                                     <span
                                       className={
                                         styles.additionalServicePriceNumber
@@ -1469,7 +1556,7 @@ export function ReviewStep({
                                   <span
                                     className={styles.additionalServicePrice}
                                   >
-                                    From&nbsp;<sup>$</sup>
+                                    {prefix}<sup>$</sup>
                                     <span
                                       className={
                                         styles.additionalServicePriceNumber

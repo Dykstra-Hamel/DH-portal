@@ -68,7 +68,7 @@ export default function HeaderSection({
             <span className={styles.companyName}>{companyName}</span>
           )}
         </div>
-
+        {/* 
         <div className={styles.headerActions}>
           {isMobile ? (
             // Mobile: Show only phone icon
@@ -84,7 +84,7 @@ export default function HeaderSection({
               <Phone size={20} /> {buttonText}
             </button>
           )}
-        </div>
+        </div> */}
       </div>
     </header>
   );

@@ -267,12 +267,12 @@ export async function GET(
     });
 
     // Fetch inspector profile if the lead has an assigned user
-    let inspector: { name: string; title: string | null; avatar_url: string | null } | null = null;
+    let inspector: { name: string; title: string | null; avatar_url: string | null; contact_phone: string | null; contact_email: string | null } | null = null;
     const assignedTo = (quote.lead as any)?.assigned_to;
     if (assignedTo) {
       const { data: profile } = await supabase
         .from('profiles')
-        .select('first_name, last_name, title, uploaded_avatar_url, avatar_url')
+        .select('first_name, last_name, title, uploaded_avatar_url, avatar_url, phone, contact_email')
         .eq('id', assignedTo)
         .single();
       if (profile) {
@@ -280,6 +280,8 @@ export async function GET(
           name: [profile.first_name, profile.last_name].filter(Boolean).join(' ') || 'Inspector',
           title: profile.title ?? null,
           avatar_url: profile.uploaded_avatar_url ?? profile.avatar_url ?? null,
+          contact_phone: profile.phone ?? null,
+          contact_email: profile.contact_email ?? null,
         };
       }
     }
@@ -291,20 +293,59 @@ export async function GET(
         .map((i: any) => i.service_plan_id as string)
     );
 
-    const { data: featuredPlans } = await supabase
-      .from('service_plans')
-      .select('id, plan_name, billing_frequency, initial_price, recurring_price, plan_description, plan_features, plan_image_url')
-      .eq('company_id', quote.company.id)
-      .eq('is_active', true)
-      .eq('is_featured', true);
+    // Robustly extract company ID — prefer the join object (verified working at line 160)
+    // then fall back to the raw FK column on the quotes row.
+    const companyId: string | undefined =
+      (quote.company as any)?.id ?? (quote as any).company_id;
 
-    const filteredFeaturedPlans = (featuredPlans ?? []).filter(
-      (p: any) => !quotedPlanIds.has(p.id)
-    );
+    if (!companyId) {
+      console.error('[public quote] Could not resolve company_id for quote', id);
+    }
+
+    const { data: featuredPlans, error: featuredPlansError } = companyId
+      ? await supabase
+          .from('service_plans')
+          .select('id, plan_name, billing_frequency, initial_price, recurring_price, plan_description, plan_features, plan_image_url, pricing_unit, price_per_unit, minimum_price, yard_sqft_pricing, home_size_pricing, yard_size_pricing')
+          .eq('company_id', companyId)
+          .eq('is_active', true)
+          .eq('is_featured', true)
+      : { data: [], error: null };
+
+    if (featuredPlansError) {
+      console.error('[public quote] Error fetching featured plans:', featuredPlansError);
+    }
+
+    console.log(`[public quote] companyId=${companyId} featuredPlans count=${featuredPlans?.length ?? 0} filteredQuotedPlanIds=${quotedPlanIds.size}`);
+
+    const UNIT_TO_TYPE: Record<string, string> = {
+      sqft: 'per_sqft',
+      acres: 'per_acre',
+      linear_feet: 'per_linear_foot',
+    };
+
+    const filteredFeaturedPlans = (featuredPlans ?? [])
+      .filter((p: any) => !quotedPlanIds.has(p.id))
+      .map((p: any) => ({
+        ...p,
+        pricing_type: p.pricing_unit ? (UNIT_TO_TYPE[p.pricing_unit] ?? null) : null,
+      }));
+
+    // Fetch company pricing settings so the client can calculate accurate featured plan prices
+    const { data: pricingSettings, error: pricingSettingsError } = companyId
+      ? await supabase
+          .from('company_pricing_settings')
+          .select('*')
+          .eq('company_id', companyId)
+          .single()
+      : { data: null, error: null };
+
+    if (pricingSettingsError && pricingSettingsError.code !== 'PGRST116') {
+      console.error('[public quote] Error fetching pricing settings:', pricingSettingsError);
+    }
 
     return NextResponse.json({
       success: true,
-      data: { ...quote, line_items: transformedLineItems, featured_plans: filteredFeaturedPlans, inspector },
+      data: { ...quote, line_items: transformedLineItems, featured_plans: filteredFeaturedPlans, inspector, pricing_settings: pricingSettings ?? null },
     });
   } catch (error) {
     console.error('Error in public quote GET:', error);

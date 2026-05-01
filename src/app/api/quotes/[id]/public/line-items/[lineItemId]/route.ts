@@ -52,20 +52,13 @@ export async function PATCH(
     // Verify line item belongs to this quote and is optional
     const { data: lineItem, error: lineItemError } = await supabase
       .from('quote_line_items')
-      .select('id, quote_id, is_optional')
+      .select('id, quote_id')
       .eq('id', lineItemId)
       .eq('quote_id', quoteId)
       .single();
 
     if (lineItemError || !lineItem) {
       return NextResponse.json({ error: 'Line item not found' }, { status: 404 });
-    }
-
-    if (!lineItem.is_optional) {
-      return NextResponse.json(
-        { error: 'This line item is required and cannot be toggled' },
-        { status: 400 }
-      );
     }
 
     // Toggle selection

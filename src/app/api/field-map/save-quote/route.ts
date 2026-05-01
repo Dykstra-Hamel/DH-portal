@@ -249,7 +249,7 @@ export async function POST(request: NextRequest) {
             discount_amount: discountType === '$' ? lineDiscountInitial + lineDiscountRecurring : 0,
             // All recommended add-on slots (isRecommended true or false) are optional and start unselected
             is_optional: item.isRecommended != null,
-            is_selected: item.isRecommended == null,
+            is_selected: item.isSelected ?? (item.isRecommended == null),
             is_recommended: item.isRecommended ?? null,
             display_order: idx,
             parent_line_item_id: item.parentLineItemId ?? null,
