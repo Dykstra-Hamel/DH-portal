@@ -41,6 +41,17 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') ?? toIsoDateUTC(new Date());
     const branchId = searchParams.get('branchId') || null;
 
+    // Optional `departments=inspector` or `departments=technician` (or
+    // CSV of both). When omitted, falls back to all field departments so
+    // existing callers keep their previous behavior.
+    const departmentsParam = searchParams.get('departments');
+    const requestedDepartments = (departmentsParam
+      ? departmentsParam.split(',').map(s => s.trim()).filter(Boolean)
+      : FIELD_DEPARTMENTS
+    ).filter(d => FIELD_DEPARTMENTS.includes(d));
+    const effectiveDepartments =
+      requestedDepartments.length > 0 ? requestedDepartments : FIELD_DEPARTMENTS;
+
     const supabase = createAdminClient();
 
     const access = await verifyCompanyAdminAccess(
@@ -56,12 +67,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Resolve field-staff user IDs (optionally branch-scoped)
+    // Resolve field-staff user IDs (optionally branch-scoped, optionally
+    // filtered by department).
     const { data: deptRows } = await supabase
       .from('user_departments')
       .select('user_id, department')
       .eq('company_id', companyId)
-      .in('department', FIELD_DEPARTMENTS);
+      .in('department', effectiveDepartments);
 
     const deptByUser = new Map<string, string[]>();
     for (const r of deptRows ?? []) {

@@ -40,6 +40,18 @@ export async function GET(
       return NextResponse.json({ error: 'companyId is required' }, { status: 400 });
     }
 
+    // Optional `departments=inspector` (or `technician`, or CSV). When set,
+    // restricts the returned members to direct reports who have at least one
+    // of those departments in this company. Used by the per-department
+    // "Show Route Map" buttons in the manager Team section.
+    const departmentsParam = searchParams.get('departments');
+    const departmentFilter = departmentsParam
+      ? departmentsParam
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean)
+      : null;
+
     const isSelf = user.id === managerId;
     const globalAdmin = !isSelf && (await isAuthorizedAdmin(user));
     const companyAdmin =
@@ -97,16 +109,29 @@ export async function GET(
       });
     });
 
+    // Apply optional department filter so e.g. the manager "Inspectors" map
+    // doesn't include direct reports who are only technicians.
+    const filteredReportIds = departmentFilter
+      ? reportIds.filter((uid: string) => {
+          const depts: string[] = profileById.get(uid)?.departments ?? [];
+          return depts.some((d: string) => departmentFilter.includes(d));
+        })
+      : reportIds;
+
+    if (filteredReportIds.length === 0) {
+      return NextResponse.json({ members: [] });
+    }
+
     // All routes for this date assigned to any direct report
     const { data: routesForDate } = await supabase
       .from('routes')
       .select('id, pestpac_route_id, assigned_to')
       .eq('company_id', companyId)
       .eq('route_date', date)
-      .in('assigned_to', reportIds);
+      .in('assigned_to', filteredReportIds);
 
     if (!routesForDate || routesForDate.length === 0) {
-      const members = reportIds.map((uid: string) => {
+      const members = filteredReportIds.map((uid: string) => {
         const p = profileById.get(uid);
         return {
           userId: uid,
@@ -148,7 +173,7 @@ export async function GET(
 
     await attachInspectionStatus(supabase, companyId, allStops);
 
-    const members = reportIds.map((uid: string) => {
+    const members = filteredReportIds.map((uid: string) => {
       const p = profileById.get(uid);
       return {
         userId: uid,
