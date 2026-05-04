@@ -9,5 +9,5 @@ export default function FieldSalesLeadDetailPage({
   params: Promise<{ leadId: string }>;
 }) {
   const { leadId } = use(params);
-  return <LeadDetailView leadId={leadId} baseRoute="/field-sales/leads" />;
+  return <LeadDetailView leadId={leadId} baseRoute="/field-sales/dashboard" />;
 }
