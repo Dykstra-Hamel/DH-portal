@@ -5,6 +5,7 @@ import Image from 'next/image';
 import SignatureCanvas from 'react-signature-canvas';
 import { getClientDeviceData } from '@/lib/device-utils';
 import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/display-utils';
+import { X } from 'lucide-react';
 import HeaderSection from './HeaderSection';
 import styles from './quotecontent.module.scss';
 import HeroSection from './HeroSection';
@@ -24,9 +25,7 @@ import {
   DEFAULT_TIME_OPTIONS,
   getEnabledTimeOptions,
 } from '@/lib/time-options';
-import {
-  calculateFeaturedPlanPrice,
-} from '@/lib/pricing-calculations';
+import { calculateFeaturedPlanPrice } from '@/lib/pricing-calculations';
 import type { CompanyPricingSettings } from '@/types/pricing';
 
 interface AlternativeColor {
@@ -233,7 +232,9 @@ export default function QuoteContent({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token, is_selected: newIsSelected }),
-      }).catch(err => console.error('Failed to persist line item selection:', err));
+      }).catch(err =>
+        console.error('Failed to persist line item selection:', err)
+      );
     }
   };
 
@@ -796,14 +797,16 @@ export default function QuoteContent({
                   <div className={styles.addonHeaderRight}>
                     {isOneTime && initialPrice ? (
                       <span className={styles.additionalServicePrice}>
-                        {priceIsExact ? '' : 'From '}<sup>$</sup>
+                        {priceIsExact ? '' : 'From '}
+                        <sup>$</sup>
                         <span className={styles.additionalServicePriceNumber}>
                           {initialPrice.toFixed(0)}
                         </span>
                       </span>
                     ) : recurringPrice ? (
                       <span className={styles.additionalServicePrice}>
-                        {priceIsExact ? '' : 'From '}<sup>$</sup>
+                        {priceIsExact ? '' : 'From '}
+                        <sup>$</sup>
                         <span className={styles.additionalServicePriceNumber}>
                           {recurringPrice.toFixed(0)}
                         </span>
@@ -1138,7 +1141,7 @@ export default function QuoteContent({
                 className={styles.scheduleModalCloseBtn}
                 onClick={() => setScheduleModalOpen(false)}
               >
-                &#215;
+                <X size={14} />
               </button>
             </div>
 
@@ -1188,7 +1191,7 @@ export default function QuoteContent({
               {/* Terms & Conditions */}
               <div className={styles.scheduleModalSection}>
                 <p className={styles.scheduleModalSectionLabel}>
-                  Terms &amp; Conditions
+                  Terms &amp; Conditions (scroll to bottom to accept terms)
                   {termsViewed && (
                     <span
                       className={styles.viewedBadge}
