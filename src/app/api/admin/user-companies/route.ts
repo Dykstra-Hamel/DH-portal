@@ -25,16 +25,23 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Load users from auth.users using admin API
-    const { data: authUsers, error: usersError } =
-      await supabase.auth.admin.listUsers();
-
-    if (usersError) {
-      console.error('Error loading users:', usersError);
-      return NextResponse.json(
-        { error: 'Failed to fetch users' },
-        { status: 500 }
-      );
+    // Load users from auth.users using admin API (paginated to avoid truncation)
+    const allAuthUsers: any[] = [];
+    let page = 1;
+    const perPage = 1000;
+    while (true) {
+      const { data: pageData, error: pageError } =
+        await supabase.auth.admin.listUsers({ page, perPage });
+      if (pageError) {
+        console.error('Error loading users:', pageError);
+        return NextResponse.json(
+          { error: 'Failed to fetch users' },
+          { status: 500 }
+        );
+      }
+      allAuthUsers.push(...pageData.users);
+      if (!pageData.nextPage) break;
+      page = pageData.nextPage;
     }
 
     // Get profiles for users
@@ -51,10 +58,10 @@ export async function GET(request: NextRequest) {
     }
 
     const usersWithProfiles =
-      authUsers.users?.map(user => ({
+      allAuthUsers.map(user => ({
         ...user,
         profiles: profilesData?.find(profile => profile.id === user.id),
-      })) || [];
+      }));
 
     // Load companies
     const { data: companiesData, error: companiesError } = await supabase
@@ -74,7 +81,7 @@ export async function GET(request: NextRequest) {
     const relationshipsWithJoins =
       relationshipsData?.map(rel => {
         const userProfile = profilesData?.find(profile => profile.id === rel.user_id);
-        const authUser = authUsers.users?.find(user => user.id === rel.user_id);
+        const authUser = allAuthUsers.find(user => user.id === rel.user_id);
         
         return {
           ...rel,

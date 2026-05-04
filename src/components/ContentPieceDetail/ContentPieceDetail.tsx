@@ -31,14 +31,14 @@ const CONTENT_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 };
 
-const CONTENT_TYPE_COLORS: Record<string, string> = {
-  blog: '#3b82f6',
-  evergreen: '#10b981',
-  location: '#f59e0b',
-  pillar: '#8b5cf6',
-  cluster: '#ec4899',
-  pest_id: '#ef4444',
-  other: '#6b7280',
+const CONTENT_TYPE_BADGE_CLASSES: Record<string, string> = {
+  blog:      'contentTypeBadgeBlog',
+  evergreen: 'contentTypeBadgeEvergreen',
+  location:  'contentTypeBadgeLocation',
+  pillar:    'contentTypeBadgePillar',
+  cluster:   'contentTypeBadgeCluster',
+  pest_id:   'contentTypeBadgePestId',
+  other:     'contentTypeBadgeOther',
 };
 
 interface ContentPiece {
@@ -571,10 +571,6 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
     return () => unregisterGuard();
   }, [isContentDirty, registerGuard, unregisterGuard]);
 
-  const typeColor = editContentType
-    ? CONTENT_TYPE_COLORS[editContentType] ?? '#6b7280'
-    : '#6b7280';
-
   const typeLabel = editContentType
     ? CONTENT_TYPE_LABELS[editContentType] ?? editContentType
     : 'Unknown';
@@ -600,13 +596,17 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
         </button>
       ),
       title: contentPiece.title || 'Untitled Content Piece',
-      description: [
-        `<span style="display:inline-block;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:600;color:white;background:${typeColor};margin-right:8px;">${typeLabel}</span>`,
-        contentPiece.company_name || '',
-        contentPiece.service_name ? ` &mdash; ${contentPiece.service_name}` : '',
-      ].join(''),
+      description: (
+        <>
+          <span className={`${styles.contentTypeBadge} ${styles[CONTENT_TYPE_BADGE_CLASSES[editContentType ?? ''] ?? 'contentTypeBadgeDefault']}`}>
+            {typeLabel}
+          </span>
+          {contentPiece.company_name || ''}
+          {contentPiece.service_name ? ` \u2014 ${contentPiece.service_name}` : ''}
+        </>
+      ),
     });
-  }, [contentPiece, typeLabel, typeColor, router, setPageHeader, handleNavigate]);
+  }, [contentPiece, typeLabel, editContentType, router, setPageHeader, handleNavigate]);
 
   useEffect(() => {
     return () => setPageHeader(null);

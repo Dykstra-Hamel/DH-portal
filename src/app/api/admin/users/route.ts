@@ -15,15 +15,22 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const allUsers = searchParams.get('all') === 'true';
 
-    // Get all users from auth.users
-    const { data: authUsers, error: usersError } =
-      await supabase.auth.admin.listUsers();
-
-    if (usersError) {
-      return NextResponse.json(
-        { error: 'Failed to fetch users' },
-        { status: 500 }
-      );
+    // Get all users from auth.users (paginated to avoid truncation)
+    const allAuthUsers: any[] = [];
+    let page = 1;
+    const perPage = 1000;
+    while (true) {
+      const { data: pageData, error: pageError } =
+        await supabase.auth.admin.listUsers({ page, perPage });
+      if (pageError) {
+        return NextResponse.json(
+          { error: 'Failed to fetch users' },
+          { status: 500 }
+        );
+      }
+      allAuthUsers.push(...pageData.users);
+      if (!pageData.nextPage) break;
+      page = pageData.nextPage;
     }
 
     // Get profiles — filtered to internal roles by default, all if ?all=true
@@ -42,8 +49,8 @@ export async function GET(request: NextRequest) {
     // Combine auth users with their profiles, filtering to internal users when not ?all=true
     const internalIds = new Set(profiles?.map(p => p.id) || []);
     const usersWithProfiles =
-      authUsers.users
-        ?.filter(u => allUsers || internalIds.has(u.id))
+      allAuthUsers
+        .filter(u => allUsers || internalIds.has(u.id))
         .map(user => ({
           ...user,
           profiles: profiles?.find(profile => profile.id === user.id),

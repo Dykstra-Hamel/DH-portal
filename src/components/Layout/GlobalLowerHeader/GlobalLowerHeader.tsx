@@ -383,13 +383,13 @@ export function GlobalLowerHeader({
               <div className={styles.titleLogoCol}>{titleLogo}</div>
               <div className={styles.titleStack}>
                 <h1 className={styles.title}>{title}</h1>
-                <p className={styles.description}>{description}</p>
+                <div className={styles.description}>{description}</div>
               </div>
             </div>
           ) : (
             <div className={styles.titleStack}>
               <h1 className={styles.title}>{title}</h1>
-              <p className={styles.description}>{description}</p>
+              <div className={styles.description}>{description}</div>
             </div>
           )}
         </div>

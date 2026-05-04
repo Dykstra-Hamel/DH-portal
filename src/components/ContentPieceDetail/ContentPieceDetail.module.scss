@@ -593,3 +593,23 @@
     background: #2563eb;
   }
 }
+
+// Header description badge
+.contentTypeBadge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  margin-right: 8px;
+}
+
+.contentTypeBadgeBlog      { background: #3b82f6; }
+.contentTypeBadgeEvergreen { background: #10b981; }
+.contentTypeBadgeLocation  { background: #f59e0b; }
+.contentTypeBadgePillar    { background: #8b5cf6; }
+.contentTypeBadgeCluster   { background: #ec4899; }
+.contentTypeBadgePestId    { background: #ef4444; }
+.contentTypeBadgeOther     { background: #6b7280; }
+.contentTypeBadgeDefault   { background: #6b7280; }
