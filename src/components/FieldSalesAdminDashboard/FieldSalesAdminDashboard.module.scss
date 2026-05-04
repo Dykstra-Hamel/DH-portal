@@ -825,6 +825,72 @@
   color: var(--gray-500);
 }
 
+.cardHeaderRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.showRouteMapBtn {
+  appearance: none;
+  border: 1px solid var(--blue-600, #2563eb);
+  background: var(--white);
+  color: var(--blue-600, #2563eb);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+
+  &:hover {
+    background: var(--blue-50, #eff6ff);
+  }
+}
+
+.teamBranchSelect {
+  appearance: none;
+  font-size: 13px;
+  padding: 6px 28px 6px 10px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background: var(--white)
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="10" height="6" viewBox="0 0 10 6"><path d="M0 0l5 6 5-6z" fill="%236b7280"/></svg>')
+    no-repeat right 10px center;
+  color: var(--gray-800);
+  cursor: pointer;
+  max-width: 220px;
+
+  &:focus {
+    outline: 2px solid var(--blue-200, #bfdbfe);
+    outline-offset: 1px;
+  }
+}
+
+.teamSectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--gray-500);
+
+  &:first-of-type {
+    margin-top: 4px;
+  }
+}
+
+.teamSectionCount {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-400);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
 // ── List ────────────────────────────────────────────────────────────────────
 
 .list {

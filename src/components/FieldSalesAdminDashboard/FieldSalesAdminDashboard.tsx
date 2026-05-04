@@ -26,6 +26,8 @@ import {
   type SavedReport,
 } from './SavedReportsDrawer';
 import { TeamMemberCard } from './TeamMemberCard';
+import { TeamMemberRouteModal } from './TeamMemberRouteModal/TeamMemberRouteModal';
+import { TeamRouteMapModal } from './TeamRouteMapModal/TeamRouteMapModal';
 import { useBranches } from '@/hooks/useBranches';
 import { authenticatedFetch } from '@/lib/api-client';
 import styles from './FieldSalesAdminDashboard.module.scss';
@@ -56,6 +58,7 @@ interface TeamBreakdownRow {
   wonRevenue: number;
   techDiscussedCount: number;
   stopsCompleted: number;
+  stopsToday: number;
   leadsFromStops: number;
   winRate: number;
   pipelineValue: number;
@@ -199,6 +202,17 @@ const LEAD_STATUS_OPTIONS = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────
+
+function dedupeByUserId<T extends { userId: string }>(rows: T[]): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const r of rows) {
+    if (seen.has(r.userId)) continue;
+    seen.add(r.userId);
+    out.push(r);
+  }
+  return out;
+}
 
 function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
@@ -350,6 +364,21 @@ export function FieldSalesAdminDashboard({
     null
   );
   const [metricLoading, setMetricLoading] = useState(false);
+
+  // Manager team-route modals
+  const [routeModalMember, setRouteModalMember] =
+    useState<TeamBreakdownRow | null>(null);
+  const [teamMapOpen, setTeamMapOpen] = useState(false);
+
+  // Admin field-staff roster (Inspectors / Technicians) for the Team section
+  const [teamRosterBranchId, setTeamRosterBranchId] = useState<string | 'all'>(
+    'all'
+  );
+  const [adminInspectors, setAdminInspectors] = useState<TeamBreakdownRow[]>([]);
+  const [adminTechnicians, setAdminTechnicians] = useState<TeamBreakdownRow[]>(
+    []
+  );
+  const [adminRosterLoading, setAdminRosterLoading] = useState(false);
 
   const goToLead = useCallback(
     (leadId: string) => {
@@ -536,6 +565,41 @@ export function FieldSalesAdminDashboard({
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // ── Admin team roster (all inspectors/technicians, optionally per branch) ─
+  useEffect(() => {
+    if (scopeRole !== 'admin' || !companyId) return;
+    let cancelled = false;
+    setAdminRosterLoading(true);
+    const params = new URLSearchParams();
+    params.set('companyId', companyId);
+    params.set('from', dates.from);
+    params.set('to', dates.to);
+    if (teamRosterBranchId !== 'all') {
+      params.set('branchId', teamRosterBranchId);
+    }
+    fetch(`/api/field-sales/admin-team-roster?${params.toString()}`)
+      .then(async res => {
+        if (!res.ok) throw new Error('roster fetch failed');
+        return res.json();
+      })
+      .then((json: { inspectors: TeamBreakdownRow[]; technicians: TeamBreakdownRow[] }) => {
+        if (cancelled) return;
+        setAdminInspectors(json.inspectors ?? []);
+        setAdminTechnicians(json.technicians ?? []);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setAdminInspectors([]);
+        setAdminTechnicians([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAdminRosterLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [scopeRole, companyId, dates.from, dates.to, teamRosterBranchId]);
 
   // ── Fetch saved reports ─────────────────────────────────────────────
   const fetchSaved = useCallback(async () => {
@@ -1278,62 +1342,122 @@ export function FieldSalesAdminDashboard({
             </div>
           )}
 
-          {data.teamBreakdown.length > 0 && (
+          {scopeRole === 'manager' && data.teamBreakdown.length > 0 && (
             <div className={styles.card}>
               <div className={styles.cardHeader}>
                 <h3 className={styles.cardTitle}>Team</h3>
-                <span className={styles.cardMeta}>
-                  {data.teamBreakdown.length}
-                </span>
+                <div className={styles.cardHeaderRight}>
+                  {managerUserId && (
+                    <button
+                      type="button"
+                      className={styles.showRouteMapBtn}
+                      onClick={() => setTeamMapOpen(true)}
+                    >
+                      Show Route Map
+                    </button>
+                  )}
+                  <span className={styles.cardMeta}>
+                    {data.teamBreakdown.length}
+                  </span>
+                </div>
               </div>
               <div className={styles.teamGrid}>
                 {data.teamBreakdown.slice(0, 60).map(member => {
-                  const isActive =
-                    compareKind !== 'branches' &&
-                    compareEntityIds.length === 1 &&
-                    compareEntityIds[0] === member.userId;
+                  const isActive = routeModalMember?.userId === member.userId;
                   return (
                     <TeamMemberCard
                       key={member.userId}
                       member={member}
                       isActive={isActive}
-                      onToggle={id => {
-                        const depts = member.departments ?? [];
-                        const targetKind: CompareKind = depts.includes(
-                          'technician'
-                        )
-                          ? 'technicians'
-                          : 'inspectors';
-                        const isClearingSelf =
-                          compareEntityIds.length === 1 &&
-                          compareEntityIds[0] === id;
-                        if (isClearingSelf) {
-                          setCompareEntityIds([]);
-                        } else {
-                          // Tell the kind-change reset effect to skip its
-                          // next firing — we're setting kind + ids atomically.
-                          // Only set the ref when the kind is actually
-                          // changing; otherwise it would stay armed and
-                          // suppress the next legitimate kind change.
-                          if (compareKind !== targetKind) {
-                            skipNextKindResetRef.current = true;
-                          }
-                          setCompareKind(targetKind);
-                          setCompareEntityIds([id]);
-                        }
-                        // Scroll back to the top so the user sees the
-                        // "Filtered to:" pill and the KPI/chart updates —
-                        // the team cards live at the bottom of the page.
-                        if (typeof window !== 'undefined') {
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }
-                      }}
+                      onToggle={() => setRouteModalMember(member)}
                     />
                   );
                 })}
               </div>
             </div>
           )}
+
+          {scopeRole === 'admin' &&
+            (adminInspectors.length > 0 ||
+              adminTechnicians.length > 0 ||
+              adminRosterLoading) && (
+              <div className={styles.card}>
+                <div className={styles.cardHeader}>
+                  <h3 className={styles.cardTitle}>Team</h3>
+                  <div className={styles.cardHeaderRight}>
+                    {availableBranches.length > 1 && (
+                      <select
+                        className={styles.teamBranchSelect}
+                        value={teamRosterBranchId}
+                        onChange={e =>
+                          setTeamRosterBranchId(
+                            e.target.value as string | 'all'
+                          )
+                        }
+                        aria-label="Filter team by branch"
+                      >
+                        <option value="all">All branches</option>
+                        {availableBranches.map(b => (
+                          <option key={b.id} value={b.id}>
+                            {b.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.showRouteMapBtn}
+                      onClick={() => setTeamMapOpen(true)}
+                    >
+                      Show Route Map
+                    </button>
+                    <span className={styles.cardMeta}>
+                      {adminInspectors.length + adminTechnicians.length}
+                    </span>
+                  </div>
+                </div>
+                {adminInspectors.length > 0 && (
+                  <>
+                    <div className={styles.teamSectionHeader}>
+                      Inspectors
+                      <span className={styles.teamSectionCount}>
+                        {adminInspectors.length}
+                      </span>
+                    </div>
+                    <div className={styles.teamGrid}>
+                      {adminInspectors.slice(0, 60).map(member => (
+                        <TeamMemberCard
+                          key={`insp-${member.userId}`}
+                          member={member}
+                          isActive={routeModalMember?.userId === member.userId}
+                          onToggle={() => setRouteModalMember(member)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {adminTechnicians.length > 0 && (
+                  <>
+                    <div className={styles.teamSectionHeader}>
+                      Technicians
+                      <span className={styles.teamSectionCount}>
+                        {adminTechnicians.length}
+                      </span>
+                    </div>
+                    <div className={styles.teamGrid}>
+                      {adminTechnicians.slice(0, 60).map(member => (
+                        <TeamMemberCard
+                          key={`tech-${member.userId}`}
+                          member={member}
+                          isActive={routeModalMember?.userId === member.userId}
+                          onToggle={() => setRouteModalMember(member)}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
           {data.recentLeads.length > 0 && (
             <div className={styles.card}>
@@ -1573,6 +1697,75 @@ export function FieldSalesAdminDashboard({
             closeMetricModal();
             goToLead(leadId);
           }}
+        />
+      )}
+
+      {routeModalMember && (
+        <TeamMemberRouteModal
+          isOpen={!!routeModalMember}
+          onClose={() => setRouteModalMember(null)}
+          member={{
+            userId: routeModalMember.userId,
+            fullName: routeModalMember.fullName,
+            email: routeModalMember.email,
+            avatarUrl: routeModalMember.avatarUrl,
+            uploadedAvatarUrl: routeModalMember.uploadedAvatarUrl,
+            departments: routeModalMember.departments,
+          }}
+          companyId={companyId}
+          peers={dedupeByUserId(
+            scopeRole === 'admin'
+              ? [...adminInspectors, ...adminTechnicians]
+              : (data?.teamBreakdown ?? [])
+          ).map(m => ({
+            userId: m.userId,
+            fullName: m.fullName,
+            email: m.email,
+            avatarUrl: m.avatarUrl,
+            uploadedAvatarUrl: m.uploadedAvatarUrl,
+            departments: m.departments,
+          }))}
+        />
+      )}
+
+      {scopeRole === 'manager' && managerUserId && teamMapOpen && (
+        <TeamRouteMapModal
+          isOpen={teamMapOpen}
+          onClose={() => setTeamMapOpen(false)}
+          mode="manager"
+          managerUserId={managerUserId}
+          companyId={companyId}
+          peers={(data?.teamBreakdown ?? []).map(m => ({
+            userId: m.userId,
+            fullName: m.fullName,
+            email: m.email,
+            avatarUrl: m.avatarUrl,
+            uploadedAvatarUrl: m.uploadedAvatarUrl,
+            departments: m.departments,
+          }))}
+        />
+      )}
+
+      {scopeRole === 'admin' && teamMapOpen && (
+        <TeamRouteMapModal
+          isOpen={teamMapOpen}
+          onClose={() => setTeamMapOpen(false)}
+          mode="admin"
+          companyId={companyId}
+          branchId={
+            teamRosterBranchId === 'all' ? null : teamRosterBranchId
+          }
+          peers={dedupeByUserId([
+            ...adminInspectors,
+            ...adminTechnicians,
+          ]).map(m => ({
+            userId: m.userId,
+            fullName: m.fullName,
+            email: m.email,
+            avatarUrl: m.avatarUrl,
+            uploadedAvatarUrl: m.uploadedAvatarUrl,
+            departments: m.departments,
+          }))}
         />
       )}
 
