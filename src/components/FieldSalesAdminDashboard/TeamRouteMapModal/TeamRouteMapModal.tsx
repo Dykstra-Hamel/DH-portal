@@ -48,6 +48,10 @@ interface TeamRouteMapModalProps {
   peers: TeamMemberLite[];
   // Optional in admin mode: filter to a single branch
   branchId?: string | null;
+  // Optional in admin mode: restrict map markers to one or more departments.
+  departments?: Array<'inspector' | 'technician'>;
+  // Optional title override (e.g. "Inspector Routes")
+  title?: string;
 }
 
 function todayLocal(): string {
@@ -83,6 +87,8 @@ export function TeamRouteMapModal({
   companyId,
   peers,
   branchId = null,
+  departments,
+  title,
 }: TeamRouteMapModalProps) {
   const [selectedDate, setSelectedDate] = useState<string>(todayLocal());
   const [members, setMembers] = useState<TeamMemberRouteData[]>([]);
@@ -126,12 +132,16 @@ export function TeamRouteMapModal({
     setLoading(true);
     setError(null);
     try {
+      const deptQs =
+        departments && departments.length > 0
+          ? `&departments=${departments.join(',')}`
+          : '';
       const url =
         mode === 'admin'
           ? `/api/field-sales/admin-team-route-stops?companyId=${companyId}&date=${selectedDate}${
               branchId ? `&branchId=${branchId}` : ''
-            }`
-          : `/api/users/${managerUserId}/team-route-stops?companyId=${companyId}&date=${selectedDate}`;
+            }${deptQs}`
+          : `/api/users/${managerUserId}/team-route-stops?companyId=${companyId}&date=${selectedDate}${deptQs}`;
       const data: any = await authenticatedFetch(url);
       if (seq !== fetchSeqRef.current) return;
       setMembers(Array.isArray(data?.members) ? data.members : []);
@@ -146,7 +156,15 @@ export function TeamRouteMapModal({
   useEffect(() => {
     void loadTeam();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, companyId, managerUserId, selectedDate, mode, branchId]);
+  }, [
+    isOpen,
+    companyId,
+    managerUserId,
+    selectedDate,
+    mode,
+    branchId,
+    (departments ?? []).join(','),
+  ]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -213,7 +231,7 @@ export function TeamRouteMapModal({
           onClick={e => e.stopPropagation()}
         >
           <div className={styles.header}>
-            <h3 className={styles.title}>Team Routes</h3>
+            <h3 className={styles.title}>{title ?? 'Team Routes'}</h3>
             <div className={styles.headerRight}>
               <input
                 type="date"

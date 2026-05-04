@@ -846,6 +846,28 @@
   &:hover {
     background: var(--blue-50, #eff6ff);
   }
+
+  &:disabled {
+    border-color: var(--border-color);
+    color: var(--gray-400);
+    background: var(--gray-50, #f9fafb);
+    cursor: not-allowed;
+
+    &:hover {
+      background: var(--gray-50, #f9fafb);
+    }
+  }
+}
+
+.teamEmpty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--gray-500);
+  font-size: 13px;
+  background: var(--gray-25, #fafafa);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  margin-top: 4px;
 }
 
 .teamBranchSelect {
@@ -870,17 +892,24 @@
 .teamSectionHeader {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: space-between;
+  gap: 12px;
   margin: 14px 4px 8px;
+
+  &:first-of-type {
+    margin-top: 4px;
+  }
+}
+
+.teamSectionLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
   color: var(--gray-500);
-
-  &:first-of-type {
-    margin-top: 4px;
-  }
 }
 
 .teamSectionCount {
