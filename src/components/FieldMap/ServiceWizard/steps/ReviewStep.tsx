@@ -450,6 +450,9 @@ export function ReviewStep({
     if (i.catalogItemKind === 'specialty-line' && i.parentLineItemId) {
       return selectedItemIds.has(i.parentLineItemId);
     }
+    if (i.catalogItemKind === 'product' && i.parentLineItemId) {
+      return selectedItemIds.has(i.parentLineItemId);
+    }
     return true;
   });
 
@@ -486,13 +489,29 @@ export function ReviewStep({
   }
 
   function toggleItemSelected(id: string) {
+    const item = effectiveLineItems.find(i => i.id === id);
     setSelectedItemIds(prev => {
       if (!prev.has(id)) {
         persistLineItemSelection(id, true);
         return new Set([...prev, id]);
       }
-      // Prevent unchecking the last selected item
-      if (prev.size <= 1) return prev;
+      // Prevent unchecking the last selected parent plan/bundle
+      if (
+        item?.catalogItemKind !== 'addon' &&
+        item?.catalogItemKind !== 'product' &&
+        item?.catalogItemKind !== 'specialty-line'
+      ) {
+        const parentCount = [...prev].filter(sid =>
+          effectiveLineItems.find(
+            i =>
+              i.id === sid &&
+              i.catalogItemKind !== 'addon' &&
+              i.catalogItemKind !== 'product' &&
+              i.catalogItemKind !== 'specialty-line'
+          )
+        ).length;
+        if (parentCount <= 1) return prev;
+      }
       persistLineItemSelection(id, false);
       const next = new Set(prev);
       next.delete(id);
@@ -1814,11 +1833,12 @@ export function ReviewStep({
                     {(planItems.length > 0 || customItems.length > 0) && (
                       <div className={qcStyles.totalSectionLabel}>Services</div>
                     )}
-                    {planItems.map(item => {
+                    {planItems.map((item, _idx, arr) => {
+                      const planSelectedCount = arr.filter(i => selectedItemIds.has(i.id)).length;
                       const isSelected = selectedItemIds.has(item.id);
                       const isOnly =
                         multipleItems &&
-                        selectedItemIds.size === 1 &&
+                        planSelectedCount === 1 &&
                         isSelected;
                       const childAddons = addonItems.filter(
                         a => a.parentLineItemId === item.id
