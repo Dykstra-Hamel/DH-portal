@@ -102,6 +102,15 @@ export async function GET(
           email,
           phone,
           website
+        ),
+        applied_discount:applied_discount_id(
+          id,
+          discount_name,
+          discount_type,
+          discount_value,
+          applies_to_price,
+          recurring_discount_type,
+          recurring_discount_value
         )
       `
       )
@@ -187,7 +196,12 @@ export async function GET(
     }
 
     // Transform line items from DB format to QuoteLineItem format with embedded planContent
-    const transformedLineItems = (quote.line_items || []).map((item: any) => {
+    // Sort by display_order first, mirroring ServiceWizard.tsx behaviour
+    const sortedLineItems = (quote.line_items || [])
+      .slice()
+      .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+
+    const transformedLineItems = sortedLineItems.map((item: any) => {
       let catalogItemKind: 'plan' | 'addon' | 'bundle' | 'product' | 'specialty-line' | 'custom' = 'custom';
       let catalogItemId: string | undefined;
 

@@ -76,6 +76,15 @@ interface Quote {
   home_size_range: string | null;
   yard_size_range: string | null;
   customer_comments?: string | null;
+  applied_discount?: {
+    id: string;
+    discount_name: string;
+    discount_type: 'percentage' | 'fixed_amount';
+    discount_value: number;
+    applies_to_price: 'initial' | 'recurring' | 'both';
+    recurring_discount_type?: 'percentage' | 'fixed_amount' | null;
+    recurring_discount_value?: number | null;
+  } | null;
   customer: {
     first_name: string;
     last_name: string;
@@ -195,7 +204,11 @@ export default function QuoteContent({
       if (item?.catalogItemKind !== 'addon') {
         const planCount = [...selectedItemIds].filter(sid =>
           effectiveLineItems.find(
-            i => i.id === sid && i.catalogItemKind !== 'addon'
+            i =>
+              i.id === sid &&
+              i.catalogItemKind !== 'addon' &&
+              i.catalogItemKind !== 'product' &&
+              i.catalogItemKind !== 'specialty-line'
           )
         ).length;
         if (planCount <= 1) return; // can't deselect last plan
@@ -1065,6 +1078,7 @@ export default function QuoteContent({
                 onToggleRecommendedAddon={toggleRecommendedAddon}
                 renderRecommendedAddons={renderRecommendedAddonsForItem}
                 renderAfterItems={featuredPlansSection}
+                appliedDiscount={quote.applied_discount ?? null}
               />
               <div className={styles.continueButtonWrapper}>
                 <button
