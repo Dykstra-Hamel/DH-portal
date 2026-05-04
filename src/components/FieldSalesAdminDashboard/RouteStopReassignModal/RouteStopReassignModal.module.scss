@@ -1,0 +1,322 @@
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+  padding: 20px;
+}
+
+.modalContent {
+  background: white;
+  border-radius: 12px;
+  max-width: 500px;
+  width: 100%;
+  max-height: 80vh;
+  overflow: hidden;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.modalTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--gray-500);
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s ease;
+
+  &:hover {
+    color: var(--gray-700);
+  }
+}
+
+.modalBody {
+  padding: 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.customerInfo {
+  margin-bottom: 24px;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-700);
+  margin: 0 0 12px 0;
+}
+
+.customerDetails {
+  background: var(--gray-50);
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.customerName {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900);
+  margin-bottom: 4px;
+}
+
+.customerContact {
+  font-size: 14px;
+  color: var(--gray-600);
+  margin-bottom: 2px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.assignSection {
+  margin-bottom: 8px;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.emptyPeers {
+  padding: 14px 16px;
+  border: 1px dashed var(--gray-300);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--gray-500);
+  text-align: center;
+}
+
+.dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdownButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 48px;
+  padding: 4px 12px;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+  &:hover {
+    border-color: #9ca3af;
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--blue-500);
+    box-shadow: none;
+  }
+}
+
+.dropdownContent {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.avatarContainer {
+  flex-shrink: 0;
+  display: flex;
+}
+
+.avatar {
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.defaultAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: #6b7280;
+}
+
+.userInfo {
+  flex: 1;
+  text-align: left;
+  min-width: 0;
+}
+
+.optionName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-900);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.optionMeta {
+  font-size: 12px;
+  color: var(--gray-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chevronIcon {
+  color: #6b7280;
+  transition: transform 0.2s ease;
+  flex-shrink: 0;
+
+  &.rotated {
+    transform: rotate(180deg);
+  }
+}
+
+.dropdownMenu {
+  position: relative;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: white;
+  border: 1px solid #dedede;
+  border-radius: 8px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.dropdownOption {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  text-align: left;
+
+  &:hover {
+    background-color: #f3f4f6;
+  }
+}
+
+.selected {
+  background-color: var(--gray-50);
+}
+
+.errorMessage {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.modalFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px 24px 24px;
+  border-top: 1px solid var(--gray-200);
+}
+
+.cancelButton {
+  background: transparent;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--border-radius);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--gray-700);
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    background: var(--gray-50);
+    border-color: var(--gray-400);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.assignButton {
+  background: var(--blue-500);
+  border: none;
+  border-radius: var(--border-radius);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  min-width: 80px;
+
+  &:hover:not(:disabled) {
+    background: var(--blue-600);
+  }
+
+  &:disabled {
+    background: var(--gray-400);
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+}
+
+@media (max-width: 640px) {
+  .modalOverlay {
+    padding: 12px;
+  }
+
+  .modalContent {
+    max-height: 90vh;
+  }
+
+  .modalFooter {
+    flex-direction: column;
+
+    .cancelButton,
+    .assignButton {
+      width: 100%;
+    }
+  }
+}

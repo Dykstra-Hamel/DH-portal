@@ -12,10 +12,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
 import { useWizard } from '@/contexts/WizardContext';
-import {
-  useRecentTechLeadCustomers,
-  type RecentCustomer,
-} from '@/hooks/useRecentTechLeadCustomers';
+import { useRecentTechLeadCustomers } from '@/hooks/useRecentTechLeadCustomers';
 import {
   AddressAutocomplete,
   type AddressComponents,
@@ -1009,24 +1006,31 @@ function StepAIReview({
 }
 
 function StepNewCustomer({
+  mode,
   form,
   onChange,
   error,
   companyId,
   isPestPacEnabled,
-  onPestPacPick,
+  isSyncingCustomer,
+  onPestPacPickAndAdvance,
+  onLocalCustomerPickAndAdvance,
 }: {
+  mode: 'search' | 'new';
   form: NewCustomerForm;
   onChange: (form: NewCustomerForm) => void;
   error: string | null;
   companyId: string;
   isPestPacEnabled: boolean;
-  onPestPacPick: (client: PestPacClientResult) => void;
+  isSyncingCustomer: boolean;
+  onPestPacPickAndAdvance: (client: PestPacClientResult) => void;
+  onLocalCustomerPickAndAdvance: (customer: CustomerResult) => void;
 }) {
   const [pestPacQuery, setPestPacQuery] = useState('');
   const [pestPacResults, setPestPacResults] = useState<PestPacClientResult[]>(
     []
   );
+  const [localResults, setLocalResults] = useState<CustomerResult[]>([]);
   const [isPestPacSearching, setIsPestPacSearching] = useState(false);
   const [pestPacSearchError, setPestPacSearchError] = useState<string | null>(
     null
@@ -1034,12 +1038,13 @@ function StepNewCustomer({
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    if (!isPestPacEnabled) return;
+    if (mode !== 'search') return;
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
 
     const q = pestPacQuery.trim();
     if (q.length < 2) {
       setPestPacResults([]);
+      setLocalResults([]);
       setPestPacSearchError(null);
       return;
     }
@@ -1048,22 +1053,34 @@ function StepNewCustomer({
       setIsPestPacSearching(true);
       setPestPacSearchError(null);
       try {
-        const res = await fetch(
-          `/api/pestpac/clients/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
-        );
+        const url = isPestPacEnabled
+          ? `/api/pestpac/clients/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
+          : `/api/customers/search?q=${encodeURIComponent(q)}&companyId=${companyId}`;
+        const res = await fetch(url);
         if (res.ok) {
           const data = await res.json();
-          setPestPacResults(data.clients ?? []);
+          if (isPestPacEnabled) {
+            setPestPacResults(data.clients ?? []);
+            setLocalResults([]);
+          } else {
+            setLocalResults(data.customers ?? []);
+            setPestPacResults([]);
+          }
         } else {
           const data = await res.json().catch(() => ({}));
           setPestPacSearchError(
             data.error ??
-              'PestPac search failed. Check your integration settings.'
+              (isPestPacEnabled
+                ? 'PestPac search failed. Check your integration settings.'
+                : 'Customer search failed.')
           );
           setPestPacResults([]);
+          setLocalResults([]);
         }
       } catch {
-        setPestPacSearchError('PestPac search failed.');
+        setPestPacSearchError(
+          isPestPacEnabled ? 'PestPac search failed.' : 'Customer search failed.'
+        );
       } finally {
         setIsPestPacSearching(false);
       }
@@ -1072,87 +1089,119 @@ function StepNewCustomer({
     return () => {
       if (searchTimeout.current) clearTimeout(searchTimeout.current);
     };
-  }, [pestPacQuery, companyId, isPestPacEnabled]);
+  }, [pestPacQuery, companyId, isPestPacEnabled, mode]);
+
+  if (mode === 'search') {
+    const trimmed = pestPacQuery.trim();
+    const showResults =
+      trimmed.length >= 2 && !isPestPacSearching && !pestPacSearchError;
+    const hasResults = isPestPacEnabled
+      ? pestPacResults.length > 0
+      : localResults.length > 0;
+    return (
+      <div className={styles.stepContent}>
+        <h2 className={styles.stepTitle}>Search Customers</h2>
+        <p className={styles.stepDesc}>
+          {isPestPacEnabled
+            ? 'Find an existing PestPac client.'
+            : 'Find an existing customer.'}
+        </p>
+
+        <div className={styles.searchInputWrapper}>
+          <input
+            className={styles.searchInput}
+            type="text"
+            placeholder="Search by name, address, or phone…"
+            value={pestPacQuery}
+            onChange={e => setPestPacQuery(e.target.value)}
+            autoFocus
+          />
+          {isPestPacSearching && <span className={styles.searchSpinner} />}
+        </div>
+
+        {pestPacSearchError && (
+          <p className={styles.errorState}>{pestPacSearchError}</p>
+        )}
+
+        {showResults && (
+          <div className={styles.customerList}>
+            {!hasResults && (
+              <p className={styles.emptyState}>
+                No customers found for &quot;{trimmed}&quot;
+              </p>
+            )}
+            {isPestPacEnabled &&
+              pestPacResults.map(client => {
+                const nameParts = [client.firstName, client.lastName].filter(
+                  Boolean
+                );
+                const displayName =
+                  nameParts.length > 0
+                    ? nameParts.join(' ')
+                    : `Client #${client.clientId}`;
+                return (
+                  <button
+                    type="button"
+                    key={client.clientId}
+                    className={styles.customerCard}
+                    onClick={() => onPestPacPickAndAdvance(client)}
+                    disabled={isSyncingCustomer}
+                  >
+                    <div className={styles.customerCardName}>{displayName}</div>
+                    {client.primaryAddress && (
+                      <div className={styles.customerCardAddr}>
+                        {client.primaryAddress.street},{' '}
+                        {client.primaryAddress.city},{' '}
+                        {client.primaryAddress.state}{' '}
+                        {client.primaryAddress.zip}
+                      </div>
+                    )}
+                    <div className={styles.customerCardContact}>
+                      {client.phone && <span>{client.phone}</span>}
+                      {client.email && <span>{client.email}</span>}
+                    </div>
+                  </button>
+                );
+              })}
+            {!isPestPacEnabled &&
+              localResults.map(customer => {
+                const addr = getPrimaryAddress(customer);
+                return (
+                  <button
+                    type="button"
+                    key={customer.id}
+                    className={styles.customerCard}
+                    onClick={() => onLocalCustomerPickAndAdvance(customer)}
+                    disabled={isSyncingCustomer}
+                  >
+                    <div className={styles.customerCardName}>
+                      {getCustomerDisplayName(customer)}
+                    </div>
+                    {addr && (
+                      <div className={styles.customerCardAddr}>
+                        {addr.street_address}, {addr.city}, {addr.state}{' '}
+                        {addr.zip_code}
+                      </div>
+                    )}
+                    <div className={styles.customerCardContact}>
+                      {customer.phone && <span>{customer.phone}</span>}
+                      {customer.email && <span>{customer.email}</span>}
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
+        )}
+
+        {error && <p className={styles.errorState}>{error}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>New Lead</h2>
       <p className={styles.stepDesc}>Enter the customer&apos;s details</p>
-
-      {isPestPacEnabled && (
-        <div className={styles.pestPacSearchBlock}>
-          <label className={styles.fieldLabel}>
-            Search PestPac
-            <span className={styles.fieldHint}>
-              {' '}
-              — pick an existing client to autofill
-            </span>
-          </label>
-          <div className={styles.searchInputWrapper}>
-            <input
-              className={styles.searchInput}
-              type="text"
-              placeholder="Search by name, address, or phone…"
-              value={pestPacQuery}
-              onChange={e => setPestPacQuery(e.target.value)}
-            />
-            {isPestPacSearching && <span className={styles.searchSpinner} />}
-          </div>
-          {pestPacSearchError && (
-            <p className={styles.errorState}>{pestPacSearchError}</p>
-          )}
-          {pestPacQuery.trim().length >= 2 &&
-            !isPestPacSearching &&
-            !pestPacSearchError && (
-              <div className={styles.customerList}>
-                {pestPacResults.length === 0 ? (
-                  <p className={styles.emptyState}>
-                    No PestPac customers found for &quot;{pestPacQuery}&quot;
-                  </p>
-                ) : (
-                  pestPacResults.map(client => {
-                    const nameParts = [
-                      client.firstName,
-                      client.lastName,
-                    ].filter(Boolean);
-                    const displayName =
-                      nameParts.length > 0
-                        ? nameParts.join(' ')
-                        : `Client #${client.clientId}`;
-                    return (
-                      <button
-                        type="button"
-                        key={client.clientId}
-                        className={styles.customerCard}
-                        onClick={() => {
-                          onPestPacPick(client);
-                          setPestPacQuery('');
-                          setPestPacResults([]);
-                        }}
-                      >
-                        <div className={styles.customerCardName}>
-                          {displayName}
-                        </div>
-                        {client.primaryAddress && (
-                          <div className={styles.customerCardAddr}>
-                            {client.primaryAddress.street},{' '}
-                            {client.primaryAddress.city},{' '}
-                            {client.primaryAddress.state}{' '}
-                            {client.primaryAddress.zip}
-                          </div>
-                        )}
-                        <div className={styles.customerCardContact}>
-                          {client.phone && <span>{client.phone}</span>}
-                          {client.email && <span>{client.email}</span>}
-                        </div>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            )}
-        </div>
-      )}
 
       <div className={styles.newCustomerRow}>
         <div className={styles.fieldGroup}>
@@ -1616,133 +1665,24 @@ function StepServiceDetails({
 }
 
 function StepSelectSite({
-  companyId,
-  selectedCustomer,
-  onSelectCustomer,
-  recentCustomers,
   todayRouteStops,
   isTodayRouteLoading,
   onPickRouteStop,
+  onSearchCustomers,
   onAddNewCustomer,
   isSyncingCustomer,
   routeStopPickError,
   companyTimezone,
 }: {
-  companyId: string;
-  selectedCustomer: CustomerResult | null;
-  onSelectCustomer: (customer: CustomerResult) => void;
-  recentCustomers: RecentCustomer[];
   todayRouteStops: TodayRouteStop[];
   isTodayRouteLoading: boolean;
   onPickRouteStop: (stop: TodayRouteStop) => void;
+  onSearchCustomers: () => void;
   onAddNewCustomer: () => void;
   isSyncingCustomer: boolean;
   routeStopPickError: string | null;
   companyTimezone: string;
 }) {
-  const [query, setQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<CustomerResult[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const doSearch = useCallback(
-    async (q: string) => {
-      if (!q.trim() || q.length < 2) {
-        setSearchResults([]);
-        return;
-      }
-      setIsSearching(true);
-      try {
-        const res = await fetch(
-          `/api/customers/search?q=${encodeURIComponent(q)}&companyId=${companyId}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          setSearchResults(data.customers ?? []);
-        }
-      } finally {
-        setIsSearching(false);
-      }
-    },
-    [companyId]
-  );
-
-  useEffect(() => {
-    if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    searchTimeout.current = setTimeout(() => doSearch(query), 400);
-    return () => {
-      if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    };
-  }, [query, doSearch]);
-
-  const isSearchActive = query.length >= 2;
-
-  const renderCustomerCard = (customer: CustomerResult) => {
-    const addr = getPrimaryAddress(customer);
-    const isSelected = selectedCustomer?.id === customer.id;
-    return (
-      <button
-        key={customer.id}
-        className={`${styles.customerCard} ${isSelected ? styles.customerCardSelected : ''}`}
-        onClick={() => onSelectCustomer(customer)}
-      >
-        <div className={styles.customerCardName}>
-          {getCustomerDisplayName(customer)}
-        </div>
-        {addr && (
-          <div className={styles.customerCardAddr}>
-            {addr.street_address}, {addr.city}, {addr.state} {addr.zip_code}
-          </div>
-        )}
-        <div className={styles.customerCardContact}>
-          {customer.phone && <span>{customer.phone}</span>}
-          {customer.email && <span>{customer.email}</span>}
-        </div>
-      </button>
-    );
-  };
-
-  const renderRecentCard = (recent: RecentCustomer) => {
-    const isSelected = selectedCustomer?.id === recent.id;
-    const nameParts = [recent.first_name, recent.last_name].filter(Boolean);
-    const displayName =
-      nameParts.length > 0
-        ? nameParts.join(' ')
-        : (recent.email ?? `Customer #${recent.id.slice(0, 8)}`);
-    const asCustomer: CustomerResult = {
-      id: recent.id,
-      first_name: recent.first_name,
-      last_name: recent.last_name,
-      email: recent.email,
-      phone: recent.phone,
-      pestpac_client_id: recent.pestpac_client_id ?? null,
-      primary_service_address: recent.primaryAddress
-        ? [{ service_address: { id: recent.id, ...recent.primaryAddress } }]
-        : undefined,
-    };
-    return (
-      <button
-        key={recent.id}
-        className={`${styles.customerCard} ${isSelected ? styles.customerCardSelected : ''}`}
-        onClick={() => onSelectCustomer(asCustomer)}
-      >
-        <div className={styles.customerCardName}>{displayName}</div>
-        {recent.primaryAddress && (
-          <div className={styles.customerCardAddr}>
-            {recent.primaryAddress.street_address}, {recent.primaryAddress.city}
-            , {recent.primaryAddress.state} {recent.primaryAddress.zip_code}
-          </div>
-        )}
-        <div className={styles.customerCardContact}>
-          {recent.phone && <span>{recent.phone}</span>}
-          {recent.email && <span>{recent.email}</span>}
-        </div>
-      </button>
-    );
-  };
-
-  const showRecents = recentCustomers.length > 0;
-
   const renderRouteStopCard = (stop: TodayRouteStop) => {
     return (
       <button
@@ -1768,84 +1708,46 @@ function StepSelectSite({
     <div className={styles.stepContent}>
       <h2 className={styles.stepTitle}>Select Customer</h2>
       <p className={styles.stepDesc}>
-        Pick a customer from today&apos;s route or add a new one.
+        Pick a customer from today&apos;s route, or search for an existing one.
       </p>
-
-      <button
-        type="button"
-        className={styles.addNewCustomerBtn}
-        onClick={onAddNewCustomer}
-      >
-        + Add New Customer
-      </button>
 
       {routeStopPickError && (
         <p className={styles.errorState}>{routeStopPickError}</p>
       )}
 
-      {/* Today's route — only when not actively searching */}
-      {query.length < 2 && (
-        <div className={styles.customerList}>
-          {isTodayRouteLoading && (
-            <div className={styles.loadingState}>
-              <span className={styles.spinner} />
-              Loading today&apos;s route…
-            </div>
-          )}
-          {!isTodayRouteLoading && todayRouteStops.length > 0 && (
-            <>
-              <p className={styles.listLabel}>Today&apos;s Route</p>
-              {todayRouteStops.map(renderRouteStopCard)}
-            </>
-          )}
-        </div>
-      )}
-
-      <div className={styles.searchInputWrapper}>
-        <input
-          className={styles.searchInput}
-          type="text"
-          placeholder="Search by name or address…"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
-        {isSearching && <span className={styles.searchSpinner} />}
+      <div className={styles.customerList}>
+        {isTodayRouteLoading && (
+          <div className={styles.loadingState}>
+            <span className={styles.spinner} />
+            Loading today&apos;s route…
+          </div>
+        )}
+        {!isTodayRouteLoading && todayRouteStops.length > 0 && (
+          <>
+            <p className={styles.listLabel}>Today&apos;s Route</p>
+            {todayRouteStops.map(renderRouteStopCard)}
+          </>
+        )}
+        {!isTodayRouteLoading && todayRouteStops.length === 0 && (
+          <p className={styles.emptyState}>No stops on today&apos;s route.</p>
+        )}
       </div>
 
-      <div className={styles.customerList}>
-        {/* Manual search results */}
-        {isSearchActive && (
-          <>
-            <p className={styles.listLabel}>Search Results</p>
-            {isSearching && (
-              <div className={styles.loadingState}>
-                <span className={styles.spinner} />
-                Searching…
-              </div>
-            )}
-            {!isSearching && searchResults.map(renderCustomerCard)}
-            {!isSearching && searchResults.length === 0 && (
-              <p className={styles.emptyState}>
-                No customers found for &quot;{query}&quot;
-              </p>
-            )}
-          </>
-        )}
-
-        {/* Idle state: recents */}
-        {!isSearchActive && (
-          <>
-            {showRecents && (
-              <p className={styles.listLabel}>Recent Customers</p>
-            )}
-            {showRecents && recentCustomers.map(renderRecentCard)}
-            {!showRecents && (
-              <p className={styles.emptyState}>
-                Search above to find a customer
-              </p>
-            )}
-          </>
-        )}
+      <div className={styles.selectSiteActions}>
+        <button
+          type="button"
+          className={styles.addNewCustomerBtn}
+          onClick={onSearchCustomers}
+        >
+          Search Customers
+        </button>
+        <button
+          type="button"
+          className={styles.addNewCustomerBtn}
+          onClick={onAddNewCustomer}
+        >
+          + Add New Customer
+        </button>
       </div>
     </div>
   );
@@ -2867,6 +2769,13 @@ export function NewOpportunityWizard() {
     'existing' | 'new' | null
   >(null);
 
+  // When customerSource = 'new', distinguishes between the two entry points
+  // exposed on select-site: 'search' surfaces the PestPac/local-DB search
+  // (auto-advances on pick) and 'new' surfaces the new-customer form.
+  const [customerEntryMode, setCustomerEntryMode] = useState<'search' | 'new'>(
+    'new'
+  );
+
   // Today's route stops surfaced inside StepSelectSite as quick-pick cards.
   const [todayRouteStops, setTodayRouteStops] = useState<TodayRouteStop[]>([]);
   const [isTodayRouteLoading, setIsTodayRouteLoading] = useState(false);
@@ -2878,7 +2787,7 @@ export function NewOpportunityWizard() {
   const selectedPestOption =
     pestOptions.find(option => option.id === selectedPestValue) ?? null;
 
-  const { recentCustomers, addRecent } = useRecentTechLeadCustomers(companyId);
+  const { addRecent } = useRecentTechLeadCustomers(companyId);
 
   // Computed wizard steps. Route-stop deep links pre-load the customer and
   // skip select-site entirely. Every other entry point (dashboard "Send Lead"
@@ -3134,13 +3043,7 @@ export function NewOpportunityWizard() {
     [selectedCompany?.id, addRecent]
   );
 
-  const handleAddNewCustomer = useCallback(() => {
-    setSelectedCustomer(null);
-    setSelectedPestPacClient(null);
-    setCustomerSource('new');
-    setRouteStopPickError(null);
-    // Advance to the freshly-inserted new-customer step. We look it up by id
-    // after the step list recomputes, so fall back to the next index.
+  const advanceToNewCustomerStep = useCallback(() => {
     requestAnimationFrame(() => {
       const idx = wizardStepsRef.current.indexOf('new-customer');
       if (idx !== -1) {
@@ -3150,6 +3053,100 @@ export function NewOpportunityWizard() {
       }
     });
   }, []);
+
+  const handleAddNewCustomer = useCallback(() => {
+    setSelectedCustomer(null);
+    setSelectedPestPacClient(null);
+    setCustomerSource('new');
+    setCustomerEntryMode('new');
+    setRouteStopPickError(null);
+    advanceToNewCustomerStep();
+  }, [advanceToNewCustomerStep]);
+
+  const handleSearchCustomers = useCallback(() => {
+    setSelectedCustomer(null);
+    setSelectedPestPacClient(null);
+    setCustomerSource('new');
+    setCustomerEntryMode('search');
+    setRouteStopPickError(null);
+    advanceToNewCustomerStep();
+  }, [advanceToNewCustomerStep]);
+
+  const handlePestPacPickAndAdvance = useCallback(
+    async (client: PestPacClientResult) => {
+      if (!companyId) return;
+      setSelectedPestPacClient(client);
+      setSelectedCustomer(null);
+      setIsSyncingCustomer(true);
+      setSyncError(null);
+      try {
+        const res = await fetch('/api/customers/pestpac-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId: client.clientId, companyId }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error ?? 'Failed to sync customer');
+        }
+        const data = await res.json();
+        const synced = data.customer;
+        setSelectedCustomer(synced);
+        const addr =
+          synced.primary_service_address?.[0]?.service_address ?? null;
+        addRecent({
+          id: synced.id,
+          first_name: synced.first_name,
+          last_name: synced.last_name,
+          email: synced.email,
+          phone: synced.phone,
+          pestpac_client_id: synced.pestpac_client_id ?? null,
+          primaryAddress: addr
+            ? {
+                street_address: addr.street_address,
+                city: addr.city,
+                state: addr.state,
+                zip_code: addr.zip_code,
+              }
+            : null,
+        });
+        setStepIndex(i => i + 1);
+      } catch (err: any) {
+        setSyncError(
+          err.message ??
+            'Failed to sync customer from PestPac. Please try again.'
+        );
+      } finally {
+        setIsSyncingCustomer(false);
+      }
+    },
+    [companyId, addRecent]
+  );
+
+  const handleLocalCustomerPickAndAdvance = useCallback(
+    (customer: CustomerResult) => {
+      setSelectedCustomer(customer);
+      setSelectedPestPacClient(null);
+      const addr = getPrimaryAddress(customer);
+      addRecent({
+        id: customer.id,
+        first_name: customer.first_name,
+        last_name: customer.last_name,
+        email: customer.email,
+        phone: customer.phone,
+        primaryAddress: addr
+          ? {
+              street_address: addr.street_address,
+              city: addr.city,
+              state: addr.state,
+              zip_code: addr.zip_code,
+            }
+          : null,
+      });
+      setStepIndex(i => i + 1);
+    },
+    [addRecent]
+  );
 
   // Load customer from route stop once selectedCompany is available
   useEffect(() => {
@@ -3760,6 +3757,11 @@ export function NewOpportunityWizard() {
       if (!selectedPestPacClient && !selectedCustomer) return false;
     }
     if (currentStepId === 'new-customer') {
+      if (customerEntryMode === 'search') {
+        // In search mode the tech advances by tapping a result. Next is only
+        // enabled if a customer is already chosen (e.g. when navigating back).
+        return !!(selectedCustomer || selectedPestPacClient);
+      }
       return !!(
         newCustomerForm.firstName.trim() &&
         newCustomerForm.lastName.trim() &&
@@ -4005,55 +4007,24 @@ export function NewOpportunityWizard() {
 
             {currentStepId === 'new-customer' && (
               <StepNewCustomer
+                mode={customerEntryMode}
                 form={newCustomerForm}
                 onChange={setNewCustomerForm}
-                error={createCustomerError}
+                error={createCustomerError ?? syncError}
                 companyId={companyId}
                 isPestPacEnabled={isPestPacEnabled}
-                onPestPacPick={client => {
-                  setSelectedPestPacClient(client);
-                  setSelectedCustomer(null);
-                  // Prefill the form so the tech can review/edit before
-                  // submitting. The client is synced on leaving this step.
-                  setNewCustomerForm(prev => ({
-                    ...prev,
-                    firstName: client.firstName ?? prev.firstName,
-                    lastName: client.lastName ?? prev.lastName,
-                    phone: client.phone ?? prev.phone,
-                    email: client.email ?? prev.email,
-                    addressInput: client.primaryAddress
-                      ? [
-                          client.primaryAddress.street,
-                          [
-                            client.primaryAddress.city,
-                            client.primaryAddress.state,
-                          ]
-                            .filter(Boolean)
-                            .join(', '),
-                          client.primaryAddress.zip,
-                        ]
-                          .filter(Boolean)
-                          .join(', ')
-                      : prev.addressInput,
-                    addressComponents: null,
-                  }));
-                }}
+                isSyncingCustomer={isSyncingCustomer}
+                onPestPacPickAndAdvance={handlePestPacPickAndAdvance}
+                onLocalCustomerPickAndAdvance={handleLocalCustomerPickAndAdvance}
               />
             )}
 
             {currentStepId === 'select-site' && (
               <StepSelectSite
-                companyId={companyId}
-                selectedCustomer={selectedCustomer}
-                onSelectCustomer={c => {
-                  setSelectedCustomer(c);
-                  setSelectedPestPacClient(null);
-                  setCustomerSource('existing');
-                }}
-                recentCustomers={recentCustomers}
                 todayRouteStops={todayRouteStops}
                 isTodayRouteLoading={isTodayRouteLoading}
                 onPickRouteStop={handlePickRouteStop}
+                onSearchCustomers={handleSearchCustomers}
                 onAddNewCustomer={handleAddNewCustomer}
                 isSyncingCustomer={isSyncingCustomer}
                 routeStopPickError={routeStopPickError}

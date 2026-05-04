@@ -128,6 +128,11 @@ export default function TicketReviewModal({
   const [isBranchDropdownOpen, setIsBranchDropdownOpen] = useState(false);
   const branchDropdownRef = useRef<HTMLDivElement>(null);
   const { branches: availableBranches } = useBranches(ticket.company_id);
+
+  // A branch is required to assign a ticket whenever the company has any
+  // active branches. Companies without branches keep the legacy behavior
+  // (no dropdown, no requirement).
+  const branchRequired = availableBranches.length > 0 && !selectedBranchId;
   const [callRecord, setCallRecord] = useState<CallRecord | undefined>();
   const [formSubmission, setFormSubmission] = useState<FormSubmission | undefined>();
   const [localTicket, setLocalTicket] = useState<Ticket>(ticket);
@@ -1180,28 +1185,35 @@ export default function TicketReviewModal({
           {availableBranches.length > 0 && (
             <div ref={branchDropdownRef} className={styles.customDropdown} style={{ marginTop: '12px' }}>
               <label style={{ fontSize: '13px', fontWeight: 500, color: '#6A7282', display: 'block', marginBottom: '4px' }}>
-                Branch:
+                Branch: <span style={{ color: '#dc2626' }}>*</span>
               </label>
               <button
                 className={`${styles.dropdownButton} ${isBranchDropdownOpen ? styles.open : ''}`}
                 onClick={() => setIsBranchDropdownOpen(!isBranchDropdownOpen)}
                 disabled={isQualifying}
+                style={
+                  branchRequired
+                    ? { borderColor: '#dc2626' }
+                    : undefined
+                }
               >
                 <div className={styles.selectedOption}>
-                  <span className={styles.optionText}>
-                    {availableBranches.find(b => b.id === selectedBranchId)?.name ?? 'No Branch'}
+                  <span
+                    className={styles.optionText}
+                    style={
+                      branchRequired
+                        ? { color: '#9ca3af' }
+                        : undefined
+                    }
+                  >
+                    {availableBranches.find(b => b.id === selectedBranchId)
+                      ?.name ?? 'Select a branch'}
                   </span>
                 </div>
                 <ChevronDown size={16} className={styles.chevronIcon} />
               </button>
               {isBranchDropdownOpen && (
                 <div className={styles.dropdownMenu}>
-                  <button
-                    className={`${styles.dropdownOption} ${!selectedBranchId ? styles.selected : ''}`}
-                    onClick={() => handleBranchSelect(null)}
-                  >
-                    <span className={styles.optionText}>No Branch</span>
-                  </button>
                   {availableBranches.map(branch => (
                     <button
                       key={branch.id}
@@ -1214,6 +1226,17 @@ export default function TicketReviewModal({
                     </button>
                   ))}
                 </div>
+              )}
+              {branchRequired && (
+                <p
+                  style={{
+                    fontSize: '12px',
+                    color: '#dc2626',
+                    margin: '4px 0 0',
+                  }}
+                >
+                  Select a branch before assigning this ticket.
+                </p>
               )}
             </div>
           )}
@@ -1230,7 +1253,8 @@ export default function TicketReviewModal({
                 onPrimaryAction={handleLiveCall}
                 onSecondaryAction={handleApprove}
                 secondaryButtonText={`Assign ${getQualificationLabel()}`}
-                primaryButtonDisabled={false}
+                primaryButtonDisabled={branchRequired}
+                secondaryButtonDisabled={branchRequired}
                 primaryButtonText={'Take It'}
                 showSecondaryButton={true}
                 primaryButtonPosition="left"
@@ -1404,7 +1428,7 @@ export default function TicketReviewModal({
             isFirstStep={false}
             onPrimaryAction={handleFinalApprove}
             primaryButtonText={`Continue ${getQualificationLabel()}`}
-            primaryButtonDisabled={false}
+            primaryButtonDisabled={branchRequired}
             isLoading={isQualifying}
             loadingText="Processing..."
           />
