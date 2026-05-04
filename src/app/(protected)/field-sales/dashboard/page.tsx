@@ -371,7 +371,6 @@ function FieldSalesDashboardInner() {
             }
           />
         </div>
-        <FieldSalesNav />
         <Toast
           message={successToast ?? ''}
           isVisible={!!successToast}

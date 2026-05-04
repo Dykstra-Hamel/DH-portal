@@ -14,6 +14,11 @@ export interface AdminReportFilters {
   managerId?: string | null;
   compare?: 'users' | 'branches' | 'managers' | null;
   entityIds?: string[] | null;
+  // Pre-seed the team breakdown with these user IDs so that users with no
+  // activity in the date window still appear (zero-padded). Used by the
+  // admin field-staff roster endpoint to render every inspector/technician
+  // on the company (or branch), not only the ones who submitted leads.
+  seedFieldStaffUserIds?: string[] | null;
 }
 
 export interface CompareDailyPoint {
@@ -61,6 +66,7 @@ export interface TeamBreakdownRow {
   wonRevenue: number;
   techDiscussedCount: number;
   stopsCompleted: number;
+  stopsToday: number;
   leadsFromStops: number;
   winRate: number;
   pipelineValue: number;
@@ -167,6 +173,7 @@ export async function getAdminFieldSalesReport(
     managerId,
     compare,
     entityIds,
+    seedFieldStaffUserIds,
   } = filters;
 
   // ── Manager → direct-reports lookup ────────────────────────────────────
@@ -426,11 +433,17 @@ export async function getAdminFieldSalesReport(
       wonRevenue: 0,
       techDiscussedCount: 0,
       stopsCompleted: 0,
+      stopsToday: 0,
       leadsFromStops: 0,
       winRate: 0,
       pipelineValue: 0,
     };
   };
+  if (seedFieldStaffUserIds && seedFieldStaffUserIds.length > 0) {
+    for (const uid of seedFieldStaffUserIds) {
+      if (!perUser.has(uid)) perUser.set(uid, blankPerUserRow(uid));
+    }
+  }
   for (const l of leads) {
     const uid = (l.submitted_by as string | null) ?? null;
     if (!uid) continue;
@@ -508,6 +521,47 @@ export async function getAdminFieldSalesReport(
   }
 
   const routesCompleted = routes.filter(r => r.status === 'completed').length;
+
+  // ── Stops scheduled for today (per user, regardless of date filter) ──────
+  const todayIso = toIsoDate(new Date());
+  let todayRoutesQuery = admin
+    .from('routes')
+    .select('id, assigned_to')
+    .eq('company_id', companyId)
+    .eq('route_date', todayIso);
+  if (userIds && userIds.length > 0) {
+    todayRoutesQuery = todayRoutesQuery.in('assigned_to', userIds);
+  }
+  if (managerId) {
+    const teamUserIds = reportsByManager.get(managerId) ?? [];
+    todayRoutesQuery = todayRoutesQuery.in(
+      'assigned_to',
+      teamUserIds.length > 0 ? teamUserIds : ['__no_reports__']
+    );
+  }
+  const { data: todayRouteRows } = await todayRoutesQuery;
+  const todayRoutes = todayRouteRows ?? [];
+  const todayRouteIdToUser = new Map<string, string | null>();
+  for (const r of todayRoutes) {
+    todayRouteIdToUser.set(
+      r.id as string,
+      (r.assigned_to as string | null) ?? null
+    );
+  }
+  const todayRouteIds = todayRoutes.map(r => r.id as string);
+  if (todayRouteIds.length > 0) {
+    const { data: todayStopsData } = await admin
+      .from('route_stops')
+      .select('route_id')
+      .in('route_id', todayRouteIds);
+    for (const s of todayStopsData ?? []) {
+      const uid = todayRouteIdToUser.get(s.route_id as string);
+      if (!uid) continue;
+      const row = perUser.get(uid) ?? blankPerUserRow(uid);
+      row.stopsToday += 1;
+      perUser.set(uid, row);
+    }
+  }
 
   for (const row of perUser.values()) {
     const decided = row.won + row.lost;

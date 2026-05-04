@@ -40,6 +40,7 @@ export interface ModalActionButtonsProps {
 
   // Secondary buttons
   secondaryButtonText?: string;
+  secondaryButtonDisabled?: boolean;
   showSecondaryButton?: boolean;
 
   // Loading states
@@ -64,6 +65,7 @@ export default function ModalActionButtons({
   primaryButtonPosition = 'right',
   showSecondaryButton = false,
   secondaryButtonText,
+  secondaryButtonDisabled = false,
   isLoading = false,
   loadingText = 'Processing...',
   addTaskDisabled = true,
@@ -133,9 +135,17 @@ export default function ModalActionButtons({
         )}
         {showSecondaryButton && (
           <button
-            onClick={onSecondaryAction}
-            className={styles.secondaryButton}
-            disabled={isLoading}
+            onClick={() => {
+              if (onSecondaryAction && !secondaryButtonDisabled && !isLoading) {
+                onSecondaryAction();
+              }
+            }}
+            className={
+              secondaryButtonDisabled
+                ? styles.disabledButton
+                : styles.secondaryButton
+            }
+            disabled={secondaryButtonDisabled || isLoading}
           >
             {secondaryButtonText}
           </button>

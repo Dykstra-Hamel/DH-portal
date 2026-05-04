@@ -23,6 +23,7 @@ interface TeamMemberCardData {
   wonRevenue: number;
   pipelineValue: number;
   stopsCompleted: number;
+  stopsToday: number;
   leadsFromStops: number;
 }
 
@@ -100,8 +101,8 @@ export function TeamMemberCard({
       <dl className={styles.stats}>
         <div className={styles.stat}>
           <CheckCircle2 size={14} className={styles.statIcon} />
-          <dt>Stops</dt>
-          <dd>{member.stopsCompleted}</dd>
+          <dt>Stops Today</dt>
+          <dd>{member.stopsToday}</dd>
         </div>
         <div className={styles.stat}>
           <FileText size={14} className={styles.statIcon} />
