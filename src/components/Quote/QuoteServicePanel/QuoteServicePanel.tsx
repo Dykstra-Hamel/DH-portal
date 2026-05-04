@@ -48,6 +48,15 @@ export interface QuoteServicePanelProps {
   showDiscountRow?: boolean;
   quoteSubtotalInitial?: number | null;
   quoteTotalInitial?: number | null;
+  appliedDiscount?: {
+    id?: string;
+    discount_name: string;
+    discount_type: 'percentage' | 'fixed_amount';
+    discount_value: number;
+    applies_to_price: 'initial' | 'recurring' | 'both';
+    recurring_discount_type?: 'percentage' | 'fixed_amount' | null;
+    recurring_discount_value?: number | null;
+  } | null;
   multipleItems?: boolean;
   /** Whether to render the totals panel (default: true) */
   showTotals?: boolean;
@@ -126,6 +135,7 @@ export default function QuoteServicePanel({
   showDiscountRow,
   quoteSubtotalInitial,
   quoteTotalInitial,
+  appliedDiscount,
   multipleItems,
   showTotals = true,
   showFaqs = true,
@@ -149,6 +159,9 @@ export default function QuoteServicePanel({
     if (i.catalogItemKind === 'specialty-line' && i.parentLineItemId) {
       return selectedItemIds.has(i.parentLineItemId);
     }
+    if (i.catalogItemKind === 'product' && i.parentLineItemId) {
+      return selectedItemIds.has(i.parentLineItemId);
+    }
     return true;
   });
 
@@ -156,8 +169,26 @@ export default function QuoteServicePanel({
     selectedItems.map(i => ({ ...i, isSelected: true }))
   );
 
+  const localDiscountDollar = (() => {
+    if (!appliedDiscount) return 0;
+    const { discount_type, discount_value, applies_to_price } = appliedDiscount;
+    if (applies_to_price === 'recurring') return 0;
+    if (discount_type === 'percentage') return (totalInitial * discount_value) / 100;
+    return discount_value;
+  })();
+
   const displaySubtotal = quoteSubtotalInitial ?? totalInitial;
-  const displayTotal = quoteTotalInitial ?? totalInitial;
+  const displayTotal = quoteTotalInitial ?? (totalInitial - localDiscountDollar);
+
+  const effectiveShowDiscount = showDiscountRow ?? (localDiscountDollar > 0);
+  const effectiveDiscountName = appliedDiscountName ?? appliedDiscount?.discount_name ?? null;
+  const effectiveDiscountDisplay =
+    appliedDiscountDisplay ??
+    (appliedDiscount
+      ? appliedDiscount.discount_type === 'percentage'
+        ? `${appliedDiscount.discount_value}%`
+        : `$${appliedDiscount.discount_value}`
+      : null);
 
   // ── FAQ helpers ──────────────────────────────────────────────────────────
 
@@ -610,10 +641,11 @@ export default function QuoteServicePanel({
               {planItems.length > 0 && (
                 <div className={qcStyles.totalSectionLabel}>Services</div>
               )}
-              {planItems.map(item => {
+              {planItems.map((item, _idx, arr) => {
+                const selectedPlanCount = arr.filter(i => selectedItemIds.has(i.id)).length;
                 const isSelected = selectedItemIds.has(item.id);
                 const isOnly =
-                  multipleItems && selectedItemIds.size === 1 && isSelected;
+                  multipleItems && selectedPlanCount === 1 && isSelected;
                 const childAddons = addonItems.filter(
                   a => a.parentLineItemId === item.id
                 );
@@ -816,16 +848,16 @@ export default function QuoteServicePanel({
           </div>
 
           {/* Discount row */}
-          {showDiscountRow && (
+          {effectiveShowDiscount && (
             <div
               className={`${qcStyles.totalRow} ${styles.discountAppliedRow}`}
             >
               <div>
-                {appliedDiscountName
-                  ? `${appliedDiscountName} - Discount Applied`
+                {effectiveDiscountName
+                  ? `${effectiveDiscountName} - Discount Applied`
                   : 'Discount Applied'}
               </div>
-              <strong>{appliedDiscountDisplay ?? ''}</strong>
+              <strong>{effectiveDiscountDisplay ?? ''}</strong>
             </div>
           )}
 
@@ -834,9 +866,9 @@ export default function QuoteServicePanel({
             <div>Total Initial Cost:</div>
             <strong>
               <span
-                className={showDiscountRow ? qcStyles.originalPriceText : ''}
+                className={effectiveShowDiscount ? qcStyles.originalPriceText : ''}
               >
-                {showDiscountRow && `$${displaySubtotal.toFixed(0)}`}
+                {effectiveShowDiscount && `$${displaySubtotal.toFixed(0)}`}
               </span>
               ${displayTotal.toFixed(0)}
             </strong>
