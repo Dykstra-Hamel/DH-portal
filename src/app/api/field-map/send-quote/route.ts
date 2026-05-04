@@ -6,6 +6,8 @@ import { getCompanyFromEmail, getCompanyTenantName } from '@/lib/email';
 import { getFullQuoteUrl } from '@/lib/quote-utils';
 import { formatHomeSizeRange, formatYardSizeRange } from '@/lib/pricing-calculations';
 import { generateFieldMapQuoteEmailTemplate } from '@/lib/email/templates/field-map-quote';
+import { stopActiveCadence } from '@/lib/leads/stop-active-cadence';
+import { fireTriggerWorkflowIfNeeded } from '@/lib/cadence/fire-trigger-workflow-if-needed';
 
 export async function POST(request: NextRequest) {
   try {
@@ -67,8 +69,14 @@ export async function POST(request: NextRequest) {
 
     const companyId = userCompany.company_id;
 
-    // Update lead status to 'quoted'
+    // Stop any active cadence before status change (cleans up pending tasks/executions)
+    await stopActiveCadence(leadId);
+
+    // Update lead status to 'quoted' — DB trigger handles cadence assignment insertion
     await adminClient.from('leads').update({ lead_status: 'quoted' }).eq('id', leadId);
+
+    // Fire trigger_workflow first step if the new cadence starts with one
+    await fireTriggerWorkflowIfNeeded(leadId, companyId);
 
     // Mark any linked route stops as completed so reports reflect the inspector's work
     await adminClient

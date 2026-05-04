@@ -46,6 +46,8 @@ interface LeadStepContentProps {
   onNotInterested?: () => void;
   onReadyToSchedule?: () => void;
   onLineItemsSaved?: (itemCount: number) => void;
+  /** Called after a lead is closed (won or final-cadence-lost) instead of hardcoded navigation. */
+  onNavigateAfterClose?: () => void;
 }
 
 export function LeadStepContent({
@@ -60,6 +62,7 @@ export function LeadStepContent({
   onNotInterested,
   onReadyToSchedule,
   onLineItemsSaved,
+  onNavigateAfterClose,
 }: LeadStepContentProps) {
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [isCommunicationExpanded, setIsCommunicationExpanded] = useState(true);
@@ -457,7 +460,11 @@ export function LeadStepContent({
       setPendingActivity(null);
 
       if (isLastStep) {
-        window.location.href = '/tickets/dashboard';
+        if (onNavigateAfterClose) {
+          onNavigateAfterClose();
+        } else {
+          window.location.href = '/tickets/dashboard';
+        }
         return;
       }
 
@@ -626,7 +633,11 @@ export function LeadStepContent({
       );
     }
     setShowScheduleModal(false);
-    window.location.href = '/tickets/leads';
+    if (onNavigateAfterClose) {
+      onNavigateAfterClose();
+    } else {
+      window.location.href = '/tickets/leads';
+    }
   // handleConfirmAndFinalize is declared above and is stable within this render
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scheduledDate, scheduledTime, confirmationNote, lead.id, quote?.id]);
