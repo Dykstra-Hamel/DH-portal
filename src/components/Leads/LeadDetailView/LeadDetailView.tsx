@@ -1460,6 +1460,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
             onNotInterested={handleNotInterested}
             onReadyToSchedule={handleReadyToSchedule}
             onLineItemsSaved={handleLineItemsSaved}
+            onNavigateAfterClose={() => router.push(baseRoute)}
           />
         </div>
 

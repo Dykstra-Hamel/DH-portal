@@ -8,6 +8,7 @@ import { logFieldChanges } from '@/lib/activity-logger';
 import { startDefaultCadenceForStage } from '@/lib/cadence/start-default-cadence';
 import { closeLeadForTerminalStatus } from '@/lib/leads/close-lead';
 import { stopActiveCadence } from '@/lib/leads/stop-active-cadence';
+import { fireTriggerWorkflowIfNeeded } from '@/lib/cadence/fire-trigger-workflow-if-needed';
 
 
 export async function GET(
@@ -588,38 +589,27 @@ export async function PUT(
       }
     }
 
-    // Automatic cadence management based on status transitions
+    // Automatic cadence management based on status transitions.
+    // Cadence assignment insertion is handled by the DB trigger
+    // `trigger_auto_cadence_on_lead_status_change`. App code here handles:
+    //   - stopActiveCadence: cancels pending tasks/executions (trigger can't do this)
+    //   - closeLeadForTerminalStatus: full cleanup for won/lost
+    //   - fireTriggerWorkflowIfNeeded: fires trigger_workflow first steps (trigger can't call Inngest)
     const currentStatus = newStatus ?? existingLead.lead_status;
     if (newStatus && newStatus !== oldStatus) {
-      const assignedTo = body.assigned_to ?? existingLead.assigned_to;
       try {
-        if (newStatus === 'in_process' && assignedTo) {
-          console.log('[cadence] checking for existing cadence on in_process', { leadId: id });
-          const adminSupabase = createAdminClient();
-          const { data: existingCadence, error: existingCadenceError } = await adminSupabase
-            .from('lead_cadence_assignments')
-            .select('id')
-            .eq('lead_id', id)
-            .is('completed_at', null)
-            .maybeSingle();
-          console.log('[cadence] existing cadence check', { existingCadence, existingCadenceError });
-          if (!existingCadence) {
-            await startDefaultCadenceForStage(id, existingLead.company_id,
-              'default_initial_contact_cadence_id', assignedTo);
-          } else {
-            console.log('[cadence] existing cadence found, skipping auto-enroll');
-          }
-        } else if (newStatus === 'quoted') {
+        if (newStatus === 'quoted') {
           await stopActiveCadence(id);
-          if (assignedTo) {
-            await startDefaultCadenceForStage(id, existingLead.company_id,
-              'default_quote_followup_cadence_id', assignedTo);
-          }
         } else if (newStatus === 'scheduling') {
           await stopActiveCadence(id);
           // Scheduling cadence starts when scheduler is assigned (see below)
         } else if (newStatus === 'won' || newStatus === 'lost') {
           await closeLeadForTerminalStatus(id);
+        }
+
+        // Fire trigger_workflow first step if the newly-assigned cadence starts with one
+        if (newStatus === 'quoted' || newStatus === 'in_process') {
+          await fireTriggerWorkflowIfNeeded(id, existingLead.company_id);
         }
       } catch (cadenceError) {
         console.error('Error managing cadence on status change:', cadenceError);

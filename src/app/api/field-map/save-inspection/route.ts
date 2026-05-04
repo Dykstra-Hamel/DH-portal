@@ -10,6 +10,7 @@ import {
   resolveBranchIdByZip,
   resolveBranchForServiceAddress,
 } from '@/lib/branch-filter';
+import { startDefaultCadenceForStage } from '@/lib/cadence/start-default-cadence';
 
 interface IncomingAddressComponents {
   street_number?: string;
@@ -367,6 +368,20 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: leadError?.message ?? 'Failed to create lead' }, { status: 500 });
       }
       leadId = newLead.id;
+
+      // Start initial contact cadence for newly-created inspection leads.
+      // This is an INSERT (not an UPDATE), so the AFTER UPDATE trigger does not fire.
+      try {
+        await startDefaultCadenceForStage(
+          leadId,
+          companyId,
+          'default_initial_contact_cadence_id',
+          user.id
+        );
+      } catch (cadenceErr) {
+        console.error('[save-inspection] Error starting initial contact cadence:', cadenceErr);
+        // Non-fatal — lead was created successfully
+      }
 
       // Log creation
       await adminClient.from('activity_log').insert({
