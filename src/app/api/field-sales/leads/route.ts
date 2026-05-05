@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
           .eq('company_id', companyId)
           .eq('lead_status', 'new')
           .is('assigned_to', null)
+          .or('archived.is.null,archived.eq.false')
           .order('created_at', { ascending: true }),
         supabase
           .from('user_companies')
@@ -255,7 +256,8 @@ export async function GET(request: NextRequest) {
         `)
         .eq('company_id', companyId)
         .eq('assigned_to', userId)
-        .not('lead_status', 'in', '("won","lost","closed")');
+        .not('lead_status', 'in', '("won","lost","closed")')
+        .or('archived.is.null,archived.eq.false');
 
       if (!canSeeScheduling) {
         leadsQuery = leadsQuery.neq('lead_status', 'scheduling');
@@ -295,6 +297,7 @@ export async function GET(request: NextRequest) {
         .eq('company_id', companyId)
         .eq('assigned_to', userId)
         .in('lead_status', ['won', 'lost', 'closed'])
+        .or('archived.is.null,archived.eq.false')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
