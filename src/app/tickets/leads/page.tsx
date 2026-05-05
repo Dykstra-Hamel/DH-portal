@@ -174,6 +174,14 @@ export default function LeadsPage() {
               company:companies(
                 id,
                 name
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `
             )
@@ -205,6 +213,14 @@ export default function LeadsPage() {
               company:companies(
                 id,
                 name
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `
             )

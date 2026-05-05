@@ -117,6 +117,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   // LeadLockedOverlay over the page and skip the heartbeat. Mirrors the
   // ticket review-lock pattern in TicketReviewModal.
   interface LockHolder {
+    userId?: string;
     firstName?: string | null;
     lastName?: string | null;
     email?: string;
@@ -760,6 +761,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
         const body = await res.json().catch(() => ({}));
         const holder = body?.reviewed_by_profile;
         setLockedBy({
+          userId: body?.reviewed_by ?? holder?.id,
           firstName: holder?.first_name ?? null,
           lastName: holder?.last_name ?? null,
           email: holder?.email ?? '',
@@ -821,6 +823,13 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   useEffect(() => {
     if (!leadId || !currentUser?.id) return;
 
+    // The broadcast channel is a singleton and there's no API to remove a
+    // single subscription, so every prior LeadDetailView mount leaves its
+    // handler attached forever. Without `alive`, our own release broadcast
+    // (self:true) — and stale handlers from previously-opened leads — would
+    // re-fire claimLeadLock and re-lock the lead we just left.
+    let alive = true;
+
     void claimLeadLock();
 
     // Heartbeat (only the holder's calls actually refresh the lock; the
@@ -841,6 +850,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
     // overlay back on if reviewerInfoRef hasn't been populated yet.
     const channel = createLeadReviewChannel();
     subscribeToLeadReviewUpdates(channel, payload => {
+      if (!alive) return;
       if (payload.lead_id !== leadId) return;
       if (payload.reviewed_by && payload.reviewed_by === currentUser.id) {
         return;
@@ -849,11 +859,27 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
         void claimLeadLock();
       } else {
         if (reviewClaimedRef.current) return;
-        setLockedBy({
-          firstName: payload.reviewed_by_first_name ?? null,
-          lastName: payload.reviewed_by_last_name ?? null,
-          email: payload.reviewed_by_email ?? '',
-          avatarUrl: payload.reviewed_by_avatar_url ?? null,
+        // Merge with existing overlay data — partial broadcasts (sent
+        // before the holder's profile loaded) shouldn't wipe out good data
+        // we already have from the API 409 response.
+        setLockedBy(prev => {
+          const sameUser =
+            !!prev?.userId && prev.userId === payload.reviewed_by;
+          return {
+            userId: payload.reviewed_by,
+            firstName:
+              payload.reviewed_by_first_name ??
+              (sameUser ? prev?.firstName ?? null : null),
+            lastName:
+              payload.reviewed_by_last_name ??
+              (sameUser ? prev?.lastName ?? null : null),
+            email:
+              payload.reviewed_by_email ??
+              (sameUser ? prev?.email ?? '' : ''),
+            avatarUrl:
+              payload.reviewed_by_avatar_url ??
+              (sameUser ? prev?.avatarUrl ?? null : null),
+          };
         });
       }
     });
@@ -861,6 +887,14 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
     // Always send `end` on cleanup — the server handler is idempotent
     // (no-ops if we aren't the holder) so this safely covers the race
     // where the user navigates away before `start` resolves.
+    //
+    // Broadcast AFTER the end request lands. Other users' subscribers
+    // call claimLeadLock() on receiving a release; if we broadcast first,
+    // their `start` POST races our `end` POST and they get a 409 (server
+    // still sees us as holder). Awaiting end before broadcasting gives a
+    // clean handoff. Page-unload uses keepalive — the .then won't run
+    // (JS context is gone) but the end request still lands; other users
+    // can recover via the LeadLockedOverlay "Try Again" button.
     const releaseLock = () => {
       if (reviewHeartbeatRef.current) {
         clearInterval(reviewHeartbeatRef.current);
@@ -871,22 +905,28 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
         method: 'PUT',
         body: JSON.stringify({ action: 'end' }),
         keepalive: true,
-      }).catch(() => {});
-      try {
-        broadcastLeadReviewUpdate(channel, {
-          lead_id: leadId,
-          reviewed_by: undefined,
-          timestamp: new Date().toISOString(),
-        });
-      } catch {
-        // ignore
-      }
+      })
+        .then(() => {
+          try {
+            broadcastLeadReviewUpdate(channel, {
+              lead_id: leadId,
+              reviewed_by: undefined,
+              timestamp: new Date().toISOString(),
+            });
+          } catch {
+            // ignore
+          }
+        })
+        .catch(() => {});
     };
 
     const handleBeforeUnload = () => releaseLock();
     window.addEventListener('beforeunload', handleBeforeUnload);
 
     return () => {
+      // Flip alive BEFORE releaseLock so the self-broadcast we're about to
+      // send doesn't loop back and re-claim the lock we're releasing.
+      alive = false;
       window.removeEventListener('beforeunload', handleBeforeUnload);
       releaseLock();
     };

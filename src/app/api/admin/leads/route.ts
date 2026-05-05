@@ -52,6 +52,9 @@ export async function GET(request: NextRequest) {
         furthest_completed_stage,
         scheduled_date,
         scheduled_time,
+        reviewed_by,
+        reviewed_at,
+        review_expires_at,
         created_at,
         updated_at,
         customer:customers(
@@ -64,6 +67,14 @@ export async function GET(request: NextRequest) {
         company:companies(
           id,
           name
+        ),
+        reviewed_by_profile:profiles!reviewed_by(
+          id,
+          first_name,
+          last_name,
+          email,
+          avatar_url,
+          uploaded_avatar_url
         )
       `
       )

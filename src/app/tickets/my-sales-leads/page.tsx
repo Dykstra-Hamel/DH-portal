@@ -147,6 +147,14 @@ export default function MySalesLeadsPage() {
               company:companies(
                 id,
                 name
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
@@ -183,6 +191,14 @@ export default function MySalesLeadsPage() {
               company:companies(
                 id,
                 name
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
