@@ -70,13 +70,16 @@ export async function GET(request: NextRequest) {
 
         await attachInspectionStatus(adminSupabase, userCompany.company_id, mappedStops);
 
-        // Background refresh from PestPac (fire-and-forget, only if configured)
-        if (userCompany.pestpac_employee_id) {
-          fetchAndSyncFromPestPac(adminSupabase, userCompany, date, user.id)
-            .catch(() => {});
-        }
+        if (mappedStops.length > 0) {
+          // Background refresh from PestPac (fire-and-forget, only if configured)
+          if (userCompany.pestpac_employee_id) {
+            fetchAndSyncFromPestPac(adminSupabase, userCompany, date, user.id)
+              .catch(() => {});
+          }
 
-        return NextResponse.json({ stops: mappedStops });
+          return NextResponse.json({ stops: mappedStops });
+        }
+        // 0 stops in DB → fall through to synchronous PestPac call
       }
     }
 
