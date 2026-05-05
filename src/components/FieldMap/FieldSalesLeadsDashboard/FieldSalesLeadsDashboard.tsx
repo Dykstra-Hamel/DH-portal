@@ -624,8 +624,8 @@ function buildSummaryCardViewConfig(
 
 function buildActionColumn(
   companyId: string,
-  reviewStatuses?: Map<string, LeadReviewStatus>,
-  activeTab: LeadTab
+  activeTab: LeadTab,
+  reviewStatuses?: Map<string, LeadReviewStatus>
 ): ColumnDefinition<FieldSalesLead> {
   return {
     key: 'action',
@@ -767,8 +767,8 @@ export function FieldSalesLeadsDashboard({
   const columns = useMemo(() => {
     const actionColumn = buildActionColumn(
       companyId,
-      reviewStatuses,
-      activeTab
+      activeTab,
+      reviewStatuses
     );
     const base =
       activeTab === 'new'
