@@ -7,7 +7,23 @@ import { DataTable, SortConfig } from '@/components/Common/DataTable';
 import { getLeadColumns, getLeadTabs } from './LeadsListConfig';
 import { TabDefinition } from '@/components/Common/DataTable';
 import { Toast } from '@/components/Common/Toast';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
 import styles from '@/components/Common/DataTable/DataTableTabs.module.scss';
+
+/**
+ * Shape of an active "User X is viewing" entry in the lead reviewStatuses
+ * Map. Mirrors the ticket pattern in TicketsList. Exported so column
+ * factories and other consumers can type their `reviewStatuses` prop.
+ */
+export interface LeadReviewStatus {
+  reviewedBy: string;
+  reviewedByName?: string;
+  reviewedByEmail?: string;
+  reviewedByFirstName?: string;
+  reviewedByLastName?: string;
+  reviewedByAvatarUrl?: string | null;
+  expiresAt: string;
+}
 
 interface LeadsListProps {
   leads: Lead[];
@@ -48,6 +64,10 @@ function LeadsList({
   const [showUndoOnToast, setShowUndoOnToast] = useState(false);
   const [previousLeadState, setPreviousLeadState] = useState<any>(null);
   const [isUndoing, setIsUndoing] = useState(false);
+
+  // Lead review-lock state — mirrors TicketsList. Seeds from lead.reviewed_by
+  // and updates live via the lead-reviews broadcast channel.
+  const reviewStatuses = useLeadReviewStatuses(leads);
 
   // Get tabs configuration
   const tabs = useMemo(
@@ -347,7 +367,7 @@ function LeadsList({
         data={filteredData}
         loading={loading}
         title="Leads Overview"
-        columns={getLeadColumns()}
+        columns={getLeadColumns(reviewStatuses)}
         tableType="leads"
         onItemAction={handleItemAction}
         onDataUpdated={onLeadUpdated}

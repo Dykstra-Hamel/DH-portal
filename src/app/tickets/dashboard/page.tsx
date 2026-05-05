@@ -51,6 +51,7 @@ import ModalActionButtons from '@/components/Common/Modal/ModalActionButtons';
 import TicketForm from '@/components/Tickets/TicketForm/TicketForm';
 import QuickQuoteModal from '@/components/QuickQuote/QuickQuoteModal';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
 import { AnnouncementsModal } from '@/components/Common/AnnouncementsModal/AnnouncementsModal';
 import ActionsTasksQuickView from '@/components/Common/ActionsTasksQuickView/ActionsTasksQuickView';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
@@ -1955,6 +1956,17 @@ function TicketsDashboardContent() {
     }),
     [totalCounts]
   );
+
+  // Live "Viewing" indicator for lead rows. The combined dashboard table
+  // shows tickets, leads, and support cases; we feed both sources of
+  // statuses (tickets via reviewStatuses above, leads via leadReviewStatuses)
+  // into the action column.
+  const leadDashboardSource = useMemo<Lead[]>(
+    () => [...leads, ...myLeads] as Lead[],
+    [leads, myLeads]
+  );
+  const leadReviewStatuses = useLeadReviewStatuses(leadDashboardSource);
+
   const dashboardOverviewColumns = useMemo<ColumnDefinition<DashboardItem>[]>(
     () => [
       {
@@ -2131,6 +2143,28 @@ function TicketsDashboardContent() {
             }
           }
 
+          if (item._type === 'lead') {
+            const leadStatus = leadReviewStatuses.get(item.id);
+            const isLeadLocked =
+              leadStatus &&
+              Date.now() < new Date(leadStatus.expiresAt).getTime();
+            if (isLeadLocked && leadStatus) {
+              return (
+                <div className={tableStyles.reviewingStatus}>
+                  <span className={tableStyles.reviewingText}>Viewing</span>
+                  <MiniAvatar
+                    firstName={leadStatus.reviewedByFirstName}
+                    lastName={leadStatus.reviewedByLastName}
+                    email={leadStatus.reviewedByEmail || ''}
+                    avatarUrl={leadStatus.reviewedByAvatarUrl}
+                    size="small"
+                    showTooltip={true}
+                  />
+                </div>
+              );
+            }
+          }
+
           const label = 'Review Ticket';
           return (
             <button
@@ -2151,7 +2185,7 @@ function TicketsDashboardContent() {
         },
       },
     ],
-    [reviewStatuses]
+    [reviewStatuses, leadReviewStatuses]
   );
 
   const handleDashboardItemRoute = useCallback(

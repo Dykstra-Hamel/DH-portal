@@ -7,6 +7,9 @@ import { getCustomerDisplayName } from '@/lib/display-utils';
 import { formatAge } from '@/lib/date-utils';
 import { DataTable, ColumnDefinition, CardViewConfig } from '@/components/Common/DataTable';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import { ReviewIndicator } from '@/components/Common/ReviewIndicator/ReviewIndicator';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
+import type { LeadReviewStatus } from '@/components/Leads/LeadsList/LeadsList';
 import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 import styles from './FieldSalesLeadsDashboard.module.scss';
 
@@ -26,6 +29,17 @@ interface FieldSalesLead {
     first_name: string | null;
     last_name: string | null;
     email: string;
+    avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
+  } | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_expires_at?: string | null;
+  reviewed_by_profile?: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
     avatar_url?: string | null;
     uploaded_avatar_url?: string | null;
   } | null;
@@ -272,7 +286,8 @@ function renderProgressCell(lead: FieldSalesLead) {
 
 function buildSimpleCardViewConfig(
   companyId: string,
-  nextTasks?: Record<string, NextTaskInfo>
+  nextTasks?: Record<string, NextTaskInfo>,
+  reviewStatuses?: Map<string, LeadReviewStatus>
 ): CardViewConfig<FieldSalesLead> {
   const topFields: CardViewConfig<FieldSalesLead>['topFields'] = [
     {
@@ -307,12 +322,29 @@ function buildSimpleCardViewConfig(
 
   return {
     topFields,
-    primaryAction: lead => (
-      <Link href={getReviewLeadHref(lead, companyId)} className={styles.reviewBtn}>
-        Open Lead
-        <ChevronRight size={16} />
-      </Link>
-    ),
+    primaryAction: lead => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      return (
+        <Link href={getReviewLeadHref(lead, companyId)} className={styles.reviewBtn}>
+          Open Lead
+          <ChevronRight size={16} />
+        </Link>
+      );
+    },
   };
 }
 
@@ -320,7 +352,8 @@ function buildSummaryCardViewConfig(
   companyId: string,
   viewedIds: Set<string>,
   markViewed: (leadId: string) => void,
-  isMobile: boolean
+  isMobile: boolean,
+  reviewStatuses?: Map<string, LeadReviewStatus>
 ): CardViewConfig<FieldSalesLead> {
   const renderSummaryAvatar = (lead: FieldSalesLead) => {
     const u = lead.assigned_user;
@@ -437,36 +470,71 @@ function buildSummaryCardViewConfig(
     },
     avatar: renderSummaryAvatar,
     statusBar: renderStatusBar,
-    primaryAction: lead => (
-      <Link
-        href={`/field-sales/leads/${lead.id}`}
-        className={styles.reviewBtn}
-        onClick={() => markViewed(lead.id)}
-      >
-        Review Lead
-        <ChevronRight size={16} />
-      </Link>
-    ),
+    primaryAction: lead => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      return (
+        <Link
+          href={`/field-sales/leads/${lead.id}`}
+          className={styles.reviewBtn}
+          onClick={() => markViewed(lead.id)}
+        >
+          Review Lead
+          <ChevronRight size={16} />
+        </Link>
+      );
+    },
     unread: lead => !viewedIds.has(lead.id),
   };
 }
 
 function buildActionColumn(
-  companyId: string
+  companyId: string,
+  reviewStatuses?: Map<string, LeadReviewStatus>
 ): ColumnDefinition<FieldSalesLead> {
   return {
     key: 'action',
     title: '',
     sortable: false,
-    render: (lead) => (
-      <Link
-        href={getReviewLeadHref(lead, companyId)}
-        className={styles.reviewBtn}
-      >
-        Review Lead
-        <ChevronRight size={16} />
-      </Link>
-    ),
+    render: (lead) => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      return (
+        <Link
+          href={getReviewLeadHref(lead, companyId)}
+          className={styles.reviewBtn}
+        >
+          Review Lead
+          <ChevronRight size={16} />
+        </Link>
+      );
+    },
   };
 }
 
@@ -565,14 +633,16 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
     };
   }, [activeTab, leads]);
 
+  const reviewStatuses = useLeadReviewStatuses(leads);
+
   const columns = useMemo(() => {
-    const actionColumn = buildActionColumn(companyId);
+    const actionColumn = buildActionColumn(companyId, reviewStatuses);
     const base =
       activeTab === 'new'
         ? BASE_COLUMNS.filter(c => c.key !== 'lead_status')
         : BASE_COLUMNS;
     return [...base, actionColumn];
-  }, [activeTab, companyId]);
+  }, [activeTab, companyId, reviewStatuses]);
 
   const columnWidths = activeTab === 'new'
     ? '80px 200px 1fr 180px 1fr'
@@ -594,14 +664,24 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         companyId,
         viewedIds,
         markViewed,
-        isMobile
+        isMobile,
+        reviewStatuses
       );
     }
     return buildSimpleCardViewConfig(
       companyId,
-      activeTab === 'my' ? nextTasks : undefined
+      activeTab === 'my' ? nextTasks : undefined,
+      reviewStatuses
     );
-  }, [activeTab, companyId, viewedIds, markViewed, nextTasks, isMobile]);
+  }, [
+    activeTab,
+    companyId,
+    viewedIds,
+    markViewed,
+    nextTasks,
+    isMobile,
+    reviewStatuses,
+  ]);
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery.trim()) return leads;
