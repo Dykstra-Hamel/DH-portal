@@ -1,0 +1,96 @@
+.scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 1300;
+  animation: fadeIn 0.12s ease-out;
+}
+
+.card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--white, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  padding: 24px 22px 20px;
+  box-shadow: 0 24px 48px rgba(0, 0, 0, 0.18);
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconWrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--blue-50, #eff6ff);
+  color: var(--blue-600, #2563eb);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.viewerName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--gray-800, #1f2937);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--gray-900, #111827);
+  margin: 4px 0 0;
+}
+
+.body {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--gray-600, #4b5563);
+  margin: 0 0 6px;
+}
+
+.tryAgainBtn {
+  appearance: none;
+  border: 1px solid var(--blue-600, #2563eb);
+  background: var(--blue-600, #2563eb);
+  color: var(--white, #ffffff);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+
+  &:hover:not(:disabled) {
+    background: var(--blue-700, #1d4ed8);
+    border-color: var(--blue-700, #1d4ed8);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

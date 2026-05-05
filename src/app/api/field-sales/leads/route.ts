@@ -79,14 +79,20 @@ export async function GET(request: NextRequest) {
 
   try {
     if (type === 'new') {
-      const [leadsResult, companyRoleResult, inspectorDeptResult] = await Promise.all([
+      const [leadsResult, companyRoleResult, inspectorDeptResult, zipGroupsResult] = await Promise.all([
         supabase
           .from('leads')
           .select(`
             id, company_id, lead_status, lead_source, lead_type, service_type,
             comments, assigned_to, created_at, updated_at, property_type,
+            service_address_id,
+            service_address:service_addresses!leads_service_address_id_fkey(zip_code),
+            reviewed_by, reviewed_at, review_expires_at,
+            reviewed_by_profile:profiles!reviewed_by(
+              id, first_name, last_name, email, avatar_url, uploaded_avatar_url
+            ),
             customer:customers(
-              id, first_name, last_name, email, phone, city, state,
+              id, first_name, last_name, email, phone, city, state, zip_code,
               customer_service_addresses(
                 is_primary_address,
                 service_address:service_addresses(street_address, apartment_unit, city, state, zip_code)
@@ -117,6 +123,11 @@ export async function GET(request: NextRequest) {
           .eq('company_id', companyId)
           .eq('department', 'inspector')
           .maybeSingle(),
+        supabase
+          .from('zip_code_groups')
+          .select('zip_codes')
+          .eq('company_id', companyId)
+          .eq('assigned_user_id', authResult.user.id),
       ]);
 
       if (leadsResult.error) throw leadsResult.error;
@@ -132,21 +143,58 @@ export async function GET(request: NextRequest) {
           ? viewerDeptType
           : null;
 
-      // Keep the lead if its directly-selected plan requires a quote, OR any
-      // plan on any of its quotes' line items requires a quote. The latter
-      // covers leads where a rep built the quote and chose the custom-quote
-      // plan there rather than on the lead itself.
+      const restrictToZipArea = !authResult.isGlobalAdmin && !isCompanyAdmin;
+      const viewerZipSet = new Set<string>();
+      for (const group of zipGroupsResult.data ?? []) {
+        for (const zip of group.zip_codes ?? []) {
+          if (typeof zip !== 'string') continue;
+          const normalized = zip.trim().split('-')[0];
+          if (/^\d{5}$/.test(normalized)) viewerZipSet.add(normalized);
+        }
+      }
+
+      // Mirror the trigger's zip resolution: leads.service_address.zip_code
+      // first, then fall through to customer-side fallbacks. If we only read
+      // the customer's primary address we'd drop leads whose service_address
+      // doesn't match the customer's saved zip.
+      const leadZip = (lead: any): string | null => {
+        const csa = Array.isArray(lead.customer?.customer_service_addresses)
+          ? lead.customer.customer_service_addresses
+          : [];
+        const primary = csa.find((a: any) => a?.is_primary_address) ?? csa[0];
+        const candidates: unknown[] = [
+          lead.service_address?.zip_code,
+          primary?.service_address?.zip_code,
+          lead.customer?.zip_code,
+        ];
+        for (const raw of candidates) {
+          if (typeof raw !== 'string') continue;
+          const normalized = raw.trim().split('-')[0];
+          if (/^\d{5}$/.test(normalized)) return normalized;
+        }
+        return null;
+      };
+
+      // New Leads scoping is zip + property_type. The requires_quote check
+      // only applies when the lead actually has a selected plan or quote
+      // line items — most new leads come in with neither, so we can't gate
+      // on plan info that doesn't exist yet.
       const filtered = (leadsResult.data ?? []).filter((lead: any) => {
         if (restrictToPropertyType) {
           const pt = lead.property_type;
           if (pt !== null && pt !== restrictToPropertyType) return false;
         }
-        if (lead.service_plan?.requires_quote === true) return true;
+        if (restrictToZipArea) {
+          const zip = leadZip(lead);
+          if (zip !== null && !viewerZipSet.has(zip)) return false;
+        }
         const quotes = Array.isArray(lead.quotes) ? lead.quotes : [];
-        return quotes.some((q: any) =>
-          (q.quote_line_items ?? []).some(
-            (li: any) => li.service_plan?.requires_quote === true
-          )
+        const lineItems = quotes.flatMap((q: any) => q.quote_line_items ?? []);
+        const hasSelectedPlan = lead.service_plan != null;
+        if (!hasSelectedPlan && lineItems.length === 0) return true;
+        if (lead.service_plan?.requires_quote === true) return true;
+        return lineItems.some(
+          (li: any) => li.service_plan?.requires_quote === true
         );
       });
 
@@ -192,6 +240,10 @@ export async function GET(request: NextRequest) {
         .select(`
           id, company_id, lead_status, lead_source, lead_type, service_type,
           comments, assigned_to, created_at, updated_at,
+          reviewed_by, reviewed_at, review_expires_at,
+          reviewed_by_profile:profiles!reviewed_by(
+            id, first_name, last_name, email, avatar_url, uploaded_avatar_url
+          ),
           customer:customers(
             id, first_name, last_name, email, phone, city, state,
             customer_service_addresses(
@@ -227,6 +279,10 @@ export async function GET(request: NextRequest) {
         .select(`
           id, company_id, lead_status, lead_source, lead_type, service_type,
           comments, assigned_to, created_at, updated_at,
+          reviewed_by, reviewed_at, review_expires_at,
+          reviewed_by_profile:profiles!reviewed_by(
+            id, first_name, last_name, email, avatar_url, uploaded_avatar_url
+          ),
           customer:customers(
             id, first_name, last_name, email, phone, city, state,
             customer_service_addresses(

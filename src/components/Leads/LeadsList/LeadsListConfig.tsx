@@ -7,6 +7,8 @@ import { ChevronRight, Mail, MailQuestionMark, MessageSquare, Phone, Truck } fro
 import { formatDateWithOrdinal } from '@/lib/date-utils';
 import { getTimeAgo } from '@/lib/time-utils';
 import { MiniAvatar } from '@/components/Common/MiniAvatar';
+import { ReviewIndicator } from '@/components/Common/ReviewIndicator/ReviewIndicator';
+import type { LeadReviewStatus } from './LeadsList';
 import styles from '@/components/Common/DataTable/DataTable.module.scss';
 
 // Helper functions for data formatting
@@ -111,7 +113,9 @@ const getFormatIcon = (lead: Lead) => {
 };
 
 // Define columns for leads table - New 5-column structure
-export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
+export const getLeadColumns = (
+  reviewStatuses?: Map<string, LeadReviewStatus>
+): ColumnDefinition<Lead>[] => [
   {
     key: 'created_at',
     title: 'Date Created',
@@ -236,14 +240,14 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
   {
     key: 'lead_source',
     title: 'Source',
-    width: '160px',
+    width: '200px',
     sortable: true,
     sortKey: 'lead_source',
     render: (lead: Lead) => (
       <div className={styles.formatCell} style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {getFormatIcon(lead)}
-          <span className={styles.sourceBadge}>
+          <span className={styles.sourceBadge} style={{ whiteSpace: 'nowrap' }}>
             {getLeadSourceLabel(lead.lead_source)}
           </span>
         </div>
@@ -260,18 +264,35 @@ export const getLeadColumns = (): ColumnDefinition<Lead>[] => [
     title: '',
     width: '140px',
     sortable: false,
-    render: (lead: Lead, onAction?: (action: string, item: Lead) => void) => (
-      <button
-        className={styles.actionButton}
-        onClick={e => {
-          e.stopPropagation();
-          onAction?.('edit', lead);
-        }}
-      >
-        {getLeadActionButtonText(lead.lead_status)}
-        <ChevronRight size={16} />
-      </button>
-    ),
+    render: (lead: Lead, onAction?: (action: string, item: Lead) => void) => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      return (
+        <button
+          className={styles.actionButton}
+          onClick={e => {
+            e.stopPropagation();
+            onAction?.('edit', lead);
+          }}
+        >
+          {getLeadActionButtonText(lead.lead_status)}
+          <ChevronRight size={16} />
+        </button>
+      );
+    },
   },
 ];
 

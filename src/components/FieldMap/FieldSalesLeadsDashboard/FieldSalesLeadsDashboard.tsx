@@ -5,8 +5,15 @@ import Link from 'next/link';
 import { ChevronRight } from 'lucide-react';
 import { getCustomerDisplayName } from '@/lib/display-utils';
 import { formatAge } from '@/lib/date-utils';
-import { DataTable, ColumnDefinition, CardViewConfig } from '@/components/Common/DataTable';
+import {
+  DataTable,
+  ColumnDefinition,
+  CardViewConfig,
+} from '@/components/Common/DataTable';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
+import { ReviewIndicator } from '@/components/Common/ReviewIndicator/ReviewIndicator';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
+import type { LeadReviewStatus } from '@/components/Leads/LeadsList/LeadsList';
 import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 import styles from './FieldSalesLeadsDashboard.module.scss';
 
@@ -26,6 +33,17 @@ interface FieldSalesLead {
     first_name: string | null;
     last_name: string | null;
     email: string;
+    avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
+  } | null;
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_expires_at?: string | null;
+  reviewed_by_profile?: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
     avatar_url?: string | null;
     uploaded_avatar_url?: string | null;
   } | null;
@@ -58,14 +76,18 @@ interface FieldSalesLead {
   is_viewed?: boolean;
 }
 
-
 function getAddressText(lead: FieldSalesLead): string {
   const c = lead.customer;
   if (!c) return 'Unknown';
   const primary = c.customer_service_addresses?.find(a => a.is_primary_address);
   const addr = primary?.service_address;
   if (addr) {
-    const parts = [addr.street_address, addr.city, addr.state, addr.zip_code].filter(Boolean);
+    const parts = [
+      addr.street_address,
+      addr.city,
+      addr.state,
+      addr.zip_code,
+    ].filter(Boolean);
     return parts.join(' ');
   }
   const parts = [c.city, c.state].filter(Boolean);
@@ -89,6 +111,11 @@ function getBuildQuoteHref(lead: FieldSalesLead, companyId: string): string {
   const params = new URLSearchParams({ leadId: lead.id });
   if (companyId) params.set('companyId', companyId);
   return `/field-sales/field-map/new?${params.toString()}`;
+}
+
+function getReviewLeadHref(lead: FieldSalesLead, companyId: string): string {
+  const params = new URLSearchParams({ companyId });
+  return `/field-sales/leads/${lead.id}?${params.toString()}`;
 }
 
 type NextTaskInfo = {
@@ -151,7 +178,7 @@ const BASE_COLUMNS: ColumnDefinition<FieldSalesLead>[] = [
     key: 'created_at',
     title: 'In Queue',
     sortable: false,
-    render: (lead) => (
+    render: lead => (
       <span className={styles.queueTime}>{formatAge(lead.created_at)}</span>
     ),
   },
@@ -159,7 +186,7 @@ const BASE_COLUMNS: ColumnDefinition<FieldSalesLead>[] = [
     key: 'customer',
     title: 'Name',
     sortable: false,
-    render: (lead) => (
+    render: lead => (
       <span className={styles.customerName}>
         {getCustomerDisplayName(lead.customer as any) ?? 'Unknown'}
       </span>
@@ -169,14 +196,20 @@ const BASE_COLUMNS: ColumnDefinition<FieldSalesLead>[] = [
     key: 'address',
     title: 'Address',
     sortable: false,
-    render: (lead) => {
+    render: lead => {
       const c = lead.customer;
       if (!c) return <span>Unknown</span>;
-      const primary = c.customer_service_addresses?.find(a => a.is_primary_address);
+      const primary = c.customer_service_addresses?.find(
+        a => a.is_primary_address
+      );
       const addr = primary?.service_address;
       if (addr) {
-        const line1 = [addr.street_address, addr.apartment_unit].filter(Boolean).join(' ');
-        const line2 = [addr.city, addr.state, addr.zip_code].filter(Boolean).join(', ');
+        const line1 = [addr.street_address, addr.apartment_unit]
+          .filter(Boolean)
+          .join(' ');
+        const line2 = [addr.city, addr.state, addr.zip_code]
+          .filter(Boolean)
+          .join(', ');
         return (
           <span className={styles.addressCell}>
             <span>{line1}</span>
@@ -192,21 +225,25 @@ const BASE_COLUMNS: ColumnDefinition<FieldSalesLead>[] = [
     key: 'service_plan',
     title: 'Service',
     sortable: false,
-    render: (lead) => <span>{lead.service_plan?.plan_name ?? '—'}</span>,
+    render: lead => <span>{lead.service_plan?.plan_name ?? '—'}</span>,
   },
   {
     key: 'lead_status',
     title: 'Status',
     sortable: false,
-    render: (lead) => (
-      <div className={`${styles.statusPill} ${styles[`status_${lead.lead_status}`]}`}>
+    render: lead => (
+      <div
+        className={`${styles.statusPill} ${styles[`status_${lead.lead_status}`]}`}
+      >
         <div className={styles.statusTrack}>
           <div
             className={styles.statusFill}
             style={{ width: `${getStatusProgress(lead.lead_status)}%` }}
           />
         </div>
-        <span className={styles.statusLabel}>{getStatusLabel(lead.lead_status)}</span>
+        <span className={styles.statusLabel}>
+          {getStatusLabel(lead.lead_status)}
+        </span>
       </div>
     ),
   },
@@ -245,9 +282,7 @@ function renderProgressCell(lead: FieldSalesLead) {
   );
 
   return (
-    <div
-      className={`${styles.progressCell} ${styles[`status_${statusKey}`]}`}
-    >
+    <div className={`${styles.progressCell} ${styles[`status_${statusKey}`]}`}>
       <div className={styles.progressAvatar}>{avatarNode}</div>
       <div className={styles.progressColumn}>
         <div className={styles.statusTrack}>
@@ -269,6 +304,7 @@ function buildSimpleCardViewConfig(
   companyId: string,
   isMyTab: boolean,
   nextTasks?: Record<string, NextTaskInfo>,
+  reviewStatuses?: Map<string, LeadReviewStatus>,
   isMobile?: boolean,
   isNarrow?: boolean
 ): CardViewConfig<FieldSalesLead> {
@@ -312,10 +348,16 @@ function buildSimpleCardViewConfig(
   const primaryAction = (lead: FieldSalesLead) =>
     isMyTab ? (
       <div className={styles.buttonGroup}>
-        <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
+        <Link
+          href={`/field-sales/leads/${lead.id}`}
+          className={styles.reviewBtn}
+        >
           Open Lead <ChevronRight size={16} />
         </Link>
-        <Link href={getBuildQuoteHref(lead, companyId)} className={styles.buildQuoteBtn}>
+        <Link
+          href={getBuildQuoteHref(lead, companyId)}
+          className={styles.buildQuoteBtn}
+        >
           Build Quote <ChevronRight size={16} />
         </Link>
       </div>
@@ -342,7 +384,11 @@ function buildSimpleCardViewConfig(
             showTooltip={false}
           />
         ) : (
-          <div className={styles.unassignedAvatar} aria-label="Unassigned" title="Unassigned">
+          <div
+            className={styles.unassignedAvatar}
+            aria-label="Unassigned"
+            title="Unassigned"
+          >
             ?
           </div>
         );
@@ -351,11 +397,18 @@ function buildSimpleCardViewConfig(
         const unassigned = !lead.assigned_to;
         const statusKey = unassigned ? 'unassigned' : lead.lead_status;
         const progress = unassigned ? 100 : getStatusProgress(lead.lead_status);
-        const label = unassigned ? 'Unassigned' : getStatusLabel(lead.lead_status);
+        const label = unassigned
+          ? 'Unassigned'
+          : getStatusLabel(lead.lead_status);
         return (
-          <div className={`${styles.statusPill} ${styles[`status_${statusKey}`]}`}>
+          <div
+            className={`${styles.statusPill} ${styles[`status_${statusKey}`]}`}
+          >
             <div className={styles.statusTrack}>
-              <div className={styles.statusFill} style={{ width: `${progress}%` }} />
+              <div
+                className={styles.statusFill}
+                style={{ width: `${progress}%` }}
+              />
             </div>
             <span className={styles.statusLabel}>{label}</span>
           </div>
@@ -367,9 +420,50 @@ function buildSimpleCardViewConfig(
 
   return {
     topFields,
-    primaryAction,
-    // At ≤1280px buttons are stacked (140px is enough).
-    // At >1280px buttons sit side by side and need ~270px.
+    primaryAction: lead => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      if (isMyTab) {
+        return (
+          <div className={styles.buttonGroup}>
+            <Link
+              href={getReviewLeadHref(lead, companyId)}
+              className={styles.reviewBtn}
+            >
+              Open Lead <ChevronRight size={16} />
+            </Link>
+            <Link
+              href={getBuildQuoteHref(lead, companyId)}
+              className={styles.buildQuoteBtn}
+            >
+              Build Quote <ChevronRight size={16} />
+            </Link>
+          </div>
+        );
+      }
+      return (
+        <Link
+          href={getReviewLeadHref(lead, companyId)}
+          className={styles.reviewBtn}
+        >
+          Open Lead
+          <ChevronRight size={16} />
+        </Link>
+      );
+    },
     actionColumnWidth: isMyTab && !isNarrow ? '270px' : '140px',
   };
 }
@@ -378,7 +472,8 @@ function buildSummaryCardViewConfig(
   companyId: string,
   viewedIds: Set<string>,
   markViewed: (leadId: string) => void,
-  isMobile: boolean
+  isMobile: boolean,
+  reviewStatuses?: Map<string, LeadReviewStatus>
 ): CardViewConfig<FieldSalesLead> {
   const renderSummaryAvatar = (lead: FieldSalesLead) => {
     const u = lead.assigned_user;
@@ -409,7 +504,10 @@ function buildSummaryCardViewConfig(
     return (
       <div className={`${styles.statusPill} ${styles.status_unassigned}`}>
         <div className={styles.statusTrack}>
-          <div className={styles.statusFill} style={{ width: `${progress}%` }} />
+          <div
+            className={styles.statusFill}
+            style={{ width: `${progress}%` }}
+          />
         </div>
         <span className={styles.statusLabel}>Unassigned</span>
       </div>
@@ -420,9 +518,7 @@ function buildSummaryCardViewConfig(
     const primary = lead.customer?.customer_service_addresses?.find(
       a => a.is_primary_address
     );
-    return (
-      primary?.service_address?.city ?? lead.customer?.city ?? 'Unknown'
-    );
+    return primary?.service_address?.city ?? lead.customer?.city ?? 'Unknown';
   };
 
   const desktopTopFields: CardViewConfig<FieldSalesLead>['topFields'] = [
@@ -495,53 +591,88 @@ function buildSummaryCardViewConfig(
     },
     avatar: renderSummaryAvatar,
     statusBar: renderStatusBar,
-    primaryAction: lead => (
-      <Link
-        href={`/field-sales/leads/${lead.id}`}
-        className={styles.reviewBtn}
-        onClick={() => markViewed(lead.id)}
-      >
-        Review Lead
-        <ChevronRight size={16} />
-      </Link>
-    ),
+    primaryAction: lead => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      return (
+        <Link
+          href={`/field-sales/leads/${lead.id}`}
+          className={styles.reviewBtn}
+          onClick={() => markViewed(lead.id)}
+        >
+          Review Lead
+          <ChevronRight size={16} />
+        </Link>
+      );
+    },
     unread: lead => !viewedIds.has(lead.id),
   };
 }
 
 function buildActionColumn(
   companyId: string,
+  reviewStatuses?: Map<string, LeadReviewStatus>,
   activeTab: LeadTab
 ): ColumnDefinition<FieldSalesLead> {
   return {
     key: 'action',
     title: '',
     sortable: false,
-    render: (lead) => (
-      activeTab === 'my' ? (
-        <div className={styles.buttonGroup}>
-          <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
-            Open Lead <ChevronRight size={16} />
-          </Link>
-          <Link href={getBuildQuoteHref(lead, companyId)} className={styles.buildQuoteBtn}>
-            Build Quote <ChevronRight size={16} />
-          </Link>
-        </div>
-      ) : (
-        <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
-          Open Lead <ChevronRight size={16} />
+    render: lead => {
+      const status = reviewStatuses?.get(lead.id);
+      const isLocked = status
+        ? Date.now() < new Date(status.expiresAt).getTime()
+        : false;
+      if (isLocked && status) {
+        return (
+          <ReviewIndicator
+            label="Viewing"
+            reviewerFirstName={status.reviewedByFirstName}
+            reviewerLastName={status.reviewedByLastName}
+            reviewerEmail={status.reviewedByEmail}
+            reviewerAvatarUrl={status.reviewedByAvatarUrl}
+          />
+        );
+      }
+      return (
+        <Link
+          href={getReviewLeadHref(lead, companyId)}
+          className={styles.reviewBtn}
+        >
+          Review Lead
+          <ChevronRight size={16} />
         </Link>
-      )
-    ),
+      );
+    },
   };
 }
 
-export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsDashboardProps) {
+export function FieldSalesLeadsDashboard({
+  companyId,
+  userId,
+}: FieldSalesLeadsDashboardProps) {
   const [activeTab, setActiveTab] = useState<LeadTab>('new');
   const [leads, setLeads] = useState<FieldSalesLead[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [counts, setCounts] = useState<Record<LeadTab, number | null>>({ new: null, my: null, closed: null });
+  const [counts, setCounts] = useState<Record<LeadTab, number | null>>({
+    new: null,
+    my: null,
+    closed: null,
+  });
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [nextTasks, setNextTasks] = useState<Record<string, NextTaskInfo>>({});
 
@@ -565,15 +696,17 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
       if (type === 'my' || type === 'closed') params.set('userId', userId);
       return fetch(`/api/field-sales/leads?${params}`)
         .then(r => r.json())
-        .then(d => Array.isArray(d.leads) ? d.leads.length : 0)
+        .then(d => (Array.isArray(d.leads) ? d.leads.length : 0))
         .catch(() => 0);
     };
 
-    Promise.all([fetchCount('new'), fetchCount('my'), fetchCount('closed')]).then(
-      ([newCount, myCount, closedCount]) => {
-        setCounts({ new: newCount, my: myCount, closed: closedCount });
-      }
-    );
+    Promise.all([
+      fetchCount('new'),
+      fetchCount('my'),
+      fetchCount('closed'),
+    ]).then(([newCount, myCount, closedCount]) => {
+      setCounts({ new: newCount, my: myCount, closed: closedCount });
+    });
   }, [companyId, userId]);
 
   useEffect(() => {
@@ -590,9 +723,7 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         setLeads(loaded);
         setCounts(prev => ({ ...prev, [activeTab]: loaded.length }));
         if (activeTab === 'new') {
-          setViewedIds(
-            new Set(loaded.filter(l => l.is_viewed).map(l => l.id))
-          );
+          setViewedIds(new Set(loaded.filter(l => l.is_viewed).map(l => l.id)));
         }
       })
       .catch(() => setLeads([]))
@@ -631,18 +762,25 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
     };
   }, [activeTab, leads]);
 
+  const reviewStatuses = useLeadReviewStatuses(leads);
+
   const columns = useMemo(() => {
-    const actionColumn = buildActionColumn(companyId, activeTab);
+    const actionColumn = buildActionColumn(
+      companyId,
+      reviewStatuses,
+      activeTab
+    );
     const base =
       activeTab === 'new'
         ? BASE_COLUMNS.filter(c => c.key !== 'lead_status')
         : BASE_COLUMNS;
     return [...base, actionColumn];
-  }, [activeTab, companyId]);
+  }, [activeTab, companyId, reviewStatuses]);
 
-  const columnWidths = activeTab === 'new'
-    ? '80px 200px 1fr 180px 1fr'
-    : '80px 200px 1fr 180px 140px 1fr';
+  const columnWidths =
+    activeTab === 'new'
+      ? '80px 200px 1fr 180px 1fr'
+      : '80px 200px 1fr 180px 140px 1fr';
 
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -673,17 +811,29 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         companyId,
         viewedIds,
         markViewed,
-        isMobile
+        isMobile,
+        reviewStatuses
       );
     }
     return buildSimpleCardViewConfig(
       companyId,
       activeTab === 'my',
       activeTab === 'my' ? nextTasks : undefined,
+      reviewStatuses,
       isMobile,
       isNarrow
     );
-  }, [activeTab, companyId, viewedIds, markViewed, nextTasks, isMobile, isNarrow]);
+  }, [
+    activeTab,
+    companyId,
+    viewedIds,
+    markViewed,
+    nextTasks,
+    isMobile,
+    reviewStatuses,
+    ,
+    isNarrow,
+  ]);
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery.trim()) return leads;
@@ -713,7 +863,11 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
               className={`${tabStyles.tab} ${activeTab === tab ? tabStyles.active : ''}`}
               onClick={() => setActiveTab(tab)}
             >
-              {tab === 'new' ? 'New Leads' : tab === 'my' ? 'My Leads' : 'Closed'}
+              {tab === 'new'
+                ? 'New Leads'
+                : tab === 'my'
+                  ? 'My Leads'
+                  : 'Closed'}
               {counts[tab] !== null && (
                 <span className={tabStyles.tabCount}>{counts[tab]}</span>
               )}
@@ -722,9 +876,27 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         </div>
         <div className={styles.searchWrapper}>
           <div className={tabStyles.searchSection}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={tabStyles.searchIcon} aria-hidden="true">
-              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-              <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              className={tabStyles.searchIcon}
+              aria-hidden="true"
+            >
+              <circle
+                cx="11"
+                cy="11"
+                r="8"
+                stroke="currentColor"
+                strokeWidth="2"
+              />
+              <path
+                d="m21 21-4.35-4.35"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
             </svg>
             <input
               type="text"
@@ -745,13 +917,12 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
         customColumnWidths={columnWidths}
         cardView={cardViewConfig}
         searchEnabled={false}
-
         emptyStateMessage={
           activeTab === 'new'
             ? 'No new leads in the queue.'
             : activeTab === 'my'
-            ? 'No leads assigned to you.'
-            : 'No closed leads.'
+              ? 'No leads assigned to you.'
+              : 'No closed leads.'
         }
       />
     </div>
