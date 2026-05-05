@@ -162,6 +162,12 @@ function StepMapPlot({
       }
     | null
   >(null);
+  const outlineNodeLongPressRef = useRef<{
+    timerId: ReturnType<typeof setTimeout>;
+    startClientX: number;
+    startClientY: number;
+    pendingGesture: NonNullable<typeof outlineNodeGestureRef.current>;
+  } | null>(null);
   const mapRotateRef = useRef<{ lastAngle: number | null; baseHeading: number }>({ lastAngle: null, baseHeading: 0 });
 
   const latitude = getMapLatitude(mapPlotData);
@@ -1092,7 +1098,8 @@ function StepMapPlot({
     if (!point || !container) return;
 
     const rect = container.getBoundingClientRect();
-    const NODE_HIT_PX = 18;
+    const isTouch = event.pointerType === 'touch';
+    const NODE_HIT_PX = isTouch ? 28 : 18;
 
     const isDrawingActiveOutline =
       !!mapPlotData.activeOutlineId &&
@@ -1160,21 +1167,42 @@ function StepMapPlot({
         event.preventDefault();
         event.stopPropagation();
         setSnapToFirst(false);
-        outlineNodeGestureRef.current = {
-          mode: 'move-node',
+        lastDragAtRef.current = Date.now();
+        event.currentTarget.setPointerCapture(event.pointerId);
+
+        const pendingGesture = {
+          mode: 'move-node' as const,
           outlineId: hitOutlineId,
           nodeIndex: hitNodeIndex,
           startClientX: event.clientX,
           startClientY: event.clientY,
           isDragging: false,
         };
-        lastDragAtRef.current = Date.now();
-        event.currentTarget.setPointerCapture(event.pointerId);
+
+        if (isTouch) {
+          const timerId = setTimeout(() => {
+            outlineNodeGestureRef.current = pendingGesture;
+            outlineNodeLongPressRef.current = null;
+          }, 150);
+          outlineNodeLongPressRef.current = {
+            timerId,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            pendingGesture,
+          };
+        } else {
+          outlineNodeGestureRef.current = pendingGesture;
+        }
       }
     }
   };
 
   const stopOutlineNodeDrag = () => {
+    if (outlineNodeLongPressRef.current) {
+      clearTimeout(outlineNodeLongPressRef.current.timerId);
+      outlineNodeLongPressRef.current = null;
+    }
+
     const gesture = outlineNodeGestureRef.current;
     if (!gesture) return;
 
@@ -1512,6 +1540,16 @@ function StepMapPlot({
   };
 
   const handleOverlayPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Cancel pending touch-hold if finger has moved (user is panning)
+    if (outlineNodeLongPressRef.current) {
+      const { startClientX, startClientY } = outlineNodeLongPressRef.current;
+      if (Math.hypot(event.clientX - startClientX, event.clientY - startClientY) > 8) {
+        clearTimeout(outlineNodeLongPressRef.current.timerId);
+        outlineNodeLongPressRef.current = null;
+      }
+      return; // don't process drag until armed
+    }
+
     const gesture = outlineNodeGestureRef.current;
     if (gesture) {
       if (gesture.mode === 'close-outline') {
@@ -2446,7 +2484,7 @@ function StepMapPlot({
                         key={`${outline.id}-mid-${i + 1}`}
                         cx={gx(point)}
                         cy={gy(point)}
-                        r={isBlankGridMode ? 5 / blankGridScale : 5}
+                        r={isBlankGridMode ? 8 / blankGridScale : 8}
                         fill="white"
                         stroke={outline.isClosed ? metrics.strokeColor : '#2563eb'}
                         strokeWidth={isBlankGridMode ? 2 / blankGridScale : 2}
@@ -2471,8 +2509,8 @@ function StepMapPlot({
                           cx={gx(outline.points[0])}
                           cy={gy(outline.points[0])}
                           r={isBlankGridMode
-                            ? (outline.isClosed ? 6 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 7 : 5) / blankGridScale
-                            : (outline.isClosed ? 6 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 7 : 5)}
+                            ? (outline.isClosed ? 9 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 10 : 8) / blankGridScale
+                            : (outline.isClosed ? 9 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 10 : 8)}
                           fill="white"
                           stroke={outline.isClosed ? metrics.strokeColor : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? (isFence ? '#22c55e' : '#f97316') : '#2563eb'}
                           strokeWidth={isBlankGridMode ? 2.5 / blankGridScale : 2.5}

@@ -13,9 +13,10 @@ import styles from './PrimarySideNav.module.scss';
 
 interface PrimarySideNavProps {
   className?: string;
+  onLinkClick?: () => void;
 }
 
-export function PrimarySideNav({ className }: PrimarySideNavProps) {
+export function PrimarySideNav({ className, onLinkClick }: PrimarySideNavProps) {
   const pathname = usePathname();
   const { setActivePrimaryNav } = useNavigation();
   const { isAdmin, isProjectManager, isHydrating, selectedCompany } =
@@ -368,7 +369,7 @@ export function PrimarySideNav({ className }: PrimarySideNavProps) {
               href={item.href}
               className={`${styles.iconItem} ${isActiveRoute(item.href) ? styles.active : ''}`}
               title={item.id.charAt(0).toUpperCase() + item.id.slice(1)}
-              onClick={() => setActivePrimaryNav(item.id)}
+              onClick={() => { setActivePrimaryNav(item.id); onLinkClick?.(); }}
             >
               <div className={styles.iconWrapper}>{item.icon}</div>
               {item.text && <p className={styles.iconText}>{item.text}</p>}

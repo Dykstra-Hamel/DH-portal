@@ -9,6 +9,57 @@ interface HousePhotoStepProps {
   companyId: string;
 }
 
+async function compressImage(file: File): Promise<File> {
+  if (file.size < 1024 * 1024) return file;
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const MAX = 1920;
+      let { width, height } = img;
+      if (width > MAX || height > MAX) {
+        if (width > height) {
+          height = Math.round((height * MAX) / width);
+          width = MAX;
+        } else {
+          width = Math.round((width * MAX) / height);
+          height = MAX;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')!.drawImage(img, 0, 0, width, height);
+      canvas.toBlob(
+        (blob) =>
+          resolve(
+            blob
+              ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })
+              : file
+          ),
+        'image/jpeg',
+        0.82
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+}
+
+async function fetchWithRetry(url: string, options: RequestInit): Promise<Response> {
+  try {
+    return await fetch(url, options);
+  } catch {
+    await new Promise((r) => setTimeout(r, 1000));
+    return fetch(url, options);
+  }
+}
+
 export function HousePhotoStep({ photoUrls, onChange, companyId }: HousePhotoStepProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -22,11 +73,18 @@ export function HousePhotoStep({ photoUrls, onChange, companyId }: HousePhotoSte
 
     try {
       for (const file of files) {
+        const compressed = await compressImage(file);
+
+        if (compressed.size > 10 * 1024 * 1024) {
+          errorMessage = 'This image is too large to upload. Please choose a smaller photo.';
+          continue;
+        }
+
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', compressed);
         if (companyId) formData.append('companyId', companyId);
 
-        const res = await fetch('/api/field-map/upload-photo', {
+        const res = await fetchWithRetry('/api/field-map/upload-photo', {
           method: 'POST',
           body: formData,
         });
@@ -113,7 +171,7 @@ export function HousePhotoStep({ photoUrls, onChange, companyId }: HousePhotoSte
           )}
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/avif"
             capture="environment"
             className={styles.fileInput}
             onChange={handleCameraChange}
@@ -139,7 +197,7 @@ export function HousePhotoStep({ photoUrls, onChange, companyId }: HousePhotoSte
           )}
           <input
             type="file"
-            accept="image/*"
+            accept="image/jpeg,image/png,image/webp,image/heic,image/avif"
             multiple
             className={styles.fileInput}
             onChange={handleUploadChange}
