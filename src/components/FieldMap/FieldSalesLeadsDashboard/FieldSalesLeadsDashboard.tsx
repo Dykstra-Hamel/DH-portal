@@ -85,15 +85,10 @@ function getStatusLabel(status: string): string {
   return labels[status] ?? status;
 }
 
-function getReviewLeadHref(lead: FieldSalesLead, companyId: string): string {
-  const inProgress =
-    lead.lead_status === 'new' || lead.lead_status === 'in_process';
-  if (inProgress) {
-    const params = new URLSearchParams({ leadId: lead.id });
-    if (companyId) params.set('companyId', companyId);
-    return `/field-sales/field-map/new?${params.toString()}`;
-  }
-  return `/field-sales/leads/${lead.id}`;
+function getBuildQuoteHref(lead: FieldSalesLead, companyId: string): string {
+  const params = new URLSearchParams({ leadId: lead.id });
+  if (companyId) params.set('companyId', companyId);
+  return `/field-sales/field-map/new?${params.toString()}`;
 }
 
 type NextTaskInfo = {
@@ -272,19 +267,24 @@ function renderProgressCell(lead: FieldSalesLead) {
 
 function buildSimpleCardViewConfig(
   companyId: string,
-  nextTasks?: Record<string, NextTaskInfo>
+  isMyTab: boolean,
+  nextTasks?: Record<string, NextTaskInfo>,
+  isMobile?: boolean,
+  isNarrow?: boolean
 ): CardViewConfig<FieldSalesLead> {
+  const mobileMyLeads = isMobile && isMyTab;
+
   const topFields: CardViewConfig<FieldSalesLead>['topFields'] = [
     {
       key: 'age',
       label: 'Age',
-      width: '64px',
+      width: isMobile ? '44px' : '64px',
       render: lead => formatAge(lead.created_at),
     },
     {
       key: 'name',
       label: 'Client Name',
-      width: 'minmax(140px, 1fr)',
+      width: isMobile ? 'minmax(0, 1fr)' : 'minmax(140px, 1fr)',
       render: lead => getCustomerDisplayName(lead.customer as any) ?? 'Unknown',
     },
   ];
@@ -293,26 +293,84 @@ function buildSimpleCardViewConfig(
     topFields.push({
       key: 'action',
       label: 'Action',
-      width: 'minmax(140px, 1fr)',
+      width: isMobile ? 'minmax(0, 1fr)' : 'minmax(140px, 1fr)',
       render: lead => formatNextAction(nextTasks[lead.id] ?? null),
     });
   }
 
-  topFields.push({
-    key: 'progress',
-    label: 'Progress',
-    width: 'minmax(100px, 2fr)',
-    render: renderProgressCell,
-  });
+  // On mobile My Leads, progress moves to the bottom row via avatar + statusBar.
+  // On all other cases keep it in the top row.
+  if (!mobileMyLeads) {
+    topFields.push({
+      key: 'progress',
+      label: 'Progress',
+      width: isMobile ? 'minmax(0, 1fr)' : 'minmax(100px, 2fr)',
+      render: renderProgressCell,
+    });
+  }
+
+  const primaryAction = (lead: FieldSalesLead) =>
+    isMyTab ? (
+      <div className={styles.buttonGroup}>
+        <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
+          Open Lead <ChevronRight size={16} />
+        </Link>
+        <Link href={getBuildQuoteHref(lead, companyId)} className={styles.buildQuoteBtn}>
+          Build Quote <ChevronRight size={16} />
+        </Link>
+      </div>
+    ) : (
+      <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
+        Open Lead <ChevronRight size={16} />
+      </Link>
+    );
+
+  if (mobileMyLeads) {
+    return {
+      topFields,
+      avatar: (lead: FieldSalesLead) => {
+        const u = lead.assigned_user;
+        return u ? (
+          <MiniAvatar
+            firstName={u.first_name ?? undefined}
+            lastName={u.last_name ?? undefined}
+            email={u.email}
+            userId={u.id}
+            avatarUrl={u.avatar_url}
+            uploadedAvatarUrl={u.uploaded_avatar_url}
+            size="medium"
+            showTooltip={false}
+          />
+        ) : (
+          <div className={styles.unassignedAvatar} aria-label="Unassigned" title="Unassigned">
+            ?
+          </div>
+        );
+      },
+      statusBar: (lead: FieldSalesLead) => {
+        const unassigned = !lead.assigned_to;
+        const statusKey = unassigned ? 'unassigned' : lead.lead_status;
+        const progress = unassigned ? 100 : getStatusProgress(lead.lead_status);
+        const label = unassigned ? 'Unassigned' : getStatusLabel(lead.lead_status);
+        return (
+          <div className={`${styles.statusPill} ${styles[`status_${statusKey}`]}`}>
+            <div className={styles.statusTrack}>
+              <div className={styles.statusFill} style={{ width: `${progress}%` }} />
+            </div>
+            <span className={styles.statusLabel}>{label}</span>
+          </div>
+        );
+      },
+      primaryAction,
+    };
+  }
 
   return {
     topFields,
-    primaryAction: lead => (
-      <Link href={getReviewLeadHref(lead, companyId)} className={styles.reviewBtn}>
-        Open Lead
-        <ChevronRight size={16} />
-      </Link>
-    ),
+    primaryAction,
+    // At ≤1280px buttons are stacked (140px is enough).
+    // At >1280px buttons sit side by side and need ~270px.
+    actionColumnWidth: isMyTab && !isNarrow ? '270px' : '140px',
   };
 }
 
@@ -452,20 +510,28 @@ function buildSummaryCardViewConfig(
 }
 
 function buildActionColumn(
-  companyId: string
+  companyId: string,
+  activeTab: LeadTab
 ): ColumnDefinition<FieldSalesLead> {
   return {
     key: 'action',
     title: '',
     sortable: false,
     render: (lead) => (
-      <Link
-        href={getReviewLeadHref(lead, companyId)}
-        className={styles.reviewBtn}
-      >
-        Review Lead
-        <ChevronRight size={16} />
-      </Link>
+      activeTab === 'my' ? (
+        <div className={styles.buttonGroup}>
+          <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
+            Open Lead <ChevronRight size={16} />
+          </Link>
+          <Link href={getBuildQuoteHref(lead, companyId)} className={styles.buildQuoteBtn}>
+            Build Quote <ChevronRight size={16} />
+          </Link>
+        </div>
+      ) : (
+        <Link href={`/field-sales/leads/${lead.id}`} className={styles.reviewBtn}>
+          Open Lead <ChevronRight size={16} />
+        </Link>
+      )
     ),
   };
 }
@@ -566,7 +632,7 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
   }, [activeTab, leads]);
 
   const columns = useMemo(() => {
-    const actionColumn = buildActionColumn(companyId);
+    const actionColumn = buildActionColumn(companyId, activeTab);
     const base =
       activeTab === 'new'
         ? BASE_COLUMNS.filter(c => c.key !== 'lead_status')
@@ -588,6 +654,19 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
     return () => mq.removeEventListener('change', handler);
   }, []);
 
+  // Tracks whether the card-view stacking breakpoint is active (≤1280px).
+  // When narrow, buttons are stacked vertically and need only 140px.
+  // When wide, buttons sit side by side and need ~270px.
+  const [isNarrow, setIsNarrow] = useState(true);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 1280px)');
+    setIsNarrow(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsNarrow(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const cardViewConfig = useMemo(() => {
     if (activeTab === 'new') {
       return buildSummaryCardViewConfig(
@@ -599,9 +678,12 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
     }
     return buildSimpleCardViewConfig(
       companyId,
-      activeTab === 'my' ? nextTasks : undefined
+      activeTab === 'my',
+      activeTab === 'my' ? nextTasks : undefined,
+      isMobile,
+      isNarrow
     );
-  }, [activeTab, companyId, viewedIds, markViewed, nextTasks, isMobile]);
+  }, [activeTab, companyId, viewedIds, markViewed, nextTasks, isMobile, isNarrow]);
 
   const filteredLeads = useMemo(() => {
     if (!searchQuery.trim()) return leads;
@@ -638,18 +720,20 @@ export function FieldSalesLeadsDashboard({ companyId, userId }: FieldSalesLeadsD
             </button>
           ))}
         </div>
-        <div className={tabStyles.searchSection}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={tabStyles.searchIcon} aria-hidden="true">
-            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
-            <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
-          <input
-            type="text"
-            placeholder="Search..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className={tabStyles.searchInput}
-          />
+        <div className={styles.searchWrapper}>
+          <div className={tabStyles.searchSection}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" className={tabStyles.searchIcon} aria-hidden="true">
+              <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2"/>
+              <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className={tabStyles.searchInput}
+            />
+          </div>
         </div>
       </div>
 
