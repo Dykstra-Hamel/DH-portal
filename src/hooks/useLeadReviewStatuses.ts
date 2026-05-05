@@ -9,6 +9,7 @@ import {
   type LeadReviewPayload,
 } from '@/lib/realtime/lead-review-channel';
 import type { LeadReviewStatus } from '@/components/Leads/LeadsList/LeadsList';
+import { useUser } from '@/hooks/useUser';
 
 /**
  * Builds and maintains a Map<leadId, LeadReviewStatus> by:
@@ -17,10 +18,11 @@ import type { LeadReviewStatus } from '@/components/Leads/LeadsList/LeadsList';
  *   2. Listening to the broadcast channel for live changes.
  *   3. Pruning expired locks every 30s.
  *
- * Pure parity with the ticket pattern in `TicketsList`. Multiple consumers
- * (LeadsList, my-sales-leads, archived-leads, FieldSalesLeadsDashboard,
- * etc.) can call this hook independently — they each get their own Map but
- * subscribe to the same singleton channel.
+ * The current user is excluded from both the seed and live updates — you
+ * are never "Viewing" your own lead from the list. This avoids the
+ * back-button race where the leads payload still says reviewed_by=you
+ * (the `end` request hasn't propagated yet) and the pill sticks on your
+ * own row.
  */
 export function useLeadReviewStatuses(
   leads: Pick<
@@ -32,12 +34,15 @@ export function useLeadReviewStatuses(
     new Map()
   );
   const channelRef = useRef<RealtimeChannel | null>(null);
+  const { user: currentUser } = useUser();
+  const currentUserId = currentUser?.id;
 
   useEffect(() => {
     const initial = new Map<string, LeadReviewStatus>();
     leads.forEach(lead => {
       if (
         lead.reviewed_by &&
+        lead.reviewed_by !== currentUserId &&
         lead.review_expires_at &&
         new Date(lead.review_expires_at) > new Date()
       ) {
@@ -67,13 +72,33 @@ export function useLeadReviewStatuses(
       setStatuses(prev => {
         const updated = new Map(prev);
         if (payload.reviewed_by && payload.review_expires_at) {
+          // Don't show "Viewing" for ourselves on our own list view.
+          if (payload.reviewed_by === currentUserId) {
+            updated.delete(payload.lead_id);
+            return updated;
+          }
+          // Merge with the existing entry so partial broadcasts (sent before
+          // the holder's profile loaded) don't wipe out good seed data from
+          // the API's reviewed_by_profile join.
+          const existing = prev.get(payload.lead_id);
+          const sameUser = existing?.reviewedBy === payload.reviewed_by;
           updated.set(payload.lead_id, {
             reviewedBy: payload.reviewed_by,
-            reviewedByName: payload.reviewed_by_name,
-            reviewedByEmail: payload.reviewed_by_email,
-            reviewedByFirstName: payload.reviewed_by_first_name,
-            reviewedByLastName: payload.reviewed_by_last_name,
-            reviewedByAvatarUrl: payload.reviewed_by_avatar_url,
+            reviewedByName:
+              payload.reviewed_by_name ??
+              (sameUser ? existing?.reviewedByName : undefined),
+            reviewedByEmail:
+              payload.reviewed_by_email ??
+              (sameUser ? existing?.reviewedByEmail : undefined),
+            reviewedByFirstName:
+              payload.reviewed_by_first_name ??
+              (sameUser ? existing?.reviewedByFirstName : undefined),
+            reviewedByLastName:
+              payload.reviewed_by_last_name ??
+              (sameUser ? existing?.reviewedByLastName : undefined),
+            reviewedByAvatarUrl:
+              payload.reviewed_by_avatar_url ??
+              (sameUser ? existing?.reviewedByAvatarUrl : null),
             expiresAt: payload.review_expires_at,
           });
         } else {
@@ -82,7 +107,7 @@ export function useLeadReviewStatuses(
         return updated;
       });
     });
-  }, [leads]);
+  }, [leads, currentUserId]);
 
   useEffect(() => {
     const cleanup = setInterval(() => {
