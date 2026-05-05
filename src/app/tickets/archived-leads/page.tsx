@@ -170,6 +170,14 @@ export default function ArchivedLeadsPage() {
                 last_name,
                 email,
                 avatar_url
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
@@ -217,6 +225,14 @@ export default function ArchivedLeadsPage() {
                 last_name,
                 email,
                 avatar_url
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
