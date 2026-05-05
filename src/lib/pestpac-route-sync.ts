@@ -264,7 +264,7 @@ export async function syncPestPacRoute({
               status: routeStatus,
               pestpac_route_id: pestpacRouteId,
             },
-            { onConflict: 'company_id,pestpac_route_id' }
+            { onConflict: 'company_id,pestpac_route_id,assigned_to' }
           )
           .select('id')
           .single();
