@@ -213,30 +213,10 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'userId is required for type=my' }, { status: 400 });
       }
 
-      const [companyRoleResult, deptResult] = await Promise.all([
-        supabase
-          .from('user_companies')
-          .select('role')
-          .eq('user_id', authResult.user.id)
-          .eq('company_id', companyId)
-          .maybeSingle(),
-        supabase
-          .from('user_departments')
-          .select('department')
-          .eq('user_id', authResult.user.id)
-          .eq('company_id', companyId)
-          .eq('department', 'scheduling')
-          .maybeSingle(),
-      ]);
-
-      const isCompanyAdmin = companyRoleResult.data
-        ? ['admin', 'manager', 'owner'].includes(companyRoleResult.data.role)
-        : false;
-
-      const hasSchedulingDept = !!deptResult.data;
-      const canSeeScheduling = authResult.isGlobalAdmin || isCompanyAdmin || hasSchedulingDept;
-
-      let leadsQuery = supabase
+      // Show every lead assigned to the user that isn't terminal — no branch
+      // scoping, no department-based status hiding. The "My Leads" tab is the
+      // user's personal queue; if it's assigned to them, they see it.
+      const { data, error } = await supabase
         .from('leads')
         .select(`
           id, company_id, lead_status, lead_source, lead_type, service_type,
@@ -257,13 +237,8 @@ export async function GET(request: NextRequest) {
         .eq('company_id', companyId)
         .eq('assigned_to', userId)
         .not('lead_status', 'in', '("won","lost","closed")')
-        .or('archived.is.null,archived.eq.false');
-
-      if (!canSeeScheduling) {
-        leadsQuery = leadsQuery.neq('lead_status', 'scheduling');
-      }
-
-      const { data, error } = await leadsQuery.order('created_at', { ascending: true });
+        .or('archived.is.null,archived.eq.false')
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
 
