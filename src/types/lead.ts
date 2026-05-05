@@ -127,6 +127,20 @@ export interface Lead {
   branch_id?: string | null;
   branch?: { id: string; name: string } | null;
 
+  // Review lock (mirrors tickets.reviewed_by). Set while a user is on the
+  // lead detail page; auto-expires after `review_expires_at`.
+  reviewed_by?: string | null;
+  reviewed_at?: string | null;
+  review_expires_at?: string | null;
+  reviewed_by_profile?: {
+    id: string;
+    first_name?: string | null;
+    last_name?: string | null;
+    email?: string | null;
+    avatar_url?: string | null;
+    uploaded_avatar_url?: string | null;
+  } | null;
+
   // Joined data from related tables
   customer?: {
     id: string;

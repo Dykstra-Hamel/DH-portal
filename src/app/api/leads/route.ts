@@ -110,9 +110,20 @@ export async function GET(request: NextRequest) {
         scheduled_date,
         scheduled_time,
         branch_id,
+        reviewed_by,
+        reviewed_at,
+        review_expires_at,
         created_at,
         updated_at,
         branch:branches(id, name),
+        reviewed_by_profile:profiles!reviewed_by(
+          id,
+          first_name,
+          last_name,
+          email,
+          avatar_url,
+          uploaded_avatar_url
+        ),
         customer:customers(
           id,
           first_name,

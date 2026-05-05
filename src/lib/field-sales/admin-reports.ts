@@ -85,6 +85,18 @@ export interface AdminRecentLead {
   submittedBy: string | null;
   submittedByName: string | null;
   leadSource: string | null;
+  // Review-lock surface (for the per-row "Viewing" pill on the dashboard's
+  // Recent Leads list). Joined when present.
+  reviewedBy: string | null;
+  reviewExpiresAt: string | null;
+  reviewedByProfile: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+    uploaded_avatar_url: string | null;
+  } | null;
 }
 
 export interface AdminReportData {
@@ -274,6 +286,11 @@ export async function getAdminFieldSalesReport(
       submitted_by,
       tech_discussed,
       branch_id,
+      reviewed_by,
+      review_expires_at,
+      reviewed_by_profile:profiles!reviewed_by(
+        id, first_name, last_name, email, avatar_url, uploaded_avatar_url
+      ),
       customers ( first_name, last_name, city, state )
       `
     )
@@ -582,6 +599,17 @@ export async function getAdminFieldSalesReport(
       null
     );
     const submittedBy = (l.submitted_by as string | null) ?? null;
+    const rawProfile = (l as unknown as {
+      reviewed_by_profile?:
+        | Record<string, unknown>
+        | Record<string, unknown>[]
+        | null;
+    }).reviewed_by_profile;
+    const reviewedByProfileRaw: Record<string, unknown> | null = Array.isArray(
+      rawProfile
+    )
+      ? rawProfile[0] ?? null
+      : rawProfile ?? null;
     return {
       id: l.id as string,
       status: (l.lead_status as string) ?? 'unknown',
@@ -598,6 +626,29 @@ export async function getAdminFieldSalesReport(
         ? memberById.get(submittedBy)?.fullName ?? null
         : null,
       leadSource: (l.lead_source as string | null) ?? null,
+      reviewedBy:
+        ((l as Record<string, unknown>).reviewed_by as string | null) ??
+        null,
+      reviewExpiresAt:
+        ((l as Record<string, unknown>).review_expires_at as
+          | string
+          | null) ?? null,
+      reviewedByProfile: reviewedByProfileRaw
+        ? {
+            id: (reviewedByProfileRaw.id as string) ?? '',
+            first_name:
+              (reviewedByProfileRaw.first_name as string | null) ?? null,
+            last_name:
+              (reviewedByProfileRaw.last_name as string | null) ?? null,
+            email: (reviewedByProfileRaw.email as string | null) ?? null,
+            avatar_url:
+              (reviewedByProfileRaw.avatar_url as string | null) ?? null,
+            uploaded_avatar_url:
+              (reviewedByProfileRaw.uploaded_avatar_url as
+                | string
+                | null) ?? null,
+          }
+        : null,
     };
   });
 
@@ -948,6 +999,11 @@ export async function getAdminFieldSalesLeadsForMetric(
       submittedBy: (l.submitted_by as string | null) ?? null,
       submittedByName: null,
       leadSource: (l.lead_source as string | null) ?? null,
+      // The KPI drill-down query doesn't project review fields — leave them
+      // null. The MetricLeadsModal doesn't currently render the indicator.
+      reviewedBy: null,
+      reviewExpiresAt: null,
+      reviewedByProfile: null,
     };
   });
 }

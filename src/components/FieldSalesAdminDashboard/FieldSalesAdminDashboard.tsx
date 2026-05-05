@@ -29,6 +29,8 @@ import { TeamMemberCard } from './TeamMemberCard';
 import { TeamMemberRouteModal } from './TeamMemberRouteModal/TeamMemberRouteModal';
 import { TeamRouteMapModal } from './TeamRouteMapModal/TeamRouteMapModal';
 import { useBranches } from '@/hooks/useBranches';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
+import { ReviewIndicator } from '@/components/Common/ReviewIndicator/ReviewIndicator';
 import { authenticatedFetch } from '@/lib/api-client';
 import styles from './FieldSalesAdminDashboard.module.scss';
 
@@ -77,6 +79,16 @@ interface AdminRecentLead {
   submittedBy: string | null;
   submittedByName: string | null;
   leadSource: string | null;
+  reviewedBy: string | null;
+  reviewExpiresAt: string | null;
+  reviewedByProfile: {
+    id: string;
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    avatar_url: string | null;
+    uploaded_avatar_url: string | null;
+  } | null;
 }
 
 interface CompareDailyPoint {
@@ -1586,63 +1598,10 @@ export function FieldSalesAdminDashboard({
           )}
 
           {data.recentLeads.length > 0 && (
-            <div className={styles.card}>
-              <div className={styles.cardHeader}>
-                <h3 className={styles.cardTitle}>Recent Leads</h3>
-                <span className={styles.cardMeta}>
-                  {data.recentLeads.length}
-                </span>
-              </div>
-              <ul className={styles.list}>
-                {data.recentLeads.map(lead => (
-                  <li key={lead.id} className={styles.listItem}>
-                    <button
-                      type="button"
-                      onClick={() => goToLead(lead.id)}
-                      className={styles.listItemLink}
-                    >
-                      <div className={styles.listItemBody}>
-                        <div className={styles.listItemTitle}>
-                          {lead.customerName}
-                        </div>
-                        <div className={styles.listItemMeta}>
-                          <span
-                            className={`${styles.statusChip} ${statusChipClass(lead.status)}`}
-                          >
-                            {statusLabel(lead.status)}
-                          </span>
-                          {lead.submittedByName && (
-                            <span className={styles.metaPill}>
-                              {lead.submittedByName}
-                            </span>
-                          )}
-                          {lead.serviceType && (
-                            <span className={styles.metaPill}>
-                              {lead.serviceType}
-                            </span>
-                          )}
-                          {(lead.city || lead.state) && (
-                            <span className={styles.metaText}>
-                              {[lead.city, lead.state].filter(Boolean).join(', ')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className={styles.listItemTrailing}>
-                        {lead.estimatedValue ? (
-                          <span className={styles.money}>
-                            {formatCurrency(Number(lead.estimatedValue))}
-                          </span>
-                        ) : null}
-                        <span className={styles.relativeTime}>
-                          {formatRelative(lead.createdAt)}
-                        </span>
-                      </div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            <RecentLeadsCard
+              recentLeads={data.recentLeads}
+              onLeadClick={goToLead}
+            />
           )}
         </>
       )}
@@ -1916,6 +1875,106 @@ export function FieldSalesAdminDashboard({
         onRename={renameSaved}
         onDelete={deleteSaved}
       />
+    </div>
+  );
+}
+
+// ── Recent Leads list with live "Viewing" indicator ─────────────────────
+// Pulled out so we can call useLeadReviewStatuses against the recentLeads
+// prop without restructuring the parent's render order. The hook adapter
+// converts AdminRecentLead's camelCase review fields to the snake_case
+// shape the hook expects, matching what the leads list endpoints return.
+interface RecentLeadsCardProps {
+  recentLeads: AdminRecentLead[];
+  onLeadClick: (leadId: string) => void;
+}
+
+function RecentLeadsCard({
+  recentLeads,
+  onLeadClick,
+}: RecentLeadsCardProps) {
+  const adapted = useMemo(
+    () =>
+      recentLeads.map(l => ({
+        id: l.id,
+        reviewed_by: l.reviewedBy,
+        review_expires_at: l.reviewExpiresAt,
+        reviewed_by_profile: l.reviewedByProfile,
+      })),
+    [recentLeads]
+  );
+  const reviewStatuses = useLeadReviewStatuses(adapted);
+
+  return (
+    <div className={styles.card}>
+      <div className={styles.cardHeader}>
+        <h3 className={styles.cardTitle}>Recent Leads</h3>
+        <span className={styles.cardMeta}>{recentLeads.length}</span>
+      </div>
+      <ul className={styles.list}>
+        {recentLeads.map(lead => {
+          const status = reviewStatuses.get(lead.id);
+          const isLocked = status
+            ? Date.now() < new Date(status.expiresAt).getTime()
+            : false;
+          return (
+            <li key={lead.id} className={styles.listItem}>
+              <button
+                type="button"
+                onClick={() => onLeadClick(lead.id)}
+                className={styles.listItemLink}
+              >
+                <div className={styles.listItemBody}>
+                  <div className={styles.listItemTitle}>
+                    {lead.customerName}
+                  </div>
+                  <div className={styles.listItemMeta}>
+                    <span
+                      className={`${styles.statusChip} ${statusChipClass(lead.status)}`}
+                    >
+                      {statusLabel(lead.status)}
+                    </span>
+                    {lead.submittedByName && (
+                      <span className={styles.metaPill}>
+                        {lead.submittedByName}
+                      </span>
+                    )}
+                    {lead.serviceType && (
+                      <span className={styles.metaPill}>
+                        {lead.serviceType}
+                      </span>
+                    )}
+                    {(lead.city || lead.state) && (
+                      <span className={styles.metaText}>
+                        {[lead.city, lead.state].filter(Boolean).join(', ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className={styles.listItemTrailing}>
+                  {isLocked && status && (
+                    <ReviewIndicator
+                      label="Viewing"
+                      reviewerFirstName={status.reviewedByFirstName}
+                      reviewerLastName={status.reviewedByLastName}
+                      reviewerEmail={status.reviewedByEmail}
+                      reviewerAvatarUrl={status.reviewedByAvatarUrl}
+                    />
+                  )}
+                  {lead.estimatedValue ? (
+                    <span className={styles.money}>
+                      {formatCurrency(Number(lead.estimatedValue))}
+                    </span>
+                  ) : null}
+                  <span className={styles.relativeTime}>
+                    {formatRelative(lead.createdAt)}
+                  </span>
+                </div>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

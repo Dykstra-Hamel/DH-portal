@@ -25,6 +25,12 @@ import {
   removeLeadChannel,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
+import {
+  createLeadReviewChannel,
+  subscribeToLeadReviewUpdates,
+  broadcastLeadReviewUpdate,
+} from '@/lib/realtime/lead-review-channel';
+import { LeadLockedOverlay } from '@/components/Leads/LeadLockedOverlay/LeadLockedOverlay';
 import { StepItem } from '@/components/Common/Step/Step';
 import { LeadStepContent } from '@/components/Common/LeadStepContent/LeadStepContent';
 import { LeadProgressBar } from '@/components/Common/LeadProgressBar/LeadProgressBar';
@@ -106,6 +112,32 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   });
   const { branches: availableBranches } = useBranches(lead?.company_id);
   const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);
+
+  // Review-lock state. When another user is on this lead, we render the
+  // LeadLockedOverlay over the page and skip the heartbeat. Mirrors the
+  // ticket review-lock pattern in TicketReviewModal.
+  interface LockHolder {
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string;
+    avatarUrl?: string | null;
+  }
+  const [lockedBy, setLockedBy] = useState<LockHolder | null>(null);
+  const [retryingLock, setRetryingLock] = useState(false);
+  const reviewHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
+  const reviewClaimedRef = useRef(false);
+  // Hold the current user's profile in a ref so the lock callbacks stay
+  // stable (don't need to be re-created when profile loads). The broadcast
+  // payload reads from the ref so it always uses the latest profile data.
+  const reviewerInfoRef = useRef<{
+    userId: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  } | null>(null);
 
   // Create stable currentUser object to prevent infinite loops
   const stableCurrentUser = useMemo(() => {
@@ -675,6 +707,251 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
       removeLeadChannel(channel);
     };
   }, [lead?.company_id, leadId, router, baseRoute]);
+
+  // ── Review lock ────────────────────────────────────────────────────────
+  // Claim the lead while this page is open. Re-attempted by tryAgain. The
+  // start call returns 409 with the holder profile when another user has
+  // the lock; we render a blocking overlay over the entire page in that
+  // case. Heartbeat every 60s and clean up on unload — same cadence as
+  // the ticket review system in TicketReviewModal.
+  // Helper that broadcasts the current viewer's identity. Reads from the
+  // reviewerInfoRef so it always picks up the latest profile fields, even
+  // when the profile loads after the initial claim.
+  const broadcastClaim = useCallback(async () => {
+    if (!leadId) return;
+    const info = reviewerInfoRef.current;
+    if (!info) return;
+    try {
+      const channel = createLeadReviewChannel();
+      const displayName =
+        `${info.firstName || ''} ${info.lastName || ''}`.trim() ||
+        info.email ||
+        '';
+      await broadcastLeadReviewUpdate(channel, {
+        lead_id: leadId,
+        reviewed_by: info.userId,
+        reviewed_by_name: displayName,
+        reviewed_by_email: info.email,
+        reviewed_by_first_name: info.firstName ?? undefined,
+        reviewed_by_last_name: info.lastName ?? undefined,
+        reviewed_by_avatar_url: info.avatarUrl,
+        reviewed_at: new Date().toISOString(),
+        review_expires_at: new Date(
+          Date.now() + 5 * 60 * 1000
+        ).toISOString(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      // Non-fatal — broadcast is best-effort
+      console.error('Lead review broadcast failed', e);
+    }
+  }, [leadId]);
+
+  const claimLeadLock = useCallback(async (): Promise<void> => {
+    if (!leadId || !reviewerInfoRef.current?.userId) return;
+    setRetryingLock(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({}));
+        const holder = body?.reviewed_by_profile;
+        setLockedBy({
+          firstName: holder?.first_name ?? null,
+          lastName: holder?.last_name ?? null,
+          email: holder?.email ?? '',
+          avatarUrl:
+            holder?.uploaded_avatar_url ?? holder?.avatar_url ?? null,
+        });
+        reviewClaimedRef.current = false;
+        return;
+      }
+      if (!res.ok) {
+        console.error('Lead review-status start failed', res.status);
+        return;
+      }
+      setLockedBy(null);
+      reviewClaimedRef.current = true;
+      await broadcastClaim();
+    } finally {
+      setRetryingLock(false);
+    }
+  }, [leadId, broadcastClaim]);
+
+  // Silent claim attempt used by the polling fallback and by the release
+  // broadcast handler. Doesn't touch overlay state on 409 — the polling
+  // loop just keeps trying. On 200 it claims and broadcasts.
+  const attemptSilentClaim = useCallback(async (): Promise<boolean> => {
+    if (!leadId || !reviewerInfoRef.current?.userId) return false;
+    if (reviewClaimedRef.current) return true;
+    try {
+      const res = await fetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      if (res.ok) {
+        setLockedBy(null);
+        reviewClaimedRef.current = true;
+        await broadcastClaim();
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  }, [leadId, broadcastClaim]);
+
+  // Keep reviewerInfoRef synced with the latest user/profile values, and
+  // re-broadcast our claim whenever profile fields refresh — this fixes the
+  // first-broadcast-with-undefined-name race when the profile loads after
+  // the lock has already been claimed.
+  useEffect(() => {
+    if (!currentUser?.id) {
+      reviewerInfoRef.current = null;
+      return;
+    }
+    reviewerInfoRef.current = {
+      userId: currentUser.id,
+      email: currentUser.email || '',
+      firstName: currentProfile?.first_name ?? null,
+      lastName: currentProfile?.last_name ?? null,
+      avatarUrl:
+        currentProfile?.uploaded_avatar_url ??
+        currentProfile?.avatar_url ??
+        null,
+    };
+    if (reviewClaimedRef.current) {
+      void broadcastClaim();
+    }
+  }, [
+    currentUser?.id,
+    currentUser?.email,
+    currentProfile?.first_name,
+    currentProfile?.last_name,
+    currentProfile?.avatar_url,
+    currentProfile?.uploaded_avatar_url,
+    broadcastClaim,
+  ]);
+
+  useEffect(() => {
+    if (!leadId || !currentUser?.id) return;
+
+    void claimLeadLock();
+
+    // Heartbeat (only the holder's calls actually refresh the lock; the
+    // server no-ops for non-holders). Safe to schedule unconditionally.
+    reviewHeartbeatRef.current = setInterval(() => {
+      if (!reviewClaimedRef.current) return;
+      fetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'heartbeat' }),
+      }).catch(() => {
+        // Errors expected on unload; ignore
+      });
+    }, 60000);
+
+    // Listen for release events from other tabs.
+    //
+    // We DON'T retry-burst on release because the holder's `end` request
+    // can take a moment to land in the DB after they navigate away —
+    // hammering would just generate 409s. Instead we clear the overlay
+    // optimistically and let the 8s polling fallback (separate effect)
+    // handle the actual claim once the server is consistent.
+    //
+    // For "someone else claimed" broadcasts we also guard against echoes
+    // of our own claim coming back via the self:true broadcast — without
+    // this, successfully claiming the lock can briefly snap the overlay
+    // back on if reviewerInfoRef hasn't been populated yet.
+    const channel = createLeadReviewChannel();
+    subscribeToLeadReviewUpdates(channel, payload => {
+      if (payload.lead_id !== leadId) return;
+      // Echo of our own broadcast — ignore.
+      if (payload.reviewed_by && payload.reviewed_by === currentUser.id) {
+        return;
+      }
+      if (!payload.reviewed_by) {
+        // Holder released — try to claim immediately. The polling effect
+        // will keep retrying every 8s if this 409s (e.g. the holder's
+        // `end` request hasn't landed yet).
+        void attemptSilentClaim();
+      } else {
+        // Someone else claimed. Guard: if we're currently the holder,
+        // don't re-render the overlay (this is a defensive double-check;
+        // the userId equality above should already cover it).
+        if (reviewClaimedRef.current) return;
+        setLockedBy({
+          firstName: payload.reviewed_by_first_name ?? null,
+          lastName: payload.reviewed_by_last_name ?? null,
+          email: payload.reviewed_by_email ?? '',
+          avatarUrl: payload.reviewed_by_avatar_url ?? null,
+        });
+      }
+    });
+
+    const releaseLock = () => {
+      if (reviewHeartbeatRef.current) {
+        clearInterval(reviewHeartbeatRef.current);
+        reviewHeartbeatRef.current = null;
+      }
+      if (!reviewClaimedRef.current) return;
+      reviewClaimedRef.current = false;
+      // keepalive lets the request finish during unload
+      fetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'end' }),
+        keepalive: true,
+      }).catch(() => {});
+      try {
+        broadcastLeadReviewUpdate(channel, {
+          lead_id: leadId,
+          reviewed_by: undefined,
+          timestamp: new Date().toISOString(),
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    const handleBeforeUnload = () => releaseLock();
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') releaseLock();
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      releaseLock();
+    };
+  }, [
+    leadId,
+    currentUser?.id,
+    claimLeadLock,
+    broadcastClaim,
+    attemptSilentClaim,
+  ]);
+
+  // Polling fallback for when the holder's release broadcast never arrives
+  // (e.g. the WebSocket frame fails to flush during a hard tab close, or
+  // the holder lost connectivity before the heartbeat could expire). Runs
+  // for the lifetime of the page; the silent-claim helper itself is a
+  // no-op when we already hold the lock (cheap), and on 409 it leaves
+  // overlay state alone. The 8s cadence balances responsiveness with
+  // server load.
+  useEffect(() => {
+    if (!leadId || !currentUser?.id) return;
+    const interval = setInterval(() => {
+      void attemptSilentClaim();
+    }, 8000);
+    return () => clearInterval(interval);
+  }, [leadId, currentUser?.id, attemptSilentClaim]);
 
   const handleBack = () => {
     router.push(baseRoute);
@@ -1440,6 +1717,18 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
 
   return (
     <>
+      {lockedBy && (
+        <LeadLockedOverlay
+          reviewerFirstName={lockedBy.firstName}
+          reviewerLastName={lockedBy.lastName}
+          reviewerEmail={lockedBy.email}
+          reviewerAvatarUrl={lockedBy.avatarUrl}
+          onTryAgain={() => {
+            void claimLeadLock();
+          }}
+          retrying={retryingLock}
+        />
+      )}
       <div className="container">
         <LeadProgressBar
           leadStatus={lead.lead_status as 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost'}
