@@ -17,6 +17,10 @@ import { useUser } from '@/hooks/useUser';
 import { useViewAs } from '@/hooks/useViewAs';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { useRealtimeCounts } from '@/hooks/useRealtimeCounts';
+import {
+  createLeadChannel,
+  subscribeToLeadUpdates,
+} from '@/lib/realtime/lead-channel';
 import { FieldMapDashboard } from '@/components/FieldMap/FieldMapDashboard/FieldMapDashboard';
 import { FieldSalesLeadsDashboard } from '@/components/FieldMap/FieldSalesLeadsDashboard/FieldSalesLeadsDashboard';
 import { FieldSalesNav } from '@/components/FieldMap/FieldSalesNav/FieldSalesNav';
@@ -74,6 +78,11 @@ function FieldSalesDashboardInner() {
   const [activeTab, setActiveTab] = useState<DashboardTab>('home');
   const [routeStops, setRouteStops] = useState(0);
   const [opportunitiesCount, setOpportunitiesCount] = useState(0);
+  // Outer "My Leads & Sales" badge. Sourced from /api/field-sales/leads so
+  // the count exactly matches what's shown in the inner "My Leads" sub-tab
+  // (cross-branch, includes scheduling). Other consumers of useRealtimeCounts
+  // (sidenav, tickets dashboard) keep the /api/leads-based count.
+  const [myLeadsAndSalesCount, setMyLeadsAndSalesCount] = useState(0);
   const [sliderStyle, setSliderStyle] = useState<{
     left: number;
     width: number;
@@ -250,6 +259,43 @@ function FieldSalesDashboardInner() {
       .catch(() => setOpportunitiesCount(0));
   }, [isTechnicianOnly, selectedCompany?.id]);
 
+  // Outer "My Leads & Sales" badge count. Uses the same field-sales endpoint
+  // as the inner My Leads sub-tab so the two always agree, and stays live via
+  // the lead-channel realtime subscription.
+  useEffect(() => {
+    if (!selectedCompany?.id || !userId) {
+      setMyLeadsAndSalesCount(0);
+      return;
+    }
+    let cancelled = false;
+    const params = new URLSearchParams({
+      companyId: selectedCompany.id,
+      type: 'my',
+      userId,
+    });
+    const refresh = () => {
+      fetch(`/api/field-sales/leads?${params}`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => {
+          if (cancelled) return;
+          setMyLeadsAndSalesCount(
+            d && Array.isArray(d.leads) ? d.leads.length : 0
+          );
+        })
+        .catch(() => {});
+    };
+
+    refresh();
+
+    const channel = createLeadChannel(selectedCompany.id);
+    subscribeToLeadUpdates(channel, refresh);
+
+    return () => {
+      cancelled = true;
+      createClient().removeChannel(channel);
+    };
+  }, [selectedCompany?.id, userId]);
+
   // Update slider position whenever active tab changes or the tab resizes.
   // useLayoutEffect so the slider is positioned before paint on first render.
   // ResizeObserver catches the initial 0→actual-width flip in case the tab
@@ -310,7 +356,7 @@ function FieldSalesDashboardInner() {
     route: { label: 'My Route', count: routeStops },
     leads: {
       label: 'My Leads & Sales',
-      count: counts.my_leads,
+      count: myLeadsAndSalesCount,
       isNew: newItemIndicators.my_leads,
     },
     opportunities: {
@@ -449,7 +495,7 @@ function FieldSalesDashboardInner() {
                 <span
                   className={`${styles.tabCount} ${newItemIndicators.my_leads ? styles.tabCountNew : ''}`}
                 >
-                  {counts.my_leads}
+                  {myLeadsAndSalesCount}
                 </span>
               </button>
             )}
