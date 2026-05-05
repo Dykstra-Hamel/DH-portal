@@ -1994,7 +1994,7 @@
   max-width: 1215px;
   width: 100%;
   margin: 0 auto;
-  padding: 0 0 40px;
+  padding: 0;
   display: grid;
   position: relative;
   z-index: 1;
@@ -2221,7 +2221,6 @@
 /* ── Hero map/photo container ── */
 .heroMapWrap {
   position: relative;
-  border-radius: 16px;
   overflow: hidden;
   min-height: 420px;
   width: 100%;

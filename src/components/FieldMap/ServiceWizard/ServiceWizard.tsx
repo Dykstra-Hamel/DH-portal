@@ -21,7 +21,10 @@ import {
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem, AvailableDiscount } from './steps/QuoteBuildStep';
 import { SalesChecklistStep } from './steps/SalesChecklistStep';
-import type { SalesChecklist, ChecklistResponseGroup } from './steps/SalesChecklistStep';
+import type {
+  SalesChecklist,
+  ChecklistResponseGroup,
+} from './steps/SalesChecklistStep';
 import { ReviewStep } from './steps/ReviewStep';
 import styles from './ServiceWizard.module.scss';
 
@@ -78,7 +81,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
   const [salesChecklists, setSalesChecklists] = useState<SalesChecklist[]>([]);
-  const [checklistResponseGroups, setChecklistResponseGroups] = useState<ChecklistResponseGroup[]>([]);
+  const [checklistResponseGroups, setChecklistResponseGroups] = useState<
+    ChecklistResponseGroup[]
+  >([]);
 
   // Fetch sales checklists
   useEffect(() => {
@@ -119,7 +124,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   // Fetch pest icon map as soon as company is known
   useEffect(() => {
     if (!selectedCompany?.id) return;
-    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}?context=fieldmap`)
+    fetch(
+      `/api/pest-options/${encodeURIComponent(selectedCompany.id)}?context=fieldmap`
+    )
       .then(r => r.json())
       .then(
         (data: {
@@ -159,7 +166,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
           '';
 
-        if (typeof lead.service_address_id === 'string' && lead.service_address_id) {
+        if (
+          typeof lead.service_address_id === 'string' &&
+          lead.service_address_id
+        ) {
           setServiceAddressId(lead.service_address_id);
         }
         const addressFromCustomer = [
@@ -271,7 +281,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         }
 
         if (quoteData?.data?.applied_discount) {
-          setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+          setAppliedDiscount(
+            quoteData.data.applied_discount as AvailableDiscount
+          );
         }
         if (
           Array.isArray(quoteData?.data?.safety_checklist_responses) &&
@@ -280,7 +292,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         ) {
           setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
         }
-        setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+        setQuoteSubtotalInitial(
+          quoteData?.data?.subtotal_initial_price ?? null
+        );
         setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
         setLeadId(directLeadId);
         if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
@@ -381,21 +395,30 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
             const lineItems: any[] = (quoteData?.data?.line_items ?? [])
               .slice()
-              .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+              .sort(
+                (a: any, b: any) =>
+                  (a.display_order ?? 0) - (b.display_order ?? 0)
+              );
             const quoteStatus: string =
               quoteData?.data?.quote_status ?? 'draft';
 
             if (quoteData?.data?.applied_discount) {
-              setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+              setAppliedDiscount(
+                quoteData.data.applied_discount as AvailableDiscount
+              );
             }
-            setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+            setQuoteSubtotalInitial(
+              quoteData?.data?.subtotal_initial_price ?? null
+            );
             setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
 
             if (
               Array.isArray(quoteData?.data?.safety_checklist_responses) &&
               quoteData.data.safety_checklist_responses.length > 0
             ) {
-              setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
+              setChecklistResponseGroups(
+                quoteData.data.safety_checklist_responses
+              );
             }
 
             if (lineItems.length > 0) {
@@ -416,7 +439,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                                 ? 'specialty-line'
                                 : undefined;
                   const catalogItemId =
-                    (item.service_plan_id && !item.parent_line_item_id ? item.service_plan_id : null) ??
+                    (item.service_plan_id && !item.parent_line_item_id
+                      ? item.service_plan_id
+                      : null) ??
                     item.addon_service_id ??
                     item.bundle_plan_id ??
                     item.product_id ??
@@ -435,7 +460,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                     frequency: item.billing_frequency ?? null,
                     parentLineItemId: item.parent_line_item_id ?? undefined,
                     quantity: item.quantity ?? null,
-                    isRecommended: item.is_recommended === null ? undefined : item.is_recommended,
+                    isRecommended:
+                      item.is_recommended === null
+                        ? undefined
+                        : item.is_recommended,
                     isSelected: item.is_selected ?? true,
                   };
                 })
@@ -474,8 +502,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
   const [appliedDiscount, setAppliedDiscount] =
     useState<AvailableDiscount | null>(null);
-  const [quoteSubtotalInitial, setQuoteSubtotalInitial] = useState<number | null>(null);
-  const [quoteTotalInitial, setQuoteTotalInitial] = useState<number | null>(null);
+  const [quoteSubtotalInitial, setQuoteSubtotalInitial] = useState<
+    number | null
+  >(null);
+  const [quoteTotalInitial, setQuoteTotalInitial] = useState<number | null>(
+    null
+  );
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] =
     useState(false);
@@ -623,8 +655,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (currentStep === CHECKLIST_STEP) {
           // Allow advance if no applicable checklists (will be auto-skipped in handleNext)
           if (applicableChecklists.length === 0) return true;
-          const allResponses = checklistResponseGroups.flatMap(g => Array.isArray(g.responses) ? g.responses : []);
-          return allResponses.length > 0 && allResponses.every(r => r != null && r.answer !== '');
+          const allResponses = checklistResponseGroups.flatMap(g =>
+            Array.isArray(g.responses) ? g.responses : []
+          );
+          return (
+            allResponses.length > 0 &&
+            allResponses.every(r => r != null && r.answer !== '')
+          );
         }
         if (currentStep === REVIEW_STEP) return true;
         return false;
@@ -988,62 +1025,72 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     <div className={styles.wizard}>
       {/* Header */}
       <div className={styles.header}>
-        <button
-          type="button"
-          className={styles.backBtn}
-          onClick={() => setShowExitConfirm(true)}
-          aria-label="Close"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden="true"
+        <div className={styles.headerInner}>
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={() => setShowExitConfirm(true)}
+            aria-label="Close"
           >
-            <path
-              d="M13 1L1 13M1 1L13 13"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <div className={styles.headerGrid}>
-          <div className={styles.headerInfo}>
-            <p className={styles.headerTitle}>
-              {clientInfo.name || 'New Inspection'}
-            </p>
-            {inspectionAddress && (
-              <p className={styles.headerSub}>{inspectionAddress}</p>
-            )}
-          </div>
-          <div className={styles.stepTrack}>
-            {STEP_LABELS.map((label, i) => {
-              const isDone = i < maxStepReached;
-              const isActive = i === maxStepReached;
-              const isViewing = i === currentStep && i < maxStepReached;
-              const isClickable = i <= maxStepReached;
-              return (
-                <div key={i} className={styles.stepTrackItem}>
-                  {i > 0 && <div className={styles.stepLine} />}
-                  {isClickable ? (
-                    <button
-                      type="button"
-                      className={`${styles.stepLabel} ${isActive ? styles.stepLabelActive : isDone ? styles.stepLabelDone : ''} ${isViewing ? styles.stepLabelViewing : ''}`}
-                      onClick={() => setCurrentStep(i)}
-                    >
-                      {isDone && <Check size={11} strokeWidth={2.5} />}
-                      {label}
-                    </button>
-                  ) : (
-                    <div className={styles.stepLabel}>{label}</div>
-                  )}
-                </div>
-              );
-            })}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M13 1L1 13M1 1L13 13"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <div className={styles.headerGrid}>
+            <div className={styles.headerInfo}>
+              <p className={styles.headerTitle}>
+                {clientInfo.name || 'New Inspection'}
+              </p>
+              {inspectionAddress && (
+                <p className={styles.headerSub}>{inspectionAddress}</p>
+              )}
+            </div>
+            <div className={styles.stepTrack}>
+              {STEP_LABELS.map((label, i) => {
+                const isDone = i < maxStepReached;
+                const isActive = i === maxStepReached;
+                const isViewing = i === currentStep && i < maxStepReached;
+                const isClickable = i <= maxStepReached;
+                return (
+                  <div key={i} className={styles.stepTrackItem}>
+                    {i > 0 && <div className={styles.stepLine} />}
+                    {isClickable ? (
+                      <button
+                        type="button"
+                        className={`${styles.stepLabel} ${isActive ? styles.stepLabelActive : isDone ? styles.stepLabelDone : ''} ${isViewing ? styles.stepLabelViewing : ''}`}
+                        onClick={() => setCurrentStep(i)}
+                      >
+                        {isDone && <Check size={11} strokeWidth={2.5} />}
+                        {label}
+                      </button>
+                    ) : (
+                      <div className={styles.stepLabel}>{label}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.stepTrackCompact}>
+              <span className={styles.stepTrackCompactLabel}>
+                {STEP_LABELS[currentStep]}
+              </span>
+              <span className={styles.stepTrackCompactCount}>
+                Step {currentStep + 1} / {STEP_COUNT}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1068,52 +1115,60 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       {/* Address step footer */}
       {currentStep === 0 && (
         <div className={styles.footer}>
-          {stepSaveError && (
-            <p className={styles.stepSaveError}>{stepSaveError}</p>
-          )}
-          <button
-            type="button"
-            className={styles.prevBtn}
-            onClick={handleBack}
-            aria-label="Previous step"
-          >
-            <ArrowLeft size={18} className={styles.prevArrow} />
-            Previous
-          </button>
-          <button
-            type="button"
-            className={styles.nextBtn}
-            onClick={handleNext}
-            disabled={!canAdvance()}
-          >
-            Continue
-          </button>
+          <div className={styles.footerInnerWrapper}>
+            {stepSaveError && (
+              <p className={styles.stepSaveError}>{stepSaveError}</p>
+            )}
+            <button
+              type="button"
+              className={styles.prevBtn}
+              onClick={handleBack}
+              aria-label="Previous step"
+            >
+              <ArrowLeft size={18} className={styles.prevArrow} />
+              Previous
+            </button>
+            <button
+              type="button"
+              className={styles.nextBtn}
+              onClick={handleNext}
+              disabled={!canAdvance()}
+            >
+              Continue
+            </button>
+          </div>
         </div>
       )}
 
       {/* Footer — hidden on map step (toolbar is inside canvas) and finalize step */}
       {currentStep !== 0 && currentStep !== 2 && !isLastStep && (
         <div className={styles.footer}>
-          {stepSaveError && (
-            <p className={styles.stepSaveError}>{stepSaveError}</p>
-          )}
-          <button
-            type="button"
-            className={styles.prevBtn}
-            onClick={handleBack}
-            aria-label="Previous step"
-          >
-            <ArrowLeft size={18} className={styles.prevArrow} />
-            Previous
-          </button>
-          <button
-            type="button"
-            className={styles.nextBtn}
-            onClick={handleNext}
-            disabled={!canAdvance() || isSavingStep}
-          >
-            {isSavingStep ? 'Saving\u2026' : isLastStep ? 'Finish' : 'Continue'}
-          </button>
+          <div className={styles.footerInnerWrapper}>
+            {stepSaveError && (
+              <p className={styles.stepSaveError}>{stepSaveError}</p>
+            )}
+            <button
+              type="button"
+              className={styles.prevBtn}
+              onClick={handleBack}
+              aria-label="Previous step"
+            >
+              <ArrowLeft size={18} className={styles.prevArrow} />
+              Previous
+            </button>
+            <button
+              type="button"
+              className={styles.nextBtn}
+              onClick={handleNext}
+              disabled={!canAdvance() || isSavingStep}
+            >
+              {isSavingStep
+                ? 'Saving\u2026'
+                : isLastStep
+                  ? 'Finish'
+                  : 'Continue'}
+            </button>
+          </div>
         </div>
       )}
       {/* Exit confirmation modal */}
