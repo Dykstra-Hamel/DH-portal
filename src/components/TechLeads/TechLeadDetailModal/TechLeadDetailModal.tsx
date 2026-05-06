@@ -27,6 +27,13 @@ export interface TechLeadNote {
   created_at: string;
 }
 
+export interface TechLeadAssignedUser {
+  id: string;
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+}
+
 export interface TechLead {
   id: string;
   lead_status: string;
@@ -39,6 +46,8 @@ export interface TechLead {
   pest_type: string | null;
   estimated_value: number | null;
   photo_urls?: string[] | null;
+  assigned_to?: string | null;
+  assigned_user?: TechLeadAssignedUser | null;
   customers: TechLeadCustomer | null;
   service_address: TechLeadServiceAddress | null;
   submitted_notes: TechLeadNote[];
@@ -82,6 +91,14 @@ export function getCustomerName(lead: TechLead): string {
   return parts.length > 0 ? parts.join(' ') : 'No customer linked';
 }
 
+export function getAssigneeName(lead: TechLead): string {
+  const user = lead.assigned_user;
+  if (!user) return 'Unassigned';
+  const parts = [user.first_name, user.last_name].filter(Boolean);
+  if (parts.length > 0) return parts.join(' ');
+  return user.email ?? 'Unassigned';
+}
+
 export function getLeadAddress(lead: TechLead): string {
   const serviceAddress = lead.service_address
     ? formatAddress([
@@ -118,6 +135,54 @@ export function TechLeadDetailModal({
   const [showMoreDetails, setShowMoreDetails] = useState(false);
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
   const moreDetailsRef = useRef<HTMLDivElement>(null);
+
+  const [notes, setNotes] = useState<TechLeadNote[]>(lead.submitted_notes);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [noteDraft, setNoteDraft] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState<string | null>(null);
+
+  const handleSaveNote = async () => {
+    const trimmed = noteDraft.trim();
+    if (!trimmed) {
+      setNoteError('Note cannot be empty');
+      return;
+    }
+    setIsSavingNote(true);
+    setNoteError(null);
+    try {
+      const res = await fetch(`/api/leads/${lead.id}/activities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activity_type: 'note_added', notes: trimmed }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setNoteError(body?.error ?? 'Failed to save note');
+        return;
+      }
+      const payload = await res.json();
+      const created = payload?.data;
+      const newNote: TechLeadNote = {
+        id: created?.id ?? `local-${Date.now()}`,
+        notes: created?.notes ?? trimmed,
+        created_at: created?.created_at ?? new Date().toISOString(),
+      };
+      setNotes(prev => [newNote, ...prev]);
+      setNoteDraft('');
+      setIsAddingNote(false);
+    } catch {
+      setNoteError('Failed to save note');
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
+
+  const handleCancelNote = () => {
+    setIsAddingNote(false);
+    setNoteDraft('');
+    setNoteError(null);
+  };
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -234,6 +299,12 @@ export function TechLeadDetailModal({
                     {formatDateTime(lead.created_at)}
                   </span>
                 </div>
+                <div className={styles.customerInfoRow}>
+                  <span className={styles.customerInfoLabel}>Assigned To</span>
+                  <span className={styles.customerInfoValue}>
+                    {getAssigneeName(lead)}
+                  </span>
+                </div>
               </div>
             </div>
 
@@ -269,10 +340,57 @@ export function TechLeadDetailModal({
             </div>
 
             <div className={styles.detailSection}>
-              <p className={styles.detailHeading}>Note to Sales</p>
-              {lead.submitted_notes.length > 0 ? (
+              <div className={styles.notesHeader}>
+                <p className={styles.detailHeading}>Note to Sales</p>
+                {!isAddingNote && (
+                  <button
+                    type="button"
+                    className={styles.addNoteButton}
+                    onClick={() => setIsAddingNote(true)}
+                  >
+                    + Add Note
+                  </button>
+                )}
+              </div>
+
+              {isAddingNote && (
+                <div className={styles.addNoteForm}>
+                  <textarea
+                    className={styles.addNoteInput}
+                    value={noteDraft}
+                    onChange={e => setNoteDraft(e.target.value)}
+                    placeholder="Add a note for sales..."
+                    rows={4}
+                    disabled={isSavingNote}
+                    autoFocus
+                  />
+                  {noteError && (
+                    <p className={styles.addNoteError}>{noteError}</p>
+                  )}
+                  <div className={styles.addNoteActions}>
+                    <button
+                      type="button"
+                      className={styles.addNoteCancel}
+                      onClick={handleCancelNote}
+                      disabled={isSavingNote}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.addNoteSave}
+                      onClick={handleSaveNote}
+                      disabled={isSavingNote || !noteDraft.trim()}
+                    >
+                      {isSavingNote ? 'Saving…' : 'Save Note'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {notes.length > 0 ? (
                 <div className={styles.noteList}>
-                  {lead.submitted_notes.map(note => (
+                  {notes.map(note => (
                     <div key={note.id} className={styles.noteCard}>
                       <p className={styles.noteDate}>
                         {formatDateTime(note.created_at)}
@@ -282,7 +400,9 @@ export function TechLeadDetailModal({
                   ))}
                 </div>
               ) : (
-                <p className={styles.emptyValue}>No notes added</p>
+                !isAddingNote && (
+                  <p className={styles.emptyValue}>No notes added</p>
+                )
               )}
             </div>
 
