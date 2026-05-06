@@ -75,6 +75,11 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [isLoadingResume, setIsLoadingResume] = useState(
     Boolean(stopId || leadIdParam)
   );
+  type ResumeStage = 'map' | 'quote' | 'checklist-or-review' | 'review' | null;
+  const [resumeStage, setResumeStage] = useState<ResumeStage>(null);
+  const [isLoadingChecklists, setIsLoadingChecklists] = useState(
+    Boolean(stopId || leadIdParam)
+  );
   const [brandPrimaryColor, setBrandPrimaryColor] = useState<
     string | undefined
   >(undefined);
@@ -94,7 +99,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       .then((data: SalesChecklist[] | null) => {
         setSalesChecklists(data ?? []);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setIsLoadingChecklists(false);
+      });
   }, [selectedCompany?.id]);
 
   // Fetch brand primary color for stamp icons
@@ -240,28 +248,44 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         }
 
         const lineItems: any[] = quoteData?.data?.line_items ?? [];
+        const quoteStatus: string = quoteData?.data?.quote_status ?? 'draft';
+        const hasChecklistResponses =
+          Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+          quoteData.data.safety_checklist_responses.length > 0 &&
+          Array.isArray(quoteData.data.safety_checklist_responses[0]?.responses);
+
         if (lineItems.length > 0) {
           setQuoteLineItems(
             lineItems.map((item: any): QuoteLineItem => {
+              const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+                item.service_plan_id && !item.parent_line_item_id
+                  ? 'plan'
+                  : item.service_plan_id && item.parent_line_item_id
+                    ? 'specialty-line'
+                    : item.addon_service_id
+                      ? 'addon'
+                      : item.bundle_plan_id
+                        ? 'bundle'
+                        : item.product_id
+                          ? 'product'
+                          : item.parent_line_item_id
+                            ? 'specialty-line'
+                            : undefined;
               const catalogItemId =
-                item.service_plan_id ??
+                (item.service_plan_id && !item.parent_line_item_id
+                  ? item.service_plan_id
+                  : null) ??
                 item.addon_service_id ??
                 item.bundle_plan_id ??
+                item.product_id ??
                 undefined;
-              const catalogItemKind: QuoteLineItem['catalogItemKind'] =
-                item.service_plan_id
-                  ? 'plan'
-                  : item.addon_service_id
-                    ? 'addon'
-                    : item.bundle_plan_id
-                      ? 'bundle'
-                      : undefined;
               return {
                 id: item.id,
                 type: catalogItemId ? 'plan-addon' : 'custom',
                 catalogItemKind,
                 catalogItemId,
                 catalogItemName: item.plan_name,
+                customName: item.plan_name,
                 coveredPestIds: [],
                 coveredPestLabels: [],
                 initialCost:
@@ -269,15 +293,25 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                 recurringCost:
                   item.final_recurring_price ?? item.recurring_price ?? null,
                 frequency: item.billing_frequency ?? null,
+                parentLineItemId: item.parent_line_item_id ?? undefined,
+                quantity: item.quantity ?? null,
+                isRecommended:
+                  item.is_recommended === null
+                    ? undefined
+                    : item.is_recommended,
                 isSelected: item.is_selected ?? true,
               };
             })
           );
-          setCurrentStep(4);
-          setMaxStepReached(4);
+          if (quoteStatus !== 'draft') {
+            setResumeStage(hasChecklistResponses ? 'review' : 'checklist-or-review');
+          } else {
+            setResumeStage('quote');
+          }
+        } else if (quoteData?.data?.id) {
+          setResumeStage('quote');
         } else {
-          setCurrentStep(2);
-          setMaxStepReached(2);
+          setResumeStage('map');
         }
 
         if (quoteData?.data?.applied_discount) {
@@ -469,20 +503,19 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                 })
               );
               if (quoteStatus !== 'draft') {
-                setCurrentStep(4);
-                setMaxStepReached(4);
+                const hasChecklistResponses =
+                  Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+                  quoteData.data.safety_checklist_responses.length > 0;
+                setResumeStage(hasChecklistResponses ? 'review' : 'checklist-or-review');
               } else {
-                setCurrentStep(3);
-                setMaxStepReached(3);
+                setResumeStage('quote');
               }
             } else if (quoteData?.data?.id) {
               // Quote record exists but no items → user already reached the Quote step
-              setCurrentStep(3);
-              setMaxStepReached(3);
+              setResumeStage('quote');
             } else {
               // No quote record at all — resume at Map step
-              setCurrentStep(2);
-              setMaxStepReached(2);
+              setResumeStage('map');
             }
 
             setLeadId(stopData.leadId);
@@ -541,6 +574,40 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const QUOTE_STEP = 3;
   const CHECKLIST_STEP = hasChecklists ? 4 : -1;
   const REVIEW_STEP = hasChecklists ? 5 : 4;
+
+  // Resolve semantic resume stage to an actual step index once all async data is loaded
+  useEffect(() => {
+    if (resumeStage === null) return;
+    if (isLoadingResume || isLoadingChecklists) return;
+
+    let step: number;
+    switch (resumeStage) {
+      case 'review':
+        step = REVIEW_STEP;
+        break;
+      case 'checklist-or-review':
+        step = hasChecklists ? CHECKLIST_STEP : REVIEW_STEP;
+        break;
+      case 'quote':
+        step = QUOTE_STEP;
+        break;
+      case 'map':
+      default:
+        step = 2;
+    }
+
+    setCurrentStep(step);
+    setMaxStepReached(step);
+    setResumeStage(null); // clear so it only fires once
+  }, [
+    resumeStage,
+    isLoadingResume,
+    isLoadingChecklists,
+    hasChecklists,
+    CHECKLIST_STEP,
+    REVIEW_STEP,
+    QUOTE_STEP,
+  ]);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents &&
@@ -1010,7 +1077,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     );
   }
 
-  if (isLoadingResume) {
+  if (isLoadingResume || resumeStage !== null) {
     return (
       <div className={styles.wizard}>
         <div className={styles.geocodingState}>
