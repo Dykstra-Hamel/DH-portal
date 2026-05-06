@@ -32,13 +32,19 @@
   transform-origin: center center;
 }
 
+// proofContent must size *exactly* to its content (the canvas / image) so pins
+// — which are absolutely-positioned children using percent coordinates — anchor
+// to the same box the user actually sees. Earlier flex centering + max-w/h
+// constraints caused proofContent to clamp shorter than the canvas (which then
+// overflowed centered), so pin percentages mapped to a smaller box than the
+// visible page. inline-block shrinks to content with no clamp, no centering.
+//
+// Centering within the viewport is handled by .stage's flex centering above.
+// Overflow (when zoomed in or for tall PDFs) is handled by .overlay's
+// `overflow: hidden` + the existing pan logic.
 .proofContent {
   position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  max-width: 100%;
-  max-height: 100%;
+  display: inline-block;
 }
 
 .loadingOverlay {
@@ -80,7 +86,10 @@
 }
 
 .pdfPage {
-  max-width: 100%;
+  // Width is driven explicitly by react-pdf's `width` prop (tied to the
+  // container). max-width here would clamp width without scaling the inline
+  // pixel `height` — distorting aspect ratio and causing pin drift.
+  display: block;
 }
 
 .unsupportedState {
