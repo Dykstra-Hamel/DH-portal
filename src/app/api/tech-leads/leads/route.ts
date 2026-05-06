@@ -62,6 +62,7 @@ export async function GET(request: NextRequest) {
         pest_type,
         estimated_value,
         photo_urls,
+        assigned_to,
         customers(
           first_name,
           last_name,
@@ -131,9 +132,36 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // leads.assigned_to FKs auth.users, not profiles, so embed-joins don't
+    // work — look up profiles separately and attach as assigned_user.
+    const assignedIds = Array.from(
+      new Set(
+        (leads ?? [])
+          .map(l => l.assigned_to as string | null)
+          .filter((id): id is string => !!id)
+      )
+    );
+    const profilesById = new Map<
+      string,
+      { id: string; first_name: string | null; last_name: string | null; email: string | null }
+    >();
+    if (assignedIds.length > 0) {
+      const profilesClient = createAdminClient();
+      const { data: profiles, error: profilesError } = await profilesClient
+        .from('profiles')
+        .select('id, first_name, last_name, email')
+        .in('id', assignedIds);
+      if (profilesError) {
+        console.error('Error fetching tech lead assignees:', profilesError);
+      } else {
+        (profiles ?? []).forEach(p => profilesById.set(p.id, p));
+      }
+    }
+
     const enrichedLeads = (leads ?? []).map(lead => ({
       ...lead,
       submitted_notes: notesByLead[lead.id] ?? [],
+      assigned_user: lead.assigned_to ? profilesById.get(lead.assigned_to as string) ?? null : null,
     }));
 
     if (leadId) {
