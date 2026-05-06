@@ -42,7 +42,18 @@ interface ProofViewerProps {
   onAddFeedback: (x: number, y: number, page: number, comment: string) => void;
   onResolvePin: (id: string, resolved: boolean) => void;
   onDeletePin: (id: string) => void;
+  onMovePin?: (id: string, x: number, y: number) => void;
 }
+
+// Standard PDF fonts + CMaps copied from pdfjs-dist into public/pdfjs/ at build
+// time (scripts/copy-pdfjs-assets.js). Without these, pdfjs falls back to
+// placeholder rectangles ("tofu") for any glyph the embedded fonts can't
+// resolve — the source of the "square boxes" defects on certain proofs.
+const PDF_DOCUMENT_OPTIONS = {
+  standardFontDataUrl: '/pdfjs/standard_fonts/',
+  cMapUrl: '/pdfjs/cmaps/',
+  cMapPacked: true,
+} as const;
 
 interface ProofMediaProps {
   isImage: boolean;
@@ -51,6 +62,8 @@ interface ProofMediaProps {
   proofUrl: string;
   fileName: string;
   currentPage: number;
+  pdfRenderWidth: number | null;
+  pdfDevicePixelRatio: number | null;
   onImageLoad: () => void;
   onMediaError: () => void;
   onPdfLoadSuccess: (details: { numPages: number }) => void;
@@ -64,6 +77,8 @@ const ProofMedia = memo(function ProofMedia({
   proofUrl,
   fileName,
   currentPage,
+  pdfRenderWidth,
+  pdfDevicePixelRatio,
   onImageLoad,
   onMediaError,
   onPdfLoadSuccess,
@@ -90,14 +105,24 @@ const ProofMedia = memo(function ProofMedia({
         onLoadError={onMediaError}
         className={styles.pdfDocument}
         loading={null}
+        options={PDF_DOCUMENT_OPTIONS}
       >
-        <Page
-          pageNumber={currentPage}
-          className={styles.pdfPage}
-          renderTextLayer={false}
-          onRenderSuccess={onPdfRenderSuccess}
-          onRenderError={onMediaError}
-        />
+        {/* Defer rendering until we know the container width. Otherwise
+            react-pdf renders at intrinsic PDF page size first, which makes
+            proofContent's bounding box (and therefore every pin's pixel
+            position) snap once the resize lands. */}
+        {pdfRenderWidth ? (
+          <Page
+            pageNumber={currentPage}
+            className={styles.pdfPage}
+            renderTextLayer={false}
+            onRenderSuccess={onPdfRenderSuccess}
+            onRenderError={onMediaError}
+            width={pdfRenderWidth}
+            // Multiply pixel ratio by user zoom so zoomed-in PDFs stay crisp.
+            {...(pdfDevicePixelRatio ? { devicePixelRatio: pdfDevicePixelRatio } : {})}
+          />
+        ) : null}
       </Document>
     );
   }
@@ -126,6 +151,7 @@ export default function ProofViewer({
   onAddFeedback,
   onResolvePin,
   onDeletePin,
+  onMovePin,
 }: ProofViewerProps) {
   const [numPages, setNumPages] = useState<number>(1);
   const [currentPage, setCurrentPage] = useState<number>(1);
@@ -138,11 +164,20 @@ export default function ProofViewer({
     composerTop: number;
   } | null>(null);
   const [isProofLoading, setIsProofLoading] = useState(true);
+  // Pixel width to render the PDF at, derived from the available stage width.
+  // Drives react-pdf's <Page width={...}> so the canvas always matches the
+  // proofContent box exactly (otherwise CSS `max-width` distorts aspect ratio).
+  const [pdfRenderWidth, setPdfRenderWidth] = useState<number | null>(null);
+  // Debounced canvas pixel ratio. We bump this above the device's native DPR
+  // when the user zooms in so the rasterized canvas stays crisp under CSS
+  // scale. Settling avoids re-rendering on every wheel tick.
+  const [pdfDevicePixelRatio, setPdfDevicePixelRatio] = useState<number | null>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const proofContentRef = useRef<HTMLDivElement>(null);
   const zoomRef = useRef<number>(DEFAULT_ZOOM);
   const panRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
+  const hasAutoFitRef = useRef<boolean>(false);
   const pointerDragRef = useRef<{
     active: boolean;
     pointerId: number | null;
@@ -176,6 +211,9 @@ export default function ProofViewer({
     setIsPanning(false);
     setPendingPin(null);
     panRef.current = { x: 0, y: 0 };
+    hasAutoFitRef.current = false;
+    setPdfRenderWidth(null);
+    setPdfDevicePixelRatio(null);
     if (stageRef.current) {
       stageRef.current.style.setProperty('--pan-x', '0px');
       stageRef.current.style.setProperty('--pan-y', '0px');
@@ -321,6 +359,48 @@ export default function ProofViewer({
     applyPan(panRef.current.x, panRef.current.y, zoomRef.current);
   }, [applyPan]);
 
+  // Track the stage's width and feed it to react-pdf as the render width so
+  // the canvas always renders at the exact size of the container (no CSS
+  // distortion). This keeps proofContent's bounding rect honest, which is
+  // what pin percentages are anchored to.
+  useEffect(() => {
+    if (!isPdf) return;
+    const stageEl = stageRef.current;
+    if (!stageEl || typeof ResizeObserver === 'undefined') return;
+
+    const measure = () => {
+      // Use offsetWidth (layout width pre-transform) so user zoom doesn't
+      // change the requested render width — zoom is applied via CSS scale on
+      // the stage instead.
+      const w = stageEl.offsetWidth;
+      if (w > 0) setPdfRenderWidth(w);
+    };
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(stageEl);
+    return () => observer.disconnect();
+  }, [isPdf, proof.id]);
+
+  // Debounced re-render at higher pixel density when the user is zoomed in.
+  // Zoom < 1 stays at base DPR (no point in lowering canvas resolution).
+  // We round to 0.25 steps so small zoom oscillations don't cause re-renders.
+  useEffect(() => {
+    if (!isPdf) return;
+    if (typeof window === 'undefined') return;
+    const baseDpr = window.devicePixelRatio || 1;
+    const targetMultiplier = Math.max(1, zoom);
+    const stepped = Math.round(targetMultiplier * 4) / 4;
+    const targetDpr = baseDpr * stepped;
+    const SETTLE_MS = 180;
+    const t = window.setTimeout(() => {
+      setPdfDevicePixelRatio((prev) =>
+        prev === null || Math.abs(prev - targetDpr) > 0.001 ? targetDpr : prev
+      );
+    }, SETTLE_MS);
+    return () => window.clearTimeout(t);
+  }, [isPdf, zoom, proof.id]);
+
   useEffect(() => {
     const stageEl = stageRef.current;
     if (!stageEl || typeof ResizeObserver === 'undefined') return;
@@ -338,10 +418,13 @@ export default function ProofViewer({
 
   const setPendingPinAtClientPoint = useCallback(
     (clientX: number, clientY: number) => {
-      const stageRect = stageRef.current?.getBoundingClientRect();
-      if (!stageRect || stageRect.width <= 0 || stageRect.height <= 0) return;
-      const x = (clientX - stageRect.left) / stageRect.width;
-      const y = (clientY - stageRect.top) / stageRect.height;
+      // Pins are anchored to the actual rendered page (proofContent), not the
+      // full stage — otherwise they drift relative to the page when the window
+      // resizes (the page is centered inside the stage with extra empty space).
+      const contentRect = proofContentRef.current?.getBoundingClientRect();
+      if (!contentRect || contentRect.width <= 0 || contentRect.height <= 0) return;
+      const x = (clientX - contentRect.left) / contentRect.width;
+      const y = (clientY - contentRect.top) / contentRect.height;
       if (x < 0 || x > 1 || y < 0 || y > 1) return;
 
       // Compute composer position in overlay space (so it renders outside the scaled stage)
@@ -494,10 +577,47 @@ export default function ProofViewer({
     setPendingPin(null);
   }, []);
 
+  // Fit the rendered content to the available overlay width on first render
+  // of each proof. Only shrinks (caps at 1.0) so we don't blow up small images.
+  // Subsequent renders (page changes, re-renders) skip this so user zoom sticks.
+  const autoFitToWidth = useCallback(() => {
+    if (hasAutoFitRef.current) return;
+    const overlayEl = overlayRef.current;
+    const contentEl = proofContentRef.current;
+    if (!overlayEl || !contentEl) return;
+
+    const contentWidth = contentEl.offsetWidth;
+    const contentHeight = contentEl.offsetHeight;
+    if (contentWidth <= 0 || contentHeight <= 0) return;
+
+    // Account for the overlay's CSS padding (16px each side per .overlay rule).
+    const overlayStyles = window.getComputedStyle(overlayEl);
+    const padX =
+      parseFloat(overlayStyles.paddingLeft || '0') +
+      parseFloat(overlayStyles.paddingRight || '0');
+    const padY =
+      parseFloat(overlayStyles.paddingTop || '0') +
+      parseFloat(overlayStyles.paddingBottom || '0');
+    const availW = overlayEl.clientWidth - padX;
+    const availH = overlayEl.clientHeight - padY;
+    if (availW <= 0 || availH <= 0) return;
+
+    const fit = clampZoom(Math.min(1, availW / contentWidth, availH / contentHeight));
+    hasAutoFitRef.current = true;
+    if (Math.abs(fit - zoomRef.current) < 0.0001) return;
+    zoomRef.current = fit;
+    setZoom(fit);
+    if (stageRef.current) {
+      stageRef.current.style.setProperty('--zoom', String(fit));
+    }
+    applyPan(0, 0, fit);
+  }, [applyPan, clampZoom]);
+
   const handleImageLoad = useCallback(() => {
     setIsProofLoading(false);
+    autoFitToWidth();
     reClampPan();
-  }, [reClampPan]);
+  }, [autoFitToWidth, reClampPan]);
 
   const handleMediaError = useCallback(() => {
     setIsProofLoading(false);
@@ -509,8 +629,9 @@ export default function ProofViewer({
 
   const handlePdfRenderSuccess = useCallback(() => {
     setIsProofLoading(false);
+    autoFitToWidth();
     reClampPan();
-  }, [reClampPan]);
+  }, [autoFitToWidth, reClampPan]);
 
   const visibleFeedback = useMemo(() => {
     return feedbackItems.filter(
@@ -552,43 +673,47 @@ export default function ProofViewer({
               proofUrl={proofUrl}
               fileName={proof.file_name}
               currentPage={currentPage}
+              pdfRenderWidth={pdfRenderWidth}
+              pdfDevicePixelRatio={pdfDevicePixelRatio}
               onImageLoad={handleImageLoad}
               onMediaError={handleMediaError}
               onPdfLoadSuccess={handlePdfLoadSuccess}
               onPdfRenderSuccess={handlePdfRenderSuccess}
             />
-          </div>
 
-          {/* Feedback pins */}
-          {!hideFeedbackPins && visibleFeedback.map((pin) => (
-            <div key={pin.id} data-pin="true">
-              <ProofFeedbackPin
-                pin={pin}
-                isActive={activePinId === pin.id}
-                isHovered={hoveredPinId === pin.id}
-                sizeScale={1 / zoom}
-                onClick={() => onPinClick(activePinId === pin.id ? null : pin.id)}
-                onClosePopover={() => onPinClick(null)}
-                currentUserId={currentUserId}
-                isAdmin={isAdmin}
-                onResolve={onResolvePin}
-                onDelete={onDeletePin}
+            {/* Feedback pins — anchored to the rendered page so they don't
+                drift when the stage / window resizes. */}
+            {!hideFeedbackPins && visibleFeedback.map((pin) => (
+              <div key={pin.id} data-pin="true">
+                <ProofFeedbackPin
+                  pin={pin}
+                  isActive={activePinId === pin.id}
+                  isHovered={hoveredPinId === pin.id}
+                  sizeScale={1 / zoom}
+                  onClick={() => onPinClick(activePinId === pin.id ? null : pin.id)}
+                  onClosePopover={() => onPinClick(null)}
+                  currentUserId={currentUserId}
+                  isAdmin={isAdmin}
+                  onResolve={onResolvePin}
+                  onDelete={onDeletePin}
+                  containerRef={proofContentRef}
+                  onMove={onMovePin}
+                />
+              </div>
+            ))}
+
+            {/* Pending pin indicator */}
+            {pendingPin && (
+              <div
+                className={styles.pendingPinMarker}
+                style={{
+                  left: `${pendingPin.x * 100}%`,
+                  top: `${pendingPin.y * 100}%`,
+                  transform: `translate(-50%, -50%) scale(${1 / zoom})`,
+                }}
               />
-            </div>
-          ))}
-
-          {/* Pending pin indicator */}
-          {pendingPin && (
-            <div
-              className={styles.pendingPinMarker}
-              style={{
-                left: `${pendingPin.x * 100}%`,
-                top: `${pendingPin.y * 100}%`,
-                transform: `translate(-50%, -50%) scale(${1 / zoom})`,
-              }}
-            />
-          )}
-
+            )}
+          </div>
         </div>
 
         {/* Comment composer — rendered outside the scaled stage so it's never blurry */}
