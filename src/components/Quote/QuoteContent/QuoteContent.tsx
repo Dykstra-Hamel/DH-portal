@@ -11,6 +11,7 @@ import styles from './quotecontent.module.scss';
 import HeroSection from './HeroSection';
 import FooterSection from './FooterSection';
 import QuoteServicePanel from '@/components/Quote/QuoteServicePanel/QuoteServicePanel';
+import { InspectorCard } from '@/components/InspectorCard/InspectorCard';
 import type { PlanContent } from '@/components/Quote/QuoteServicePanel/QuoteServicePanel';
 import type { QuoteLineItem } from '@/components/FieldMap/ServiceWizard/steps/QuoteBuildStep';
 import {
@@ -1009,55 +1010,15 @@ export default function QuoteContent({
                 )}
 
                 {quote.inspector && (
-                  <div className={styles.inspectorCard}>
-                    <div className={styles.inspectorInfo}>
-                      {quote.inspector.avatar_url ? (
-                        <Image
-                          src={quote.inspector.avatar_url}
-                          alt={quote.inspector.name}
-                          width={57}
-                          height={57}
-                          className={styles.inspectorAvatar}
-                        />
-                      ) : (
-                        <div className={styles.inspectorAvatarFallback}>
-                          {quote.inspector.name.charAt(0)}
-                        </div>
-                      )}
-                      <div className={styles.inspectorText}>
-                        <p className={styles.inspectorName}>
-                          {quote.inspector.name}
-                        </p>
-                        <p className={styles.inspectorTitle}>
-                          {quote.inspector.title || 'Lead Sales Inspector'}
-                        </p>
-                        {(quote.inspector.contact_phone || company.phone) && (
-                          <p className={styles.inspectorPhone}>
-                            {quote.inspector.contact_phone || company.phone}
-                          </p>
-                        )}
-                        {quote.inspector.contact_email && (
-                          <p className={styles.inspectorEmail}>
-                            {quote.inspector.contact_email}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    {inspectionAddress && (
-                      <>
-                        <div className={styles.inspectorSeparator} />
-                        <div className={styles.inspectorAddress}>
-                          <p className={styles.inspectorAddressLabel}>
-                            Inspection Address:
-                          </p>
-                          <div className={styles.inspectorAddressSeparator} />
-                          <p className={styles.inspectorAddressValue}>
-                            {inspectionAddress}
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <InspectorCard
+                    name={quote.inspector.name}
+                    title={quote.inspector.title}
+                    phone={quote.inspector.contact_phone}
+                    email={quote.inspector.contact_email}
+                    avatarUrl={quote.inspector.avatar_url}
+                    address={inspectionAddress}
+                    companyPhone={company.phone}
+                  />
                 )}
               </div>
             )}
