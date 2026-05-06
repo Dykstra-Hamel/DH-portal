@@ -12,6 +12,11 @@
   justify-content: center;
   align-items: stretch;
   z-index: 100;
+
+  @media (width > 1600px) {
+    width: calc(100% - 336px);
+    left: 336px;
+  }
 }
 
 .navInner {

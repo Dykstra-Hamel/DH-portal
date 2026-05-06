@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { Check, X } from 'lucide-react';
 import styles from './ExecutionManager.module.scss';
 
 interface Execution {
@@ -223,7 +224,7 @@ export default function ExecutionManager({ companyId, workflowId, leadId }: Exec
                         {execution.execution_data.stepResults.map((step: any, index: number) => (
                           <div key={index} className={`${styles.stepResult} ${step.success ? styles.success : styles.failed}`}>
                             <span className={styles.stepId}>{step.stepId}</span>
-                            <span className={styles.stepStatus}>{step.success ? '✓' : '✗'}</span>
+                            <span className={styles.stepStatus}>{step.success ? <Check size={14} strokeWidth={2} /> : <X size={14} strokeWidth={2} />}</span>
                             {step.error && <span className={styles.stepError}>{step.error}</span>}
                           </div>
                         ))}

@@ -803,7 +803,7 @@ export function ContentCalendar() {
         onClick={e => handleBadgeClick(e, item, serviceId, monthKey, idx)}
         title={label}
       >
-        {isCompleted && <span className={styles.checkmark}>✓</span>}
+        {isCompleted && <span className={styles.checkmark}><Check size={14} strokeWidth={2.5} /></span>}
         {label}
       </button>
     );

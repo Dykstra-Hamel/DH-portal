@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Check } from 'lucide-react';
 import { User } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/client';
 import ProjectTaskDetail from '@/components/Projects/ProjectTaskDetail/ProjectTaskDetail';
@@ -846,7 +846,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                       onClick={() => handleApproveTopic(topic)}
                       disabled={isApprovingTopic || isApproved}
                     >
-                      {isApproved ? '✓ Approved' : 'Approve'}
+                      {isApproved ? <><Check size={12} strokeWidth={2.5} /> Approved</> : 'Approve'}
                     </button>
                   </div>
                 );
@@ -885,7 +885,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                   </button>
                   {headlinePrompt.trim() && (
                     headlineInstructionSaved ? (
-                      <span className={styles.saveRuleSaved}>✓ Saved!</span>
+                      <span className={styles.saveRuleSaved}><Check size={12} strokeWidth={2.5} /> Saved!</span>
                     ) : headlineSaveMenuOpen ? (
                       <div className={styles.saveRuleMenu}>
                         {contentPiece.company_id && (
@@ -944,7 +944,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                           onClick={() => handleUseHeadline(headline)}
                           disabled={isSelected}
                         >
-                          {isSelected ? '✓ Selected' : 'Use as Title'}
+                          {isSelected ? <><Check size={12} strokeWidth={2.5} /> Selected</> : 'Use as Title'}
                         </button>
                       </div>
                     );
@@ -985,7 +985,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                   </button>
                   {draftPrompt.trim() && (
                     draftInstructionSaved ? (
-                      <span className={styles.saveRuleSaved}>✓ Saved!</span>
+                      <span className={styles.saveRuleSaved}><Check size={12} strokeWidth={2.5} /> Saved!</span>
                     ) : draftSaveMenuOpen ? (
                       <div className={styles.saveRuleMenu}>
                         {contentPiece.company_id && (
@@ -1060,7 +1060,7 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                             onClick={() => handleUseDraft(i)}
                             disabled={isSelected}
                           >
-                            {isSelected ? '✓ Selected' : 'Use this Draft'}
+                            {isSelected ? <><Check size={12} strokeWidth={2.5} /> Selected</> : 'Use this Draft'}
                           </button>
                         </div>
                       </div>

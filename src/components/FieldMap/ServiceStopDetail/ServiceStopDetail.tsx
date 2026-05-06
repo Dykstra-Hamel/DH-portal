@@ -241,13 +241,6 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
 
           {/* Info cards */}
           <div className={styles.cards}>
-            {stop.serviceType && (
-              <div className={styles.card}>
-                <p className={styles.cardLabel}>Service Type</p>
-                <p className={styles.cardValue}>{stop.serviceType}</p>
-              </div>
-            )}
-
             {stop.serviceClass && (
               <div className={styles.card}>
                 <p className={styles.cardLabel}>Service Class</p>
@@ -259,17 +252,6 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
               <div className={styles.card}>
                 <p className={styles.cardLabel}>Program</p>
                 <p className={styles.cardValue}>{stop.programCode}</p>
-              </div>
-            )}
-
-            {stop.serviceStatus && (
-              <div className={styles.card}>
-                <p className={styles.cardLabel}>Status</p>
-                <span
-                  className={`${styles.statusBadge} ${styles[`status_${stop.serviceStatus.toLowerCase().replace(/\s+/g, '_')}`] ?? ''}`}
-                >
-                  {stop.serviceStatus}
-                </span>
               </div>
             )}
 
@@ -520,26 +502,22 @@ export function ServiceStopDetail({ stopId }: ServiceStopDetailProps) {
               </div>
             )}
 
-            {stop.stopId && (
-              <div className={`${styles.card} ${styles.cardFull}`}>
-                <p className={styles.cardLabel}>Order ID</p>
-                <p className={styles.cardValue}>{stop.stopId}</p>
-              </div>
-            )}
           </div>
         </div>
       </div>
 
       <div className={styles.footer}>
-        <button
-          className={styles.prevBtn}
-          onClick={() => router.push('/field-sales/dashboard')}
-        >
-          <ArrowLeft size={18} className={styles.prevArrow} /> Cancel
-        </button>
-        <button onClick={handleStartService} className={styles.startBtn}>
-          {hasExistingInspection ? 'Review Quote' : 'Start Service'}
-        </button>
+        <div className={styles.footerInner}>
+          <button
+            className={styles.prevBtn}
+            onClick={() => router.push('/field-sales/dashboard')}
+          >
+            <ArrowLeft size={18} className={styles.prevArrow} /> Cancel
+          </button>
+          <button onClick={handleStartService} className={styles.startBtn}>
+            {hasExistingInspection ? 'Review Quote' : 'Start Service'}
+          </button>
+        </div>
       </div>
     </div>
   );

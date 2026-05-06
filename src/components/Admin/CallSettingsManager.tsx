@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Settings,
   Phone,
+  Check,
 } from 'lucide-react';
 import { useCompany } from '@/contexts/CompanyContext';
 import AgentsManager from '@/components/Agents/AgentsManager';
@@ -485,7 +486,7 @@ export default function CallSettingsManager() {
                                     color: '#059669',
                                   }}
                                 >
-                                  ✓ {validEmails.length} valid email
+                                  <Check size={12} strokeWidth={2.5} /> {validEmails.length} valid email
                                   {validEmails.length !== 1 ? 's' : ''}:{' '}
                                   {validEmails.slice(0, 3).join(', ')}
                                   {validEmails.length > 3

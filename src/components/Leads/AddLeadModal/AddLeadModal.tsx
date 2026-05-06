@@ -7,7 +7,7 @@ import SearchableDropdown from '@/components/Common/SearchableDropdown/Searchabl
 import { useUser } from '@/hooks/useUser';
 import { useAssignableUsers } from '@/hooks/useAssignableUsers';
 import Image from 'next/image';
-import { Users, ChevronDown } from 'lucide-react';
+import { Users, ChevronDown, Check } from 'lucide-react';
 import { leadFormatOptions, leadSourceOptions, leadTypesByFormat } from '@/types/lead';
 import styles from './AddLeadModal.module.scss';
 
@@ -925,7 +925,7 @@ export function AddLeadModal({ isOpen, onClose, companyId, onSuccess }: AddLeadM
             {/* Complete Step */}
             {bulkStep === 'complete' && uploadResult && (
               <div className={styles.complete}>
-                <div className={styles.successIcon}>✓</div>
+                <div className={styles.successIcon}><Check size={20} strokeWidth={2} /></div>
                 <h3>Bulk Upload Scheduled!</h3>
                 <p>
                   Your upload of {parsedData.validRows} leads has been{' '}
