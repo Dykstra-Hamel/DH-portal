@@ -7,7 +7,7 @@ import React, {
   useCallback,
   useMemo,
 } from 'react';
-import { UserPlus, TrendingUp, ChevronDown, ArrowLeft } from 'lucide-react';
+import { UserPlus, TrendingUp, ChevronDown, ArrowLeft, Check } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import SignatureCanvas from 'react-signature-canvas';
 import { useCompany } from '@/contexts/CompanyContext';
@@ -1648,7 +1648,7 @@ function StepServiceDetails({
                     <ul className={styles.planCardFeatures}>
                       {features.map((f, i) => (
                         <li key={i} className={styles.planCardFeatureItem}>
-                          <span className={styles.planCardFeatureCheck}>✓</span>
+                          <span className={styles.planCardFeatureCheck}><Check size={14} strokeWidth={2.5} /></span>
                           {f}
                         </li>
                       ))}
@@ -1945,7 +1945,7 @@ function StepServicePlanSelect({
                 <ul className={styles.planCardFeatures}>
                   {features.map((f, i) => (
                     <li key={i} className={styles.planCardFeatureItem}>
-                      <span className={styles.planCardFeatureCheck}>✓</span>
+                      <span className={styles.planCardFeatureCheck}><Check size={14} strokeWidth={2.5} /></span>
                       {f}
                     </li>
                   ))}
@@ -2100,7 +2100,7 @@ function StepUpsellCatalog({
                     <ul className={styles.planCardFeatures}>
                       {features.map((f, i) => (
                         <li key={i} className={styles.planCardFeatureItem}>
-                          <span className={styles.planCardFeatureCheck}>✓</span>
+                          <span className={styles.planCardFeatureCheck}><Check size={14} strokeWidth={2.5} /></span>
                           {f}
                         </li>
                       ))}
@@ -2180,7 +2180,7 @@ function StepUpsellCatalog({
                     <ul className={styles.planCardFeatures}>
                       {features.map((f, i) => (
                         <li key={i} className={styles.planCardFeatureItem}>
-                          <span className={styles.planCardFeatureCheck}>✓</span>
+                          <span className={styles.planCardFeatureCheck}><Check size={14} strokeWidth={2.5} /></span>
                           {f}
                         </li>
                       ))}
@@ -2361,7 +2361,7 @@ function StepServiceTodayConfirm({
             <ul className={styles.confirmFeatureList}>
               {addonFeatures.map((f, i) => (
                 <li key={i} className={styles.confirmFeatureItem}>
-                  <span className={styles.confirmFeatureCheck}>✓</span>
+                  <span className={styles.confirmFeatureCheck}><Check size={14} strokeWidth={2.5} /></span>
                   {f}
                 </li>
               ))}
@@ -2391,7 +2391,7 @@ function StepServiceTodayConfirm({
             <ul className={styles.confirmFeatureList}>
               {planFeatures.map((f, i) => (
                 <li key={i} className={styles.confirmFeatureItem}>
-                  <span className={styles.confirmFeatureCheck}>✓</span>
+                  <span className={styles.confirmFeatureCheck}><Check size={14} strokeWidth={2.5} /></span>
                   {f}
                 </li>
               ))}
@@ -3925,7 +3925,7 @@ export function NewOpportunityWizard() {
                     className={`${styles.progressStep} ${i === progressIndex ? styles.progressStepActive : ''} ${i < progressIndex ? styles.progressStepDone : ''}`}
                   >
                     <div className={styles.progressDot}>
-                      {i < progressIndex ? '✓' : i + 1}
+                      {i < progressIndex ? <Check size={11} strokeWidth={2.5} /> : i + 1}
                     </div>
                     <span className={styles.progressLabel}>
                       {STEP_ID_LABELS[stepId]}

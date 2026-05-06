@@ -17,6 +17,7 @@ import {
   ChevronRight,
   ExternalLink,
   Lock,
+  Check,
 } from 'lucide-react';
 import { useUser } from '@/hooks/useUser';
 import { useActiveSection } from '@/contexts/ActiveSectionContext';
@@ -3578,7 +3579,7 @@ export function LeadQuoteSection({
                                     </p>
                                     {selection.servicePlan
                                       .includes_inspection && (
-                                      <p>✓ Initial inspection included</p>
+                                      <p><Check size={12} strokeWidth={2.5} /> Initial inspection included</p>
                                     )}
                                     <div className={styles.expectHighlight}>
                                       <p className={styles.expectHighlightText}>

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
+import { Check } from 'lucide-react';
 import styles from './Brand.module.scss';
 import { Toast } from '@/components/Common/Toast/Toast';
 import { BrandData, ColorInfo, LogoInfo } from '@/types/branding';
@@ -494,7 +495,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
           >
             Hex: <span className={styles.colorValue}>{hex}</span>
             {copiedColor === `${uniqueId}-hex-text` && (
-              <span className={styles.copiedIndicator}>✓ Copied!</span>
+              <span className={styles.copiedIndicator}><Check size={12} strokeWidth={2.5} /> Copied!</span>
             )}
           </p>
           {cmyk && (
@@ -505,7 +506,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             >
               CMYK: <span className={styles.colorValue}>{cmyk}</span>
               {copiedColor === `${uniqueId}-cmyk` && (
-                <span className={styles.copiedIndicator}>✓ Copied!</span>
+                <span className={styles.copiedIndicator}><Check size={12} strokeWidth={2.5} /> Copied!</span>
               )}
             </p>
           )}
@@ -517,7 +518,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             >
               Pantone: <span className={styles.colorValue}>{pantone}</span>
               {copiedColor === `${uniqueId}-pantone` && (
-                <span className={styles.copiedIndicator}>✓ Copied!</span>
+                <span className={styles.copiedIndicator}><Check size={12} strokeWidth={2.5} /> Copied!</span>
               )}
             </p>
           )}
@@ -529,7 +530,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             >
               50%: <span className={styles.colorValue}>{hexToRgba(hex, 0.5)}</span>
               {copiedColor === `${uniqueId}-50-text` && (
-                <span className={styles.copiedIndicator}>✓</span>
+                <span className={styles.copiedIndicator}><Check size={12} strokeWidth={2.5} /></span>
               )}
             </p>
             <p
@@ -539,7 +540,7 @@ const Brand: React.FC<BrandProps> = ({ brandData, companyName }) => {
             >
               25%: <span className={styles.colorValue}>{hexToRgba(hex, 0.25)}</span>
               {copiedColor === `${uniqueId}-25-text` && (
-                <span className={styles.copiedIndicator}>✓</span>
+                <span className={styles.copiedIndicator}><Check size={12} strokeWidth={2.5} /></span>
               )}
             </p>
           </div>

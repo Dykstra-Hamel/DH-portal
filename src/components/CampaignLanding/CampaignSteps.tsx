@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import Image from 'next/image';
+import { Check } from 'lucide-react';
 import SignatureCanvas from 'react-signature-canvas';
 import { getClientDeviceData } from '@/lib/device-utils';
 import { formatDiscount } from '@/lib/campaign-utils';
@@ -422,7 +423,7 @@ export default function CampaignSteps({
           <div className={styles.dhFormStepContent}>
             <div className={styles.dhFormContentArea}>
               <div className={styles.completionHeader}>
-                <div className={styles.checkmark}>✓</div>
+                <div className={styles.checkmark}><Check size={20} strokeWidth={2} /></div>
                 <h2>Thank You, {customer.first_name}!</h2>
                 <p>
                   Your campaign offer has been redeemed successfully.

@@ -288,10 +288,8 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                 customName: item.plan_name,
                 coveredPestIds: [],
                 coveredPestLabels: [],
-                initialCost:
-                  item.final_initial_price ?? item.initial_price ?? null,
-                recurringCost:
-                  item.final_recurring_price ?? item.recurring_price ?? null,
+                initialCost: item.initial_price ?? null,
+                recurringCost: item.recurring_price ?? null,
                 frequency: item.billing_frequency ?? null,
                 parentLineItemId: item.parent_line_item_id ?? undefined,
                 quantity: item.quantity ?? null,

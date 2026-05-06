@@ -18,6 +18,7 @@ import {
   Mail,
   MapPin,
   Trash2,
+  Check,
 } from 'lucide-react';
 import { CallHistory } from '@/components/Calls/CallHistory/CallHistory';
 
@@ -282,7 +283,7 @@ export default function TicketDetailPage({ params }: TicketDetailPageProps) {
               justifyContent: 'space-between',
             }}
           >
-            <span>✓ This ticket has been converted to a lead</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Check size={14} strokeWidth={2.5} /> This ticket has been converted to a lead</span>
             <a
               href={`/leads/${ticket.converted_to_lead_id}`}
               style={{
