@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { isAuthorizedAdmin } from '@/lib/auth-helpers';
 import { sendTaskReassignedNotification } from '@/lib/slack/task-notifications';
+import { STORAGE_CONFIG } from '@/lib/storage-utils';
 
 // GET /api/admin/tasks/[taskId] - Get task details
 export async function GET(
@@ -47,7 +48,8 @@ export async function GET(
           created_at,
           updated_at,
           user_id,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+          attachments:comment_attachments!task_comment_id(id, file_path, file_name, file_size, mime_type, created_at)
         ),
         activity:project_task_activity (
           id,
@@ -103,7 +105,20 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ ...task, hasUnreadComments });
+    const taskWithAttachmentUrls = {
+      ...task,
+      hasUnreadComments,
+      comments: (task.comments || []).map((comment: any) => ({
+        ...comment,
+        attachments: (comment.attachments || []).map((att: any) => {
+          const { data: urlData } = supabase.storage
+            .from(STORAGE_CONFIG.BUCKET_NAME)
+            .getPublicUrl(att.file_path);
+          return { ...att, url: urlData.publicUrl };
+        }),
+      })),
+    };
+    return NextResponse.json(taskWithAttachmentUrls);
   } catch (error) {
     console.error('Error in GET /api/admin/tasks/[taskId]:', error);
     return NextResponse.json(

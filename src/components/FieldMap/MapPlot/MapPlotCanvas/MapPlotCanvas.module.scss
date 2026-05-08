@@ -793,8 +793,8 @@
 .readOnlyThumbnail {
   display: block;
   width: 100%;
+  height: 100%;
   border: 1px solid var(--gray-200);
-  border-radius: 12px;
 
   @media (max-width: 992px) {
     border-radius: 0;
@@ -810,7 +810,8 @@
 .readOnlyMapFrame {
   position: relative;
   width: 100%;
-  height: 500px;
+  height: 100%;
+  min-height: 500px;
   overflow: hidden;
   background: var(--gray-100);
   user-select: none;
@@ -1165,18 +1166,29 @@
 // ─── Onboarding Hint ──────────────────────────────────────────────────────────
 
 @keyframes onboardingBounce {
-  0%, 100% { transform: translateX(0); }
-  50%       { transform: translateX(-6px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-6px);
+  }
 }
 
 @keyframes onboardingFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .onboardingHint {
   position: absolute;
-  top: 37px;   /* aligns with center of Outline button (14px panel top + 9px padding + 24px half-btn) */
+  top: 37px; /* aligns with center of Outline button (14px panel top + 9px padding + 24px half-btn) */
   left: 84px;
   z-index: 11;
   display: flex;
