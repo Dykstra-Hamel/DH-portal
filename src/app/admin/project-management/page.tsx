@@ -86,6 +86,11 @@ export default function AdminProjectManagementDashboard() {
   const currentChannelRef = useRef<ReturnType<typeof createAdminProjectChannel> | null>(null);
   const isFetchingRef = useRef(false);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Tracks whether any event seen during the current debounce window referred
+  // to project_tasks. Completing a task fires two near-simultaneous broadcasts
+  // (project_tasks update + projects update from the progress trigger); we
+  // need to refetch tasks if EITHER event arrived, not just the latest one.
+  const pendingTasksFetchRef = useRef(false);
 
   // Admin and project_manager access check
   const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'project_manager';
@@ -298,8 +303,24 @@ export default function AdminProjectManagementDashboard() {
     currentChannelRef.current = channel;
 
     subscribeToProjectUpdates(channel, async (payload: ProjectUpdatePayload) => {
-      // Skip if already fetching to avoid thrashing
-      if (isFetchingRef.current) return;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[admin:projects broadcast]', payload);
+      }
+
+      // Latch: if any event in the debounce window touched project_tasks, we
+      // must refetch tasks. Reset only after the fetch runs.
+      if (payload.table === 'project_tasks') {
+        pendingTasksFetchRef.current = true;
+      }
+
+      // Skip scheduling a new debounce if a fetch is already in flight, but
+      // keep the latch so the in-flight fetch's successor still picks it up.
+      if (isFetchingRef.current) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[admin:projects broadcast] skipped (already fetching)');
+        }
+        return;
+      }
 
       // Debounce rapid changes (e.g., bulk task updates) by 500ms
       if (debounceTimerRef.current) {
@@ -308,12 +329,13 @@ export default function AdminProjectManagementDashboard() {
 
       debounceTimerRef.current = setTimeout(async () => {
         isFetchingRef.current = true;
+        const shouldFetchTasks = pendingTasksFetchRef.current;
+        pendingTasksFetchRef.current = false;
         try {
           await Promise.all([
             fetchProjects(),
             fetchAllProjectsForCounts(),
-            // Also refresh tasks if a project_task changed
-            payload.table === 'project_tasks' ? fetchTasks() : Promise.resolve(),
+            shouldFetchTasks ? fetchTasks() : Promise.resolve(),
           ]);
         } finally {
           isFetchingRef.current = false;

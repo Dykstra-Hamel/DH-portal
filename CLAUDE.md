@@ -87,6 +87,109 @@ When creating a new migration file, ALWAYS use the following naming convention:
 
 - The current time should be used to generate the timestamp to prevent duplicated filenames from different users.
 
+## Supabase RLS Performance Conventions
+
+When creating or editing RLS policies in a migration, follow these rules. They prevent the `auth_rls_initplan` and `multiple_permissive_policies` lints flagged by the Supabase performance advisor.
+
+### 1. Always wrap auth.<fn>() in (SELECT ...)
+
+Wrong (re-evaluated for every row):
+
+```sql
+USING (auth.uid() = user_id)
+USING (auth.role() = 'authenticated')
+USING (auth.jwt() ->> 'role' = 'admin')
+```
+
+Right (evaluated once per statement):
+
+```sql
+USING ((SELECT auth.uid()) = user_id)
+USING ((SELECT auth.role()) = 'authenticated')
+USING ((SELECT auth.jwt()) ->> 'role' = 'admin')
+```
+
+This applies to `auth.uid()`, `auth.role()`, `auth.jwt()`, `auth.email()`.
+
+### 2. Always specify TO <role> on every policy
+
+Without `TO`, a policy applies to every Postgres role (anon, authenticated, authenticator, dashboard_user, service_role) and the linter flags overlaps on each. Default to:
+
+```sql
+CREATE POLICY ... ON <table>
+  FOR <action>
+  TO authenticated     -- or anon, or service_role -- be explicit
+  USING (...);
+```
+
+### 3. One permissive policy per (role, action) pair
+
+If two policies both apply to the same role+action, Postgres evaluates BOTH on every matching row. Consolidate by OR'ing their conditions into a single policy.
+
+Wrong:
+
+```sql
+CREATE POLICY "admin can do anything" ON t FOR ALL USING (is_admin());
+CREATE POLICY "user can read own" ON t FOR SELECT USING (user_id = (SELECT auth.uid()));
+-- Overlap on SELECT for authenticated role.
+```
+
+Right:
+
+```sql
+CREATE POLICY "t_select" ON t FOR SELECT TO authenticated
+  USING (is_admin() OR user_id = (SELECT auth.uid()));
+CREATE POLICY "t_insert" ON t FOR INSERT TO authenticated
+  WITH CHECK (is_admin());
+-- and so on for UPDATE, DELETE
+```
+
+### 4. Don't write "service_role can manage" policies
+
+The `service_role` Postgres role has `bypassrls = true` in Supabase. RLS is never evaluated for it. Policies of the form `USING (auth.jwt() ->> 'role' = 'service_role')` or `TO service_role` are no-ops -- drop them. Server-side code that uses the service-role key already bypasses every policy.
+
+### 5. Don't create UNIQUE indexes alongside UNIQUE constraints
+
+A `UNIQUE` constraint already creates an index named `<table>_<col>_key`. Don't add a separate `CREATE UNIQUE INDEX idx_<table>_<col>` -- it's a duplicate. If you need a non-default index name, drop the UNIQUE constraint and create the index manually (rare).
+
+### 6. New table checklist
+
+When adding a table with RLS, the policy block should look like:
+
+```sql
+ALTER TABLE public.<t> ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "<t>_select" ON public.<t>
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM profiles
+            WHERE id = (SELECT auth.uid()) AND role = 'admin')
+    OR company_id IN (
+      SELECT company_id FROM user_companies WHERE user_id = (SELECT auth.uid())
+    )
+  );
+
+CREATE POLICY "<t>_insert" ON public.<t> FOR INSERT TO authenticated WITH CHECK (...);
+CREATE POLICY "<t>_update" ON public.<t> FOR UPDATE TO authenticated USING (...) WITH CHECK (...);
+CREATE POLICY "<t>_delete" ON public.<t> FOR DELETE TO authenticated USING (...);
+```
+
+Avoid `FOR ALL` policies when there is also any per-action policy on the same table for the same role -- that combination always trips the multiple_permissive lint.
+
+### 7. Re-run the linter after schema work
+
+Before merging a PR that touches any migration, run the Supabase performance advisor (Dashboard -> Advisors -> Performance) and confirm no new `auth_rls_initplan`, `multiple_permissive_policies`, or `duplicate_index` warnings were introduced.
+
+### 8. Realtime: prefer broadcast over postgres_changes
+
+When wiring a UI to live data updates, default to broadcast (the `/src/lib/realtime/*-channel.ts` pattern + a `SECURITY DEFINER` trigger that calls `realtime.send`) instead of `postgres_changes`. `postgres_changes` requires the table to be in the `supabase_realtime` publication, and every additional table in that publication makes every Realtime client's `realtime.list_changes` call slower (it processes more WAL per tick). Broadcast channels do not use the publication and bypass WAL entirely.
+
+If you must use `postgres_changes`:
+
+- Add the table to the publication explicitly: `ALTER PUBLICATION supabase_realtime ADD TABLE public.<t>`. Subscriptions to tables not in the publication silently receive no events.
+- Always include a row-level filter on a column with an index, e.g. `filter: 'project_id=eq.<id>'`.
+- When the subscription is later migrated to broadcast, remove the table from the publication in the same PR.
+
 ## Widget Configuration
 
 - **Address Autocomplete**: Uses Google Places API for address suggestions

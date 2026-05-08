@@ -7,6 +7,11 @@ import { User } from '@supabase/supabase-js';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import ProjectDetailWithTasks from '@/components/Projects/ProjectDetailWithTasks/ProjectDetailWithTasks';
 import { Project } from '@/types/project';
+import {
+  createAdminProjectChannel,
+  removeProjectChannel,
+  subscribeToProjectUpdates,
+} from '@/lib/realtime/project-channel';
 
 interface ProjectDetailPageProps {
   params: Promise<{ id: string }>;
@@ -118,44 +123,30 @@ export default function ProjectDetailPage({ params }: ProjectDetailPageProps) {
     fetchProject();
   }, [projectId, refreshKey]);
 
-  // Subscribe to project updates to keep details in sync without full refreshes
+  // Subscribe to project updates via the admin:projects broadcast channel.
+  // The trigger broadcast_project_update broadcasts every project INSERT/UPDATE/
+  // DELETE here; we filter to the project we're viewing and refetch on UPDATE
+  // (broadcast payload is intentionally minimal -- not enough to merge in place).
   useEffect(() => {
     if (!projectId) return;
 
-    const channel = supabase
-      .channel(`project:${projectId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'projects',
-          filter: `id=eq.${projectId}`,
-        },
-        (payload) => {
-          if (!payload.new) return;
-          setProject((prev) => (prev ? { ...prev, ...(payload.new as Partial<Project>) } : prev));
-        }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'DELETE',
-          schema: 'public',
-          table: 'projects',
-          filter: `id=eq.${projectId}`,
-        },
-        () => {
-          setProject(null);
-          setError('Project not found');
-        }
-      )
-      .subscribe();
+    const channel = createAdminProjectChannel();
+    subscribeToProjectUpdates(channel, (payload) => {
+      if (payload.table !== 'projects') return;
+      if (payload.project_id !== projectId) return;
+
+      if (payload.action === 'DELETE') {
+        setProject(null);
+        setError('Project not found');
+      } else if (payload.action === 'UPDATE') {
+        setRefreshKey((prev) => prev + 1);
+      }
+    });
 
     return () => {
-      supabase.removeChannel(channel);
+      removeProjectChannel(channel);
     };
-  }, [projectId, supabase]);
+  }, [projectId]);
 
   const handleProjectUpdate = (updates?: Partial<Project>) => {
     if (updates) {
