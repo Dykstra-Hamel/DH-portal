@@ -13,7 +13,6 @@ import {
   TaskUpdatePayload,
 } from '@/lib/realtime/task-channel';
 import styles from './ActionsAutomationsPanel.module.scss';
-import tabStyles from '@/components/Common/DataTable/DataTableTabs.module.scss';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -975,16 +974,16 @@ export default function ActionsAutomationsPanel({
 
       {leftPanelView === 'actions' ? (
         <>
-          <div className={tabStyles.tabsRow}>
-            <div className={tabStyles.tabsSection}>
+          <div className={styles.subTabsRow}>
+            <div className={styles.subTabs}>
               {ACTIONS_TABS.map(tab => (
                 <button
                   key={tab.key}
-                  className={`${tabStyles.tab} ${actionsTab === tab.key ? tabStyles.active : ''}`}
+                  className={`${styles.subTab} ${actionsTab === tab.key ? styles.subTabActive : ''}`}
                   onClick={() => setActionsTab(tab.key)}
                 >
                   {tab.label}
-                  <span className={tabStyles.tabCount}>
+                  <span className={styles.subTabCount}>
                     {actionTabCounts[tab.key]}
                   </span>
                 </button>
@@ -1007,16 +1006,16 @@ export default function ActionsAutomationsPanel({
         </>
       ) : (
         <>
-          <div className={tabStyles.tabsRow}>
-            <div className={tabStyles.tabsSection}>
+          <div className={styles.subTabsRow}>
+            <div className={styles.subTabs}>
               {AUTOMATIONS_TABS.map(tab => (
                 <button
                   key={tab.key}
-                  className={`${tabStyles.tab} ${automationsTab === tab.key ? tabStyles.active : ''}`}
+                  className={`${styles.subTab} ${automationsTab === tab.key ? styles.subTabActive : ''}`}
                   onClick={() => setAutomationsTab(tab.key)}
                 >
                   {tab.label}
-                  <span className={tabStyles.tabCount}>
+                  <span className={styles.subTabCount}>
                     {automationsTabCounts[tab.key]}
                   </span>
                 </button>

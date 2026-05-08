@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server-admin';
 import {
   createOrFindServiceAddress,
   linkCustomerToServiceAddress,
+  normalizeAddressFields,
   type ServiceAddressData,
 } from '@/lib/service-addresses';
 import {
@@ -123,6 +124,23 @@ export async function POST(request: NextRequest) {
     const companyId = userCompany.company_id;
     const { firstName, lastName } = splitName(clientName);
 
+    // Derive structured customer address fields. If Google Places gave us
+    // proper components, prefer those; otherwise fall back to the formatted
+    // string and let normalizeAddressFields split it. This prevents the full
+    // address landing in customers.address with city/state/zip empty.
+    const componentStreet = addressComponents
+      ? [addressComponents.street_number, addressComponents.route]
+          .filter(Boolean)
+          .join(' ')
+          .trim()
+      : '';
+    const customerAddressFields = normalizeAddressFields({
+      street_address: componentStreet || address || null,
+      city: addressComponents?.locality ?? null,
+      state: addressComponents?.administrative_area_level_1 ?? null,
+      zip_code: addressComponents?.postal_code ?? null,
+    });
+
     const pestList: string[] =
       Array.isArray(pestTypes)
         ? pestTypes.filter((p): p is string => typeof p === 'string' && p.trim().length > 0)
@@ -171,7 +189,10 @@ export async function POST(request: NextRequest) {
           last_name: lastName,
           email: clientEmail || null,
           phone: clientPhone || null,
-          address,
+          address: customerAddressFields.street_address ?? address,
+          city: customerAddressFields.city,
+          state: customerAddressFields.state,
+          zip_code: customerAddressFields.zip_code,
         })
         .select('id')
         .single();
@@ -211,12 +232,22 @@ export async function POST(request: NextRequest) {
 
     if (!serviceAddressId && address) {
       // Last-resort fallback: legacy single-string match. Used only when no
-      // structured components were sent (e.g. older clients).
+      // structured components were sent (e.g. older clients). Run the string
+      // through normalizeAddressFields so we don't write the full concatenated
+      // address into street_address with city/state/zip empty.
+      const fallbackParts = normalizeAddressFields({
+        street_address: address,
+        city: null,
+        state: null,
+        zip_code: null,
+      });
+      const fallbackStreet = fallbackParts.street_address ?? address;
+
       const { data: existingAddress } = await adminClient
         .from('service_addresses')
         .select('id')
         .eq('company_id', companyId)
-        .ilike('street_address', address)
+        .ilike('street_address', fallbackStreet)
         .maybeSingle();
 
       if (existingAddress?.id) {
@@ -224,7 +255,13 @@ export async function POST(request: NextRequest) {
       } else {
         const { data: newAddress } = await adminClient
           .from('service_addresses')
-          .insert({ company_id: companyId, street_address: address })
+          .insert({
+            company_id: companyId,
+            street_address: fallbackStreet,
+            city: fallbackParts.city,
+            state: fallbackParts.state,
+            zip_code: fallbackParts.zip_code,
+          })
           .select('id')
           .single();
         serviceAddressId = newAddress?.id ?? null;

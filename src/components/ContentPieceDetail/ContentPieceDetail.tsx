@@ -55,6 +55,10 @@ interface ContentPiece {
   ai_topics:    { items: string[]; prompt: string; generated_at: string } | null;
   ai_headlines: { items: string[]; prompt: string; generated_at: string } | null;
   ai_draft:     { items: Array<{ approach: string; content: string }>; selected_index?: number; prompt: string; generated_at: string } | null;
+  ai_page_titles:       { items: string[]; prompt: string; generated_at: string } | null;
+  ai_meta_descriptions: { items: string[]; prompt: string; generated_at: string } | null;
+  page_title?: string | null;
+  meta_description?: string | null;
   content?: string | null;
   is_completed: boolean;
   service_month: string | null;
@@ -99,6 +103,8 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
   const [editTopic, setEditTopic] = useState(contentPiece.topic || '');
   const [editLink, setEditLink] = useState(contentPiece.link || '');
   const [editGoogleDocLink, setEditGoogleDocLink] = useState<string>(contentPiece.google_doc_link ?? '');
+  const [editPageTitle, setEditPageTitle] = useState(contentPiece.page_title || '');
+  const [editMetaDescription, setEditMetaDescription] = useState(contentPiece.meta_description || '');
   const [editNotes, setEditNotes] = useState(contentPiece.notes || '');
   const [editContent, setEditContent] = useState<string>(contentPiece.content || '');
   const [isContentDirty, setIsContentDirty] = useState(false);
@@ -133,6 +139,22 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
     return contentPiece.ai_headlines?.items?.length ? contentPiece.ai_headlines.items : null;
   });
   const [headlineError, setHeadlineError] = useState<string | null>(null);
+
+  // AI page title (SEO <title>) generator state
+  const [pageTitlePrompt, setPageTitlePrompt] = useState('');
+  const [isGeneratingPageTitles, setIsGeneratingPageTitles] = useState(false);
+  const [pageTitleSuggestions, setPageTitleSuggestions] = useState<string[] | null>(() => {
+    return contentPiece.ai_page_titles?.items?.length ? contentPiece.ai_page_titles.items : null;
+  });
+  const [pageTitleError, setPageTitleError] = useState<string | null>(null);
+
+  // AI meta description generator state
+  const [metaDescriptionPrompt, setMetaDescriptionPrompt] = useState('');
+  const [isGeneratingMetaDescriptions, setIsGeneratingMetaDescriptions] = useState(false);
+  const [metaDescriptionSuggestions, setMetaDescriptionSuggestions] = useState<string[] | null>(() => {
+    return contentPiece.ai_meta_descriptions?.items?.length ? contentPiece.ai_meta_descriptions.items : null;
+  });
+  const [metaDescriptionError, setMetaDescriptionError] = useState<string | null>(null);
 
   // AI draft generator state
   const [draftPrompt, setDraftPrompt] = useState('');
@@ -193,6 +215,8 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
           topic: editTopic || null,
           link: editLink || null,
           google_doc_link: editGoogleDocLink || null,
+          page_title: editPageTitle || null,
+          meta_description: editMetaDescription || null,
           notes: editNotes || null,
           content: editContent || null,
         }),
@@ -407,6 +431,86 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
       onPieceUpdate({ ...contentPiece, title: headline });
     } catch {
       // silently fail — title still updates in UI
+    }
+  };
+
+  const handleGeneratePageTitles = async () => {
+    setIsGeneratingPageTitles(true);
+    setPageTitleError(null);
+    setPageTitleSuggestions(null);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/content-pieces/${contentPiece.id}/ai-page-titles`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prompt: pageTitlePrompt }),
+      });
+      if (!response.ok) {
+        setPageTitleError('Failed to generate page titles. Please try again.');
+        return;
+      }
+      const data = await response.json();
+      setPageTitleSuggestions(data.suggestions.page_titles);
+    } catch {
+      setPageTitleError('Failed to generate page titles. Please try again.');
+    } finally {
+      setIsGeneratingPageTitles(false);
+    }
+  };
+
+  const handleUsePageTitle = async (pageTitle: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/content-pieces/${contentPiece.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ page_title: pageTitle }),
+      });
+      if (!response.ok) return;
+      setEditPageTitle(pageTitle);
+      onPieceUpdate({ ...contentPiece, page_title: pageTitle });
+    } catch {
+      // silently fail — value still updates in UI
+    }
+  };
+
+  const handleGenerateMetaDescriptions = async () => {
+    setIsGeneratingMetaDescriptions(true);
+    setMetaDescriptionError(null);
+    setMetaDescriptionSuggestions(null);
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/content-pieces/${contentPiece.id}/ai-meta-descriptions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ prompt: metaDescriptionPrompt }),
+      });
+      if (!response.ok) {
+        setMetaDescriptionError('Failed to generate meta descriptions. Please try again.');
+        return;
+      }
+      const data = await response.json();
+      setMetaDescriptionSuggestions(data.suggestions.meta_descriptions);
+    } catch {
+      setMetaDescriptionError('Failed to generate meta descriptions. Please try again.');
+    } finally {
+      setIsGeneratingMetaDescriptions(false);
+    }
+  };
+
+  const handleUseMetaDescription = async (description: string) => {
+    try {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`/api/admin/content-pieces/${contentPiece.id}`, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({ meta_description: description }),
+      });
+      if (!response.ok) return;
+      setEditMetaDescription(description);
+      onPieceUpdate({ ...contentPiece, meta_description: description });
+    } catch {
+      // silently fail — value still updates in UI
     }
   };
 
@@ -683,6 +787,40 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
             </div>
 
             <div className={styles.formGroup}>
+              <label className={styles.label}>
+                Page Title (SEO){' '}
+                <span className={styles.labelHint}>
+                  {editPageTitle.length}/60
+                </span>
+              </label>
+              <input
+                type="text"
+                className={styles.input}
+                value={editPageTitle}
+                onChange={e => setEditPageTitle(e.target.value)}
+                placeholder="SEO <title> tag — what shows in the browser tab and search results (50–60 chars)"
+                maxLength={70}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
+              <label className={styles.label}>
+                Meta Description{' '}
+                <span className={styles.labelHint}>
+                  {editMetaDescription.length}/160
+                </span>
+              </label>
+              <textarea
+                className={styles.textarea}
+                value={editMetaDescription}
+                onChange={e => setEditMetaDescription(e.target.value)}
+                placeholder="SEO meta description — the snippet shown under the title in search results (150–160 chars)"
+                rows={3}
+                maxLength={170}
+              />
+            </div>
+
+            <div className={styles.formGroup}>
               <label className={styles.label}>Notes</label>
               <textarea
                 className={styles.textarea}
@@ -945,6 +1083,126 @@ export function ContentPieceDetail({ contentPiece, user, onPieceUpdate }: Conten
                           disabled={isSelected}
                         >
                           {isSelected ? <><Check size={12} strokeWidth={2.5} /> Selected</> : 'Use as Title'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* AI Page Title Generator (SEO <title>) */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>AI Page Title (SEO)</h2>
+          {!editTopic ? (
+            <p className={styles.aiDescription}>
+              Approve a topic above to unlock SEO page title generation.
+            </p>
+          ) : (
+            <>
+              <p className={styles.aiDescription}>
+                Generate 5 SEO page title variations for: <strong>{editTopic}</strong>
+              </p>
+              <div className={styles.aiPromptRow}>
+                <textarea
+                  className={styles.aiPrompt}
+                  value={pageTitlePrompt}
+                  onChange={e => setPageTitlePrompt(e.target.value)}
+                  placeholder="Optional: additional guidance (e.g. 'lead with location', 'emphasize the primary keyword')..."
+                  rows={2}
+                />
+                <div className={styles.aiPromptActions}>
+                  <button
+                    className={styles.generateBtn}
+                    onClick={handleGeneratePageTitles}
+                    disabled={isGeneratingPageTitles}
+                  >
+                    {isGeneratingPageTitles ? 'Generating...' : pageTitleSuggestions ? 'Regenerate' : 'Generate Page Titles'}
+                  </button>
+                </div>
+              </div>
+              {pageTitleError && <p className={styles.aiError}>{pageTitleError}</p>}
+              {pageTitleSuggestions && (
+                <div className={styles.topicOptions}>
+                  {pageTitleSuggestions.map((option, i) => {
+                    const isSelected = editPageTitle === option;
+                    return (
+                      <div
+                        key={i}
+                        className={`${styles.topicOption} ${isSelected ? styles.topicOptionApproved : ''}`}
+                      >
+                        <span className={styles.topicOptionText}>
+                          {option}{' '}
+                          <span className={styles.labelHint}>({option.length} chars)</span>
+                        </span>
+                        <button
+                          className={styles.approveBtn}
+                          onClick={() => handleUsePageTitle(option)}
+                          disabled={isSelected}
+                        >
+                          {isSelected ? <><Check size={12} strokeWidth={2.5} /> Selected</> : 'Use as Page Title'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* AI Meta Description Generator */}
+        <section className={styles.section}>
+          <h2 className={styles.sectionTitle}>AI Meta Description</h2>
+          {!editTopic ? (
+            <p className={styles.aiDescription}>
+              Approve a topic above to unlock meta description generation.
+            </p>
+          ) : (
+            <>
+              <p className={styles.aiDescription}>
+                Generate 5 meta description variations for: <strong>{editTopic}</strong>
+              </p>
+              <div className={styles.aiPromptRow}>
+                <textarea
+                  className={styles.aiPrompt}
+                  value={metaDescriptionPrompt}
+                  onChange={e => setMetaDescriptionPrompt(e.target.value)}
+                  placeholder="Optional: additional guidance (e.g. 'mention free quotes', 'emphasize same-day service')..."
+                  rows={2}
+                />
+                <div className={styles.aiPromptActions}>
+                  <button
+                    className={styles.generateBtn}
+                    onClick={handleGenerateMetaDescriptions}
+                    disabled={isGeneratingMetaDescriptions}
+                  >
+                    {isGeneratingMetaDescriptions ? 'Generating...' : metaDescriptionSuggestions ? 'Regenerate' : 'Generate Meta Descriptions'}
+                  </button>
+                </div>
+              </div>
+              {metaDescriptionError && <p className={styles.aiError}>{metaDescriptionError}</p>}
+              {metaDescriptionSuggestions && (
+                <div className={styles.topicOptions}>
+                  {metaDescriptionSuggestions.map((option, i) => {
+                    const isSelected = editMetaDescription === option;
+                    return (
+                      <div
+                        key={i}
+                        className={`${styles.topicOption} ${isSelected ? styles.topicOptionApproved : ''}`}
+                      >
+                        <span className={styles.topicOptionText}>
+                          {option}{' '}
+                          <span className={styles.labelHint}>({option.length} chars)</span>
+                        </span>
+                        <button
+                          className={styles.approveBtn}
+                          onClick={() => handleUseMetaDescription(option)}
+                          disabled={isSelected}
+                        >
+                          {isSelected ? <><Check size={12} strokeWidth={2.5} /> Selected</> : 'Use as Meta Description'}
                         </button>
                       </div>
                     );

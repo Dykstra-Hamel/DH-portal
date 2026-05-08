@@ -123,6 +123,17 @@ export async function GET(
         priority,
         due_date,
         assigned_to,
+        created_at,
+        updated_at,
+        created_by,
+        created_by_profile:profiles!created_by (
+          id,
+          first_name,
+          last_name,
+          email,
+          avatar_url,
+          uploaded_avatar_url
+        ),
         profiles:assigned_to (
           id,
           first_name,

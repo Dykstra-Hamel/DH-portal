@@ -10,12 +10,14 @@
 import { useEditor, EditorContent, ReactRenderer, useEditorState } from '@tiptap/react';
 import {
   Bold, Italic, Strikethrough, Link2, Pilcrow,
-  Heading2, Heading3, List, ListOrdered, Sparkles
+  Heading2, Heading3, List, ListOrdered, Sparkles, Palette
 } from 'lucide-react';
 import StarterKit from '@tiptap/starter-kit';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import Mention from '@tiptap/extension-mention';
+import { TextStyle } from '@tiptap/extension-text-style';
+import { Color } from '@tiptap/extension-color';
 import { useEffect, useCallback, useState, forwardRef, useImperativeHandle, useMemo, useRef } from 'react';
 import tippy, { Instance as TippyInstance } from 'tippy.js';
 import styles from './RichTextEditor.module.scss';
@@ -69,6 +71,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
   const [aiSelectedText, setAISelectedText] = useState('');
   const [aiMode, setAiMode] = useState<'edit' | 'insert'>('edit');
   const [aiDocumentContext, setAiDocumentContext] = useState('');
+  const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+  const colorPickerRef = useRef<HTMLDivElement>(null);
   const savedSelectionRef = useRef<{ from: number; to: number } | null>(null);
 
   // Use ref to store mentionUsers so the suggestion can always access latest value
@@ -192,6 +196,8 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
           class: null,
         },
       }),
+      TextStyle,
+      Color,
       Placeholder.configure({
         placeholder,
       }),
@@ -230,6 +236,7 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
       isBulletList: ctx.editor?.isActive('bulletList') ?? false,
       isOrderedList: ctx.editor?.isActive('orderedList') ?? false,
       hasSelection: !(ctx.editor?.state.selection.empty ?? true),
+      activeColor: (ctx.editor?.getAttributes('textStyle')?.color as string | undefined) ?? null,
     }),
   });
 
@@ -315,9 +322,43 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
     [editor]
   );
 
+  // Close the color picker popover on outside click.
+  useEffect(() => {
+    if (!isColorPickerOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        colorPickerRef.current &&
+        !colorPickerRef.current.contains(event.target as Node)
+      ) {
+        setIsColorPickerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isColorPickerOpen]);
+
   if (!editor) {
     return null;
   }
+
+  // Palette pulled from Globals.scss design tokens. Keep small and intentional.
+  const colorSwatches: Array<{ label: string; value: string | null }> = [
+    { label: 'Default', value: null },
+    { label: 'Blue', value: '#2478f5' },     // --blue-600
+    { label: 'Red', value: '#f53d2e' },      // --error-600
+    { label: 'Amber', value: '#e9a23b' },    // --amber-600
+    { label: 'Green', value: '#15803d' },    // --green-600
+  ];
+
+  const applyColor = (value: string | null) => {
+    if (!editor) return;
+    if (value === null) {
+      editor.chain().focus().unsetColor().run();
+    } else {
+      editor.chain().focus().setColor(value).run();
+    }
+    setIsColorPickerOpen(false);
+  };
 
   const toolbarContent = (
     <>
@@ -345,6 +386,43 @@ const RichTextEditor = forwardRef<RichTextEditorHandle, RichTextEditorProps>(fun
       >
         <Strikethrough size={16} />
       </button>
+      <div className={styles.colorPickerWrapper} ref={colorPickerRef}>
+        <button
+          type="button"
+          onClick={() => setIsColorPickerOpen(open => !open)}
+          className={editorState?.activeColor ? styles.active : ''}
+          title="Text color"
+          aria-haspopup="true"
+          aria-expanded={isColorPickerOpen}
+        >
+          <Palette size={16} />
+        </button>
+        {isColorPickerOpen && (
+          <div className={styles.colorPickerPopover} role="menu">
+            {colorSwatches.map(swatch => (
+              <button
+                key={swatch.label}
+                type="button"
+                role="menuitem"
+                className={styles.colorSwatch}
+                onClick={() => applyColor(swatch.value)}
+                title={swatch.label}
+                aria-label={`${swatch.label} text color`}
+              >
+                {swatch.value === null ? (
+                  <span className={styles.colorSwatchDefault} aria-hidden="true">A</span>
+                ) : (
+                  <span
+                    className={styles.colorSwatchDot}
+                    style={{ background: swatch.value }}
+                    aria-hidden="true"
+                  />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className={styles.divider} />
       <button
         type="button"
