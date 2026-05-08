@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { ProjectTask, ProjectTaskFilters } from '@/types/project';
-import { simpleSubscriptionHandler } from '@/lib/realtime/channel-helpers';
-import { REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
+import {
+  createProjectTasksChannel,
+  subscribeToProjectTaskUpdates,
+} from '@/lib/realtime/project-channel';
 
 const isDevelopment = process.env.NODE_ENV === 'development';
 
@@ -217,98 +219,38 @@ export function useProjectTasks(projectId?: string): UseProjectTasksResult {
     setError(null);
   }, []);
 
-  // Set up realtime subscription
+  // Realtime subscription via broadcast (project_tasks is no longer in the
+  // supabase_realtime publication; the broadcast_project_task_to_projects
+  // trigger sends per-project events to project:{id}:tasks).
   useEffect(() => {
     if (!projectId) return;
 
-    let isSubscribed = true;
-    let reconnectAttempts = 0;
-    const maxReconnectAttempts = 3;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
+    const channel = createProjectTasksChannel(projectId);
+    subscribeToProjectTaskUpdates(channel, async (payload) => {
+      if (isDevelopment) {
+        console.log('Task change received:', payload);
+      }
 
-    const setupChannel = () => {
-      const channelName = `project:${projectId}:tasks`;
-
-      const channel = supabase
-        .channel(channelName)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'project_tasks',
-            filter: `project_id=eq.${projectId}`,
-          },
-          (payload) => {
-            if (isDevelopment) {
-              console.log('Task change received:', payload);
+      if (payload.action === 'INSERT' || payload.action === 'UPDATE') {
+        try {
+          const res = await fetch(`/api/admin/projects/${projectId}/tasks/${payload.record_id}`);
+          const task = await res.json();
+          setTasks((prev) => {
+            if (payload.action === 'INSERT') {
+              if (prev.some((t) => t.id === task.id)) return prev;
+              return [...prev, task];
             }
-
-            if (payload.eventType === 'INSERT') {
-              // Fetch full task data with relationships
-              fetch(`/api/admin/projects/${projectId}/tasks/${payload.new.id}`)
-                .then((res) => res.json())
-                .then((newTask) => {
-                  setTasks((prev) => {
-                    // Avoid duplicates
-                    if (prev.some((t) => t.id === newTask.id)) {
-                      return prev;
-                    }
-                    return [...prev, newTask];
-                  });
-                })
-                .catch((err) => console.error('Error fetching new task:', err));
-            } else if (payload.eventType === 'UPDATE') {
-              // Fetch updated task data
-              fetch(`/api/admin/projects/${projectId}/tasks/${payload.new.id}`)
-                .then((res) => res.json())
-                .then((updatedTask) => {
-                  setTasks((prev) => applyTaskUpdate(prev, updatedTask));
-                })
-                .catch((err) => console.error('Error fetching updated task:', err));
-            } else if (payload.eventType === 'DELETE') {
-              setTasks((prev) => prev.filter((task) => task.id !== payload.old.id));
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-            reconnectAttempts = 0;
-          } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
-            if (reconnectAttempts === 0 && isDevelopment) {
-              console.warn(`⚠️ Channel error: ${channelName}`);
-            }
-
-            // Retry logic with exponential backoff
-            if (reconnectAttempts < maxReconnectAttempts && isSubscribed) {
-              reconnectAttempts++;
-              const backoffDelay = Math.min(1000 * Math.pow(2, reconnectAttempts), 10000);
-
-              reconnectTimeout = setTimeout(() => {
-                if (isSubscribed) {
-                  if (isDevelopment) {
-                    console.log(
-                      `🔄 Reconnecting ${channelName} (attempt ${reconnectAttempts}/${maxReconnectAttempts})`
-                    );
-                  }
-                  supabase.removeChannel(channel);
-                  setupChannel();
-                }
-              }, backoffDelay);
-            }
-          }
-        });
-
-      return channel;
-    };
-
-    const channel = setupChannel();
+            return applyTaskUpdate(prev, task);
+          });
+        } catch (err) {
+          console.error('Error fetching task after broadcast:', err);
+        }
+      } else if (payload.action === 'DELETE') {
+        setTasks((prev) => prev.filter((task) => task.id !== payload.record_id));
+      }
+    });
 
     return () => {
-      isSubscribed = false;
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
       supabase.removeChannel(channel);
     };
   }, [projectId, supabase]);

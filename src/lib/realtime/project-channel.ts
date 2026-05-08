@@ -117,3 +117,54 @@ export function removeProjectChannel(channel: RealtimeChannel): void {
   const supabase = createClient();
   supabase.removeChannel(channel);
 }
+
+/**
+ * Payload structure broadcast by the project_tasks trigger to a per-project channel
+ */
+export interface ProjectTaskUpdatePayload {
+  table: 'project_tasks';
+  company_id: string;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  /** Task id */
+  record_id: string;
+  project_id: string;
+  timestamp: number;
+}
+
+/**
+ * Creates a Realtime channel scoped to one project's tasks.
+ *
+ * Channel name: project:{projectId}:tasks
+ * Used by the project detail page (useProjectTasks) to react to task changes
+ * without subscribing to postgres_changes on the project_tasks table.
+ */
+export function createProjectTasksChannel(projectId: string): RealtimeChannel {
+  const supabase = createClient();
+  return supabase.channel(`project:${projectId}:tasks`, {
+    config: {
+      broadcast: {
+        self: true,
+        ack: true,
+      },
+    },
+  });
+}
+
+/**
+ * Subscribes to project-task updates on a per-project channel.
+ *
+ * The callback receives a small payload identifying which task changed and how.
+ * Consumers fetch the full task row themselves (typically via the project tasks API).
+ */
+export function subscribeToProjectTaskUpdates(
+  channel: RealtimeChannel,
+  callback: (payload: ProjectTaskUpdatePayload) => void | Promise<void>
+): void {
+  channel
+    .on('broadcast', { event: 'project_task_update' }, ({ payload }) => {
+      callback(payload as ProjectTaskUpdatePayload);
+    })
+    .subscribe((status) => {
+      simpleSubscriptionHandler(status, 'project-tasks');
+    });
+}
