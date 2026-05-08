@@ -757,6 +757,19 @@ export default function AdminTasksPage() {
     try {
       const headers = await getAuthHeaders();
       const isProjectTask = !!selectedTaskDetail.project_id;
+
+      // Empty updates means a refresh-only call (e.g. after attachment upload).
+      // Use a GET endpoint that returns full task data including comment attachments.
+      if (Object.keys(updates).length === 0) {
+        const refreshEndpoint = isProjectTask
+          ? `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${taskId}`
+          : `/api/admin/tasks/${taskId}`;
+        const refreshed = await fetch(refreshEndpoint, { headers }).then(res => res.json());
+        setSelectedTaskDetail(refreshed);
+        await fetchTasks();
+        return;
+      }
+
       const endpoint = isProjectTask
         ? `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${taskId}`
         : `/api/admin/project-tasks/${taskId}`;
@@ -850,27 +863,32 @@ export default function AdminTasksPage() {
 
   const handleAddComment = useCallback(async (comment: string) => {
     if (!selectedTaskDetail?.id) return null;
-    if (!selectedTaskDetail.project_id) {
-      console.warn('Comments are not available for personal tasks.');
-      return null;
-    }
 
     try {
       const headers = await getAuthHeaders();
-      const response = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}/comments`, {
+
+      let endpoint: string;
+      if (selectedTaskDetail.project_id) {
+        endpoint = `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}/comments`;
+      } else {
+        endpoint = `/api/admin/tasks/${selectedTaskDetail.id}/comments`;
+      }
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ content: comment }),
+        body: JSON.stringify({ comment }),
       });
 
       if (response.ok) {
         const createdComment = await response.json();
 
         // Refresh task to get new comment
-        const updatedTask = await fetch(`/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`, {
-          headers,
-        }).then(res => res.json());
+        const refreshEndpoint = selectedTaskDetail.project_id
+          ? `/api/admin/projects/${selectedTaskDetail.project_id}/tasks/${selectedTaskDetail.id}`
+          : `/api/admin/tasks/${selectedTaskDetail.id}`;
 
+        const updatedTask = await fetch(refreshEndpoint, { headers }).then(res => res.json());
         setSelectedTaskDetail(updatedTask);
 
         return createdComment;

@@ -2769,6 +2769,10 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const roTransformRef = useRef(roTransform);
   useEffect(() => { roTransformRef.current = roTransform; }, [roTransform]);
 
+  // Stable ref for the native wheel handler so the useEffect below can attach
+  // it with { passive: false } without needing to re-register on every render.
+  const handleRoWheelRef = useRef<((e: WheelEvent) => void) | null>(null);
+
   const handleRoPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Don't capture when the touch started on a stamp button — we need
     // the browser to fire the click event on the button naturally.
@@ -2863,7 +2867,10 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
     if (g.pointers.size === 0) { g.pan = null; }
   };
 
-  const handleRoWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  // Keep the native wheel handler ref in sync on every render so it always
+  // closes over the latest `previewSize` without needing to re-attach the
+  // non-passive DOM listener.
+  handleRoWheelRef.current = (e: WheelEvent) => {
     e.preventDefault();
     setRoAnimating(false);
     // Scale by actual deltaY so trackpads (many small events) don't compound
@@ -2967,11 +2974,15 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       e.preventDefault();
     };
 
+    const onWheel = (e: WheelEvent) => handleRoWheelRef.current?.(e);
+
     frame.addEventListener('touchstart', onTouchStart, { passive: false });
     frame.addEventListener('touchmove', onTouchMove, { passive: false });
+    frame.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       frame.removeEventListener('touchstart', onTouchStart);
       frame.removeEventListener('touchmove', onTouchMove);
+      frame.removeEventListener('wheel', onWheel);
     };
   }, []);
 
@@ -3065,6 +3076,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
 
         return {
           id: outline.id,
+          type: outline.type,
           points: projectedPoints,
           strokeColor,
           fillColor: hexToRgba(strokeColor, 0.12),
@@ -3073,6 +3085,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       })
       .filter((outline): outline is {
         id: string;
+        type: MapElementStampType;
         points: Array<{ x: number; y: number }>;
         strokeColor: string;
         fillColor: string;
@@ -3143,7 +3156,6 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
           onPointerUp={handleRoPointerEnd}
           onPointerCancel={handleRoPointerEnd}
           onPointerLeave={handleRoPointerEnd}
-          onWheel={handleRoWheel}
           style={{ cursor: 'grab', touchAction: 'none', overflow: 'hidden' }}
         >
           <div
@@ -3182,8 +3194,51 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                   viewBox={`0 0 ${previewSize.width} ${previewSize.height}`}
                   preserveAspectRatio="none"
                 >
-                  {previewOutlines.map(outline =>
-                    outline.isClosed && outline.points.length >= 3 ? (
+                  {previewOutlines.map(outline => {
+                    if (outline.type === 'fence') {
+                      const spacing = 14;
+                      const half = 6;
+                      const ticks: React.ReactNode[] = [];
+                      for (let si = 0; si < outline.points.length - 1; si++) {
+                        const ax = outline.points[si].x, ay = outline.points[si].y;
+                        const bx = outline.points[si + 1].x, by = outline.points[si + 1].y;
+                        const dx = bx - ax, dy = by - ay;
+                        const len = Math.sqrt(dx * dx + dy * dy);
+                        if (len < 1) continue;
+                        const ux = dx / len, uy = dy / len;
+                        const px = -uy, py = ux;
+                        const n = Math.max(1, Math.round(len / spacing));
+                        for (let t = 0; t <= n; t++) {
+                          const cx = ax + ux * (len * t / n);
+                          const cy = ay + uy * (len * t / n);
+                          ticks.push(
+                            <line
+                              key={`f-${si}-${t}`}
+                              x1={cx - px * half} y1={cy - py * half}
+                              x2={cx + px * half} y2={cy + py * half}
+                              stroke={outline.strokeColor}
+                              strokeWidth={2}
+                              strokeLinecap="round"
+                            />
+                          );
+                        }
+                      }
+                      return (
+                        <g key={outline.id}>
+                          <polyline
+                            points={outline.points.map(p => `${p.x},${p.y}`).join(' ')}
+                            fill="none"
+                            stroke={outline.strokeColor}
+                            strokeWidth={2}
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                          />
+                          {ticks}
+                        </g>
+                      );
+                    }
+
+                    return outline.isClosed && outline.points.length >= 3 ? (
                       <polygon
                         key={outline.id}
                         points={outline.points.map(point => `${point.x},${point.y}`).join(' ')}
@@ -3201,8 +3256,8 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                         strokeWidth={2}
                         strokeLinejoin="round"
                       />
-                    )
-                  )}
+                    );
+                  })}
                 </svg>
               )}
 
