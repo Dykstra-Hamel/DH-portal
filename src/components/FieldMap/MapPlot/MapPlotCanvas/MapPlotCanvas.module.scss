@@ -1165,24 +1165,34 @@
 // ─── Onboarding Hint ──────────────────────────────────────────────────────────
 
 @keyframes onboardingBounce {
-  0%, 100% { transform: translateX(0); }
-  50%       { transform: translateX(-6px); }
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(-6px);
+  }
 }
 
 @keyframes onboardingFadeIn {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .onboardingHint {
   position: absolute;
-  top: 37px;   /* aligns with center of Outline button (14px panel top + 9px padding + 24px half-btn) */
+  top: 37px; /* aligns with center of Outline button (14px panel top + 9px padding + 24px half-btn) */
   left: 84px;
   z-index: 11;
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
   pointer-events: none;
   animation: onboardingFadeIn 0.4s ease forwards;
 }
@@ -1200,6 +1210,8 @@
   background: rgba(255, 255, 255, 0.9);
   padding: 4px 10px;
   border-radius: 6px;
+  position: relative;
+  top: -3px;
   white-space: nowrap;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.15);
 }

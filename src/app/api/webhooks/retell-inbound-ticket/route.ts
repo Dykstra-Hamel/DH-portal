@@ -13,6 +13,7 @@ import {
   createOrFindServiceAddress,
   getCustomerPrimaryServiceAddress,
   linkCustomerToServiceAddress,
+  normalizeAddressFields,
 } from '@/lib/service-addresses';
 import { inngest } from '@/lib/inngest/client';
 import { detectCampaignAttribution, hasRecentResponse } from '@/lib/campaigns/campaign-attribution';
@@ -759,11 +760,24 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         call_analysis.custom_analysis_data.customer_first_name;
       const customerLastName =
         call_analysis.custom_analysis_data.customer_last_name;
-      const customerStreetAddress =
+      const rawStreetAddress =
         call_analysis.custom_analysis_data.customer_street_address;
-      const customerCity = call_analysis.custom_analysis_data.customer_city;
-      const customerState = call_analysis.custom_analysis_data.customer_state;
-      const customerZip = call_analysis.custom_analysis_data.customer_zip;
+      const rawCity = call_analysis.custom_analysis_data.customer_city;
+      const rawState = call_analysis.custom_analysis_data.customer_state;
+      const rawZip = call_analysis.custom_analysis_data.customer_zip;
+
+      // If the agent dumped a full address into customer_street_address while
+      // leaving city/state/zip empty, split it back out before persisting.
+      const normalized = normalizeAddressFields({
+        street_address: rawStreetAddress,
+        city: rawCity,
+        state: rawState,
+        zip_code: rawZip,
+      });
+      const customerStreetAddress = normalized.street_address;
+      const customerCity = normalized.city;
+      const customerState = normalized.state;
+      const customerZip = normalized.zip_code;
 
       // Build update object conditionally
       const customerUpdateData: any = {};
@@ -774,7 +788,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
       };
 
       // Helper: Check if incoming value is valid (not null, empty, or "none")
-      const isValidValue = (value: string | null | undefined): boolean => {
+      const isValidValue = (value: string | null | undefined): value is string => {
         return !!(
           value &&
           value.trim() !== '' &&

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { MapPinned } from 'lucide-react';
+import { MapPinned, AlertTriangle } from 'lucide-react';
 import { InfoCard } from '@/components/Common/InfoCard/InfoCard';
 import { authenticatedFetch } from '@/lib/api-client';
 import { generateHomeSizeOptions, generateYardSizeOptions } from '@/lib/pricing-calculations';
@@ -87,6 +87,90 @@ export function ServiceLocationCard({
   const [selectedYardSizeOption, setSelectedYardSizeOption] = useState<string>('');
 
   const [isSavingPropertyType, setIsSavingPropertyType] = useState(false);
+  const [isVerifyingAddress, setIsVerifyingAddress] = useState(false);
+
+  // Inline warning when the user pasted a full address into the Address field
+  // (commas present) while leaving city/state/zip empty.
+  const showConcatenatedAddressHint = useMemo(() => {
+    const street = serviceLocationData?.street_address ?? '';
+    const cityVal = serviceLocationData?.city ?? '';
+    const stateVal = serviceLocationData?.state ?? '';
+    const zipVal = serviceLocationData?.zip_code ?? '';
+    return (
+      street.includes(',') && (!cityVal.trim() || !stateVal.trim() || !zipVal.trim())
+    );
+  }, [
+    serviceLocationData?.street_address,
+    serviceLocationData?.city,
+    serviceLocationData?.state,
+    serviceLocationData?.zip_code,
+  ]);
+
+  const canVerifyAddress = !!serviceLocationData?.street_address?.trim();
+  const needsCoordinates =
+    canVerifyAddress &&
+    !serviceLocationData?.latitude &&
+    !serviceLocationData?.longitude;
+
+  const handleVerifyAddress = async () => {
+    if (!serviceLocationData?.street_address || isVerifyingAddress) return;
+    setIsVerifyingAddress(true);
+    try {
+      const geocodeResponse = await fetch('/api/internal/geocode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          street: serviceLocationData.street_address,
+          city: serviceLocationData.city || '',
+          state: serviceLocationData.state || '',
+          zip: serviceLocationData.zip_code || '',
+        }),
+      });
+
+      if (!geocodeResponse.ok) {
+        throw new Error('Geocoding request failed');
+      }
+
+      const geocodeData = await geocodeResponse.json();
+      if (!geocodeData.success || !geocodeData.coordinates) {
+        onShowToast?.(
+          'Could not verify address. Try selecting a suggestion from the dropdown.',
+          'error'
+        );
+        return;
+      }
+
+      onServiceLocationChange?.(
+        'latitude',
+        geocodeData.coordinates.lat.toString()
+      );
+      onServiceLocationChange?.(
+        'longitude',
+        geocodeData.coordinates.lng.toString()
+      );
+
+      if (serviceAddress?.id) {
+        await authenticatedFetch(
+          `/api/service-addresses/${serviceAddress.id}`,
+          {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              latitude: geocodeData.coordinates.lat,
+              longitude: geocodeData.coordinates.lng,
+              hasStreetView: geocodeData.coordinates.hasStreetView || false,
+            }),
+          }
+        );
+      }
+
+      onShowToast?.('Address verified.', 'success');
+    } catch (error) {
+      onShowToast?.('Address verification failed.', 'error');
+    } finally {
+      setIsVerifyingAddress(false);
+    }
+  };
 
   // Derive the displayed value directly from DB props — never store it in
   // local state. Only trust service_address.address_type when the address is
@@ -412,7 +496,34 @@ export function ServiceLocationCard({
   const editableBody = (
       <div className={styles.cardContent}>
         <div className={styles.serviceLocationGrid}>
-          {/* Row 1: City, State, Zip (3 columns) */}
+          {/* Row 1: Address (1 column - full width). Lead with autocomplete so
+              selecting a suggestion auto-fills city/state/zip below. */}
+          <div className={`${styles.gridRow} ${styles.oneColumn}`}>
+            <div className={styles.formField}>
+              <label className={styles.fieldLabel}>Address</label>
+              <AddressAutocomplete
+                value={serviceLocationData?.street_address || ''}
+                onChange={value =>
+                  onServiceLocationChange?.('street_address', value)
+                }
+                onAddressSelect={onAddressSelect || (() => {})}
+                placeholder="Start typing an address…"
+                hideDropdown={hasCompleteUnchangedAddress}
+              />
+              {showConcatenatedAddressHint && (
+                <div className={styles.addressInlineHint} role="status">
+                  <AlertTriangle size={14} aria-hidden="true" />
+                  <span>
+                    Looks like a full address — pick a suggestion from the
+                    dropdown to auto-fill, or split it into the City/State/Zip
+                    fields below.
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: City, State, Zip Code (3 columns) */}
           <div className={`${styles.gridRow} ${styles.threeColumns}`}>
             <div className={styles.formField}>
               <label className={styles.fieldLabel}>City</label>
@@ -440,7 +551,7 @@ export function ServiceLocationCard({
               />
             </div>
             <div className={styles.formField}>
-              <label className={styles.fieldLabel}>Zip</label>
+              <label className={styles.fieldLabel}>Zip Code</label>
               <input
                 type="text"
                 className={styles.textInput}
@@ -449,22 +560,6 @@ export function ServiceLocationCard({
                   onServiceLocationChange?.('zip_code', e.target.value)
                 }
                 placeholder="12345"
-              />
-            </div>
-          </div>
-
-          {/* Row 2: Address (1 column - full width) */}
-          <div className={`${styles.gridRow} ${styles.oneColumn}`}>
-            <div className={styles.formField}>
-              <label className={styles.fieldLabel}>Address</label>
-              <AddressAutocomplete
-                value={serviceLocationData?.street_address || ''}
-                onChange={value =>
-                  onServiceLocationChange?.('street_address', value)
-                }
-                onAddressSelect={onAddressSelect || (() => {})}
-                placeholder="324 Winston Churchill Drive, Suite #34"
-                hideDropdown={hasCompleteUnchangedAddress}
               />
             </div>
           </div>
@@ -574,6 +669,18 @@ export function ServiceLocationCard({
                 }
                 fallbackToSatellite={true}
               />
+              {needsCoordinates && (
+                <div className={styles.verifyAddressRow}>
+                  <button
+                    type="button"
+                    className={styles.verifyAddressButton}
+                    onClick={handleVerifyAddress}
+                    disabled={isVerifyingAddress}
+                  >
+                    {isVerifyingAddress ? 'Verifying…' : 'Verify address'}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>

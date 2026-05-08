@@ -117,6 +117,10 @@ interface MonthlyServiceTask {
   priority: string | null;
   due_date: string;
   assigned_to: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  created_by?: string | null;
+  created_by_profile?: Profile | null;
   profiles: Profile | null;
   monthly_service_task_department_assignments?: {
     department_id: string;
@@ -679,7 +683,7 @@ export function MonthlyServiceDetail({
       priority:
         (task.priority as 'low' | 'medium' | 'high' | 'critical') || 'medium',
       assigned_to: task.assigned_to,
-      created_by: user.id,
+      created_by: task.created_by ?? null,
       due_date: task.due_date,
       start_date: null,
       progress_percentage: task.is_completed ? 100 : 0,
@@ -694,9 +698,10 @@ export function MonthlyServiceDetail({
       parent_recurring_task_id: null,
       is_recurring_template: false,
       next_recurrence_date: null,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      created_at: task.created_at ?? new Date().toISOString(),
+      updated_at: task.updated_at ?? new Date().toISOString(),
       assigned_to_profile: assignedToProfile,
+      created_by_profile: task.created_by_profile ?? null,
       // Include comments and activity from the task
       comments: task.comments || [],
       activity: task.activity || [],

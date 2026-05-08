@@ -22,6 +22,7 @@ import {
 import { notifyLeadCreated } from '@/lib/notifications/lead-notifications';
 import { sendCampaignSubmissionNotification, sendTicketCreatedNotification } from '@/lib/email/company-submission-notifications';
 import { parseFormSubmission } from '@/lib/gemini/form-parser';
+import { normalizeAddressFields } from '@/lib/service-addresses';
 import type { FormSubmissionResponse } from '@/types/form-submission';
 import {
   createOrFindServiceAddress,
@@ -359,6 +360,20 @@ export async function POST(request: NextRequest) {
 
     // Step 6.5: Check for duplicate submissions (within 30 second window)
     const { normalized } = geminiResult;
+
+    // If the form gave us a single combined address that Gemini couldn't split,
+    // try splitting it back into structured fields so geocoding can run.
+    const normalizedAddress = normalizeAddressFields({
+      street_address: normalized.street_address,
+      city: normalized.city,
+      state: normalized.state,
+      zip_code: normalized.zip,
+    });
+    normalized.street_address = normalizedAddress.street_address ?? normalized.street_address;
+    normalized.city = normalizedAddress.city ?? normalized.city;
+    normalized.state = normalizedAddress.state ?? normalized.state;
+    normalized.zip = normalizedAddress.zip_code ?? normalized.zip;
+
     const isDuplicate = await checkForRecentDuplicate(
       supabase,
       companyId,

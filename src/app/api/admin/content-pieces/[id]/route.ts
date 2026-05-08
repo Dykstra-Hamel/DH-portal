@@ -79,6 +79,10 @@ export async function GET(
       ai_topics:    (piece as any).ai_topics    ?? null,
       ai_headlines: (piece as any).ai_headlines ?? null,
       ai_draft:     (piece as any).ai_draft     ?? null,
+      ai_page_titles:       (piece as any).ai_page_titles       ?? null,
+      ai_meta_descriptions: (piece as any).ai_meta_descriptions ?? null,
+      page_title:           (piece as any).page_title           ?? null,
+      meta_description:     (piece as any).meta_description     ?? null,
       content:      (piece as any).content      ?? null,
       is_completed: piece.is_completed,
       service_month: piece.service_month,
@@ -141,7 +145,7 @@ export async function PATCH(
     }
 
     const body = await request.json();
-    const { content_type, title, publish_date, link, notes, google_doc_link, topic, content } = body;
+    const { content_type, title, publish_date, link, notes, google_doc_link, topic, content, page_title, meta_description } = body;
 
     if (content_type && !VALID_CONTENT_TYPES.includes(content_type)) {
       return NextResponse.json({ error: 'Invalid content_type' }, { status: 400 });
@@ -155,9 +159,13 @@ export async function PATCH(
     if ('notes' in body) updateData.notes = notes || null;
     if ('google_doc_link' in body) updateData.google_doc_link = google_doc_link || null;
     if ('topic' in body) updateData.topic = topic ?? null;
+    if ('page_title' in body) updateData.page_title = page_title || null;
+    if ('meta_description' in body) updateData.meta_description = meta_description || null;
     if ('ai_topics'    in body) updateData.ai_topics    = body.ai_topics    ?? null;
     if ('ai_headlines' in body) updateData.ai_headlines = body.ai_headlines ?? null;
     if ('ai_draft'     in body) updateData.ai_draft     = body.ai_draft     ?? null;
+    if ('ai_page_titles'       in body) updateData.ai_page_titles       = body.ai_page_titles       ?? null;
+    if ('ai_meta_descriptions' in body) updateData.ai_meta_descriptions = body.ai_meta_descriptions ?? null;
     if ('content'      in body) updateData.content      = content          ?? null;
 
     const { data: contentPiece, error: updateError } = await supabase

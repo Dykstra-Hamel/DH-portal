@@ -3278,62 +3278,149 @@ export default function ProjectDetailWithTasks({ project, projectLoading = false
                                   )}
                                 </span>
                               </div>
-                              {isCommentOwner && (
+                              {isCommentOwner && !isEditing && (
                                 <div className={styles.commentActions}>
-                                  {isEditing ? (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className={styles.commentActionButton}
-                                        onClick={handleUpdateComment}
-                                        aria-label="Save comment"
-                                        disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
-                                      >
-                                        <Check size={14} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={styles.commentActionButton}
-                                        onClick={handleCancelEditComment}
-                                        aria-label="Cancel edit"
-                                        disabled={isUpdatingComment}
-                                      >
-                                        <X size={14} />
-                                      </button>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className={styles.commentActionButton}
-                                        onClick={() => handleStartEditComment(comment)}
-                                        aria-label="Edit comment"
-                                      >
-                                        <Pencil size={14} />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={`${styles.commentActionButton} ${styles.commentActionDanger}`}
-                                        onClick={() => handleDeleteComment(comment.id)}
-                                        aria-label="Delete comment"
-                                        disabled={deletingCommentId === comment.id}
-                                      >
-                                        <Trash2 size={14} />
-                                      </button>
-                                    </>
-                                  )}
+                                  <button
+                                    type="button"
+                                    className={styles.commentActionButton}
+                                    onClick={() => handleStartEditComment(comment)}
+                                    aria-label="Edit comment"
+                                  >
+                                    <Pencil size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={`${styles.commentActionButton} ${styles.commentActionDanger}`}
+                                    onClick={() => handleDeleteComment(comment.id)}
+                                    aria-label="Delete comment"
+                                    disabled={deletingCommentId === comment.id}
+                                  >
+                                    <Trash2 size={14} />
+                                  </button>
                                 </div>
                               )}
                             </div>
                             {isEditing ? (
-                              <RichTextEditor
-                                value={editingCommentText}
-                                onChange={setEditingCommentText}
-                                placeholder="Edit comment..."
-                                className={styles.commentEditRichEditor}
-                                compact
-                                mentionUsers={mentionUsers}
-                              />
+                              <>
+                                <RichTextEditor
+                                  value={editingCommentText}
+                                  onChange={setEditingCommentText}
+                                  placeholder="Edit comment..."
+                                  className={styles.commentEditRichEditor}
+                                  compact
+                                  mentionUsers={mentionUsers}
+                                />
+                                {comment.attachments && comment.attachments.length > 0 && (() => {
+                                  const imageAttachments = comment.attachments.filter(
+                                    (attachment: { mime_type?: string | null }) =>
+                                      attachment.mime_type?.startsWith('image/')
+                                  );
+                                  const fileAttachments = comment.attachments.filter(
+                                    (attachment: { mime_type?: string | null }) =>
+                                      !attachment.mime_type?.startsWith('image/')
+                                  );
+
+                                  return (
+                                    <>
+                                      {imageAttachments.length > 0 && (
+                                        <div className={styles.commentImageAttachments}>
+                                          {imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => (
+                                            <div
+                                              key={attachment.id}
+                                              className={styles.commentImageLink}
+                                            >
+                                              <img
+                                                src={attachment.url}
+                                                alt={attachment.file_name}
+                                                className={styles.commentImage}
+                                              />
+                                              <button
+                                                type="button"
+                                                className={styles.commentDeleteButton}
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  void handleDeleteCommentAttachment(
+                                                    comment.id,
+                                                    attachment.id
+                                                  );
+                                                }}
+                                                aria-label="Remove attachment"
+                                              >
+                                                <X size={14} />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                      {fileAttachments.length > 0 && (
+                                        <div className={styles.commentAttachments}>
+                                          {fileAttachments.map((attachment: { id: string; url: string; file_name: string; mime_type?: string | null }) => (
+                                            <div key={attachment.id} className={styles.commentAttachmentCardWrapper}>
+                                              <div className={styles.attachmentCard}>
+                                                <div className={styles.attachmentIcon}>
+                                                  {attachment.mime_type === 'application/pdf' ? (
+                                                    <FileText size={16} />
+                                                  ) : (
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                                                      <path
+                                                        d="M14 2H6C5.46957 2 4.96086 2.21071 4.58579 2.58579C4.21071 2.96086 4 3.46957 4 4V20C4 20.5304 4.21071 21.0391 4.58579 21.4142C4.96086 21.7893 5.46957 22 6 22H18C18.5304 22 19.0391 21.7893 19.4142 21.4142C19.7893 21.0391 20 20.5304 20 20V8L14 2Z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="2"
+                                                        strokeLinecap="round"
+                                                        strokeLinejoin="round"
+                                                      />
+                                                      <path d="M14 2V8H20" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                                                    </svg>
+                                                  )}
+                                                </div>
+                                                <div className={styles.attachmentInfo}>
+                                                  <span className={styles.attachmentName}>{attachment.file_name}</span>
+                                                  {attachment.mime_type === 'application/pdf' && (
+                                                    <span className={styles.attachmentBadge}>PDF</span>
+                                                  )}
+                                                </div>
+                                              </div>
+                                              <button
+                                                type="button"
+                                                className={styles.commentDeleteButton}
+                                                onClick={(e) => {
+                                                  e.preventDefault();
+                                                  e.stopPropagation();
+                                                  void handleDeleteCommentAttachment(
+                                                    comment.id,
+                                                    attachment.id
+                                                  );
+                                                }}
+                                                aria-label="Remove attachment"
+                                              >
+                                                <X size={14} />
+                                              </button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  );
+                                })()}
+                                <div className={styles.commentEditActions}>
+                                  <button
+                                    type="button"
+                                    className={styles.projectDescriptionCancel}
+                                    onClick={handleCancelEditComment}
+                                    disabled={isUpdatingComment}
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className={styles.projectDescriptionSave}
+                                    onClick={handleUpdateComment}
+                                    disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
+                                  >
+                                    {isUpdatingComment ? 'Saving...' : 'Save'}
+                                  </button>
+                                </div>
+                              </>
                             ) : (
                               <>
                                 <div

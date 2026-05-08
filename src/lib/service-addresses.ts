@@ -223,6 +223,58 @@ export async function linkCustomerToServiceAddress(
 }
 
 /**
+ * Normalizes inbound address fields when an upstream source (e.g. a Retell
+ * call analysis or Gemini form parse) has dumped a full concatenated address
+ * into `street_address` while leaving city/state/zip empty. Splits the
+ * concatenated value via extractAddressData and merges the parsed pieces in
+ * without overwriting any non-empty existing value.
+ */
+export function normalizeAddressFields(input: {
+  street_address?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip_code?: string | null;
+}): {
+  street_address: string | null;
+  city: string | null;
+  state: string | null;
+  zip_code: string | null;
+} {
+  const isEmpty = (value?: string | null): boolean => {
+    if (!value) return true;
+    const trimmed = value.trim();
+    return trimmed === '' || trimmed.toLowerCase() === 'none';
+  };
+
+  const street = input.street_address?.trim() ?? null;
+  const city = isEmpty(input.city) ? null : input.city!.trim();
+  const state = isEmpty(input.state) ? null : input.state!.trim();
+  const zip = isEmpty(input.zip_code) ? null : input.zip_code!.trim();
+
+  const looksConcatenated = !!street && street.includes(',');
+  const anyStructuredMissing = !city || !state || !zip;
+
+  if (looksConcatenated && anyStructuredMissing) {
+    const parsed = extractAddressData(undefined, street);
+    if (parsed) {
+      return {
+        street_address: parsed.street_address || street,
+        city: city ?? parsed.city ?? null,
+        state: state ?? parsed.state ?? null,
+        zip_code: zip ?? parsed.zip_code ?? null,
+      };
+    }
+  }
+
+  return {
+    street_address: street,
+    city,
+    state,
+    zip_code: zip,
+  };
+}
+
+/**
  * Extracts standardized address data from various input formats
  */
 export function extractAddressData(

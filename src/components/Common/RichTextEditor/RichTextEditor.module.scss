@@ -64,6 +64,62 @@
   }
 }
 
+// Color picker — toolbar trigger button + floating swatch popover.
+.colorPickerWrapper {
+  position: relative;
+  display: inline-flex;
+}
+
+.colorPickerPopover {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background: var(--white, #ffffff);
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 20;
+}
+
+.colorSwatch {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--gray-200, #e5e7eb);
+  border-radius: 6px;
+  background: var(--white, #ffffff);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, transform 0.05s;
+
+  &:hover {
+    border-color: var(--gray-400, #9ca3af);
+  }
+
+  &:active {
+    transform: scale(0.95);
+  }
+}
+
+.colorSwatchDot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+}
+
+.colorSwatchDefault {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--gray-900, #1a1a1a);
+  line-height: 1;
+}
+
 // Compact mode styles
 .compact {
   position: relative;

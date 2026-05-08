@@ -139,6 +139,58 @@
   }
 }
 
+// Inline yellow hint shown when the user pasted a full address into the
+// Address field but city/state/zip remain empty.
+.addressInlineHint {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--amber-50, #fffbeb);
+  border: 1px solid var(--amber-200, #fde68a);
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--amber-800, #92400e);
+
+  svg {
+    flex-shrink: 0;
+    margin-top: 1px;
+    color: var(--amber-600, #d97706);
+  }
+}
+
+// "Verify address" recovery action shown below the map placeholder when an
+// address has been entered but no coordinates were geocoded.
+.verifyAddressRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.verifyAddressButton {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  background: white;
+  color: var(--blue-700, #1d4ed8);
+  border: 1px solid var(--blue-300, #93c5fd);
+  border-radius: var(--border-radius, 6px);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover:not(:disabled) {
+    background: var(--blue-50, #eff6ff);
+    border-color: var(--blue-500, #3b82f6);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
 // Address Actions (Save/Cancel buttons)
 .addressActions {
   margin-top: 16px;
