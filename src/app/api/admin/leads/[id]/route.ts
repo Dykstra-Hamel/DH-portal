@@ -172,19 +172,19 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Verify authentication and admin authorization
+    // Verify authentication first.
     const { user, error: authError } = await verifyAuth(request);
-    if (authError || !user || !(await isAuthorizedAdmin(user))) {
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     const { id } = await params;
     const body = await request.json();
 
-    // Use admin client to update lead
+    // Use admin client for lookup + update.
     const supabase = createAdminClient();
 
-    // Get the existing lead to capture old values before update (for activity logging)
+    // Get the existing lead first so we can scope the access check by company.
     const { data: existingLead, error: existingLeadError } = await supabase
       .from('leads')
       .select('*')
@@ -203,6 +203,26 @@ export async function PUT(
         { error: 'Failed to fetch lead' },
         { status: 500 }
       );
+    }
+
+    // Authorize: global admin OR member of the lead's company.
+    const isAdmin = await isAuthorizedAdmin(user);
+    if (!isAdmin) {
+      const { data: membership } = await supabase
+        .from('user_companies')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('company_id', existingLead.company_id)
+        .maybeSingle();
+
+      if (!membership) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+
+      // Non-admin company members cannot reassign ownership/identity fields.
+      delete body.id;
+      delete body.company_id;
+      delete body.created_at;
     }
 
     // Log the admin update attempt for debugging
