@@ -799,35 +799,44 @@ async function handleOutboundCallAnalyzed(supabase: any, callData: any) {
   const targetAgent = 'agent_e8b7d7fad725ae4a44cd5ee3d0';
 
   if (agentId && agentId === targetAgent) {
-    try {
-      console.log(
-        `[External Webhook] Sending payload for agent ${agentId} to Tadabase`
+    // Guard: skip if callData resolved to an empty array (Retell edge-case envelope)
+    if (Array.isArray(callData) && callData.length === 0) {
+      console.warn(
+        `[External Webhook] Skipping Tadabase send for call ${call_id} — callData is an empty array`
       );
-      const response = await fetch(
-        'https://catchtemp.tadabase.io/webhook/RBe3G7c8eL',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(callData),
-        }
-      );
-
-      if (response.ok) {
+    } else {
+      try {
+        const serializedPayload = JSON.stringify(callData);
         console.log(
-          `[External Webhook] Successfully sent payload for call ${call_id}`
+          `[External Webhook] Sending payload for agent ${agentId} to Tadabase:`,
+          serializedPayload
         );
-      } else {
-        console.warn(
-          `[External Webhook] Failed to send payload for call ${call_id}: ${response.status} ${response.statusText}`
+        const response = await fetch(
+          'https://catchtemp.tadabase.io/webhook/RBe3G7c8eL',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: serializedPayload,
+          }
+        );
+
+        if (response.ok) {
+          console.log(
+            `[External Webhook] Successfully sent payload for call ${call_id}`
+          );
+        } else {
+          console.warn(
+            `[External Webhook] Failed to send payload for call ${call_id}: ${response.status} ${response.statusText}`
+          );
+        }
+      } catch (error) {
+        console.error(
+          `[External Webhook] Error sending payload for call ${call_id}:`,
+          error instanceof Error ? error.message : error
         );
       }
-    } catch (error) {
-      console.error(
-        `[External Webhook] Error sending payload for call ${call_id}:`,
-        error instanceof Error ? error.message : error
-      );
     }
   }
 
