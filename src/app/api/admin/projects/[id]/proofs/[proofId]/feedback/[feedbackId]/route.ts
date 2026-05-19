@@ -60,6 +60,18 @@ export async function PATCH(
     if (typeof body.comment === 'string' && body.comment.trim()) {
       updates.comment = body.comment.trim();
     }
+    // Allow repositioning a pin (drag-to-move). Both axes must be supplied
+    // together and within the schema's [0, 1] CHECK constraint.
+    if (typeof body.x_percent === 'number' && typeof body.y_percent === 'number') {
+      if (
+        body.x_percent < 0 || body.x_percent > 1 ||
+        body.y_percent < 0 || body.y_percent > 1
+      ) {
+        return NextResponse.json({ error: 'x_percent and y_percent must be between 0 and 1' }, { status: 400 });
+      }
+      updates.x_percent = body.x_percent;
+      updates.y_percent = body.y_percent;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
@@ -112,6 +124,16 @@ export async function PATCH(
     if (typeof updates.comment === 'string' && !isAuthor && !isAdmin) {
       return NextResponse.json(
         { error: 'Only the feedback author or an admin can edit comment text' },
+        { status: 403 }
+      );
+    }
+    if (
+      (typeof updates.x_percent === 'number' || typeof updates.y_percent === 'number') &&
+      !isAuthor &&
+      !isAdmin
+    ) {
+      return NextResponse.json(
+        { error: 'Only the feedback author or an admin can reposition a pin' },
         { status: 403 }
       );
     }

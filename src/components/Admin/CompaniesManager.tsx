@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { Check } from 'lucide-react';
 import { adminAPI } from '@/lib/api-client';
 import { useRouter } from 'next/navigation';
 import styles from './AdminManager.module.scss';
@@ -551,8 +552,8 @@ export default function CompaniesManager() {
                 <td>{company.email || '-'}</td>
                 <td>
                   {company.ga_property_id ? (
-                    <span style={{ color: '#10b981', fontWeight: '500' }}>
-                      ✓ {company.ga_property_id}
+                    <span style={{ color: '#10b981', fontWeight: '500', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <Check size={12} strokeWidth={2.5} /> {company.ga_property_id}
                     </span>
                   ) : (
                     <span style={{ color: '#6b7280' }}>Not configured</span>

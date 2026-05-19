@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Lock } from 'lucide-react';
 import { Lead } from '@/types/lead';
 import { Quote } from '@/types/quote';
 import {
@@ -103,6 +104,8 @@ export function LeadQuoteBuilder({
   const [lineItems, setLineItems] = useState<BuilderLineItem[]>([]);
   const [appliedDiscount, setAppliedDiscount] = useState<AvailableDiscount | null>(null);
   const [isBuilderReady, setIsBuilderReady] = useState(false);
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const [isUnlocking, setIsUnlocking] = useState(false);
   const hydratedRef = useRef(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lineItemsRef = useRef<BuilderLineItem[]>([]);
@@ -110,6 +113,8 @@ export function LeadQuoteBuilder({
   const hasFiredReadyRef = useRef(false);
   const onShowToastRef = useRef(onShowToast);
   const onLineItemsSavedRef = useRef(onLineItemsSaved);
+
+  const isQuoteLocked = quote?.quote_status === 'accepted';
   useEffect(() => {
     onReadyRef.current = onReady;
     onShowToastRef.current = onShowToast;
@@ -200,21 +205,45 @@ export function LeadQuoteBuilder({
 
   const handleChange = useCallback(
     (items: BuilderLineItem[]) => {
+      if (isQuoteLocked) return;
       hydratedRef.current = true;
       setLineItems(items);
       scheduleSave(items, appliedDiscount, 1500);
     },
-    [appliedDiscount, scheduleSave]
+    [appliedDiscount, scheduleSave, isQuoteLocked]
   );
 
   const handleDiscountChange = useCallback(
     (discount: AvailableDiscount | null) => {
+      if (isQuoteLocked) return;
       hydratedRef.current = true;
       setAppliedDiscount(discount);
       scheduleSave(lineItemsRef.current, discount, 300);
     },
-    [scheduleSave]
+    [scheduleSave, isQuoteLocked]
   );
+
+  const handleUnlockConfirm = useCallback(async () => {
+    if (!quote) return;
+    setIsUnlocking(true);
+    try {
+      const response = await fetch(`/api/quotes/${quote.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quote_status: 'draft' }),
+      });
+      if (!response.ok) throw new Error('Failed to unlock quote');
+      const data = await response.json();
+      if (data.success && data.data) {
+        await broadcastQuoteUpdate(data.data);
+      }
+      setShowUnlockModal(false);
+    } catch {
+      onShowToast?.('Failed to unlock quote', 'error');
+    } finally {
+      setIsUnlocking(false);
+    }
+  }, [quote, broadcastQuoteUpdate, onShowToast]);
 
   useEffect(() => {
     return () => {
@@ -231,19 +260,89 @@ export function LeadQuoteBuilder({
         </div>
       )}
       <div style={{ display: isLoading ? 'none' : 'block' }}>
-        <QuoteBuildStep
-          lineItems={lineItems}
-          onChange={handleChange}
-          plottedPests={plottedPests}
-          companyId={lead.company_id}
-          pestIconMap={pestIconMap}
-          selectedDiscount={appliedDiscount}
-          onDiscountChange={handleDiscountChange}
-          onEditPests={onEditPests}
-          pricingReadOnly
-          onReady={handleBuilderReady}
-        />
+        {isQuoteLocked && (
+          <div className={styles.lockedBanner}>
+            <div className={styles.lockedBannerLeft}>
+              <Lock size={16} className={styles.lockedBannerIcon} />
+              <div>
+                <div className={styles.lockedBannerTitle}>
+                  Quote Accepted &amp; Signed
+                </div>
+                {quote?.signed_at && (
+                  <div className={styles.lockedBannerSubtitle}>
+                    Signed on {new Date(quote.signed_at).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              className={styles.unlockButton}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowUnlockModal(true);
+              }}
+            >
+              Unlock to Edit
+            </button>
+          </div>
+        )}
+        <div className={isQuoteLocked ? styles.lockedControlsWrapper : undefined}>
+          <QuoteBuildStep
+            lineItems={lineItems}
+            onChange={handleChange}
+            plottedPests={plottedPests}
+            companyId={lead.company_id}
+            pestIconMap={pestIconMap}
+            selectedDiscount={appliedDiscount}
+            onDiscountChange={handleDiscountChange}
+            onEditPests={onEditPests}
+            pricingReadOnly
+            onReady={handleBuilderReady}
+          />
+        </div>
       </div>
+
+      {showUnlockModal && (
+        <div
+          className={styles.modalOverlay}
+          onClick={() => setShowUnlockModal(false)}
+        >
+          <div
+            className={styles.confirmModal}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className={styles.confirmModalTitle}>
+              Unlock Quote for Editing
+            </div>
+            <div className={styles.confirmModalBody}>
+              This quote was accepted and signed by the customer
+              {quote?.signed_at &&
+                ` on ${new Date(quote.signed_at).toLocaleDateString()}`}
+              . Unlocking it will clear the signature and require the quote to
+              be resent and re-accepted by the customer.
+            </div>
+            <div className={styles.confirmModalActions}>
+              <button
+                type="button"
+                className={styles.confirmCancelBtn}
+                onClick={() => setShowUnlockModal(false)}
+                disabled={isUnlocking}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={styles.confirmUnlockBtn}
+                onClick={handleUnlockConfirm}
+                disabled={isUnlocking}
+              >
+                {isUnlocking ? 'Unlocking...' : 'Yes, Unlock Quote'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

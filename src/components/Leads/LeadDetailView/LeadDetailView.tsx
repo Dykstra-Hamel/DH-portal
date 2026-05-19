@@ -16,7 +16,7 @@ import {
   ChevronRight,
   CalendarCheck,
 } from 'lucide-react';
-import { adminAPI } from '@/lib/api-client';
+import { adminAPI, authenticatedFetch } from '@/lib/api-client';
 import { Lead } from '@/types/lead';
 import { isAuthorizedAdminSync } from '@/lib/auth-helpers';
 import {
@@ -25,6 +25,12 @@ import {
   removeLeadChannel,
   LeadUpdatePayload,
 } from '@/lib/realtime/lead-channel';
+import {
+  createLeadReviewChannel,
+  subscribeToLeadReviewUpdates,
+  broadcastLeadReviewUpdate,
+} from '@/lib/realtime/lead-review-channel';
+import { LeadLockedOverlay } from '@/components/Leads/LeadLockedOverlay/LeadLockedOverlay';
 import { StepItem } from '@/components/Common/Step/Step';
 import { LeadStepContent } from '@/components/Common/LeadStepContent/LeadStepContent';
 import { LeadProgressBar } from '@/components/Common/LeadProgressBar/LeadProgressBar';
@@ -106,6 +112,33 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   });
   const { branches: availableBranches } = useBranches(lead?.company_id);
   const [currentBranchId, setCurrentBranchId] = useState<string | null>(null);
+
+  // Review-lock state. When another user is on this lead, we render the
+  // LeadLockedOverlay over the page and skip the heartbeat. Mirrors the
+  // ticket review-lock pattern in TicketReviewModal.
+  interface LockHolder {
+    userId?: string;
+    firstName?: string | null;
+    lastName?: string | null;
+    email?: string;
+    avatarUrl?: string | null;
+  }
+  const [lockedBy, setLockedBy] = useState<LockHolder | null>(null);
+  const [retryingLock, setRetryingLock] = useState(false);
+  const reviewHeartbeatRef = useRef<ReturnType<typeof setInterval> | null>(
+    null
+  );
+  const reviewClaimedRef = useRef(false);
+  // Hold the current user's profile in a ref so the lock callbacks stay
+  // stable (don't need to be re-created when profile loads). The broadcast
+  // payload reads from the ref so it always uses the latest profile data.
+  const reviewerInfoRef = useRef<{
+    userId: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    avatarUrl: string | null;
+  } | null>(null);
 
   // Create stable currentUser object to prevent infinite loops
   const stableCurrentUser = useMemo(() => {
@@ -675,6 +708,229 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
       removeLeadChannel(channel);
     };
   }, [lead?.company_id, leadId, router, baseRoute]);
+
+  // ── Review lock ────────────────────────────────────────────────────────
+  // Claim the lead while this page is open. Re-attempted by tryAgain. The
+  // start call returns 409 with the holder profile when another user has
+  // the lock; we render a blocking overlay over the entire page in that
+  // case. Heartbeat every 60s and clean up on unload — same cadence as
+  // the ticket review system in TicketReviewModal.
+  // Helper that broadcasts the current viewer's identity. Reads from the
+  // reviewerInfoRef so it always picks up the latest profile fields, even
+  // when the profile loads after the initial claim.
+  const broadcastClaim = useCallback(async () => {
+    if (!leadId) return;
+    const info = reviewerInfoRef.current;
+    if (!info) return;
+    try {
+      const channel = createLeadReviewChannel();
+      const displayName =
+        `${info.firstName || ''} ${info.lastName || ''}`.trim() ||
+        info.email ||
+        '';
+      await broadcastLeadReviewUpdate(channel, {
+        lead_id: leadId,
+        reviewed_by: info.userId,
+        reviewed_by_name: displayName,
+        reviewed_by_email: info.email,
+        reviewed_by_first_name: info.firstName ?? undefined,
+        reviewed_by_last_name: info.lastName ?? undefined,
+        reviewed_by_avatar_url: info.avatarUrl,
+        reviewed_at: new Date().toISOString(),
+        review_expires_at: new Date(
+          Date.now() + 5 * 60 * 1000
+        ).toISOString(),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (e) {
+      // Non-fatal — broadcast is best-effort
+      console.error('Lead review broadcast failed', e);
+    }
+  }, [leadId]);
+
+  const claimLeadLock = useCallback(async (): Promise<void> => {
+    if (!leadId || !currentUser?.id) return;
+    setRetryingLock(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'start' }),
+      });
+      if (res.status === 409) {
+        const body = await res.json().catch(() => ({}));
+        const holder = body?.reviewed_by_profile;
+        setLockedBy({
+          userId: body?.reviewed_by ?? holder?.id,
+          firstName: holder?.first_name ?? null,
+          lastName: holder?.last_name ?? null,
+          email: holder?.email ?? '',
+          avatarUrl:
+            holder?.uploaded_avatar_url ?? holder?.avatar_url ?? null,
+        });
+        reviewClaimedRef.current = false;
+        return;
+      }
+      if (!res.ok) {
+        console.error('Lead review-status start failed', res.status);
+        return;
+      }
+      setLockedBy(null);
+      reviewClaimedRef.current = true;
+      await broadcastClaim();
+    } finally {
+      setRetryingLock(false);
+    }
+  }, [leadId, currentUser?.id, broadcastClaim]);
+
+  // Keep reviewerInfoRef synced with the latest user/profile values, and
+  // re-broadcast our claim whenever profile fields refresh — this fixes the
+  // first-broadcast-with-undefined-name race when the profile loads after
+  // the lock has already been claimed.
+  useEffect(() => {
+    // Wait for profile to load before populating the ref. broadcastClaim()
+    // returns early when the ref is null, so we never broadcast partial
+    // profile data (would otherwise overwrite list-page seed entries with
+    // undefined name/avatar). The lock itself can still be claimed without
+    // the profile — claimLeadLock only needs currentUser.id.
+    if (!currentUser?.id || !currentProfile) {
+      reviewerInfoRef.current = null;
+      return;
+    }
+    reviewerInfoRef.current = {
+      userId: currentUser.id,
+      email: currentUser.email || '',
+      firstName: currentProfile.first_name ?? null,
+      lastName: currentProfile.last_name ?? null,
+      avatarUrl:
+        currentProfile.uploaded_avatar_url ??
+        currentProfile.avatar_url ??
+        null,
+    };
+    if (reviewClaimedRef.current) {
+      void broadcastClaim();
+    }
+  }, [
+    currentUser?.id,
+    currentUser?.email,
+    currentProfile?.first_name,
+    currentProfile?.last_name,
+    currentProfile?.avatar_url,
+    currentProfile?.uploaded_avatar_url,
+    broadcastClaim,
+  ]);
+
+  useEffect(() => {
+    if (!leadId || !currentUser?.id) return;
+
+    // The broadcast channel is a singleton and there's no API to remove a
+    // single subscription, so every prior LeadDetailView mount leaves its
+    // handler attached forever. Without `alive`, our own release broadcast
+    // (self:true) — and stale handlers from previously-opened leads — would
+    // re-fire claimLeadLock and re-lock the lead we just left.
+    let alive = true;
+
+    void claimLeadLock();
+
+    // Heartbeat (only the holder's calls actually refresh the lock; the
+    // server no-ops for non-holders). Safe to schedule unconditionally.
+    reviewHeartbeatRef.current = setInterval(() => {
+      if (!reviewClaimedRef.current) return;
+      authenticatedFetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        body: JSON.stringify({ action: 'heartbeat' }),
+      }).catch(() => {
+        // Errors expected on unload; ignore
+      });
+    }, 60000);
+
+    // Listen for release events from other tabs and re-claim immediately.
+    // Guard against echoes of our own claim coming back via the self:true
+    // broadcast — without this, successfully claiming can briefly snap the
+    // overlay back on if reviewerInfoRef hasn't been populated yet.
+    const channel = createLeadReviewChannel();
+    subscribeToLeadReviewUpdates(channel, payload => {
+      if (!alive) return;
+      if (payload.lead_id !== leadId) return;
+      if (payload.reviewed_by && payload.reviewed_by === currentUser.id) {
+        return;
+      }
+      if (!payload.reviewed_by) {
+        void claimLeadLock();
+      } else {
+        if (reviewClaimedRef.current) return;
+        // Merge with existing overlay data — partial broadcasts (sent
+        // before the holder's profile loaded) shouldn't wipe out good data
+        // we already have from the API 409 response.
+        setLockedBy(prev => {
+          const sameUser =
+            !!prev?.userId && prev.userId === payload.reviewed_by;
+          return {
+            userId: payload.reviewed_by,
+            firstName:
+              payload.reviewed_by_first_name ??
+              (sameUser ? prev?.firstName ?? null : null),
+            lastName:
+              payload.reviewed_by_last_name ??
+              (sameUser ? prev?.lastName ?? null : null),
+            email:
+              payload.reviewed_by_email ??
+              (sameUser ? prev?.email ?? '' : ''),
+            avatarUrl:
+              payload.reviewed_by_avatar_url ??
+              (sameUser ? prev?.avatarUrl ?? null : null),
+          };
+        });
+      }
+    });
+
+    // Always send `end` on cleanup — the server handler is idempotent
+    // (no-ops if we aren't the holder) so this safely covers the race
+    // where the user navigates away before `start` resolves.
+    //
+    // Broadcast AFTER the end request lands. Other users' subscribers
+    // call claimLeadLock() on receiving a release; if we broadcast first,
+    // their `start` POST races our `end` POST and they get a 409 (server
+    // still sees us as holder). Awaiting end before broadcasting gives a
+    // clean handoff. Page-unload uses keepalive — the .then won't run
+    // (JS context is gone) but the end request still lands; other users
+    // can recover via the LeadLockedOverlay "Try Again" button.
+    const releaseLock = () => {
+      if (reviewHeartbeatRef.current) {
+        clearInterval(reviewHeartbeatRef.current);
+        reviewHeartbeatRef.current = null;
+      }
+      reviewClaimedRef.current = false;
+      authenticatedFetch(`/api/leads/${leadId}/review-status`, {
+        method: 'PUT',
+        body: JSON.stringify({ action: 'end' }),
+        keepalive: true,
+      })
+        .then(() => {
+          try {
+            broadcastLeadReviewUpdate(channel, {
+              lead_id: leadId,
+              reviewed_by: undefined,
+              timestamp: new Date().toISOString(),
+            });
+          } catch {
+            // ignore
+          }
+        })
+        .catch(() => {});
+    };
+
+    const handleBeforeUnload = () => releaseLock();
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      // Flip alive BEFORE releaseLock so the self-broadcast we're about to
+      // send doesn't loop back and re-claim the lock we're releasing.
+      alive = false;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      releaseLock();
+    };
+  }, [leadId, currentUser?.id, claimLeadLock, broadcastClaim]);
 
   const handleBack = () => {
     router.push(baseRoute);
@@ -1440,6 +1696,18 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
 
   return (
     <>
+      {lockedBy && (
+        <LeadLockedOverlay
+          reviewerFirstName={lockedBy.firstName}
+          reviewerLastName={lockedBy.lastName}
+          reviewerEmail={lockedBy.email}
+          reviewerAvatarUrl={lockedBy.avatarUrl}
+          onTryAgain={() => {
+            void claimLeadLock();
+          }}
+          retrying={retryingLock}
+        />
+      )}
       <div className="container">
         <LeadProgressBar
           leadStatus={lead.lead_status as 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost'}

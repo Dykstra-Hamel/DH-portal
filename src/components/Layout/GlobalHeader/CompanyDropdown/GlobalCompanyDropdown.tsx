@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
-import { Building2 } from 'lucide-react';
+import { Building2, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
 import styles from './GlobalCompanyDropdown.module.scss';
@@ -173,7 +173,7 @@ export function GlobalCompanyDropdown() {
                 >
                   <span>{company.name}</span>
                   {selectedCompany?.id === company.id && (
-                    <div className={styles.checkmark}>✓</div>
+                    <div className={styles.checkmark}><Check size={14} strokeWidth={2.5} /></div>
                   )}
                 </button>
               ))

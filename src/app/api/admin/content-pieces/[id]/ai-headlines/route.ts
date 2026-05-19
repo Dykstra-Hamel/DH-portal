@@ -16,13 +16,13 @@ function getHeadlineInstruction(contentType: string | null): string {
       return `Generate 5 distinct headline variations. Each must include the pest name. Include a mix of: identification-forward (e.g., "How to Identify [Pest] in Your Home"), danger/threat-aware (risks or damage), action-oriented (treatment or removal), informational (facts or biology), and local authority framing. Headlines should be 50–70 characters, factual in tone, and SEO-friendly. Do not repeat the same format twice.`;
 
     case 'location':
-      return `Generate 5 distinct headline variations. Each must include the city or location name. Include a mix of: local service statement (e.g., "[City] Pest Control Services"), local pest authority, question (local problem-based), benefit-driven (e.g., "Same-Day Service in [City]"), and local environmental angle. Headlines should be 50–70 characters, locally specific, and service-focused. Do not repeat the same format twice.`;
+      return `Generate 5 distinct headline variations. Each must include the city or location name. Include a mix of: local service statement (e.g., "[City] [Service] Services"), local authority, question (local problem-based), benefit-driven (e.g., "Same-Day Service in [City]"), and local environmental angle. Use COMPANY CONTEXT to determine the company's industry and the relevant service noun — do not assume any specific industry. Headlines should be 50–70 characters, locally specific, and service-focused. Do not repeat the same format twice.`;
 
     case 'pillar':
-      return `Generate 5 distinct headline variations for a comprehensive pillar page. Headlines should signal breadth and authority. Include a mix of: "complete guide" framing, "everything you need to know", broad authoritative question, service-hub statement, and local comprehensive angle. Headlines should be 55–75 characters and read as the definitive resource on this topic. Do not repeat the same format twice.`;
+      return `Generate 5 distinct headline variations for a comprehensive pillar page. Headlines should signal breadth and authority. Include a mix of: "complete guide" framing, "everything you need to know", broad authoritative question, service-hub statement, and local comprehensive angle. Use COMPANY CONTEXT to determine the company's industry — do not assume any specific industry. Headlines should be 55–75 characters and read as the definitive resource on this topic. Do not repeat the same format twice.`;
 
     case 'cluster':
-      return `Generate 5 distinct headline variations for a focused cluster page. Headlines should signal specificity and depth — one precise answer to one specific question. Include a mix of: specific how-to, focused question, number-based (e.g., "3 Signs of Termites in Your Tucson Home"), comparison or decision-guide, and local service-specific statement. Headlines should be 50–70 characters and feel like a precise, narrow answer. Do not repeat the same format twice.`;
+      return `Generate 5 distinct headline variations for a focused cluster page. Headlines should signal specificity and depth — one precise answer to one specific question. Include a mix of: specific how-to, focused question, number-based (e.g., "3 Signs of [Issue] in Your [City] Home"), comparison or decision-guide, and local service-specific statement. Use COMPANY CONTEXT to determine the company's industry — do not assume any specific industry. Headlines should be 50–70 characters and feel like a precise, narrow answer. Do not repeat the same format twice.`;
 
     case 'evergreen':
       return `Generate 5 distinct headline variations for a timeless educational page. Headlines must avoid seasonal language or date references. Include a mix of: how-to guide, signs or identification-focused, decision-guide (DIY vs. professional), informational reference, and question. Headlines should be 50–70 characters, educational in tone, and hold equal relevance year-round. Do not repeat the same format twice.`;
@@ -109,7 +109,7 @@ export async function POST(
       ? await fetchStandingInstructions(supabase, companyId, 'headlines', piece.content_type)
       : '';
 
-    const systemInstruction = `You are an SEO content strategist for a pest control company. Generate headline variations for the given content topic.
+    const systemInstruction = `You are an SEO content strategist for ${companyName}, a local service business. Use COMPANY CONTEXT below for industry and voice — do not assume any specific industry. Write headlines a 7th–8th grader would understand. Avoid industry jargon. Generate headline variations for the given content topic.
 
 COMPANY: ${companyName}, ${location}
 CONTENT TYPE: ${piece.content_type ?? 'general'}

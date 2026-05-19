@@ -9,6 +9,7 @@ import {
   getArchivedLeadColumns,
   getArchivedLeadTabs,
 } from '@/components/Leads/LeadsList/ArchivedLeadsListConfig';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
 import { Lead } from '@/types/lead';
 import { useCompany } from '@/contexts/CompanyContext';
 import {
@@ -39,6 +40,9 @@ export default function ArchivedLeadsPage() {
 
   // Use global company context
   const { selectedCompany, isAdmin, isLoading: companyLoading } = useCompany();
+
+  // Live "Viewing" indicator state — see useLeadReviewStatuses for details.
+  const reviewStatuses = useLeadReviewStatuses(leads);
 
   useEffect(() => {
     const supabase = createClient();
@@ -166,6 +170,14 @@ export default function ArchivedLeadsPage() {
                 last_name,
                 email,
                 avatar_url
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
@@ -213,6 +225,14 @@ export default function ArchivedLeadsPage() {
                 last_name,
                 email,
                 avatar_url
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
@@ -311,7 +331,7 @@ export default function ArchivedLeadsPage() {
       <DataTable
         data={leads}
         title="Archived Leads"
-        columns={getArchivedLeadColumns()}
+        columns={getArchivedLeadColumns(reviewStatuses)}
         tabs={getArchivedLeadTabs()}
         loading={leadsLoading}
         onItemAction={handleAction}

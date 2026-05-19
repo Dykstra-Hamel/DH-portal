@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
-import { Building2, X } from 'lucide-react';
+import { Building2, X, Check } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useCompany } from '@/contexts/CompanyContext';
 import styles from './MobileCompanySwitcher.module.scss';
@@ -100,7 +100,7 @@ export function MobileCompanySwitcher() {
                   >
                     <span>{company.name}</span>
                     {selectedCompany?.id === company.id && (
-                      <span className={styles.checkmark}>✓</span>
+                      <span className={styles.checkmark}><Check size={14} strokeWidth={2.5} /></span>
                     )}
                   </button>
                 ))

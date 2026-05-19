@@ -129,3 +129,35 @@ button.step {
   border-color: var(--green-400);
   color: white;
 }
+
+@media (max-width: 820px) {
+  // Hide all step pills that are not the current step
+  .stepWrapper:not(:has(.stepCurrent)) {
+    display: none;
+  }
+
+  // Make the current step pill non-interactive (read-only)
+  .step {
+    pointer-events: none;
+    cursor: default;
+  }
+
+  // When a current step is shown, hide the Lost/Won action chips
+  .progressBarRow:has(.stepCurrent) .actionsWrapper {
+    display: none;
+  }
+
+  // When no current step exists (won/lost terminal state), hide the steps container
+  .progressBarRow:not(:has(.stepCurrent)) .stepsContainer {
+    display: none;
+  }
+
+  // Hide "Ticket Completed!" label — chips communicate this
+  .completedLabel {
+    display: none;
+  }
+
+  .separator {
+    display: none;
+  }
+}

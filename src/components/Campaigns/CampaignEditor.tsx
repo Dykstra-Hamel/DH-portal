@@ -865,7 +865,7 @@ export default function CampaignEditor({
                 {!campaignNameValidating &&
                   campaignNameAvailable === true &&
                   formData.name && (
-                    <small style={{ color: '#22c55e' }}>✓ Available</small>
+                    <small style={{ color: '#22c55e' }}><Check size={12} strokeWidth={2.5} /> Available</small>
                   )}
                 {!campaignNameValidating && campaignNameAvailable === false && (
                   <small style={{ color: '#ef4444' }}>
@@ -910,7 +910,7 @@ export default function CampaignEditor({
                 {!campaignIdValidating &&
                   campaignIdAvailable === true &&
                   formData.campaign_id && (
-                    <small style={{ color: '#22c55e' }}>✓ Available</small>
+                    <small style={{ color: '#22c55e' }}><Check size={12} strokeWidth={2.5} /> Available</small>
                   )}
                 {!campaignIdValidating && campaignIdAvailable === false && (
                   <small style={{ color: '#ef4444' }}>✗ Already in use</small>

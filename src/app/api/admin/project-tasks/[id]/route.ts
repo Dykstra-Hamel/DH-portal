@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAuth, isAuthorizedAdmin, isAuthorizedAdminOrPM } from '@/lib/auth-helpers';
 import { createAdminClient } from '@/lib/supabase/server-admin';
+import { STORAGE_CONFIG } from '@/lib/storage-utils';
 
 export async function GET(
   request: NextRequest,
@@ -46,7 +47,8 @@ export async function GET(
         blocked_by_task:blocked_by_task_id(id, title, is_completed, assigned_to, due_date),
         comments:project_task_comments(
           *,
-          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url)
+          user_profile:profiles(id, first_name, last_name, email, avatar_url, uploaded_avatar_url),
+          attachments:comment_attachments!task_comment_id(id, file_path, file_name, file_size, mime_type, created_at)
         ),
         activity:project_task_activity(
           *,
@@ -123,6 +125,15 @@ export async function GET(
       categories,
       subtasks: subtasks || [],
       activity: sortedActivity,
+      comments: (taskWithoutAssignments.comments || []).map((comment: any) => ({
+        ...comment,
+        attachments: (comment.attachments || []).map((att: any) => {
+          const { data: urlData } = supabase.storage
+            .from(STORAGE_CONFIG.BUCKET_NAME)
+            .getPublicUrl(att.file_path);
+          return { ...att, url: urlData.publicUrl };
+        }),
+      })),
     };
 
     return NextResponse.json(taskWithSubtasks);

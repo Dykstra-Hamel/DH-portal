@@ -33,6 +33,10 @@
   overflow-y: auto;
   scrollbar-gutter: stable both-edges;
   min-height: 0;
+
+  &.techLeadsMainContent {
+    padding: 0;
+  }
 }
 
 .projectManagementMainContent {
@@ -53,7 +57,7 @@
 :global(.pageWrapper).techLeadsPageWrapper {
   width: 100%;
   min-height: 100%;
-  max-width: 1357px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 0;
   display: flex;
@@ -64,7 +68,7 @@
 
 :global(.pageWrapper).fieldMapWizardPageWrapper {
   width: 100%;
-  max-width: 1309px;
+  max-width: 100%;
   margin: 0 auto;
   padding: 0;
   height: 100%;

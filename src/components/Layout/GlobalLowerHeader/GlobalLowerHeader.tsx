@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, ReactNode } from 'react';
-import { ChevronDown, Users } from 'lucide-react';
+import { ChevronDown, Users, SlidersHorizontal } from 'lucide-react';
 import { MiniAvatar } from '@/components/Common/MiniAvatar/MiniAvatar';
 import styles from './GlobalLowerHeader.module.scss';
 
@@ -127,6 +127,7 @@ export function GlobalLowerHeader({
   const [isStatusOpen, setIsStatusOpen] = useState(false);
   const [isBranchOpen, setIsBranchOpen] = useState(false);
   const [hasShadow, setHasShadow] = useState(false);
+  const [isMobileControlsOpen, setIsMobileControlsOpen] = useState(false);
 
   const leadTypeRef = useRef<HTMLDivElement>(null);
   const assignedToRef = useRef<HTMLDivElement>(null);
@@ -134,19 +135,25 @@ export function GlobalLowerHeader({
   const supportAssignedToRef = useRef<HTMLDivElement>(null);
   const supportStatusRef = useRef<HTMLDivElement>(null);
   const branchRef = useRef<HTMLDivElement>(null);
+  const mobileControlsRef = useRef<HTMLDivElement>(null);
+  const mobileAssignedToRef = useRef<HTMLDivElement>(null);
+  const mobileBranchRef = useRef<HTMLDivElement>(null);
+  const mobileLeadTypeRef = useRef<HTMLDivElement>(null);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (
         leadTypeRef.current &&
-        !leadTypeRef.current.contains(event.target as Node)
+        !leadTypeRef.current.contains(event.target as Node) &&
+        (!mobileLeadTypeRef.current || !mobileLeadTypeRef.current.contains(event.target as Node))
       ) {
         setIsLeadTypeOpen(false);
       }
       if (
         assignedToRef.current &&
-        !assignedToRef.current.contains(event.target as Node)
+        !assignedToRef.current.contains(event.target as Node) &&
+        (!mobileAssignedToRef.current || !mobileAssignedToRef.current.contains(event.target as Node))
       ) {
         setIsAssignedToOpen(false);
       }
@@ -170,9 +177,16 @@ export function GlobalLowerHeader({
       }
       if (
         branchRef.current &&
-        !branchRef.current.contains(event.target as Node)
+        !branchRef.current.contains(event.target as Node) &&
+        (!mobileBranchRef.current || !mobileBranchRef.current.contains(event.target as Node))
       ) {
         setIsBranchOpen(false);
+      }
+      if (
+        mobileControlsRef.current &&
+        !mobileControlsRef.current.contains(event.target as Node)
+      ) {
+        setIsMobileControlsOpen(false);
       }
     };
 
@@ -367,6 +381,218 @@ export function GlobalLowerHeader({
       .length;
   };
 
+  // Shared assigned-to dropdown menu content (used in both desktop and mobile)
+  const renderAssignedToMenu = () => (
+    <div className={styles.dropdownMenu}>
+      {isSchedulingStatus() ? (
+        <>
+          <button
+            className={`${styles.dropdownOption} ${leadAssignmentControls!.assignedScheduler === leadAssignmentControls!.currentUser.id ? styles.selected : ''}`}
+            onClick={() => {
+              leadAssignmentControls!.onSchedulerChange(leadAssignmentControls!.currentUser.id);
+              setIsAssignedToOpen(false);
+            }}
+          >
+            <div className={styles.optionContent}>
+              <MiniAvatar
+                firstName={leadAssignmentControls!.currentUser.name.split(' ')[0]}
+                lastName={leadAssignmentControls!.currentUser.name.split(' ').slice(1).join(' ')}
+                email={leadAssignmentControls!.currentUser.email}
+                userId={leadAssignmentControls!.currentUser.id}
+                avatarUrl={leadAssignmentControls!.currentUser.avatar}
+                size="small"
+                showTooltip={false}
+              />
+              <div className={styles.optionInfo}>
+                <div className={styles.optionName}>{leadAssignmentControls!.currentUser.name}</div>
+                <div className={styles.optionSubtitle}>Myself</div>
+              </div>
+            </div>
+          </button>
+          {leadAssignmentControls!.assignableUsers
+            .filter(u => u.id !== leadAssignmentControls!.currentUser.id)
+            .map(user => (
+              <button
+                key={user.id}
+                className={`${styles.dropdownOption} ${leadAssignmentControls!.assignedScheduler === user.id ? styles.selected : ''}`}
+                onClick={() => {
+                  leadAssignmentControls!.onSchedulerChange(user.id);
+                  setIsAssignedToOpen(false);
+                }}
+              >
+                <div className={styles.optionContent}>
+                  <MiniAvatar
+                    firstName={user.first_name || user.display_name}
+                    lastName={user.last_name}
+                    email={user.email}
+                    userId={user.id}
+                    avatarUrl={user.avatar_url}
+                    uploadedAvatarUrl={user.uploaded_avatar_url}
+                    size="small"
+                    showTooltip={false}
+                  />
+                  <div className={styles.optionInfo}>
+                    <div className={styles.optionName}>{user.display_name}</div>
+                    <div className={styles.optionSubtitle}>{user.email}</div>
+                  </div>
+                </div>
+              </button>
+            ))}
+        </>
+      ) : (
+        <>
+          <button
+            className={`${styles.dropdownOption} ${leadAssignmentControls!.assignedTo === leadAssignmentControls!.currentUser.id ? styles.selected : ''}`}
+            onClick={() => {
+              leadAssignmentControls!.onAssigneeChange(leadAssignmentControls!.currentUser.id);
+              setIsAssignedToOpen(false);
+            }}
+          >
+            <div className={styles.optionContent}>
+              <MiniAvatar
+                firstName={leadAssignmentControls!.currentUser.name.split(' ')[0]}
+                lastName={leadAssignmentControls!.currentUser.name.split(' ').slice(1).join(' ')}
+                email={leadAssignmentControls!.currentUser.email}
+                userId={leadAssignmentControls!.currentUser.id}
+                avatarUrl={leadAssignmentControls!.currentUser.avatar}
+                size="small"
+                showTooltip={false}
+              />
+              <div className={styles.optionInfo}>
+                <div className={styles.optionName}>{leadAssignmentControls!.currentUser.name}</div>
+                <div className={styles.optionSubtitle}>Myself</div>
+              </div>
+            </div>
+          </button>
+
+          {leadAssignmentControls!.leadType === 'sales' && (
+            <button
+              className={`${styles.dropdownOption} ${leadAssignmentControls!.assignedTo === 'sales_team' ? styles.selected : ''}`}
+              onClick={() => {
+                leadAssignmentControls!.onAssigneeChange('sales_team');
+                setIsAssignedToOpen(false);
+              }}
+            >
+              <div className={styles.optionContent}>
+                <TeamAvatar />
+                <div className={styles.optionInfo}>
+                  <div className={styles.optionName}>Sales Team</div>
+                  <div className={styles.optionSubtitle}>{getTeamCount()} members</div>
+                </div>
+              </div>
+            </button>
+          )}
+
+          {leadAssignmentControls!.leadType === 'support' && (
+            <button
+              className={`${styles.dropdownOption} ${leadAssignmentControls!.assignedTo === 'support_team' ? styles.selected : ''}`}
+              onClick={() => {
+                leadAssignmentControls!.onAssigneeChange('support_team');
+                setIsAssignedToOpen(false);
+              }}
+            >
+              <div className={styles.optionContent}>
+                <TeamAvatar />
+                <div className={styles.optionInfo}>
+                  <div className={styles.optionName}>Support Team</div>
+                  <div className={styles.optionSubtitle}>{getTeamCount()} members</div>
+                </div>
+              </div>
+            </button>
+          )}
+
+          {(leadAssignmentControls!.leadType === 'sales' || leadAssignmentControls!.leadType === 'support') &&
+            leadAssignmentControls!.assignableUsers
+              .filter(u => u.id !== leadAssignmentControls!.currentUser.id)
+              .map(user => (
+                <button
+                  key={user.id}
+                  className={`${styles.dropdownOption} ${leadAssignmentControls!.assignedTo === user.id ? styles.selected : ''}`}
+                  onClick={() => {
+                    leadAssignmentControls!.onAssigneeChange(user.id);
+                    setIsAssignedToOpen(false);
+                  }}
+                >
+                  <div className={styles.optionContent}>
+                    <MiniAvatar
+                      firstName={user.first_name || user.display_name}
+                      lastName={user.last_name}
+                      email={user.email}
+                      userId={user.id}
+                      avatarUrl={user.avatar_url}
+                      uploadedAvatarUrl={user.uploaded_avatar_url}
+                      size="small"
+                      showTooltip={false}
+                    />
+                    <div className={styles.optionInfo}>
+                      <div className={styles.optionName}>{user.display_name}</div>
+                      <div className={styles.optionSubtitle}>{user.email}</div>
+                    </div>
+                  </div>
+                </button>
+              ))}
+        </>
+      )}
+    </div>
+  );
+
+  // Shared branch dropdown menu content
+  const renderBranchMenu = () => (
+    <div className={styles.dropdownMenu}>
+      <button
+        className={`${styles.dropdownOption} ${!leadAssignmentControls!.currentBranchId ? styles.selected : ''}`}
+        onClick={() => {
+          leadAssignmentControls!.onBranchChange?.(null);
+          setIsBranchOpen(false);
+        }}
+      >
+        No Branch
+      </button>
+      {leadAssignmentControls!.availableBranches!.map(branch => (
+        <button
+          key={branch.id}
+          className={`${styles.dropdownOption} ${leadAssignmentControls!.currentBranchId === branch.id ? styles.selected : ''}`}
+          onClick={() => {
+            leadAssignmentControls!.onBranchChange?.(branch.id);
+            setIsBranchOpen(false);
+          }}
+        >
+          {branch.name}{branch.is_primary ? ' (Primary)' : ''}
+        </button>
+      ))}
+    </div>
+  );
+
+  // Shared lead type dropdown menu content
+  const renderLeadTypeMenu = () => (
+    <div className={styles.dropdownMenu}>
+      {[
+        { value: 'sales', label: 'Sales Lead' },
+        { value: 'support', label: 'Support Case' },
+        { value: 'junk', label: 'Junk' },
+      ].map(({ value, label }) => (
+        <button
+          key={value}
+          className={`${styles.dropdownOption} ${leadAssignmentControls!.leadType === value ? styles.selected : ''}`}
+          onClick={() => {
+            if (
+              (value === 'junk' || value === 'support') &&
+              value !== leadAssignmentControls!.leadType &&
+              leadAssignmentControls!.onLeadTypeChangeWithModal
+            ) {
+              leadAssignmentControls!.onLeadTypeChangeWithModal(value);
+            } else {
+              leadAssignmentControls!.onLeadTypeChange(value);
+            }
+            setIsLeadTypeOpen(false);
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div
       className={`${styles.globalLowerHeader} ${hasShadow ? styles.globalLowerHeaderScrolled : ''}`}
@@ -395,383 +621,302 @@ export function GlobalLowerHeader({
         </div>
 
         {leadAssignmentControls && (
-          <div className={styles.controlsSection}>
-            {/* Assigned To / Scheduler Dropdown */}
-            <div className={styles.controlGroup} ref={assignedToRef}>
-              {isLeadUnassigned() ? (
-                <>
-                  <span className={styles.currentlyAssignedLabel}>
-                    Currently Assigned To:
-                  </span>
-                  <span className={styles.unassignedText}>Unassigned</span>
-                  <button
-                    type="button"
-                    className={styles.assignButton}
-                    onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="16"
-                      height="16"
-                      viewBox="0 0 16 16"
-                      fill="none"
-                      aria-hidden="true"
+          <>
+            {/* Desktop controls — hidden below 968px */}
+            <div className={styles.controlsSection}>
+              {/* Assigned To / Scheduler Dropdown */}
+              <div className={styles.controlGroup} ref={assignedToRef}>
+                {isLeadUnassigned() ? (
+                  <>
+                    <span className={styles.currentlyAssignedLabel}>
+                      Currently Assigned To:
+                    </span>
+                    <span className={styles.unassignedText}>Unassigned</span>
+                    <button
+                      type="button"
+                      className={styles.assignButton}
+                      onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
                     >
-                      <path
-                        d="M9.66536 13V11.6667C9.66536 10.9594 9.38441 10.2811 8.88432 9.78105C8.38422 9.28095 7.70594 9 6.9987 9H2.9987C2.29145 9 1.61318 9.28095 1.11308 9.78105C0.612983 10.2811 0.332031 10.9594 0.332031 11.6667V13"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="16"
+                        height="16"
+                        viewBox="0 0 16 16"
+                        fill="none"
+                        aria-hidden="true"
+                      >
+                        <path
+                          d="M9.66536 13V11.6667C9.66536 10.9594 9.38441 10.2811 8.88432 9.78105C8.38422 9.28095 7.70594 9 6.9987 9H2.9987C2.29145 9 1.61318 9.28095 1.11308 9.78105C0.612983 10.2811 0.332031 10.9594 0.332031 11.6667V13"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M4.9987 6.33333C6.47146 6.33333 7.66536 5.13943 7.66536 3.66667C7.66536 2.19391 6.47146 1 4.9987 1C3.52594 1 2.33203 2.19391 2.33203 3.66667C2.33203 5.13943 3.52594 6.33333 4.9987 6.33333Z"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M11.668 4.3335V8.3335"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M13.668 6.3335H9.66797"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      Assign
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className={styles.currentlyAssignedLabel}>
+                      Currently Assigned To:
+                    </span>
+                    <button
+                      className={styles.controlDropdown}
+                      onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
+                    >
+                      <div className={styles.assignedToContent}>
+                        {(() => {
+                          const display = getAssignedToDisplay();
+                          if (display.avatar === 'team') {
+                            return <TeamAvatar />;
+                          }
+                          return (
+                            <MiniAvatar
+                              firstName={display.firstName}
+                              lastName={display.lastName}
+                              email={display.email || ''}
+                              userId={display.userId}
+                              avatarUrl={display.avatar as string | null}
+                              size="small"
+                              className={styles.assignedAvatar}
+                              showTooltip={false}
+                            />
+                          );
+                        })()}
+                        <span className={styles.controlValue}>
+                          {getAssignedToDisplay().name}
+                        </span>
+                      </div>
+                      <ChevronDown
+                        size={16}
+                        className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`}
                       />
-                      <path
-                        d="M4.9987 6.33333C6.47146 6.33333 7.66536 5.13943 7.66536 3.66667C7.66536 2.19391 6.47146 1 4.9987 1C3.52594 1 2.33203 2.19391 2.33203 3.66667C2.33203 5.13943 3.52594 6.33333 4.9987 6.33333Z"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M11.668 4.3335V8.3335"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                      <path
-                        d="M13.668 6.3335H9.66797"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                    Assign
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className={styles.currentlyAssignedLabel}>
-                    Currently Assigned To:
-                  </span>
+                    </button>
+                  </>
+                )}
+                {isAssignedToOpen && renderAssignedToMenu()}
+              </div>
+
+              {/* Branch Dropdown (only rendered when company has branches) */}
+              {leadAssignmentControls.availableBranches && leadAssignmentControls.availableBranches.length > 0 && (
+                <div className={styles.controlGroup} ref={branchRef}>
+                  <label className={styles.controlLabel}>Branch:</label>
                   <button
                     className={styles.controlDropdown}
-                    onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
+                    onClick={() => setIsBranchOpen(!isBranchOpen)}
                   >
-                    <div className={styles.assignedToContent}>
-                      {(() => {
-                        const display = getAssignedToDisplay();
-                        if (display.avatar === 'team') {
-                          return <TeamAvatar />;
-                        }
-                        return (
-                          <MiniAvatar
-                            firstName={display.firstName}
-                            lastName={display.lastName}
-                            email={display.email || ''}
-                            userId={display.userId}
-                            avatarUrl={display.avatar as string | null}
-                            size="small"
-                            className={styles.assignedAvatar}
-                            showTooltip={false}
-                          />
-                        );
-                      })()}
-                      <span className={styles.controlValue}>
-                        {getAssignedToDisplay().name}
-                      </span>
-                    </div>
+                    <span className={styles.controlValue}>
+                      {leadAssignmentControls.availableBranches.find(
+                        b => b.id === leadAssignmentControls.currentBranchId
+                      )?.name ?? 'No Branch'}
+                    </span>
                     <ChevronDown
                       size={16}
-                      className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`}
+                      className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
                     />
                   </button>
-                </>
-              )}
-              {isAssignedToOpen && (
-                <div className={styles.dropdownMenu}>
-                  {isSchedulingStatus() ? (
-                    // Scheduler options
-                    <>
-                      <button
-                        className={`${styles.dropdownOption} ${leadAssignmentControls.assignedScheduler === leadAssignmentControls.currentUser.id ? styles.selected : ''}`}
-                        onClick={() => {
-                          leadAssignmentControls.onSchedulerChange(
-                            leadAssignmentControls.currentUser.id
-                          );
-                          setIsAssignedToOpen(false);
-                        }}
-                      >
-                        <div className={styles.optionContent}>
-                          <MiniAvatar
-                            firstName={leadAssignmentControls.currentUser.name.split(' ')[0]}
-                            lastName={leadAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
-                            email={leadAssignmentControls.currentUser.email}
-                            userId={leadAssignmentControls.currentUser.id}
-                            avatarUrl={leadAssignmentControls.currentUser.avatar}
-                            size="small"
-                            showTooltip={false}
-                          />
-                          <div className={styles.optionInfo}>
-                            <div className={styles.optionName}>
-                              {leadAssignmentControls.currentUser.name}
-                            </div>
-                            <div className={styles.optionSubtitle}>Myself</div>
-                          </div>
-                        </div>
-                      </button>
-                      {leadAssignmentControls.assignableUsers
-                        .filter(
-                          u => u.id !== leadAssignmentControls.currentUser.id
-                        )
-                        .map(user => (
-                          <button
-                            key={user.id}
-                            className={`${styles.dropdownOption} ${leadAssignmentControls.assignedScheduler === user.id ? styles.selected : ''}`}
-                            onClick={() => {
-                              leadAssignmentControls.onSchedulerChange(user.id);
-                              setIsAssignedToOpen(false);
-                            }}
-                          >
-                            <div className={styles.optionContent}>
-                              <MiniAvatar
-                                firstName={user.first_name || user.display_name}
-                                lastName={user.last_name}
-                                email={user.email}
-                                userId={user.id}
-                                avatarUrl={user.avatar_url}
-                                uploadedAvatarUrl={user.uploaded_avatar_url}
-                                size="small"
-                                showTooltip={false}
-                              />
-                              <div className={styles.optionInfo}>
-                                <div className={styles.optionName}>
-                                  {user.display_name}
-                                </div>
-                                <div className={styles.optionSubtitle}>
-                                  {user.email}
-                                </div>
-                              </div>
-                            </div>
-                          </button>
-                        ))}
-                    </>
-                  ) : (
-                    // Salesperson options
-                    <>
-                      <button
-                        className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === leadAssignmentControls.currentUser.id ? styles.selected : ''}`}
-                        onClick={() => {
-                          leadAssignmentControls.onAssigneeChange(
-                            leadAssignmentControls.currentUser.id
-                          );
-                          setIsAssignedToOpen(false);
-                        }}
-                      >
-                        <div className={styles.optionContent}>
-                          <MiniAvatar
-                            firstName={leadAssignmentControls.currentUser.name.split(' ')[0]}
-                            lastName={leadAssignmentControls.currentUser.name.split(' ').slice(1).join(' ')}
-                            email={leadAssignmentControls.currentUser.email}
-                            userId={leadAssignmentControls.currentUser.id}
-                            avatarUrl={leadAssignmentControls.currentUser.avatar}
-                            size="small"
-                            showTooltip={false}
-                          />
-                          <div className={styles.optionInfo}>
-                            <div className={styles.optionName}>
-                              {leadAssignmentControls.currentUser.name}
-                            </div>
-                            <div className={styles.optionSubtitle}>Myself</div>
-                          </div>
-                        </div>
-                      </button>
-
-                      {/* Team option */}
-                      {leadAssignmentControls.leadType === 'sales' && (
-                        <button
-                          className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === 'sales_team' ? styles.selected : ''}`}
-                          onClick={() => {
-                            leadAssignmentControls.onAssigneeChange(
-                              'sales_team'
-                            );
-                            setIsAssignedToOpen(false);
-                          }}
-                        >
-                          <div className={styles.optionContent}>
-                            <TeamAvatar />
-                            <div className={styles.optionInfo}>
-                              <div className={styles.optionName}>
-                                Sales Team
-                              </div>
-                              <div className={styles.optionSubtitle}>
-                                {getTeamCount()} members
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      )}
-
-                      {leadAssignmentControls.leadType === 'support' && (
-                        <button
-                          className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === 'support_team' ? styles.selected : ''}`}
-                          onClick={() => {
-                            leadAssignmentControls.onAssigneeChange(
-                              'support_team'
-                            );
-                            setIsAssignedToOpen(false);
-                          }}
-                        >
-                          <div className={styles.optionContent}>
-                            <TeamAvatar />
-                            <div className={styles.optionInfo}>
-                              <div className={styles.optionName}>
-                                Support Team
-                              </div>
-                              <div className={styles.optionSubtitle}>
-                                {getTeamCount()} members
-                              </div>
-                            </div>
-                          </div>
-                        </button>
-                      )}
-
-                      {/* Team members */}
-                      {(leadAssignmentControls.leadType === 'sales' ||
-                        leadAssignmentControls.leadType === 'support') &&
-                        leadAssignmentControls.assignableUsers
-                          .filter(
-                            u => u.id !== leadAssignmentControls.currentUser.id
-                          )
-                          .map(user => (
-                            <button
-                              key={user.id}
-                              className={`${styles.dropdownOption} ${leadAssignmentControls.assignedTo === user.id ? styles.selected : ''}`}
-                              onClick={() => {
-                                leadAssignmentControls.onAssigneeChange(
-                                  user.id
-                                );
-                                setIsAssignedToOpen(false);
-                              }}
-                            >
-                              <div className={styles.optionContent}>
-                                <MiniAvatar
-                                  firstName={user.first_name || user.display_name}
-                                  lastName={user.last_name}
-                                  email={user.email}
-                                  userId={user.id}
-                                  avatarUrl={user.avatar_url}
-                                uploadedAvatarUrl={user.uploaded_avatar_url}
-                                  size="small"
-                                  showTooltip={false}
-                                />
-                                <div className={styles.optionInfo}>
-                                  <div className={styles.optionName}>
-                                    {user.display_name}
-                                  </div>
-                                  <div className={styles.optionSubtitle}>
-                                    {user.email}
-                                  </div>
-                                </div>
-                              </div>
-                            </button>
-                          ))}
-                    </>
-                  )}
+                  {isBranchOpen && renderBranchMenu()}
                 </div>
               )}
-            </div>
 
-            {/* Branch Dropdown (only rendered when company has branches) */}
-            {leadAssignmentControls.availableBranches && leadAssignmentControls.availableBranches.length > 0 && (
-              <div className={styles.controlGroup} ref={branchRef}>
-                <label className={styles.controlLabel}>Branch:</label>
+              {/* Lead Type Dropdown */}
+              <div className={styles.controlGroup} ref={leadTypeRef}>
                 <button
                   className={styles.controlDropdown}
-                  onClick={() => setIsBranchOpen(!isBranchOpen)}
+                  onClick={() => setIsLeadTypeOpen(!isLeadTypeOpen)}
                 >
                   <span className={styles.controlValue}>
-                    {leadAssignmentControls.availableBranches.find(
-                      b => b.id === leadAssignmentControls.currentBranchId
-                    )?.name ?? 'No Branch'}
+                    {getLeadTypeDisplay()}
                   </span>
                   <ChevronDown
                     size={16}
-                    className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
+                    className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`}
                   />
                 </button>
-                {isBranchOpen && (
-                  <div className={styles.dropdownMenu}>
-                    <button
-                      className={`${styles.dropdownOption} ${!leadAssignmentControls.currentBranchId ? styles.selected : ''}`}
-                      onClick={() => {
-                        leadAssignmentControls.onBranchChange?.(null);
-                        setIsBranchOpen(false);
-                      }}
-                    >
-                      No Branch
-                    </button>
-                    {leadAssignmentControls.availableBranches.map(branch => (
-                      <button
-                        key={branch.id}
-                        className={`${styles.dropdownOption} ${leadAssignmentControls.currentBranchId === branch.id ? styles.selected : ''}`}
-                        onClick={() => {
-                          leadAssignmentControls.onBranchChange?.(branch.id);
-                          setIsBranchOpen(false);
-                        }}
-                      >
-                        {branch.name}{branch.is_primary ? ' (Primary)' : ''}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                {isLeadTypeOpen && renderLeadTypeMenu()}
               </div>
-            )}
+            </div>
 
-            {/* Lead Type Dropdown */}
-            <div className={styles.controlGroup} ref={leadTypeRef}>
+            {/* Mobile controls — visible only below 968px */}
+            <div className={styles.mobileControls} ref={mobileControlsRef}>
               <button
-                className={styles.controlDropdown}
-                onClick={() => setIsLeadTypeOpen(!isLeadTypeOpen)}
+                className={styles.mobileControlsButton}
+                onClick={() => setIsMobileControlsOpen(o => !o)}
+                type="button"
               >
-                <span className={styles.controlValue}>
-                  {getLeadTypeDisplay()}
-                </span>
+                <SlidersHorizontal size={15} />
+                <span>Options</span>
                 <ChevronDown
-                  size={16}
-                  className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`}
+                  size={14}
+                  className={`${styles.chevron} ${isMobileControlsOpen ? styles.open : ''}`}
                 />
               </button>
-              {isLeadTypeOpen && (
-                <div className={styles.dropdownMenu}>
-                  {[
-                    { value: 'sales', label: 'Sales Lead' },
-                    { value: 'support', label: 'Support Case' },
-                    { value: 'junk', label: 'Junk' },
-                  ].map(({ value, label }) => (
-                    <button
-                      key={value}
-                      className={`${styles.dropdownOption} ${leadAssignmentControls.leadType === value ? styles.selected : ''}`}
-                      onClick={() => {
-                        if (
-                          (value === 'junk' || value === 'support') &&
-                          value !== leadAssignmentControls.leadType &&
-                          leadAssignmentControls.onLeadTypeChangeWithModal
-                        ) {
-                          leadAssignmentControls.onLeadTypeChangeWithModal(value);
-                        } else {
-                          leadAssignmentControls.onLeadTypeChange(value);
-                        }
-                        setIsLeadTypeOpen(false);
-                      }}
-                    >
-                      {label}
-                    </button>
-                  ))}
+
+              {isMobileControlsOpen && (
+                <div className={styles.mobileControlsPanel}>
+
+                  {/* Assignment / Scheduler row */}
+                  <div className={styles.mobilePanelRow}>
+                    <span className={styles.mobilePanelLabel}>
+                      {isSchedulingStatus() ? 'Scheduler' : 'Assigned To'}
+                    </span>
+                    <div className={styles.controlGroup} ref={mobileAssignedToRef}>
+                      {isLeadUnassigned() ? (
+                        <>
+                          <span className={styles.unassignedText}>Unassigned</span>
+                          <button
+                            type="button"
+                            className={styles.assignButton}
+                            onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              width="16"
+                              height="16"
+                              viewBox="0 0 16 16"
+                              fill="none"
+                              aria-hidden="true"
+                            >
+                              <path
+                                d="M9.66536 13V11.6667C9.66536 10.9594 9.38441 10.2811 8.88432 9.78105C8.38422 9.28095 7.70594 9 6.9987 9H2.9987C2.29145 9 1.61318 9.28095 1.11308 9.78105C0.612983 10.2811 0.332031 10.9594 0.332031 11.6667V13"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M4.9987 6.33333C6.47146 6.33333 7.66536 5.13943 7.66536 3.66667C7.66536 2.19391 6.47146 1 4.9987 1C3.52594 1 2.33203 2.19391 2.33203 3.66667C2.33203 5.13943 3.52594 6.33333 4.9987 6.33333Z"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M11.668 4.3335V8.3335"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <path
+                                d="M13.668 6.3335H9.66797"
+                                stroke="currentColor"
+                                strokeWidth="1.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                            </svg>
+                            Assign
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          className={styles.controlDropdown}
+                          onClick={() => setIsAssignedToOpen(!isAssignedToOpen)}
+                        >
+                          <div className={styles.assignedToContent}>
+                            {(() => {
+                              const display = getAssignedToDisplay();
+                              if (display.avatar === 'team') {
+                                return <TeamAvatar />;
+                              }
+                              return (
+                                <MiniAvatar
+                                  firstName={display.firstName}
+                                  lastName={display.lastName}
+                                  email={display.email || ''}
+                                  userId={display.userId}
+                                  avatarUrl={display.avatar as string | null}
+                                  size="small"
+                                  className={styles.assignedAvatar}
+                                  showTooltip={false}
+                                />
+                              );
+                            })()}
+                            <span className={styles.controlValue}>
+                              {getAssignedToDisplay().name}
+                            </span>
+                          </div>
+                          <ChevronDown
+                            size={16}
+                            className={`${styles.chevron} ${isAssignedToOpen ? styles.open : ''}`}
+                          />
+                        </button>
+                      )}
+                      {isAssignedToOpen && renderAssignedToMenu()}
+                    </div>
+                  </div>
+
+                  {/* Branch row */}
+                  {leadAssignmentControls.availableBranches && leadAssignmentControls.availableBranches.length > 0 && (
+                    <div className={styles.mobilePanelRow}>
+                      <span className={styles.mobilePanelLabel}>Branch</span>
+                      <div className={styles.controlGroup} ref={mobileBranchRef}>
+                        <button
+                          className={styles.controlDropdown}
+                          onClick={() => setIsBranchOpen(!isBranchOpen)}
+                        >
+                          <span className={styles.controlValue}>
+                            {leadAssignmentControls.availableBranches.find(
+                              b => b.id === leadAssignmentControls.currentBranchId
+                            )?.name ?? 'No Branch'}
+                          </span>
+                          <ChevronDown
+                            size={16}
+                            className={`${styles.chevron} ${isBranchOpen ? styles.open : ''}`}
+                          />
+                        </button>
+                        {isBranchOpen && renderBranchMenu()}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lead Type row */}
+                  <div className={styles.mobilePanelRow}>
+                    <span className={styles.mobilePanelLabel}>Type</span>
+                    <div className={styles.controlGroup} ref={mobileLeadTypeRef}>
+                      <button
+                        className={styles.controlDropdown}
+                        onClick={() => setIsLeadTypeOpen(!isLeadTypeOpen)}
+                      >
+                        <span className={styles.controlValue}>
+                          {getLeadTypeDisplay()}
+                        </span>
+                        <ChevronDown
+                          size={16}
+                          className={`${styles.chevron} ${isLeadTypeOpen ? styles.open : ''}`}
+                        />
+                      </button>
+                      {isLeadTypeOpen && renderLeadTypeMenu()}
+                    </div>
+                  </div>
+
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
 
         {supportCaseAssignmentControls && (

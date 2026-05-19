@@ -87,6 +87,210 @@ When creating a new migration file, ALWAYS use the following naming convention:
 
 - The current time should be used to generate the timestamp to prevent duplicated filenames from different users.
 
+## Supabase RLS Performance Conventions
+
+When creating or editing RLS policies in a migration, follow these rules. They prevent the `auth_rls_initplan` and `multiple_permissive_policies` lints flagged by the Supabase performance advisor.
+
+### 1. Always wrap auth.<fn>() in (SELECT ...)
+
+Wrong (re-evaluated for every row):
+
+```sql
+USING (auth.uid() = user_id)
+USING (auth.role() = 'authenticated')
+USING (auth.jwt() ->> 'role' = 'admin')
+```
+
+Right (evaluated once per statement):
+
+```sql
+USING ((SELECT auth.uid()) = user_id)
+USING ((SELECT auth.role()) = 'authenticated')
+USING ((SELECT auth.jwt()) ->> 'role' = 'admin')
+```
+
+This applies to `auth.uid()`, `auth.role()`, `auth.jwt()`, `auth.email()`.
+
+### 2. Always specify TO <role> on every policy
+
+Without `TO`, a policy applies to every Postgres role (anon, authenticated, authenticator, dashboard_user, service_role) and the linter flags overlaps on each. Default to:
+
+```sql
+CREATE POLICY ... ON <table>
+  FOR <action>
+  TO authenticated     -- or anon, or service_role -- be explicit
+  USING (...);
+```
+
+### 3. One permissive policy per (role, action) pair
+
+If two policies both apply to the same role+action, Postgres evaluates BOTH on every matching row. Consolidate by OR'ing their conditions into a single policy.
+
+Wrong:
+
+```sql
+CREATE POLICY "admin can do anything" ON t FOR ALL USING (is_admin());
+CREATE POLICY "user can read own" ON t FOR SELECT USING (user_id = (SELECT auth.uid()));
+-- Overlap on SELECT for authenticated role.
+```
+
+Right:
+
+```sql
+CREATE POLICY "t_select" ON t FOR SELECT TO authenticated
+  USING (is_admin() OR user_id = (SELECT auth.uid()));
+CREATE POLICY "t_insert" ON t FOR INSERT TO authenticated
+  WITH CHECK (is_admin());
+-- and so on for UPDATE, DELETE
+```
+
+### 4. Don't write "service_role can manage" policies
+
+The `service_role` Postgres role has `bypassrls = true` in Supabase. RLS is never evaluated for it. Policies of the form `USING (auth.jwt() ->> 'role' = 'service_role')` or `TO service_role` are no-ops -- drop them. Server-side code that uses the service-role key already bypasses every policy.
+
+### 5. Don't create UNIQUE indexes alongside UNIQUE constraints
+
+A `UNIQUE` constraint already creates an index named `<table>_<col>_key`. Don't add a separate `CREATE UNIQUE INDEX idx_<table>_<col>` -- it's a duplicate. If you need a non-default index name, drop the UNIQUE constraint and create the index manually (rare).
+
+### 6. New table checklist
+
+When adding a table with RLS, the policy block should look like:
+
+```sql
+ALTER TABLE public.<t> ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "<t>_select" ON public.<t>
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM profiles
+            WHERE id = (SELECT auth.uid()) AND role = 'admin')
+    OR company_id IN (
+      SELECT company_id FROM user_companies WHERE user_id = (SELECT auth.uid())
+    )
+  );
+
+CREATE POLICY "<t>_insert" ON public.<t> FOR INSERT TO authenticated WITH CHECK (...);
+CREATE POLICY "<t>_update" ON public.<t> FOR UPDATE TO authenticated USING (...) WITH CHECK (...);
+CREATE POLICY "<t>_delete" ON public.<t> FOR DELETE TO authenticated USING (...);
+```
+
+Avoid `FOR ALL` policies when there is also any per-action policy on the same table for the same role -- that combination always trips the multiple_permissive lint.
+
+### 7. Re-run the linter after schema work
+
+Before merging a PR that touches any migration, run the Supabase performance advisor (Dashboard -> Advisors -> Performance) and confirm no new `auth_rls_initplan`, `multiple_permissive_policies`, or `duplicate_index` warnings were introduced.
+
+### 8. Realtime: prefer broadcast over postgres_changes
+
+When wiring a UI to live data updates, default to broadcast (the `/src/lib/realtime/*-channel.ts` pattern + a `SECURITY DEFINER` trigger that calls `realtime.send`) instead of `postgres_changes`. `postgres_changes` requires the table to be in the `supabase_realtime` publication, and every additional table in that publication makes every Realtime client's `realtime.list_changes` call slower (it processes more WAL per tick). Broadcast channels do not use the publication and bypass WAL entirely.
+
+If you must use `postgres_changes`:
+
+- Add the table to the publication explicitly: `ALTER PUBLICATION supabase_realtime ADD TABLE public.<t>`. Subscriptions to tables not in the publication silently receive no events.
+- Always include a row-level filter on a column with an index, e.g. `filter: 'project_id=eq.<id>'`.
+- When the subscription is later migrated to broadcast, remove the table from the publication in the same PR.
+
+### 9. Always enable RLS on new public-schema tables
+
+Every new table added to the `public` schema must include `ALTER TABLE public.<t> ENABLE ROW LEVEL SECURITY` and at least one policy in the same migration. Tables in `public` are exposed by PostgREST, so without RLS any authenticated user can read/write everything via the API. The `rls_disabled_in_public` lint catches this -- don't ship a migration that leaves it warning.
+
+Junction tables count too: even a 2-column link table needs RLS. Gate them via the parent's `company_id` (or whatever scoping column applies):
+
+```sql
+CREATE POLICY <t>_select ON public.<t>
+  FOR SELECT TO authenticated
+  USING (
+    EXISTS (SELECT 1 FROM profiles
+            WHERE id = (SELECT auth.uid()) AND role IN ('admin','super_admin'))
+    OR EXISTS (
+      SELECT 1 FROM <parent> p
+      WHERE p.id = <t>.<parent>_id
+        AND p.company_id IN (
+          SELECT company_id FROM user_companies WHERE user_id = (SELECT auth.uid())
+        )
+    )
+  );
+```
+
+If a table is service-role-write-only (e.g. a debug/audit log written by a `SECURITY DEFINER` trigger), enable RLS anyway and add only a SELECT policy -- service_role bypasses RLS, so writes still work.
+
+### 10. Views in public must use SECURITY INVOKER
+
+Without `WITH (security_invoker = true)`, Postgres views run with the *owner*'s permissions, bypassing the querying user's RLS. Every new view in `public` should be defined as:
+
+```sql
+CREATE VIEW public.<v> WITH (security_invoker = true) AS
+SELECT ...;
+```
+
+For existing views, retrofit with `ALTER VIEW public.<v> SET (security_invoker = true)`. The `security_definer_view` lint flags any view in `public` that doesn't have this option set. Pair this with proper RLS on the underlying tables -- the view will then only return rows the querying user is allowed to see.
+
+### 11. Realtime: trigger chains and frontend coalescing
+
+When one user action causes multiple broadcasts (e.g., completing a task fires the `project_tasks` trigger AND the `projects` trigger via the `progress_percentage` chain), a debounced frontend handler that captures the *latest* event's payload in its closure will lose information from earlier events.
+
+Wrong:
+
+```typescript
+const handler = (payload) => {
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    fetchProjects();
+    if (payload.table === 'project_tasks') fetchTasks();  // BUG: payload is the LAST event
+  }, 500);
+};
+```
+
+Right (use refs to latch the *union* of what arrived during the window):
+
+```typescript
+const pendingTasksFetchRef = useRef(false);
+const handler = (payload) => {
+  if (payload.table === 'project_tasks') pendingTasksFetchRef.current = true;
+  if (debounceTimer) clearTimeout(debounceTimer);
+  debounceTimer = setTimeout(() => {
+    const shouldFetchTasks = pendingTasksFetchRef.current;
+    pendingTasksFetchRef.current = false;
+    fetchProjects();
+    if (shouldFetchTasks) fetchTasks();
+  }, 500);
+};
+```
+
+Same idea applies to any `if (payload.table === ...)` style branching inside a debounce -- the variable closed over is the *most recent* event, not all events in the window.
+
+### 12. Don't leave temporary or snapshot tables in `public`
+
+Migrations that create defensive backup/snapshot tables (e.g., `_rls_policy_snapshot_*`) must either:
+
+- drop them in a follow-up migration once the change is verified, or
+- create them in a non-public schema (e.g., `_internal`) so they aren't exposed by PostgREST and don't trigger `rls_disabled_in_public`.
+
+`public` is for tables the API serves. Backups, audit dumps, and one-shot migration aids belong elsewhere.
+
+### 13. Always pin `search_path` on new functions
+
+Functions without a pinned `search_path` are vulnerable to hijacking: a caller can manipulate their own `search_path` so that an unqualified name like `projects` resolves to an attacker-controlled object. For `SECURITY DEFINER` functions (broadcast triggers, RLS helpers, etc.) this lets the attacker execute code as the function owner. The `function_search_path_mutable` lint catches it.
+
+Always include a `SET search_path` clause in `CREATE FUNCTION` (or `CREATE OR REPLACE FUNCTION`):
+
+```sql
+CREATE OR REPLACE FUNCTION public.<fn>(...)
+RETURNS ...
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = 'public, pg_temp'    -- pin it!
+AS $$
+BEGIN
+  ...
+END;
+$$;
+```
+
+`'public, pg_temp'` is a safe default for app functions: it lets the body reference unqualified public-schema names, and `pg_temp` is appended last so temp objects can't shadow public ones. The strictest option is `SET search_path = ''`, which forces every reference inside the body to be fully qualified (`public.projects`, `pg_catalog.now()`, etc.). Use the strict form for any new `SECURITY DEFINER` function that touches sensitive data.
+
+If you need to retrofit an existing function, use `ALTER FUNCTION public.<fn>(<args>) SET search_path = 'public, pg_temp'` -- no body change required.
+
 ## Widget Configuration
 
 - **Address Autocomplete**: Uses Google Places API for address suggestions

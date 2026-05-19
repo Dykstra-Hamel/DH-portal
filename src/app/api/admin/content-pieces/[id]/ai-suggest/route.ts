@@ -69,25 +69,25 @@ function getPastContentInstruction(contentType: string | null): { header: string
 function getTopicInstruction(contentType: string | null): string {
   switch (contentType) {
     case 'blog':
-      return `Generate 5 blog topic ideas. Each should be a specific angle or research direction — a theme to explore, not a polished headline. Focus on: current pest pressure trends, seasonal patterns, service area relevance, and gaps in past content. Topics should be descriptive directions like "Termite prevention for new homeowners in the Phoenix metro" rather than headline-formatted strings.`;
+      return `Generate 5 blog topic ideas. Each should be a specific angle or research direction — a theme to explore, not a polished headline. Focus on: current trends in the company's services, seasonal patterns relevant to those services, service area relevance, and gaps in past content. Use COMPANY CONTEXT and TARGETS / SPECIALTIES below to determine the company's industry — do not assume any specific industry. Topics should be descriptive directions like "[Service] for new homeowners in [Metro Area]" rather than headline-formatted strings.`;
 
     case 'pest_id':
       return `Generate 5 Pest ID page topic ideas. Each topic must name a specific pest species the company treats that is NOT already covered (see deduplication list above). Topics should include the pest name and a geographic or audience angle — e.g., "American cockroach identification and treatment for Central Florida homes." Suggest specific species or closely related species clusters, not broad categories like "cockroaches."`;
 
     case 'location':
-      return `Generate 5 Location page topic ideas. Each topic must target a specific city, neighborhood, or service area NOT already covered (see deduplication list above). Use the service areas list for candidates. Topics should include the location name and the primary pest challenge — e.g., "Pest control services in Weeki Wachee, FL — mosquito and rodent focus." Do not suggest locations already covered.`;
+      return `Generate 5 Location page topic ideas. Each topic must target a specific city, neighborhood, or service area NOT already covered (see deduplication list above). Use the service areas list for candidates. Topics should include the location name and the primary local need or challenge for the company's services — e.g., "[Service] in [City], [State] — [Specialty 1] and [Specialty 2] focus." Use COMPANY CONTEXT and TARGETS / SPECIALTIES to determine the relevant services; do not assume any specific industry.`;
 
     case 'pillar':
-      return `Generate 5 Pillar page topic ideas. Each topic must be a broad, comprehensive subject that could serve as a hub for multiple cluster pages — not a narrow single-pest angle. Focus on: service category overviews for a city or region, pest category comprehensive guides, or full location guides. Topics should feel like the "hub" of a content cluster — e.g., "Complete Pest Control Guide for Tucson, AZ" or "Termite, Rodent & Mosquito Control in the Greater Phoenix Area."`;
+      return `Generate 5 Pillar page topic ideas. Each topic must be a broad, comprehensive subject that could serve as a hub for multiple cluster pages — not a narrow single-specialty angle. Focus on: service category overviews for a city or region, comprehensive specialty guides, or full location guides. Use COMPANY CONTEXT and TARGETS / SPECIALTIES to determine the relevant categories; do not assume any specific industry. Topics should feel like the "hub" of a content cluster — e.g., "Complete [Service Category] Guide for [City], [State]" or "[Specialty 1], [Specialty 2] & [Specialty 3] in the Greater [Region] Area."`;
 
     case 'cluster':
-      return `Generate 5 Cluster page topic ideas. Each topic must be a focused sub-topic — ONE pest type or ONE service in ONE location. Focus on specific treatment coverage, specific pest species in a specific city, or a specific service category tied to a location. Topics should feel like one focused chapter — e.g., "Termite Control in Tucson, AZ" or "Mosquito Yard Treatment Services in Weeki Wachee, FL."`;
+      return `Generate 5 Cluster page topic ideas. Each topic must be a focused sub-topic — ONE specialty or ONE service in ONE location. Focus on specific treatment coverage, a specific specialty in a specific city, or a specific service category tied to a location. Use COMPANY CONTEXT and TARGETS / SPECIALTIES to determine the relevant services; do not assume any specific industry. Topics should feel like one focused chapter — e.g., "[Specialty] in [City], [State]" or "[Service] Services in [City], [State]."`;
 
     case 'evergreen':
-      return `Generate 5 Evergreen page topic ideas. Each topic must be a timeless, educational subject with long-term search relevance — no seasonal hooks or time-sensitive events. Focus on: identification and types guides, signs of infestation, prevention how-tos, homeowner decision guides (DIY vs. professional), or pest biology explainers. Topics should be just as useful to a homeowner searching 2 years from now as today.`;
+      return `Generate 5 Evergreen page topic ideas. Each topic must be a timeless, educational subject with long-term search relevance — no seasonal hooks or time-sensitive events. Focus on: identification and types guides, signs the homeowner should watch for, prevention how-tos, homeowner decision guides (DIY vs. professional), or domain explainers relevant to the company's services. Use COMPANY CONTEXT and TARGETS / SPECIALTIES to determine the topic domain; do not assume any specific industry. Topics should be just as useful to a homeowner searching 2 years from now as today.`;
 
     default:
-      return `Generate 5 content topic ideas. Each should be a specific angle or research direction — a theme to explore, not a polished headline. Focus on: current pest pressure trends, seasonal patterns, service area relevance, and gaps in past content. Topics should be descriptive directions like "Termite prevention for new homeowners in the Phoenix metro" rather than headline-formatted strings.`;
+      return `Generate 5 content topic ideas. Each should be a specific angle or research direction — a theme to explore, not a polished headline. Focus on: current trends in the company's services, seasonal patterns, service area relevance, and gaps in past content. Use COMPANY CONTEXT and TARGETS / SPECIALTIES to determine the topic domain; do not assume any specific industry. Topics should be descriptive directions like "[Service] for new homeowners in [Metro Area]" rather than headline-formatted strings.`;
   }
 }
 
@@ -294,7 +294,7 @@ export async function POST(
 
     const { header: pastContentHeader, instruction: pastContentInstruction } = getPastContentInstruction(piece.content_type);
 
-    const systemInstruction = `You are a content marketing expert for a pest control company. Use all the provided context to generate highly relevant, timely, and SEO-friendly topic ideas.
+    const systemInstruction = `You are a content marketing expert for ${company?.name ?? companyName}, a local service business. Use the COMPANY PROFILE, COMPANY AI CONTEXT, and TARGETS / SPECIALTIES below to determine industry, voice, and relevant topics — do not assume any specific industry. Some sections (pest pressure, predictions) only apply to pest control companies and may be empty for other industries; ignore them when not applicable. Use simple, clear language a homeowner would search for. Generate highly relevant, timely, and SEO-friendly topic ideas.
 
 COMPANY PROFILE:
 Name: ${company?.name ?? companyName}
@@ -306,13 +306,13 @@ Content Type Requested: ${piece.content_type ?? 'general'}
 SERVICE AREAS:
 ${areasSection || 'No service areas on file.'}
 
-PESTS TREATED:
-${pestNames || 'No pest data on file.'}
+TARGETS / SPECIALTIES:
+${pestNames || 'No specialty data on file.'}
 
 SERVICE PLANS:
 ${plansSection || 'No service plans on file.'}
 
-RECENT PEST PRESSURE (last 30 days):
+RECENT PEST PRESSURE (last 30 days, pest companies only):
 ${recentPressureSection || 'No recent pest pressure data.'}
 
 SAME PERIOD LAST YEAR (${yearAgoLabel}):

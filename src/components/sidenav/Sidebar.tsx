@@ -24,7 +24,7 @@ export function Sidebar({ collapsed = false, isActive = false, onLinkClick, hide
       className={`${styles.sidebarContainer} ${isActive ? styles.active : ''} ${hideSecondary ? styles.primaryOnly : ''}`}
       onClick={handleOverlayClick}
     >
-      <PrimarySideNav />
+      <PrimarySideNav onLinkClick={onLinkClick} />
       {!hideSecondary && (
         <SecondarySideNav
           collapsed={collapsed}

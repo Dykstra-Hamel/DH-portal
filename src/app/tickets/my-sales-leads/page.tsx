@@ -8,6 +8,7 @@ import { useCompany } from '@/contexts/CompanyContext';
 import { usePageActions } from '@/contexts/PageActionsContext';
 import { DataTable } from '@/components/Common/DataTable';
 import { getLeadColumns, getUserLeadTabs } from '@/components/Leads/LeadsList/LeadsListConfig';
+import { useLeadReviewStatuses } from '@/hooks/useLeadReviewStatuses';
 import { Lead } from '@/types/lead';
 import { createClient } from '@/lib/supabase/client';
 import { AddLeadModal } from '@/components/Leads/AddLeadModal/AddLeadModal';
@@ -50,6 +51,9 @@ export default function MySalesLeadsPage() {
     if (!activeTabConfig) return leads;
     return activeTabConfig.filter(leads);
   }, [leads, activeTab, tabs]);
+
+  // Live "Viewing" indicator state — see useLeadReviewStatuses for details.
+  const reviewStatuses = useLeadReviewStatuses(leads);
 
   // Apply search filter
   const filteredData = useMemo(() => {
@@ -143,6 +147,14 @@ export default function MySalesLeadsPage() {
               company:companies(
                 id,
                 name
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
@@ -179,6 +191,14 @@ export default function MySalesLeadsPage() {
               company:companies(
                 id,
                 name
+              ),
+              reviewed_by_profile:profiles!reviewed_by(
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url,
+                uploaded_avatar_url
               )
             `)
             .eq('id', record_id)
@@ -271,7 +291,7 @@ export default function MySalesLeadsPage() {
       <DataTable<Lead>
         data={filteredData}
         title="My Sales Leads"
-        columns={getLeadColumns()}
+        columns={getLeadColumns(reviewStatuses)}
         loading={loading}
         emptyStateMessage="No leads assigned to you yet."
         tableType="leads"

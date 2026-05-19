@@ -162,6 +162,12 @@ function StepMapPlot({
       }
     | null
   >(null);
+  const outlineNodeLongPressRef = useRef<{
+    timerId: ReturnType<typeof setTimeout>;
+    startClientX: number;
+    startClientY: number;
+    pendingGesture: NonNullable<typeof outlineNodeGestureRef.current>;
+  } | null>(null);
   const mapRotateRef = useRef<{ lastAngle: number | null; baseHeading: number }>({ lastAngle: null, baseHeading: 0 });
 
   const latitude = getMapLatitude(mapPlotData);
@@ -1092,7 +1098,8 @@ function StepMapPlot({
     if (!point || !container) return;
 
     const rect = container.getBoundingClientRect();
-    const NODE_HIT_PX = 18;
+    const isTouch = event.pointerType === 'touch';
+    const NODE_HIT_PX = isTouch ? 28 : 18;
 
     const isDrawingActiveOutline =
       !!mapPlotData.activeOutlineId &&
@@ -1160,21 +1167,42 @@ function StepMapPlot({
         event.preventDefault();
         event.stopPropagation();
         setSnapToFirst(false);
-        outlineNodeGestureRef.current = {
-          mode: 'move-node',
+        lastDragAtRef.current = Date.now();
+        event.currentTarget.setPointerCapture(event.pointerId);
+
+        const pendingGesture = {
+          mode: 'move-node' as const,
           outlineId: hitOutlineId,
           nodeIndex: hitNodeIndex,
           startClientX: event.clientX,
           startClientY: event.clientY,
           isDragging: false,
         };
-        lastDragAtRef.current = Date.now();
-        event.currentTarget.setPointerCapture(event.pointerId);
+
+        if (isTouch) {
+          const timerId = setTimeout(() => {
+            outlineNodeGestureRef.current = pendingGesture;
+            outlineNodeLongPressRef.current = null;
+          }, 150);
+          outlineNodeLongPressRef.current = {
+            timerId,
+            startClientX: event.clientX,
+            startClientY: event.clientY,
+            pendingGesture,
+          };
+        } else {
+          outlineNodeGestureRef.current = pendingGesture;
+        }
       }
     }
   };
 
   const stopOutlineNodeDrag = () => {
+    if (outlineNodeLongPressRef.current) {
+      clearTimeout(outlineNodeLongPressRef.current.timerId);
+      outlineNodeLongPressRef.current = null;
+    }
+
     const gesture = outlineNodeGestureRef.current;
     if (!gesture) return;
 
@@ -1512,6 +1540,16 @@ function StepMapPlot({
   };
 
   const handleOverlayPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    // Cancel pending touch-hold if finger has moved (user is panning)
+    if (outlineNodeLongPressRef.current) {
+      const { startClientX, startClientY } = outlineNodeLongPressRef.current;
+      if (Math.hypot(event.clientX - startClientX, event.clientY - startClientY) > 8) {
+        clearTimeout(outlineNodeLongPressRef.current.timerId);
+        outlineNodeLongPressRef.current = null;
+      }
+      return; // don't process drag until armed
+    }
+
     const gesture = outlineNodeGestureRef.current;
     if (gesture) {
       if (gesture.mode === 'close-outline') {
@@ -2446,7 +2484,7 @@ function StepMapPlot({
                         key={`${outline.id}-mid-${i + 1}`}
                         cx={gx(point)}
                         cy={gy(point)}
-                        r={isBlankGridMode ? 5 / blankGridScale : 5}
+                        r={isBlankGridMode ? 8 / blankGridScale : 8}
                         fill="white"
                         stroke={outline.isClosed ? metrics.strokeColor : '#2563eb'}
                         strokeWidth={isBlankGridMode ? 2 / blankGridScale : 2}
@@ -2471,8 +2509,8 @@ function StepMapPlot({
                           cx={gx(outline.points[0])}
                           cy={gy(outline.points[0])}
                           r={isBlankGridMode
-                            ? (outline.isClosed ? 6 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 7 : 5) / blankGridScale
-                            : (outline.isClosed ? 6 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 7 : 5)}
+                            ? (outline.isClosed ? 9 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 10 : 8) / blankGridScale
+                            : (outline.isClosed ? 9 : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? 10 : 8)}
                           fill="white"
                           stroke={outline.isClosed ? metrics.strokeColor : (isFence ? outline.points.length >= 2 : outline.points.length >= 3) ? (isFence ? '#22c55e' : '#f97316') : '#2563eb'}
                           strokeWidth={isBlankGridMode ? 2.5 / blankGridScale : 2.5}
@@ -2731,6 +2769,10 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
   const roTransformRef = useRef(roTransform);
   useEffect(() => { roTransformRef.current = roTransform; }, [roTransform]);
 
+  // Stable ref for the native wheel handler so the useEffect below can attach
+  // it with { passive: false } without needing to re-register on every render.
+  const handleRoWheelRef = useRef<((e: WheelEvent) => void) | null>(null);
+
   const handleRoPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     // Don't capture when the touch started on a stamp button — we need
     // the browser to fire the click event on the button naturally.
@@ -2825,7 +2867,10 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
     if (g.pointers.size === 0) { g.pan = null; }
   };
 
-  const handleRoWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+  // Keep the native wheel handler ref in sync on every render so it always
+  // closes over the latest `previewSize` without needing to re-attach the
+  // non-passive DOM listener.
+  handleRoWheelRef.current = (e: WheelEvent) => {
     e.preventDefault();
     setRoAnimating(false);
     // Scale by actual deltaY so trackpads (many small events) don't compound
@@ -2929,11 +2974,15 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       e.preventDefault();
     };
 
+    const onWheel = (e: WheelEvent) => handleRoWheelRef.current?.(e);
+
     frame.addEventListener('touchstart', onTouchStart, { passive: false });
     frame.addEventListener('touchmove', onTouchMove, { passive: false });
+    frame.addEventListener('wheel', onWheel, { passive: false });
     return () => {
       frame.removeEventListener('touchstart', onTouchStart);
       frame.removeEventListener('touchmove', onTouchMove);
+      frame.removeEventListener('wheel', onWheel);
     };
   }, []);
 
@@ -3027,6 +3076,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
 
         return {
           id: outline.id,
+          type: outline.type,
           points: projectedPoints,
           strokeColor,
           fillColor: hexToRgba(strokeColor, 0.12),
@@ -3035,6 +3085,7 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
       })
       .filter((outline): outline is {
         id: string;
+        type: MapElementStampType;
         points: Array<{ x: number; y: number }>;
         strokeColor: string;
         fillColor: string;
@@ -3105,7 +3156,6 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
           onPointerUp={handleRoPointerEnd}
           onPointerCancel={handleRoPointerEnd}
           onPointerLeave={handleRoPointerEnd}
-          onWheel={handleRoWheel}
           style={{ cursor: 'grab', touchAction: 'none', overflow: 'hidden' }}
         >
           <div
@@ -3144,8 +3194,51 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                   viewBox={`0 0 ${previewSize.width} ${previewSize.height}`}
                   preserveAspectRatio="none"
                 >
-                  {previewOutlines.map(outline =>
-                    outline.isClosed && outline.points.length >= 3 ? (
+                  {previewOutlines.map(outline => {
+                    if (outline.type === 'fence') {
+                      const spacing = 14;
+                      const half = 6;
+                      const ticks: React.ReactNode[] = [];
+                      for (let si = 0; si < outline.points.length - 1; si++) {
+                        const ax = outline.points[si].x, ay = outline.points[si].y;
+                        const bx = outline.points[si + 1].x, by = outline.points[si + 1].y;
+                        const dx = bx - ax, dy = by - ay;
+                        const len = Math.sqrt(dx * dx + dy * dy);
+                        if (len < 1) continue;
+                        const ux = dx / len, uy = dy / len;
+                        const px = -uy, py = ux;
+                        const n = Math.max(1, Math.round(len / spacing));
+                        for (let t = 0; t <= n; t++) {
+                          const cx = ax + ux * (len * t / n);
+                          const cy = ay + uy * (len * t / n);
+                          ticks.push(
+                            <line
+                              key={`f-${si}-${t}`}
+                              x1={cx - px * half} y1={cy - py * half}
+                              x2={cx + px * half} y2={cy + py * half}
+                              stroke={outline.strokeColor}
+                              strokeWidth={2}
+                              strokeLinecap="round"
+                            />
+                          );
+                        }
+                      }
+                      return (
+                        <g key={outline.id}>
+                          <polyline
+                            points={outline.points.map(p => `${p.x},${p.y}`).join(' ')}
+                            fill="none"
+                            stroke={outline.strokeColor}
+                            strokeWidth={2}
+                            strokeLinejoin="round"
+                            strokeLinecap="round"
+                          />
+                          {ticks}
+                        </g>
+                      );
+                    }
+
+                    return outline.isClosed && outline.points.length >= 3 ? (
                       <polygon
                         key={outline.id}
                         points={outline.points.map(point => `${point.x},${point.y}`).join(' ')}
@@ -3163,8 +3256,8 @@ function ReadOnlySummary({ mapPlotData, companyId, stampColor }: { mapPlotData: 
                         strokeWidth={2}
                         strokeLinejoin="round"
                       />
-                    )
-                  )}
+                    );
+                  })}
                 </svg>
               )}
 

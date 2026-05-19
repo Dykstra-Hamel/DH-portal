@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { Check } from 'lucide-react';
 import { SupportCase } from '@/types/support-case';
 import { adminAPI } from '@/lib/api-client';
 import styles from './SupportCaseRow.module.scss';
@@ -190,7 +191,7 @@ export default function SupportCaseRow({
             disabled={isUpdating}
             title="Mark as resolved"
           >
-            ✓
+            <Check size={14} strokeWidth={2.5} />
           </button>
         )}
         

@@ -19,6 +19,8 @@ import {
 } from './QuoteBuildStep';
 import qcStyles from '@/components/Quote/QuoteContent/quotecontent.module.scss';
 import styles from './ReviewStep.module.scss';
+import { InspectorCard } from '@/components/InspectorCard/InspectorCard';
+import { HeroMapPanel } from '@/components/HeroMapPanel/HeroMapPanel';
 import {
   TimeOption,
   DEFAULT_TIME_OPTIONS,
@@ -234,8 +236,6 @@ export function ReviewStep({
   const [showEmailModal, setShowEmailModal] = useState(false);
   const [enteredEmail, setEnteredEmail] = useState('');
   const [showSigModal, setShowSigModal] = useState(false);
-  const [showMapView, setShowMapView] = useState(false);
-  const housePhoto = mapPlotData.housePhotos?.[0] ?? null;
   const [signedBy, setSignedBy] = useState(clientName || '');
   const [signatureData, setSignatureData] = useState<string | null>(null);
   const [scheduleSuccessMsg, setScheduleSuccessMsg] = useState('');
@@ -1320,145 +1320,22 @@ export function ReviewStep({
                 </div>
               )}
               {/* Inspector + address card */}
-              <div className={styles.inspectorCard}>
-                <div className={styles.inspectorInfo}>
-                  {inspectorAvatarUrl && (
-                    <Image
-                      src={inspectorAvatarUrl}
-                      alt={inspectorName}
-                      width={57}
-                      height={57}
-                      className={styles.inspectorAvatar}
-                    />
-                  )}
-                  <div className={styles.inspectorText}>
-                    <p className={styles.inspectorName}>{inspectorName}</p>
-                    <p className={styles.inspectorTitle}>
-                      {inspectorTitle || 'Lead Sales Inspector'}
-                    </p>
-                    {(inspectorPhone || companyPhone) && (
-                      <p className={styles.inspectorPhone}>
-                        {inspectorPhone || companyPhone}
-                      </p>
-                    )}
-                    {inspectorEmail && (
-                      <p className={styles.inspectorEmail}>
-                        {inspectorEmail}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className={styles.inspectorSeparator} />
-                <div className={styles.inspectorAddress}>
-                  <p className={styles.inspectorAddressLabel}>
-                    Inspection
-                    <span className={styles.addressLabelBreak}>
-                      <br />
-                    </span>{' '}
-                    Address:
-                  </p>
-                  <div className={styles.inspectorAddressSeparator} />
-                  <p className={styles.inspectorAddressValue}>
-                    {(() => {
-                      const comma = address.indexOf(',');
-                      if (comma === -1) return address;
-                      return (
-                        <>
-                          {address.slice(0, comma)}
-                          <br />
-                          {address.slice(comma + 1).trim()}
-                        </>
-                      );
-                    })()}
-                  </p>
-                </div>
-              </div>
+              <InspectorCard
+                name={inspectorName}
+                title={inspectorTitle}
+                phone={inspectorPhone}
+                email={inspectorEmail}
+                avatarUrl={inspectorAvatarUrl}
+                address={address}
+                companyPhone={companyPhone}
+              />
             </div>
-            <div
-              className={`${qcStyles.heroImage} ${styles.heroMapWrap}`}
-              style={
-                {
-                  '--blue-500': '#3b82f6',
-                  '--primary-color': '#3b82f6',
-                } as React.CSSProperties
-              }
-            >
-              {/* Map layer — stays in normal flow so it drives container height */}
-              <div
-                className={styles.heroMapLayer}
-                style={{ opacity: showMapView || !housePhoto ? 1 : 0 }}
-              >
-                <MapPlotCanvas
-                  mapPlotData={mapPlotData}
-                  onChange={() => {}}
-                  isReadOnly
-                  companyId={companyId}
-                  stampColor={brandPrimary ?? undefined}
-                />
-              </div>
-              {/* House photo — absolutely overlaid, crossfades over the map */}
-              {housePhoto && (
-                <div
-                  className={`${styles.heroPhotoLayer} ${!showMapView ? styles.heroPhotoLayerVisible : ''}`}
-                >
-                  <Image
-                    src={housePhoto}
-                    alt="House photo"
-                    fill
-                    objectFit="cover"
-                  />
-                </div>
-              )}
-              {/* "Switch To Pest Findings Map" — shown in photo view */}
-              {housePhoto && !showMapView && (
-                <button
-                  type="button"
-                  className={styles.heroViewToggleBtn}
-                  onClick={() => setShowMapView(true)}
-                >
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="18"
-                    height="18"
-                    viewBox="0 0 22 22"
-                    fill="none"
-                  >
-                    <path
-                      d="M21 11C21 16.5228 16.5228 21 11 21M21 11C21 5.47715 16.5228 1 11 1M21 11H17M11 21C5.47715 21 1 16.5228 1 11M11 21V17M1 11C1 5.47715 5.47715 1 11 1M1 11H5M11 1V5"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  Switch To Pest Findings Map
-                </button>
-              )}
-              {/* "Close Map" — shown in map view, top-right */}
-              {housePhoto && showMapView && (
-                <button
-                  type="button"
-                  className={styles.heroCloseMapBtn}
-                  onClick={() => setShowMapView(false)}
-                >
-                  Close Map
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="34"
-                    height="34"
-                    viewBox="0 0 36 36"
-                    fill="none"
-                  >
-                    <path
-                      d="M23.1 12.9L12.9 23.1M12.9 12.9L23.1 23.1M35 18C35 27.3888 27.3888 35 18 35C8.61116 35 1 27.3888 1 18C1 8.61116 8.61116 1 18 1C27.3888 1 35 8.61116 35 18Z"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                </button>
-              )}
+            <div className={qcStyles.heroImage}>
+              <HeroMapPanel
+                mapPlotData={mapPlotData}
+                companyId={companyId}
+                brandPrimary={brandPrimary}
+              />
             </div>
           </div>
         </section>

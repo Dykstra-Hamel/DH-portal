@@ -1130,6 +1130,92 @@
   margin-bottom: 0;
 }
 
+.commentEditActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.commentEditSave,
+.commentEditCancel {
+  border: none;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.commentEditSave {
+  background: var(--action-600, #0284c7);
+  color: var(--white);
+
+  &:hover:not(:disabled) {
+    background: var(--action-700, #0369a1);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.commentEditCancel {
+  background: var(--gray-100, #f3f4f6);
+  color: var(--gray-700, #374151);
+
+  &:hover:not(:disabled) {
+    background: var(--gray-200, #e5e7eb);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+.commentImageDelete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(239, 68, 68, 0.92);
+  color: var(--white);
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: rgba(220, 38, 38, 1);
+  }
+}
+
+.commentFileDelete {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--error-600, #dc2626);
+  cursor: pointer;
+  transition: background 0.15s;
+
+  &:hover {
+    background: var(--error-50, #fef2f2);
+  }
+}
+
 // Activity Feed
 .activityFeed {
   display: flex;

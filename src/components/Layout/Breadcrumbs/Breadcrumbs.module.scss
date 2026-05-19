@@ -2,8 +2,11 @@
   display: flex;
   align-items: center;
   font-size: 14px;
-  color: #6b7280;
+  color: var(--gray-500);
   overflow: hidden;
+  @media (width < 600px) {
+    display: none;
+  }
 }
 
 .breadcrumbGroup {
@@ -40,7 +43,7 @@
 }
 
 .breadcrumbItem {
-  color: #6b7280;
+  color: var(--gray-500);
   overflow: hidden;
   text-overflow: ellipsis;
 

@@ -289,9 +289,8 @@
 
 .attachmentsGrid {
   display: grid;
-  grid-template-columns: repeat(4, 150px);
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
   gap: 16px;
-  flex-wrap: wrap;
 }
 
 .attachmentItem {
@@ -1233,6 +1232,14 @@
   margin-bottom: 0;
 }
 
+.commentEditActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+
 .commentInput {
   flex: 1;
   border: none;
@@ -1479,7 +1486,7 @@
   padding: 10px 16px;
   border: none;
   border-radius: 8px;
-  background: var(--action-600, #0284c7);
+  background: var(--blue-500);
   color: var(--white);
   font-size: 14px;
   font-weight: 600;
@@ -1487,7 +1494,7 @@
   transition: background 0.2s ease;
 
   &:hover {
-    background: #0369a1;
+    background: var(--blue-600);
   }
 
   &:disabled {

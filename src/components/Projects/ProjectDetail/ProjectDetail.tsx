@@ -523,7 +523,8 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     }
   }, [editFormData, onProjectUpdate, project.id]);
 
-  const isAdminRole = (role?: string | null) => role === 'admin' || role === 'super_admin';
+  const isAssignableRole = (role?: string | null) =>
+    role === 'admin' || role === 'super_admin' || role === 'project_manager';
 
   const getUserRole = (user: any) => {
     if (user?.profiles?.role) return user.profiles.role;
@@ -531,6 +532,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
     if (Array.isArray(user?.roles)) {
       if (user.roles.includes('admin')) return 'admin';
       if (user.roles.includes('super_admin')) return 'super_admin';
+      if (user.roles.includes('project_manager')) return 'project_manager';
     }
     return null;
   };
@@ -546,22 +548,22 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
 
   const assignableUsers = useMemo(() => {
     const shouldFilterByRole = users.some(user => getUserRole(user));
-    const adminUsers = shouldFilterByRole
+    const filtered = shouldFilterByRole
       ? users.filter(user => {
           const role = getUserRole(user);
-          return role ? isAdminRole(role) : false;
+          return role ? isAssignableRole(role) : false;
         })
       : users;
 
     const assignedId = editFormData.assigned_to || project.assigned_to_profile?.id;
-    if (assignedId && !adminUsers.some(user => user.id === assignedId)) {
+    if (assignedId && !filtered.some(user => user.id === assignedId)) {
       const assignedUser = users.find(user => user.id === assignedId);
       if (assignedUser) {
-        return [...adminUsers, assignedUser];
+        return [...filtered, assignedUser];
       }
       if (project.assigned_to_profile) {
         return [
-          ...adminUsers,
+          ...filtered,
           {
             id: assignedId,
             profiles: project.assigned_to_profile,
@@ -571,7 +573,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
       }
     }
 
-    return adminUsers;
+    return filtered;
   }, [editFormData.assigned_to, project.assigned_to_profile, users]);
 
   const requestedByProfile = useMemo(() => {
@@ -1315,16 +1317,14 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({
                           {taskCount > 0 && (
                             <div className={styles.memberTaskCount}>{taskCount}</div>
                           )}
-                          {member.added_via === 'manual' && (
-                            <button
-                              className={styles.removeMemberButton}
-                              onClick={() => handleRemoveMember(member.user_id)}
-                              title="Remove member"
-                              type="button"
-                            >
-                              <X size={14} />
-                            </button>
-                          )}
+                          <button
+                            className={styles.removeMemberButton}
+                            onClick={() => handleRemoveMember(member.user_id)}
+                            title="Remove from project. Tasks must be reassigned first."
+                            type="button"
+                          >
+                            <X size={14} />
+                          </button>
                         </div>
                       </div>
                     );

@@ -484,7 +484,9 @@ export default function DataTable<T>({
               const isSingleRow =
                 !cardView.summary && !cardView.avatar && !cardView.statusBar;
               const actionCol =
-                isSingleRow && cardView.primaryAction ? '140px' : '0px';
+                isSingleRow && cardView.primaryAction
+                  ? (cardView.actionColumnWidth ?? '140px')
+                  : '0px';
               const fieldWidths = cardView.topFields
                 .map(f => f.width ?? 'minmax(0, 1fr)')
                 .join(' ');

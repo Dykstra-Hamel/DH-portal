@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { Check } from 'lucide-react';
 import styles from './unsubscribe.module.scss';
 
 interface TokenData {
@@ -126,7 +127,7 @@ function UnsubscribeContent() {
       <div className={styles.container}>
         <div className={styles.card}>
           <div className={styles.success}>
-            <div className={styles.successIcon}>✓</div>
+            <div className={styles.successIcon}><Check size={20} strokeWidth={2} /></div>
             <h1>Successfully Unsubscribed</h1>
             <p>You have been unsubscribed from all marketing communications.</p>
             <p className={styles.note}>

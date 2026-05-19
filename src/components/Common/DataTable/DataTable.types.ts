@@ -47,6 +47,9 @@ export interface CardViewConfig<T> {
   statusBar?: (item: T) => ReactNode;
   // Primary action button (e.g. "Review Lead"). Usually a link.
   primaryAction?: (item: T) => ReactNode;
+  // Override the default 140px action column width in single-row card view.
+  // Useful when the action area contains multiple buttons side by side.
+  actionColumnWidth?: string;
   // Returns true when the row should render with the "unread" highlight
   // (blue border + blue-25 background). Used by inbox-style views.
   unread?: (item: T) => boolean;

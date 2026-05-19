@@ -23,6 +23,9 @@
 /public/workbox-*.js
 /public/workbox-*.js.map
 
+# PDF.js assets copied from pdfjs-dist (see scripts/copy-pdfjs-assets.js)
+/public/pdfjs/
+
 # production
 /build
 

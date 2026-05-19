@@ -120,7 +120,7 @@ export function TechLeadsOpportunities({
   const [loading, setLoading] = useState(true);
   const [selectedLead, setSelectedLead] = useState<TechLead | null>(null);
   const [selectedDraft, setSelectedDraft] = useState<DraftLead | null>(null);
-  const [activeTab, setActiveTab] = useState<Tab>('all');
+  const [activeTab, setActiveTab] = useState<Tab>('in-process');
   const [draft, setDraft] = useState<DraftLead | null>(null);
 
   // Load draft from localStorage

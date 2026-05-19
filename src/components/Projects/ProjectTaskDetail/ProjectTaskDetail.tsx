@@ -653,6 +653,28 @@ export default function ProjectTaskDetail({
     }
   }, [editingCommentId, task, onUpdate]);
 
+  const handleDeleteCommentAttachment = useCallback(
+    async (commentId: string, attachmentId: string) => {
+      if (!task) return;
+      try {
+        const response = await fetch(
+          `/api/admin/tasks/${task.id}/comments/${commentId}/attachments?attachmentId=${attachmentId}`,
+          { method: 'DELETE' }
+        );
+
+        if (!response.ok) {
+          throw new Error('Failed to delete attachment');
+        }
+
+        await onUpdate(task.id, {});
+      } catch (error) {
+        console.error('Error deleting comment attachment:', error);
+        alert('Failed to remove attachment. Please try again.');
+      }
+    },
+    [task, onUpdate]
+  );
+
   // File attachment handlers
   const handleCommentFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0) {
@@ -1917,63 +1939,137 @@ export default function ProjectTaskDetail({
                               <span className={styles.commentEdited}> (edited)</span>
                             )}
                           </div>
-                          {isCommentOwner && (
+                          {isCommentOwner && !isEditing && (
                             <div className={styles.commentActions}>
-                              {isEditing ? (
-                                <>
-                                  <button
-                                    type="button"
-                                    className={styles.commentActionButton}
-                                    onClick={handleUpdateComment}
-                                    aria-label="Save comment"
-                                    disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
-                                  >
-                                    <Check size={14} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={styles.commentActionButton}
-                                    onClick={handleCancelEditComment}
-                                    aria-label="Cancel edit"
-                                    disabled={isUpdatingComment}
-                                  >
-                                    <X size={14} />
-                                  </button>
-                                </>
-                              ) : (
-                                <>
-                                  <button
-                                    type="button"
-                                    className={styles.commentActionButton}
-                                    onClick={() => handleStartEditComment(comment)}
-                                    aria-label="Edit comment"
-                                  >
-                                    <Pencil size={14} />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className={`${styles.commentActionButton} ${styles.commentActionDanger}`}
-                                    onClick={() => handleDeleteComment(comment.id)}
-                                    aria-label="Delete comment"
-                                    disabled={deletingCommentId === comment.id}
-                                  >
-                                    <Trash2 size={14} />
-                                  </button>
-                                </>
-                              )}
+                              <button
+                                type="button"
+                                className={styles.commentActionButton}
+                                onClick={() => handleStartEditComment(comment)}
+                                aria-label="Edit comment"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.commentActionButton} ${styles.commentActionDanger}`}
+                                onClick={() => handleDeleteComment(comment.id)}
+                                aria-label="Delete comment"
+                                disabled={deletingCommentId === comment.id}
+                              >
+                                <Trash2 size={14} />
+                              </button>
                             </div>
                           )}
                         </div>
                       </div>
                       {isEditing ? (
-                        <RichTextEditor
-                          value={editingCommentText}
-                          onChange={setEditingCommentText}
-                          placeholder="Edit comment..."
-                          className={styles.commentEditRichEditor}
-                          compact
-                          mentionUsers={mentionUsers}
-                        />
+                        <>
+                          <RichTextEditor
+                            value={editingCommentText}
+                            onChange={setEditingCommentText}
+                            placeholder="Edit comment..."
+                            className={styles.commentEditRichEditor}
+                            compact
+                            mentionUsers={mentionUsers}
+                          />
+                          {comment.attachments && comment.attachments.length > 0 && (() => {
+                            const imageAttachments = comment.attachments.filter(
+                              (attachment: { mime_type?: string | null }) =>
+                                attachment.mime_type?.startsWith('image/')
+                            );
+                            const fileAttachments = comment.attachments.filter(
+                              (attachment: { mime_type?: string | null }) =>
+                                !attachment.mime_type?.startsWith('image/')
+                            );
+
+                            return (
+                              <>
+                                {imageAttachments.length > 0 && (
+                                  <div className={styles.commentImages}>
+                                    {imageAttachments.map((attachment: { id: string; url: string; file_name: string }) => (
+                                      <div
+                                        key={attachment.id}
+                                        className={styles.commentImage}
+                                      >
+                                        <img
+                                          src={attachment.url}
+                                          alt={attachment.file_name}
+                                          loading="lazy"
+                                        />
+                                        <button
+                                          type="button"
+                                          className={styles.commentImageDelete}
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            void handleDeleteCommentAttachment(comment.id, attachment.id);
+                                          }}
+                                          aria-label="Remove attachment"
+                                        >
+                                          <X size={13} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                                {fileAttachments.length > 0 && (
+                                  <div className={styles.commentAttachments}>
+                                    {fileAttachments.map((attachment: { id: string; url: string; file_name: string; mime_type?: string | null }) => (
+                                      <div key={attachment.id} className={styles.commentFile}>
+                                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                          <path
+                                            d="M9.33333 1.33334H4C3.46957 1.33334 2.96086 1.54405 2.58579 1.91913C2.21071 2.2942 2 2.80291 2 3.33334V12.6667C2 13.1971 2.21071 13.7058 2.58579 14.0809C2.96086 14.456 3.46957 14.6667 4 14.6667H12C12.5304 14.6667 13.0391 14.456 13.4142 14.0809C13.7893 13.7058 14 13.1971 14 12.6667V6L9.33333 1.33334Z"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          />
+                                          <path
+                                            d="M9.33333 1.33334V6H14"
+                                            stroke="currentColor"
+                                            strokeWidth="1.5"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                          />
+                                        </svg>
+                                        <span>{attachment.file_name}</span>
+                                        <button
+                                          type="button"
+                                          className={styles.commentFileDelete}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            void handleDeleteCommentAttachment(comment.id, attachment.id);
+                                          }}
+                                          aria-label="Remove attachment"
+                                        >
+                                          <X size={13} />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            );
+                          })()}
+                          <div className={styles.commentEditActions}>
+                            <button
+                              type="button"
+                              className={styles.commentEditCancel}
+                              onClick={handleCancelEditComment}
+                              disabled={isUpdatingComment}
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              className={styles.commentEditSave}
+                              onClick={handleUpdateComment}
+                              disabled={isUpdatingComment || isRichTextEmpty(editingCommentText)}
+                            >
+                              {isUpdatingComment ? 'Saving...' : 'Save'}
+                            </button>
+                          </div>
+                        </>
                       ) : (
                         <>
                           <div

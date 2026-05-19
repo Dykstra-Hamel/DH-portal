@@ -498,6 +498,31 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
     }
   }, [viewingProof, project.id, activePinId]);
 
+  const handleMovePin = useCallback(async (id: string, x: number, y: number) => {
+    if (!viewingProof) return;
+
+    // Optimistic update so the pin doesn't snap back while the request is in flight.
+    setFeedbackItems((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, x_percent: x, y_percent: y } : f))
+    );
+
+    try {
+      const res = await fetch(
+        `/api/admin/projects/${project.id}/proofs/${viewingProof.id}/feedback/${id}`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ x_percent: x, y_percent: y }),
+        }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      setFeedbackItems((prev) => prev.map((f) => (f.id === id ? data.feedback : f)));
+    } catch {
+      // silent — optimistic value stays
+    }
+  }, [viewingProof, project.id]);
+
   const handleStartEditFeedback = useCallback((feedback: ProofFeedback) => {
     setEditingFeedbackId(feedback.id);
     setEditingFeedbackComment(feedback.comment);
@@ -750,6 +775,7 @@ export default function ProofsTab({ project, user, canEdit, mentionUsers, autoOp
                   onAddFeedback={handleAddFeedback}
                   onResolvePin={handleResolvePin}
                   onDeletePin={handleDeletePin}
+                  onMovePin={handleMovePin}
                 />
               </div>
 

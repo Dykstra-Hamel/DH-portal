@@ -30,6 +30,14 @@
 
 // ─── Mobile bottom row — stack summary, then avatar + action on one line ─────
 
+// ─── Search wrapper (hidden at mobile) ───────────────────────────────────────
+
+.searchWrapper {
+  @media (max-width: 767px) {
+    display: none;
+  }
+}
+
 @media (max-width: 767px) {
   .container [data-card-section='top'] {
     align-items: flex-start;
@@ -54,14 +62,24 @@
   }
 
   .container [data-card-section='bottom-middle'] {
-    flex: 1 1 auto;
+    flex: 1 1 0%;
     grid-column: auto;
     min-width: 0;
+    overflow: hidden;
+
+    // Let the status bar grow to fill remaining width in the flex row,
+    // overriding the shared DataTable min-width so it can also shrink on
+    // very narrow screens without forcing the action buttons to wrap.
+    :global([class*='cardStatusBar']) {
+      flex: 1;
+      min-width: 0;
+    }
   }
 
   .container [data-card-section='bottom-action'] {
     margin-left: auto;
     grid-column: auto;
+    flex-shrink: 0;
   }
 }
 
@@ -101,6 +119,12 @@
   gap: 5px;
   min-width: 90px;
   max-width: 140px;
+
+  @media (max-width: 767px) {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+  }
 }
 
 .statusTrack {
@@ -121,6 +145,8 @@
   font-weight: 600;
   color: var(--blue-400);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 // Per-status fill color overrides
@@ -212,6 +238,30 @@
   font-weight: 600;
 }
 
+// ─── Button Group ─────────────────────────────────────────────────────────────
+
+.buttonGroup {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+
+  @media (max-width: 1280px) {
+    flex-direction: column;
+    gap: 6px;
+    width: 140px;
+
+    > * {
+      width: 100%;
+      justify-content: center;
+    }
+  }
+
+  @media (max-width: 767px) {
+    width: auto;
+    align-items: stretch;
+  }
+}
+
 // ─── Review Button ────────────────────────────────────────────────────────────
 
 .reviewBtn {
@@ -232,8 +282,43 @@
   white-space: nowrap;
   transition: background-color 0.2s ease;
 
+  @media (max-width: 767px) {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
   &:hover {
     background: var(--gray-100);
+    text-decoration: none;
+  }
+}
+
+// ─── Build Quote Button ───────────────────────────────────────────────────────
+
+.buildQuoteBtn {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  background: var(--blue-600);
+  color: #fff;
+  border: 1px solid var(--blue-600);
+  border-radius: 4px;
+  padding: 11px 8px 11px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 14px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+
+  @media (max-width: 767px) {
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+
+  &:hover {
+    background: var(--blue-700);
     text-decoration: none;
   }
 }

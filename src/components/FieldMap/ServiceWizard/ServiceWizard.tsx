@@ -21,7 +21,10 @@ import {
 import { QuoteBuildStep } from './steps/QuoteBuildStep';
 import type { QuoteLineItem, AvailableDiscount } from './steps/QuoteBuildStep';
 import { SalesChecklistStep } from './steps/SalesChecklistStep';
-import type { SalesChecklist, ChecklistResponseGroup } from './steps/SalesChecklistStep';
+import type {
+  SalesChecklist,
+  ChecklistResponseGroup,
+} from './steps/SalesChecklistStep';
 import { ReviewStep } from './steps/ReviewStep';
 import styles from './ServiceWizard.module.scss';
 
@@ -72,13 +75,20 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [isLoadingResume, setIsLoadingResume] = useState(
     Boolean(stopId || leadIdParam)
   );
+  type ResumeStage = 'map' | 'quote' | 'checklist-or-review' | 'review' | null;
+  const [resumeStage, setResumeStage] = useState<ResumeStage>(null);
+  const [isLoadingChecklists, setIsLoadingChecklists] = useState(
+    Boolean(stopId || leadIdParam)
+  );
   const [brandPrimaryColor, setBrandPrimaryColor] = useState<
     string | undefined
   >(undefined);
 
   const [pestIconMap, setPestIconMap] = useState<Record<string, string>>({});
   const [salesChecklists, setSalesChecklists] = useState<SalesChecklist[]>([]);
-  const [checklistResponseGroups, setChecklistResponseGroups] = useState<ChecklistResponseGroup[]>([]);
+  const [checklistResponseGroups, setChecklistResponseGroups] = useState<
+    ChecklistResponseGroup[]
+  >([]);
 
   // Fetch sales checklists
   useEffect(() => {
@@ -89,7 +99,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       .then((data: SalesChecklist[] | null) => {
         setSalesChecklists(data ?? []);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        setIsLoadingChecklists(false);
+      });
   }, [selectedCompany?.id]);
 
   // Fetch brand primary color for stamp icons
@@ -119,7 +132,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   // Fetch pest icon map as soon as company is known
   useEffect(() => {
     if (!selectedCompany?.id) return;
-    fetch(`/api/pest-options/${encodeURIComponent(selectedCompany.id)}?context=fieldmap`)
+    fetch(
+      `/api/pest-options/${encodeURIComponent(selectedCompany.id)}?context=fieldmap`
+    )
       .then(r => r.json())
       .then(
         (data: {
@@ -159,7 +174,10 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
           [customer.first_name, customer.last_name].filter(Boolean).join(' ') ||
           '';
 
-        if (typeof lead.service_address_id === 'string' && lead.service_address_id) {
+        if (
+          typeof lead.service_address_id === 'string' &&
+          lead.service_address_id
+        ) {
           setServiceAddressId(lead.service_address_id);
         }
         const addressFromCustomer = [
@@ -230,48 +248,74 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         }
 
         const lineItems: any[] = quoteData?.data?.line_items ?? [];
+        const quoteStatus: string = quoteData?.data?.quote_status ?? 'draft';
+        const hasChecklistResponses =
+          Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+          quoteData.data.safety_checklist_responses.length > 0 &&
+          Array.isArray(quoteData.data.safety_checklist_responses[0]?.responses);
+
         if (lineItems.length > 0) {
           setQuoteLineItems(
             lineItems.map((item: any): QuoteLineItem => {
+              const catalogItemKind: QuoteLineItem['catalogItemKind'] =
+                item.service_plan_id && !item.parent_line_item_id
+                  ? 'plan'
+                  : item.service_plan_id && item.parent_line_item_id
+                    ? 'specialty-line'
+                    : item.addon_service_id
+                      ? 'addon'
+                      : item.bundle_plan_id
+                        ? 'bundle'
+                        : item.product_id
+                          ? 'product'
+                          : item.parent_line_item_id
+                            ? 'specialty-line'
+                            : undefined;
               const catalogItemId =
-                item.service_plan_id ??
+                (item.service_plan_id && !item.parent_line_item_id
+                  ? item.service_plan_id
+                  : null) ??
                 item.addon_service_id ??
                 item.bundle_plan_id ??
+                item.product_id ??
                 undefined;
-              const catalogItemKind: QuoteLineItem['catalogItemKind'] =
-                item.service_plan_id
-                  ? 'plan'
-                  : item.addon_service_id
-                    ? 'addon'
-                    : item.bundle_plan_id
-                      ? 'bundle'
-                      : undefined;
               return {
                 id: item.id,
                 type: catalogItemId ? 'plan-addon' : 'custom',
                 catalogItemKind,
                 catalogItemId,
                 catalogItemName: item.plan_name,
+                customName: item.plan_name,
                 coveredPestIds: [],
                 coveredPestLabels: [],
-                initialCost:
-                  item.final_initial_price ?? item.initial_price ?? null,
-                recurringCost:
-                  item.final_recurring_price ?? item.recurring_price ?? null,
+                initialCost: item.initial_price ?? null,
+                recurringCost: item.recurring_price ?? null,
                 frequency: item.billing_frequency ?? null,
+                parentLineItemId: item.parent_line_item_id ?? undefined,
+                quantity: item.quantity ?? null,
+                isRecommended:
+                  item.is_recommended === null
+                    ? undefined
+                    : item.is_recommended,
                 isSelected: item.is_selected ?? true,
               };
             })
           );
-          setCurrentStep(4);
-          setMaxStepReached(4);
+          if (quoteStatus !== 'draft') {
+            setResumeStage(hasChecklistResponses ? 'review' : 'checklist-or-review');
+          } else {
+            setResumeStage('quote');
+          }
+        } else if (quoteData?.data?.id) {
+          setResumeStage('quote');
         } else {
-          setCurrentStep(2);
-          setMaxStepReached(2);
+          setResumeStage('map');
         }
 
         if (quoteData?.data?.applied_discount) {
-          setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+          setAppliedDiscount(
+            quoteData.data.applied_discount as AvailableDiscount
+          );
         }
         if (
           Array.isArray(quoteData?.data?.safety_checklist_responses) &&
@@ -280,7 +324,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         ) {
           setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
         }
-        setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+        setQuoteSubtotalInitial(
+          quoteData?.data?.subtotal_initial_price ?? null
+        );
         setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
         setLeadId(directLeadId);
         if (quoteData?.data?.id) setQuoteId(quoteData.data.id);
@@ -381,21 +427,30 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
 
             const lineItems: any[] = (quoteData?.data?.line_items ?? [])
               .slice()
-              .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+              .sort(
+                (a: any, b: any) =>
+                  (a.display_order ?? 0) - (b.display_order ?? 0)
+              );
             const quoteStatus: string =
               quoteData?.data?.quote_status ?? 'draft';
 
             if (quoteData?.data?.applied_discount) {
-              setAppliedDiscount(quoteData.data.applied_discount as AvailableDiscount);
+              setAppliedDiscount(
+                quoteData.data.applied_discount as AvailableDiscount
+              );
             }
-            setQuoteSubtotalInitial(quoteData?.data?.subtotal_initial_price ?? null);
+            setQuoteSubtotalInitial(
+              quoteData?.data?.subtotal_initial_price ?? null
+            );
             setQuoteTotalInitial(quoteData?.data?.total_initial_price ?? null);
 
             if (
               Array.isArray(quoteData?.data?.safety_checklist_responses) &&
               quoteData.data.safety_checklist_responses.length > 0
             ) {
-              setChecklistResponseGroups(quoteData.data.safety_checklist_responses);
+              setChecklistResponseGroups(
+                quoteData.data.safety_checklist_responses
+              );
             }
 
             if (lineItems.length > 0) {
@@ -416,7 +471,9 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                                 ? 'specialty-line'
                                 : undefined;
                   const catalogItemId =
-                    (item.service_plan_id && !item.parent_line_item_id ? item.service_plan_id : null) ??
+                    (item.service_plan_id && !item.parent_line_item_id
+                      ? item.service_plan_id
+                      : null) ??
                     item.addon_service_id ??
                     item.bundle_plan_id ??
                     item.product_id ??
@@ -435,26 +492,28 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
                     frequency: item.billing_frequency ?? null,
                     parentLineItemId: item.parent_line_item_id ?? undefined,
                     quantity: item.quantity ?? null,
-                    isRecommended: item.is_recommended === null ? undefined : item.is_recommended,
+                    isRecommended:
+                      item.is_recommended === null
+                        ? undefined
+                        : item.is_recommended,
                     isSelected: item.is_selected ?? true,
                   };
                 })
               );
               if (quoteStatus !== 'draft') {
-                setCurrentStep(4);
-                setMaxStepReached(4);
+                const hasChecklistResponses =
+                  Array.isArray(quoteData?.data?.safety_checklist_responses) &&
+                  quoteData.data.safety_checklist_responses.length > 0;
+                setResumeStage(hasChecklistResponses ? 'review' : 'checklist-or-review');
               } else {
-                setCurrentStep(3);
-                setMaxStepReached(3);
+                setResumeStage('quote');
               }
             } else if (quoteData?.data?.id) {
               // Quote record exists but no items → user already reached the Quote step
-              setCurrentStep(3);
-              setMaxStepReached(3);
+              setResumeStage('quote');
             } else {
               // No quote record at all — resume at Map step
-              setCurrentStep(2);
-              setMaxStepReached(2);
+              setResumeStage('map');
             }
 
             setLeadId(stopData.leadId);
@@ -474,8 +533,12 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const [quoteLineItems, setQuoteLineItems] = useState<QuoteLineItem[]>([]);
   const [appliedDiscount, setAppliedDiscount] =
     useState<AvailableDiscount | null>(null);
-  const [quoteSubtotalInitial, setQuoteSubtotalInitial] = useState<number | null>(null);
-  const [quoteTotalInitial, setQuoteTotalInitial] = useState<number | null>(null);
+  const [quoteSubtotalInitial, setQuoteSubtotalInitial] = useState<
+    number | null
+  >(null);
+  const [quoteTotalInitial, setQuoteTotalInitial] = useState<number | null>(
+    null
+  );
   const [notes, setNotes] = useState('');
   const [returnToReviewAfterMapEdit, setReturnToReviewAfterMapEdit] =
     useState(false);
@@ -509,6 +572,40 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
   const QUOTE_STEP = 3;
   const CHECKLIST_STEP = hasChecklists ? 4 : -1;
   const REVIEW_STEP = hasChecklists ? 5 : 4;
+
+  // Resolve semantic resume stage to an actual step index once all async data is loaded
+  useEffect(() => {
+    if (resumeStage === null) return;
+    if (isLoadingResume || isLoadingChecklists) return;
+
+    let step: number;
+    switch (resumeStage) {
+      case 'review':
+        step = REVIEW_STEP;
+        break;
+      case 'checklist-or-review':
+        step = hasChecklists ? CHECKLIST_STEP : REVIEW_STEP;
+        break;
+      case 'quote':
+        step = QUOTE_STEP;
+        break;
+      case 'map':
+      default:
+        step = 2;
+    }
+
+    setCurrentStep(step);
+    setMaxStepReached(step);
+    setResumeStage(null); // clear so it only fires once
+  }, [
+    resumeStage,
+    isLoadingResume,
+    isLoadingChecklists,
+    hasChecklists,
+    CHECKLIST_STEP,
+    REVIEW_STEP,
+    QUOTE_STEP,
+  ]);
 
   const selectedAddressFromComponents =
     mapPlotData.addressComponents &&
@@ -623,8 +720,13 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
         if (currentStep === CHECKLIST_STEP) {
           // Allow advance if no applicable checklists (will be auto-skipped in handleNext)
           if (applicableChecklists.length === 0) return true;
-          const allResponses = checklistResponseGroups.flatMap(g => Array.isArray(g.responses) ? g.responses : []);
-          return allResponses.length > 0 && allResponses.every(r => r != null && r.answer !== '');
+          const allResponses = checklistResponseGroups.flatMap(g =>
+            Array.isArray(g.responses) ? g.responses : []
+          );
+          return (
+            allResponses.length > 0 &&
+            allResponses.every(r => r != null && r.answer !== '')
+          );
         }
         if (currentStep === REVIEW_STEP) return true;
         return false;
@@ -973,7 +1075,7 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     );
   }
 
-  if (isLoadingResume) {
+  if (isLoadingResume || resumeStage !== null) {
     return (
       <div className={styles.wizard}>
         <div className={styles.geocodingState}>
@@ -988,62 +1090,72 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
     <div className={styles.wizard}>
       {/* Header */}
       <div className={styles.header}>
-        <button
-          type="button"
-          className={styles.backBtn}
-          onClick={() => setShowExitConfirm(true)}
-          aria-label="Close"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            aria-hidden="true"
+        <div className={styles.headerInner}>
+          <button
+            type="button"
+            className={styles.backBtn}
+            onClick={() => setShowExitConfirm(true)}
+            aria-label="Close"
           >
-            <path
-              d="M13 1L1 13M1 1L13 13"
-              stroke="white"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-        <div className={styles.headerGrid}>
-          <div className={styles.headerInfo}>
-            <p className={styles.headerTitle}>
-              {clientInfo.name || 'New Inspection'}
-            </p>
-            {inspectionAddress && (
-              <p className={styles.headerSub}>{inspectionAddress}</p>
-            )}
-          </div>
-          <div className={styles.stepTrack}>
-            {STEP_LABELS.map((label, i) => {
-              const isDone = i < maxStepReached;
-              const isActive = i === maxStepReached;
-              const isViewing = i === currentStep && i < maxStepReached;
-              const isClickable = i <= maxStepReached;
-              return (
-                <div key={i} className={styles.stepTrackItem}>
-                  {i > 0 && <div className={styles.stepLine} />}
-                  {isClickable ? (
-                    <button
-                      type="button"
-                      className={`${styles.stepLabel} ${isActive ? styles.stepLabelActive : isDone ? styles.stepLabelDone : ''} ${isViewing ? styles.stepLabelViewing : ''}`}
-                      onClick={() => setCurrentStep(i)}
-                    >
-                      {isDone && <Check size={11} strokeWidth={2.5} />}
-                      {label}
-                    </button>
-                  ) : (
-                    <div className={styles.stepLabel}>{label}</div>
-                  )}
-                </div>
-              );
-            })}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="14"
+              height="14"
+              viewBox="0 0 14 14"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M13 1L1 13M1 1L13 13"
+                stroke="white"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <div className={styles.headerGrid}>
+            <div className={styles.headerInfo}>
+              <p className={styles.headerTitle}>
+                {clientInfo.name || 'New Inspection'}
+              </p>
+              {inspectionAddress && (
+                <p className={styles.headerSub}>{inspectionAddress}</p>
+              )}
+            </div>
+            <div className={styles.stepTrack}>
+              {STEP_LABELS.map((label, i) => {
+                const isDone = i < maxStepReached;
+                const isActive = i === maxStepReached;
+                const isViewing = i === currentStep && i < maxStepReached;
+                const isClickable = i <= maxStepReached;
+                return (
+                  <div key={i} className={styles.stepTrackItem}>
+                    {i > 0 && <div className={styles.stepLine} />}
+                    {isClickable ? (
+                      <button
+                        type="button"
+                        className={`${styles.stepLabel} ${isActive ? styles.stepLabelActive : isDone ? styles.stepLabelDone : ''} ${isViewing ? styles.stepLabelViewing : ''}`}
+                        onClick={() => setCurrentStep(i)}
+                      >
+                        {isDone && <Check size={11} strokeWidth={2.5} />}
+                        {label}
+                      </button>
+                    ) : (
+                      <div className={styles.stepLabel}>{label}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className={styles.stepTrackCompact}>
+              <span className={styles.stepTrackCompactLabel}>
+                {STEP_LABELS[currentStep]}
+              </span>
+              <span className={styles.stepTrackCompactCount}>
+                Step {currentStep + 1} / {STEP_COUNT}
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -1068,52 +1180,60 @@ export function ServiceWizard({ stopId }: ServiceWizardProps) {
       {/* Address step footer */}
       {currentStep === 0 && (
         <div className={styles.footer}>
-          {stepSaveError && (
-            <p className={styles.stepSaveError}>{stepSaveError}</p>
-          )}
-          <button
-            type="button"
-            className={styles.prevBtn}
-            onClick={handleBack}
-            aria-label="Previous step"
-          >
-            <ArrowLeft size={18} className={styles.prevArrow} />
-            Previous
-          </button>
-          <button
-            type="button"
-            className={styles.nextBtn}
-            onClick={handleNext}
-            disabled={!canAdvance()}
-          >
-            Continue
-          </button>
+          <div className={styles.footerInnerWrapper}>
+            {stepSaveError && (
+              <p className={styles.stepSaveError}>{stepSaveError}</p>
+            )}
+            <button
+              type="button"
+              className={styles.prevBtn}
+              onClick={handleBack}
+              aria-label="Previous step"
+            >
+              <ArrowLeft size={18} className={styles.prevArrow} />
+              Previous
+            </button>
+            <button
+              type="button"
+              className={styles.nextBtn}
+              onClick={handleNext}
+              disabled={!canAdvance()}
+            >
+              Continue
+            </button>
+          </div>
         </div>
       )}
 
       {/* Footer — hidden on map step (toolbar is inside canvas) and finalize step */}
       {currentStep !== 0 && currentStep !== 2 && !isLastStep && (
         <div className={styles.footer}>
-          {stepSaveError && (
-            <p className={styles.stepSaveError}>{stepSaveError}</p>
-          )}
-          <button
-            type="button"
-            className={styles.prevBtn}
-            onClick={handleBack}
-            aria-label="Previous step"
-          >
-            <ArrowLeft size={18} className={styles.prevArrow} />
-            Previous
-          </button>
-          <button
-            type="button"
-            className={styles.nextBtn}
-            onClick={handleNext}
-            disabled={!canAdvance() || isSavingStep}
-          >
-            {isSavingStep ? 'Saving\u2026' : isLastStep ? 'Finish' : 'Continue'}
-          </button>
+          <div className={styles.footerInnerWrapper}>
+            {stepSaveError && (
+              <p className={styles.stepSaveError}>{stepSaveError}</p>
+            )}
+            <button
+              type="button"
+              className={styles.prevBtn}
+              onClick={handleBack}
+              aria-label="Previous step"
+            >
+              <ArrowLeft size={18} className={styles.prevArrow} />
+              Previous
+            </button>
+            <button
+              type="button"
+              className={styles.nextBtn}
+              onClick={handleNext}
+              disabled={!canAdvance() || isSavingStep}
+            >
+              {isSavingStep
+                ? 'Saving\u2026'
+                : isLastStep
+                  ? 'Finish'
+                  : 'Continue'}
+            </button>
+          </div>
         </div>
       )}
       {/* Exit confirmation modal */}
