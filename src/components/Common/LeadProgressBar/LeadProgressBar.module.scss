@@ -99,6 +99,7 @@ button.step {
 .completedLabel {
   font-size: 13px;
   font-weight: 600;
+  margin-right: 8px;
   color: var(--blue-500);
   white-space: nowrap;
 }
@@ -116,6 +117,26 @@ button.step {
   background: transparent;
   color: var(--slate-400);
   user-select: none;
+}
+
+button.statusChip {
+  font-family: inherit;
+}
+
+.statusChipInteractive {
+  cursor: pointer;
+  transition:
+    opacity 0.15s ease,
+    filter 0.15s ease;
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.92);
+    border-color: var(--gray-400);
+  }
+
+  &:disabled {
+    cursor: default;
+  }
 }
 
 .lostActive {

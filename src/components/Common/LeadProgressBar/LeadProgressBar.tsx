@@ -86,16 +86,34 @@ export function LeadProgressBar({ leadStatus, onStatusChange }: LeadProgressBarP
       </span>
 
       <div className={styles.actionsWrapper}>
-        <span
-          className={`${styles.statusChip} ${leadStatus === 'lost' ? styles.lostActive : ''}`}
-        >
-          Lost
-        </span>
-        <span
-          className={`${styles.statusChip} ${leadStatus === 'won' ? styles.wonActive : ''}`}
-        >
-          Won
-        </span>
+        {interactive && onStatusChange ? (
+          <button
+            type="button"
+            className={`${styles.statusChip} ${leadStatus === 'lost' ? styles.lostActive : ''} ${styles.statusChipInteractive}`}
+            onClick={() => onStatusChange('lost')}
+            disabled={leadStatus === 'lost'}
+          >
+            Lost
+          </button>
+        ) : (
+          <span className={`${styles.statusChip} ${leadStatus === 'lost' ? styles.lostActive : ''}`}>
+            Lost
+          </span>
+        )}
+        {interactive && onStatusChange ? (
+          <button
+            type="button"
+            className={`${styles.statusChip} ${leadStatus === 'won' ? styles.wonActive : ''} ${styles.statusChipInteractive}`}
+            onClick={() => onStatusChange('won')}
+            disabled={leadStatus === 'won'}
+          >
+            Won
+          </button>
+        ) : (
+          <span className={`${styles.statusChip} ${leadStatus === 'won' ? styles.wonActive : ''}`}>
+            Won
+          </span>
+        )}
       </div>
     </div>
   );
