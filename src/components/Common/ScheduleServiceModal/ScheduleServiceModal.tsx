@@ -124,7 +124,7 @@ export function ScheduleServiceModal({
         <div className={styles.header}>
           <h2 className={styles.title}>Ready to Schedule</h2>
           <p className={styles.subtitle}>
-            All the details of the customer for PestPac
+            All the details of the customer
           </p>
         </div>
 

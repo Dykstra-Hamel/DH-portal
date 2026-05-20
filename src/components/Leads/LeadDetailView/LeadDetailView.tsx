@@ -90,7 +90,7 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   const [showMarkAsJunkModal, setShowMarkAsJunkModal] = useState(false);
   const [showCustomerCardModal, setShowCustomerCardModal] = useState(false);
   const [pendingStatusChange, setPendingStatusChange] = useState<{
-    target: 'new' | 'in_process' | 'quoted' | 'scheduling';
+    target: 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost';
     title: string;
     message: string;
   } | null>(null);
@@ -1243,7 +1243,6 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
   const handleProgressBarStatusClick = useCallback(
     (target: 'new' | 'in_process' | 'quoted' | 'scheduling' | 'won' | 'lost') => {
       if (!lead) return;
-      if (target === 'won' || target === 'lost') return;
       if (target === lead.lead_status) return;
 
       const STATUS_ORDER = ['new', 'in_process', 'quoted', 'scheduling'];
@@ -1253,7 +1252,15 @@ export function LeadDetailView({ leadId, baseRoute }: LeadDetailViewProps) {
 
       let confirm: { title: string; message: string } | null = null;
 
-      if (target === 'quoted') {
+      if (target === 'won') {
+        confirm = {
+          title: 'Mark lead as Won?',
+          message: 'This marks the lead as won. You can update the status again at any time.',
+        };
+      } else if (target === 'lost') {
+        setShowNotInterestedModal(true);
+        return;
+      } else if (target === 'quoted') {
         confirm = {
           title: 'Move lead to Quoted?',
           message:
