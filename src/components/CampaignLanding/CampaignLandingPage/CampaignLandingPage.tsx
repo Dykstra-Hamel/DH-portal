@@ -142,6 +142,7 @@ interface CampaignLandingPageProps {
     };
     redemptionCard: {
       heading: string | null;
+      subheading: string | null;
       disclaimer: string | null;
     };
     branding: {
@@ -389,6 +390,7 @@ export default function CampaignLandingPage({
                 landingPage={{
                   redemptionCard: {
                     heading: landingPage.redemptionCard.heading || undefined,
+                    subheading: landingPage.redemptionCard.subheading || undefined,
                     disclaimer: landingPage.redemptionCard.disclaimer || undefined,
                   },
                 }}

@@ -51,6 +51,7 @@ interface InlineRedemptionCardProps {
   landingPage?: {
     redemptionCard?: {
       heading?: string;
+      subheading?: string;
       disclaimer?: string;
     };
   };
@@ -125,6 +126,14 @@ export default function InlineRedemptionCard({
     [disclaimerText, variableContext]
   );
 
+  // Process subheading with variables
+  const defaultSubheading = 'When do you want us to get started?';
+  const subheadingText = landingPage?.redemptionCard?.subheading || defaultSubheading;
+  const processedSubheading = useMemo(
+    () => processTextWithVariables(subheadingText, variableContext),
+    [subheadingText, variableContext]
+  );
+
   const handleRedeemClick = async () => {
     let selectedAddonIds: string[] = [];
     let selectedServicePlanId: string | undefined;
@@ -163,7 +172,10 @@ export default function InlineRedemptionCard({
         dangerouslySetInnerHTML={{ __html: processedHeading }}
       />
 
-      <h3 className={styles.subheading}>When do you want us to get started?</h3>
+      <h3
+        className={styles.subheading}
+        dangerouslySetInnerHTML={{ __html: processedSubheading }}
+      />
 
       <div className={styles.inputGrid}>
         {/* Start Date Input */}
