@@ -544,13 +544,16 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
           }
         );
 
+        const responseBody = await response.text();
         if (response.ok) {
           console.log(
-            `[External Webhook] Successfully sent payload for call ${call_id}`
+            `[External Webhook] Successfully sent payload for call ${call_id}. Tadabase response:`,
+            responseBody
           );
         } else {
           console.warn(
-            `[External Webhook] Failed to send payload for call ${call_id}: ${response.status} ${response.statusText}`
+            `[External Webhook] Failed to send payload for call ${call_id}: ${response.status} ${response.statusText}. Body:`,
+            responseBody
           );
         }
       } catch (error) {
