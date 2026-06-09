@@ -67,6 +67,7 @@ export default function EditLandingPageModal({
     footer_links: [],
     terms_content: '',
     redemption_card_heading: '',
+    redemption_card_subheading: '',
     override_logo_url: '',
     override_primary_color: '',
     override_secondary_color: '',
@@ -150,6 +151,7 @@ export default function EditLandingPageModal({
             footer_links: [],
             terms_content: '',
             redemption_card_heading: '',
+            redemption_card_subheading: '',
             override_logo_url: '',
             override_primary_color: '',
             override_secondary_color: '',
@@ -237,6 +239,7 @@ export default function EditLandingPageModal({
 
         // Redemption Card
         redemption_card_heading: apiData.landingPage.redemptionCard?.heading || '',
+        redemption_card_subheading: apiData.landingPage.redemptionCard?.subheading || '',
 
         // Branding overrides
         override_logo_url: apiData.landingPage.branding.logoUrl || '',
