@@ -563,6 +563,7 @@ export async function GET(
       },
       redemptionCard: {
         heading: landingPageData?.redemption_card_heading || null,
+        subheading: landingPageData?.redemption_card_subheading || null,
         disclaimer: landingPageData?.redemption_card_disclaimer || null,
       },
       thankYou: {
@@ -823,6 +824,7 @@ export async function POST(
 
         // Redemption Card
         redemption_card_heading: body.redemption_card_heading || null,
+        redemption_card_subheading: body.redemption_card_subheading || null,
 
         // Thank You Page
         thankyou_greeting: body.thankyou_greeting || 'Thanks {first_name}!',
@@ -1039,6 +1041,7 @@ export async function PUT(
 
     // Redemption Card
     if (body.redemption_card_heading !== undefined) updateData.redemption_card_heading = body.redemption_card_heading;
+    if (body.redemption_card_subheading !== undefined) updateData.redemption_card_subheading = body.redemption_card_subheading;
 
     // Thank You Page
     if (body.thankyou_greeting !== undefined) updateData.thankyou_greeting = body.thankyou_greeting;

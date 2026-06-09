@@ -71,6 +71,7 @@ export interface LandingPageFormData {
 
   // Redemption Card
   redemption_card_heading: string;
+  redemption_card_subheading: string;
 
   // Brand Overrides
   override_logo_url: string;
@@ -1094,6 +1095,21 @@ export default function CampaignLandingPageEditorStep({
               <p className={styles.helpText}>
                 Pricing variables like {'{original_price}'}, {'{display_price}'}, and {'{savings}'}
                 will be automatically styled (strikethrough for original price, highlight for display price/savings).
+              </p>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Redemption Card Subheading</label>
+              <input
+                type="text"
+                value={data.redemption_card_subheading}
+                onChange={(e) => updateField('redemption_card_subheading', e.target.value)}
+                placeholder="When do you want us to get started?"
+                className={styles.input}
+              />
+              <p className={styles.helpText}>
+                Shown above the date and time inputs. Leave blank to use the default
+                (&quot;When do you want us to get started?&quot;). Variables like {'{first_name}'} are supported.
               </p>
             </div>
 

@@ -134,6 +134,7 @@ interface CampaignData {
     };
     redemptionCard: {
       heading: string | null;
+      subheading: string | null;
       disclaimer: string | null;
     };
     branding: {
