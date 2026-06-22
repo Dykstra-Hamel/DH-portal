@@ -122,6 +122,9 @@ export async function DELETE(
     // broadcast_project_task_to_projects, broadcast_project_task_comment_change). Those
     // functions reference tables without schema qualification and can fail with
     // "relation does not exist" when the session search_path is empty (PostgREST default).
+    await supabase.from('email_template_library').update({ created_by: null }).eq('created_by', userId);
+    // _deprecated_lead_activity_log.user_id is NOT NULL so the FK cascade cannot SET NULL — delete rows instead
+    await supabase.from('_deprecated_lead_activity_log').delete().eq('user_id', userId);
     await supabase.from('project_tasks').update({ assigned_to: null }).eq('assigned_to', userId);
     await supabase.from('project_tasks').update({ created_by: null }).eq('created_by', userId);
     await supabase.from('project_task_comments').update({ user_id: null }).eq('user_id', userId);
