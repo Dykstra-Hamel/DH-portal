@@ -101,7 +101,7 @@ export async function DELETE(
 
     // NULL out RESTRICT FK columns that reference auth.users directly.
     // Log any errors so we can discover missing tables/columns without failing the deletion.
-    const prereqs: Array<{ label: string; promise: Promise<{ error: unknown }> }> = [
+    const prereqs: Array<{ label: string; promise: PromiseLike<{ error: unknown }> }> = [
       { label: 'widget_domains.created_by',            promise: supabase.from('widget_domains').update({ created_by: null }).eq('created_by', userId) },
       { label: 'widget_domains.updated_by',            promise: supabase.from('widget_domains').update({ updated_by: null }).eq('updated_by', userId) },
       { label: 'system_settings.created_by',           promise: supabase.from('system_settings').update({ created_by: null }).eq('created_by', userId) },
