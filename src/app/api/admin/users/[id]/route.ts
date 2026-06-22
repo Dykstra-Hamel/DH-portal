@@ -128,11 +128,16 @@ export async function DELETE(
       { label: 'reusable_contact_lists.added_by',      promise: supabase.from('reusable_contact_lists').update({ added_by: null }).eq('added_by', userId) },
       { label: 'reusable_contact_lists.assigned_by',   promise: supabase.from('reusable_contact_lists').update({ assigned_by: null }).eq('assigned_by', userId) },
       { label: 'ab_test_campaigns.created_by',         promise: supabase.from('ab_test_campaigns').update({ created_by: null }).eq('created_by', userId) },
+      // storage.objects.owner references auth.users — null it out so Supabase storage doesn't block deleteUser
+      { label: 'storage.objects.owner',               promise: supabase.schema('storage').from('objects').update({ owner: null }).eq('owner', userId) },
     ];
 
     const results = await Promise.all(prereqs.map(async ({ label, promise }) => {
       const { error } = await promise;
-      if (error) console.error(`Pre-delete cleanup error [${label}]:`, error);
+      if (error) {
+        const e = error as { message?: string; code?: string; details?: string; hint?: string };
+        console.error(`Pre-delete cleanup error [${label}]:`, { message: e.message, code: e.code, details: e.details, hint: e.hint });
+      }
       return { label, error };
     }));
 
