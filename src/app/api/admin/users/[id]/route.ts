@@ -123,13 +123,13 @@ export async function DELETE(
       { label: 'project_task_comments.user_id',        promise: supabase.from('project_task_comments').update({ user_id: null }).eq('user_id', userId) },
       { label: 'project_task_templates.created_by',    promise: supabase.from('project_task_templates').update({ created_by: null }).eq('created_by', userId) },
       { label: 'project_templates.created_by',         promise: supabase.from('project_templates').update({ created_by: null }).eq('created_by', userId) },
-      { label: 'admin_template_library.created_by',    promise: supabase.from('admin_template_library').update({ created_by: null }).eq('created_by', userId) },
       { label: 'reusable_contact_lists.created_by',    promise: supabase.from('reusable_contact_lists').update({ created_by: null }).eq('created_by', userId) },
       { label: 'reusable_contact_lists.added_by',      promise: supabase.from('reusable_contact_lists').update({ added_by: null }).eq('added_by', userId) },
       { label: 'reusable_contact_lists.assigned_by',   promise: supabase.from('reusable_contact_lists').update({ assigned_by: null }).eq('assigned_by', userId) },
       { label: 'ab_test_campaigns.created_by',         promise: supabase.from('ab_test_campaigns').update({ created_by: null }).eq('created_by', userId) },
-      // storage.objects.owner references auth.users — null it out so Supabase storage doesn't block deleteUser
-      { label: 'storage.objects.owner',               promise: supabase.schema('storage').from('objects').update({ owner: null }).eq('owner', userId) },
+      // storage.objects.owner/owner_id reference auth.users with RESTRICT. PostgREST blocks
+      // direct access to the storage schema (PGRST106), so we call an RPC instead.
+      { label: 'storage.objects.owner',               promise: supabase.rpc('clear_user_storage_owner', { p_user_id: userId }) },
     ];
 
     const results = await Promise.all(prereqs.map(async ({ label, promise }) => {
