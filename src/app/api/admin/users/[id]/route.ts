@@ -148,30 +148,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Failed to delete user profile' }, { status: 500 });
     }
 
-    // Diagnostic: log any remaining FK blockers before attempting deleteUser
-    const { data: blockers } = await supabase.rpc('find_auth_user_fk_blockers', { p_user_id: userId });
-    if (blockers && blockers.length > 0) {
-      console.error('FK blockers still referencing auth user before deleteUser:', blockers);
+    // Hard-delete the auth user via a SECURITY DEFINER RPC that pre-cleans
+    // auth-schema tables and then deletes auth.users directly. This bypasses
+    // GoTrue's adminDeleteUser, which fails with unexpected_failure when its
+    // own internal pre-cleanup sequence hits a schema mismatch.
+    const { data: deleteResult, error: deleteRpcError } = await supabase.rpc('admin_hard_delete_auth_user', { p_user_id: userId });
+
+    if (deleteRpcError) {
+      console.error('admin_hard_delete_auth_user RPC error:', deleteRpcError);
+      return NextResponse.json(
+        { error: 'Failed to delete user from authentication' },
+        { status: 500 }
+      );
     }
 
-    // Pre-clean auth schema tables that GoTrue may not handle (e.g. auth.flow_state)
-    const { error: authCleanupError } = await supabase.rpc('cleanup_auth_user_before_delete', { p_user_id: userId });
-    if (authCleanupError) {
-      console.error('Auth schema pre-cleanup error:', authCleanupError);
-    }
-
-    // Diagnostic: dry-run the actual DELETE FROM auth.users to surface any remaining blocker
-    const { data: deleteCheck, error: deleteCheckError } = await supabase.rpc('diagnose_auth_user_delete', { p_user_id: userId });
-    if (deleteCheckError) {
-      console.error('diagnose_auth_user_delete RPC error:', deleteCheckError);
-    }
-    console.error('diagnose_auth_user_delete result:', deleteCheck);
-
-    // Finally, delete user from auth
-    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
-
-    if (deleteError) {
-      console.error('Auth deleteUser error:', deleteError);
+    if (deleteResult !== 'OK') {
+      console.error('admin_hard_delete_auth_user returned:', deleteResult);
       return NextResponse.json(
         { error: 'Failed to delete user from authentication' },
         { status: 500 }
