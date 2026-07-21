@@ -107,6 +107,7 @@ export interface DataTableProps<T> {
 
   // Sorting
   defaultSort?: SortConfig; // Default sort configuration
+  pinnedSortFn?: (a: T, b: T) => number; // Always applied as the primary sort before any column sort
 
   // Toast integration
   onShowToast?: (message: string) => void;

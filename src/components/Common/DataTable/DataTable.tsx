@@ -55,6 +55,7 @@ export default function DataTable<T>({
   cardView,
   cardBreakpoint = 1280,
   defaultSort,
+  pinnedSortFn,
   onShowToast,
   // Callbacks
   onTabChange,
@@ -69,6 +70,10 @@ export default function DataTable<T>({
   const [sortConfig, setSortConfig] = useState<SortConfig | null>(
     defaultSort || null
   );
+  // Tracks whether the user has explicitly clicked a column header to sort.
+  // When false, pinnedSortFn (e.g. urgent-first) still applies alongside defaultSort.
+  // When true, the user's chosen sort takes full control.
+  const [userHasSorted, setUserHasSorted] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
 
@@ -154,6 +159,10 @@ export default function DataTable<T>({
           newSort = null; // Clear sort
         }
 
+        // Track whether the user has actively chosen a sort column.
+        // Cleared back to false when the user cycles back to no sort.
+        setUserHasSorted(newSort !== null);
+
         return newSort;
       });
 
@@ -182,12 +191,51 @@ export default function DataTable<T>({
 
   // Sort data based on current sort configuration
   const sortedData = useMemo(() => {
-    if (!sortConfig) return searchedData;
+    // User has explicitly clicked a column — their sort takes full control
+    if (userHasSorted && sortConfig) {
+      return [...searchedData].sort((a, b) => {
+        const modifier = sortConfig.direction === 'asc' ? 1 : -1;
+
+        const column = columns.find(
+          col => col.sortKey === sortConfig.key || col.key === sortConfig.key
+        );
+        const sortKey = column?.sortKey || sortConfig.key;
+
+        const getNestedValue = (obj: any, path: string): any =>
+          path.split('.').reduce((current, key) => current?.[key], obj);
+
+        const aValue = getNestedValue(a, String(sortKey));
+        const bValue = getNestedValue(b, String(sortKey));
+
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return aValue.localeCompare(bValue) * modifier;
+        }
+        if (typeof aValue === 'number' && typeof bValue === 'number') {
+          return (aValue - bValue) * modifier;
+        }
+        if (aValue instanceof Date && bValue instanceof Date) {
+          return (aValue.getTime() - bValue.getTime()) * modifier;
+        }
+        const aStr = String(aValue || '');
+        const bStr = String(bValue || '');
+        return aStr.localeCompare(bStr) * modifier;
+      });
+    }
+
+    // Default state (page load / sort cleared) — pinnedSortFn wins, defaultSort as tiebreaker
+    if (!pinnedSortFn && !sortConfig) return searchedData;
 
     return [...searchedData].sort((a, b) => {
+      if (pinnedSortFn) {
+        const pinnedResult = pinnedSortFn(a, b);
+        if (pinnedResult !== 0) return pinnedResult;
+      }
+
+      if (!sortConfig) return 0;
+
       const modifier = sortConfig.direction === 'asc' ? 1 : -1;
 
-      // Get the column definition to check for custom sort key
+      // Get the column definition to check for a custom sort key
       const column = columns.find(
         col => col.sortKey === sortConfig.key || col.key === sortConfig.key
       );
@@ -219,7 +267,7 @@ export default function DataTable<T>({
       const bStr = String(bValue || '');
       return aStr.localeCompare(bStr) * modifier;
     });
-  }, [searchedData, sortConfig, columns]);
+  }, [searchedData, sortConfig, columns, pinnedSortFn, userHasSorted]);
 
   const visibleSortedData = useMemo(() => {
     if (
