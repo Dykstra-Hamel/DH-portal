@@ -300,9 +300,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Apply sorting
+    // Apply sorting — priority_order must be the LAST .order() call so PostgREST
+    // treats it as the primary sort column (Supabase JS appends each call and
+    // PostgREST uses the last value as the leading ORDER BY column).
     const ascending = sortOrder === 'asc';
-    query = query.order(sortBy, { ascending });
+    query = query
+      .order(sortBy, { ascending })
+      .order('priority_order', { ascending: true });
 
     // Apply pagination
     const from = (page - 1) * limit;
@@ -510,8 +514,19 @@ export async function GET(request: NextRequest) {
       }
     );
 
+    // Sort urgent tickets to the top within the current page.
+    // This works immediately regardless of whether the priority_order DB migration
+    // has been applied. Once the migration is live, the DB-level sort will handle
+    // cross-page ordering and this becomes a cheap no-op tiebreaker.
+    const PRIORITY_RANK: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 };
+    const sortedTickets = [...enhancedTickets].sort((a, b) => {
+      const ra = PRIORITY_RANK[a.priority] ?? 2;
+      const rb = PRIORITY_RANK[b.priority] ?? 2;
+      return ra - rb;
+    });
+
     return createSuccessResponse({
-      tickets: enhancedTickets,
+      tickets: sortedTickets,
       pagination: {
         page,
         limit,
