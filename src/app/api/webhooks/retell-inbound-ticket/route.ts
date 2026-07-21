@@ -730,7 +730,7 @@ async function handleInboundCallAnalyzed(supabase: any, callData: any) {
         call_direction: 'inbound',
         call_record_id: callRecord.id,
         status: 'new',
-        priority: 'medium',
+        priority: extractedData.priority || 'medium',
         branch_id: resolvedBranchId,
         service_type: serviceType,
         pest_type: extractedData.pest_issue,
@@ -1042,6 +1042,7 @@ function extractCallData(
     customer_last_name: null as string | null,
     summary: '',
     action_required: null as string | null,
+    priority: null as string | null,
   };
 
   // Extract from call analysis (Post-Call Analysis) - primary data source
@@ -1082,6 +1083,12 @@ function extractCallData(
     const rawActionRequired = callAnalysis.custom_analysis_data.action_required;
     extractedData.action_required =
       rawActionRequired != null ? String(rawActionRequired) : null;
+
+    // Extract priority from post-call analysis
+    const rawPriority = callAnalysis.custom_analysis_data.priority;
+    if (rawPriority && ['low', 'medium', 'high', 'urgent'].includes(rawPriority)) {
+      extractedData.priority = rawPriority;
+    }
   }
 
   // Extract sentiment and summary from call analysis (highest priority)
@@ -1148,6 +1155,12 @@ function extractCallData(
       const rawRetellActionRequired = retellVariables.action_required;
       extractedData.action_required =
         rawRetellActionRequired != null ? String(rawRetellActionRequired) : null;
+    }
+    if (!extractedData.priority) {
+      const rawRetellPriority = retellVariables.priority;
+      if (rawRetellPriority && ['low', 'medium', 'high', 'urgent'].includes(rawRetellPriority)) {
+        extractedData.priority = rawRetellPriority;
+      }
     }
   }
 

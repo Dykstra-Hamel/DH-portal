@@ -162,7 +162,12 @@ export const getTicketColumns = (
     width: '180px',
     sortable: false,
     render: (ticket: Ticket) => (
-      <span className={styles.nameCell}>{formatCustomerName(ticket)}</span>
+      <span className={styles.nameCell}>
+        {ticket.priority === 'urgent' && (
+          <span className={styles.urgentBadge}>URGENT</span>
+        )}
+        {formatCustomerName(ticket)}
+      </span>
     ),
   },
   {

@@ -58,6 +58,13 @@ function TicketsList({
 }: TicketsListProps) {
   // Tab and search state (managed internally, callbacks notify parent)
   const [activeTab, setActiveTab] = useState('all');
+
+  // Urgent tickets always sort to the top regardless of the active column sort
+  const TICKET_PRIORITY_RANK: Record<string, number> = useMemo(() => ({ urgent: 0, high: 1, medium: 2, low: 3 }), []);
+  const ticketPinnedSort = useCallback(
+    (a: Ticket, b: Ticket) => (TICKET_PRIORITY_RANK[a.priority ?? ''] ?? 2) - (TICKET_PRIORITY_RANK[b.priority ?? ''] ?? 2),
+    [TICKET_PRIORITY_RANK]
+  );
   const [searchQuery, setSearchQuery] = useState('');
 
   // Qualify modal state
@@ -448,6 +455,7 @@ function TicketsList({
         onShowToast={handleShowToast}
         searchEnabled={false}
         defaultSort={defaultSort}
+        pinnedSortFn={ticketPinnedSort}
         // Infinite scroll props
         infiniteScrollEnabled={infiniteScrollEnabled}
         hasMore={hasMore}

@@ -13,6 +13,9 @@ import {
   generateTicketCreatedNotificationTemplate,
   type TicketCreatedNotificationData,
 } from '@/lib/email/templates/ticket-created-notification';
+import {
+  generateUrgentTicketNotificationTemplate,
+} from '@/lib/email/templates/urgent-ticket-notification';
 
 const BASE_URL =
   process.env.NEXT_PUBLIC_SITE_URL ||
@@ -347,6 +350,68 @@ export async function sendTicketCreatedNotification(
 }
 
 /**
+ * Send urgent ticket notification emails. Uses the same notification settings as
+ * ticket_created_notification. Sends a red-header email with call summary included.
+ */
+export async function sendUrgentTicketCreatedNotification(
+  input: TicketNotificationInput & { callSummary?: string }
+): Promise<void> {
+  const { ticketId, companyId, customerName, customerEmail, customerPhone, address, ticketType, callSummary } = input;
+
+  const { enabled, emails } = await getCompanyNotificationSettings(
+    companyId,
+    'ticket_created_notification_enabled',
+    'ticket_created_notification_emails'
+  );
+
+  if (!enabled || emails.length === 0) return;
+
+  const ticketUrl = `${BASE_URL}/tickets/dashboard?ticketId=${ticketId}`;
+
+  const now = new Date().toISOString();
+  const timezone = await getCompanyTimezone(companyId);
+
+  const templateData = {
+    customerName,
+    customerEmail,
+    customerPhone,
+    address,
+    ticketUrl,
+    submittedAt: now,
+    submittedAtDisplay: formatDateForEmail(now, timezone),
+    ticketType,
+    callSummary,
+  };
+
+  const [fromEmail, fromName, tenantName] = await Promise.all([
+    getCompanyFromEmail(companyId),
+    getCompanyName(companyId),
+    getCompanyTenantName(companyId),
+  ]);
+
+  const html = generateUrgentTicketNotificationTemplate(templateData);
+  const subject = `URGENT: New Ticket - ${customerName}`;
+
+  await Promise.all(
+    emails.map((to) =>
+      sendEmailRouted({
+        tenantName,
+        from: fromEmail,
+        fromName,
+        to,
+        subject,
+        html,
+        companyId,
+        source: 'urgent_ticket_notification',
+        tags: ['ticket', 'urgent', 'notification'],
+      }).catch((err) =>
+        console.error(`Urgent ticket notification failed for ${to}:`, err)
+      )
+    )
+  );
+}
+
+/**
  * Fetch-and-send variant for cases (e.g. Retell webhooks) where customer data
  * isn't directly in scope. Looks up the ticket and customer from the DB.
  */
@@ -362,6 +427,8 @@ export async function sendTicketCreatedNotificationByTicketId(
     .select(`
       id,
       type,
+      priority,
+      description,
       customers:customer_id (
         first_name,
         last_name,
@@ -390,7 +457,7 @@ export async function sendTicketCreatedNotificationByTicketId(
     .filter(Boolean)
     .join(', ') || undefined;
 
-  return sendTicketCreatedNotification({
+  const notificationInput: TicketNotificationInput = {
     ticketId,
     companyId,
     customerName,
@@ -398,5 +465,14 @@ export async function sendTicketCreatedNotificationByTicketId(
     customerPhone: customer?.phone || undefined,
     address,
     ticketType: ticketType ?? ticket.type ?? undefined,
-  });
+  };
+
+  await sendTicketCreatedNotification(notificationInput);
+
+  if (ticket.priority === 'urgent') {
+    await sendUrgentTicketCreatedNotification({
+      ...notificationInput,
+      callSummary: ticket.description ?? undefined,
+    });
+  }
 }
